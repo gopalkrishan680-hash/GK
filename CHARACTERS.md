@@ -47,6 +47,16 @@ sirf tab aayega jab story ko uski zaroorat ho, aur wo bhi yahan add hoga.
 - Shuru aur end mein kaali screen par ek line, end mein bada title.
 - Vertical (9:16) video mein text bada: captions ~64px, title ~190px (1080×1920 par).
 
+## Thumbnail style (TEMPER jaisa – har video ke liye same)
+Thumbnail **video ka frame nahi** hoga. Har baar alag se ek "poster" banega:
+- **Background:** Poora kaala (lagbhag `(6, 6, 8)`), koi kamra ya scene nahi.
+- **Glow:** Har character ke peeche uske emotion ke rang ka bada, soft glow (Rohan ka emotion rang, Papa/Maa ka sunehra, wagairah).
+- **Characters:** Bade, poster jaise khade (poora body ya kamar tak), outline glow tez. 1-2 characters, ek bada aur ek chhota/side mein.
+- **Pose:** Simple aur saaf – kamar par haath, haath mein koi cheez (marksheet, phone, trophy) jo kahani batati hai.
+- **Title:** Upar ek ya do shabd, **Montserrat Black**, safed, bada (9:16 mein ~250px, 16:9 mein ~150px), halki kaali shadow. Zaroorat ho to ek shabd/number emotion ke rang mein.
+- **Extra text:** Kam se kam. Kahani wali cheez (jaise "58%") prop ke andar likhi ho, alag caption nahi.
+- **Size:** 16:9 video → 1280×720, 9:16 Shorts → 1080×1920.
+
 ## Ab tak ki videos
 | Video | Format | Rohan ka role |
 |---|---|---|
