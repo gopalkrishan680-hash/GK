@@ -54,7 +54,12 @@ sirf tab aayega jab story ko uski zaroorat ho, aur wo bhi yahan add hoga.
 - Kaale silhouette characters + glow outline, background blur (depth of field).
 - Side mein emotion meter (thermometer jaisa), label Hindi mein (jaise "जलन", "डर").
 - Captions: Hindi (Devanagari) + jo shabd English mein natural lagte hain wo English mein.
-- Caption font: Baloo 2 (bold), narration font: Martel.
+- **Caption style (eye-catching):** Baloo 2 ExtraBold, bade (16:9 Full HD par ~84px, chillane wali lines ~96px),
+  safed akshar + mota kaala outline + shadow. Khaas shabd **peele** mein highlight (chillane wali lines mein **laal**).
+  Upar bolne wale ka **rangeen naam-tag** (PAPA narangi, ROHAN neela, MAA sunehra, MR. KHANNA laal, DADU bhoora).
+  Caption "pop" hokar aata hai; chillane wali lines halki hilti hain aur peeche laal glow hota hai.
+- Narration font: Martel (bada, ~76px).
+- **Walk rule:** Chalte waqt character ki nazar aur jhukaav chalne ki disha mein ho, aur kadmon ki speed aage badhne ki speed se match kare (warna ulta chalna/phisalna lagta hai).
 - Shuru aur end mein kaali screen par ek line, end mein bada title.
 - Vertical (9:16) video mein text bada: captions ~64px, title ~190px (1080×1920 par).
 
