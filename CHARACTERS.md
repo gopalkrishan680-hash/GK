@@ -66,6 +66,7 @@ sirf tab aayega jab story ko uski zaroorat ho, aur wo bhi yahan add hoga.
   Upar bolne wale ka **rangeen naam-tag** (PAPA narangi, ROHAN neela, MAA sunehra, MR. KHANNA laal, DADU bhoora).
   Caption "pop" hokar aata hai; chillane wali lines halki hilti hain aur peeche laal glow hota hai.
 - Narration font: Martel (bada, ~76px).
+- **No-freeze rule:** Koi bhi shot 3 second se zyada bilkul ruka hua nahi hona chahiye (shuru/ant ki kaali screen wali lines chhod kar). Phone screens par bhi kuch chalta rahe – counter, comments, waveform, haath ki halki hilaawat, camera push-in. Har video bhejne se pehle automatic "still check" chalana hai.
 - **Walk rule:** Chalte waqt character ki nazar aur jhukaav chalne ki disha mein ho, aur kadmon ki speed aage badhne ki speed se match kare (warna ulta chalna/phisalna lagta hai).
 - Shuru aur end mein kaali screen par ek line, end mein bada title.
 - Vertical (9:16) video mein text bada: captions ~64px, title ~190px (1080×1920 par).
