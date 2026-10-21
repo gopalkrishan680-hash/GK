@@ -88,7 +88,6 @@ Thumbnail **video ka frame nahi** hoga. Har baar alag se ek "poster" banega:
 | ANGRY PAPA (गुस्सा) | 16:9, 5:03, 1920×1080 | Teenager; Papa ka gussa, Dadu wala flashback, balcony par sulah |
 | BEIZZATI (बेइज़्ज़ती) | 16:9, 5:32, 1920×1080 | College student (B.Com final year); shaadi mein Papa ka mazaak, stage par Papa ke liye khada hota hai |
 | PRANK (प्रैंक) | 16:9, 5:03, 1920×1080 | Chhota YouTube channel "Rohan Vlogs" (312 subscribers); Aman ke saath Papa par fake accident prank, phir video delete karke maafi |
-
 | AJNABI (अजनबी) | 16:9, 4:33, 1920×1080 | PRANK ka sequel; hit-and-run mein bheed video banati hai, Rohan ghayal (Mr. Khanna) ko auto se hospital le jaata hai |
 
 **AJNABI ke baad:** Mr. Khanna ki jaan Rohan ne bachayi; ab Khanna, Papa par chillaate nahi – dono ke beech izzat ka rishta hai. Mr. Khanna scooter chalate hain (laal helmet).
