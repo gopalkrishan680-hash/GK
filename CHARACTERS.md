@@ -35,9 +35,20 @@ sirf tab aayega jab story ko uski zaroorat ho, aur wo bhi yahan add hoga.
 - **Glow:** Garam peela `(222, 205, 170)`. Udaasi mein neela `(150, 170, 215)`.
 - **Rishta:** Rohan ka best friend. Bahar se "perfect life", andar se apni pareshaniyan.
 
+### Dadu (Papa ke Papa)
+- **Look:** Ganja sar, **dono taraf baalon ke gol guchhe**, haath mein **chhadi (walking stick)**, thoda jhuka hua (scale 1.05).
+- **Glow:** Gusse mein laal-narangi `(240, 80, 50)`.
+- **Kahan aate hain:** Flashback mein (sepia rang). Gussail – unka dialogue "पैसे पेड़ पे उगते हैं क्या?!" Papa ne bachpan mein suna tha.
+
+### Young Papa (bachpan ka Papa)
+- **Look:** Chhota (scale 0.62) + **chashma** – taaki pata chale ye Papa hi hain.
+- **Kahan aate hain:** Sirf flashback mein.
+
 ## Side characters (zaroorat padne par)
-- **Boss:** Chashma + flat baal, scale 1.06 (sirf office wali kahaniyon mein).
+- **Boss (Rohan ka):** Chashma + flat baal, scale 1.06 (Rohan ki office wali kahaniyon mein).
+- **Mr. Khanna (Papa ka boss):** Ganja sar, bada body (scale 1.2), **laal tie**, glow `(220, 140, 100)`. Hamesha naraz.
 - **"Sharma ji ka beta":** Sirf zikr hota hai, screen par nahi aata.
+- **Bheed / passengers / dukaandaar:** Saade silhouette, halka dim glow – kabhi naam nahi.
 
 ## Video style (har video mein same)
 - Kaale silhouette characters + glow outline, background blur (depth of field).
@@ -62,3 +73,4 @@ Thumbnail **video ka frame nahi** hoga. Har baar alag se ek "poster" banega:
 |---|---|---|
 | JEALOUSY (जलन) | 16:9, 5:03 | Young professional, dost Aman se jalan |
 | RESULT | 9:16, 2:02 | 10th class student, result ka darr, Papa ka saath |
+| ANGRY PAPA (गुस्सा) | 16:9, 5:03, 1920×1080 | Teenager; Papa ka gussa, Dadu wala flashback, balcony par sulah |
