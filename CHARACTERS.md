@@ -87,5 +87,8 @@ Thumbnail **video ka frame nahi** hoga. Har baar alag se ek "poster" banega:
 | RESULT | 9:16, 2:02 | 10th class student, result ka darr, Papa ka saath |
 | ANGRY PAPA (गुस्सा) | 16:9, 5:03, 1920×1080 | Teenager; Papa ka gussa, Dadu wala flashback, balcony par sulah |
 | BEIZZATI (बेइज़्ज़ती) | 16:9, 5:32, 1920×1080 | College student (B.Com final year); shaadi mein Papa ka mazaak, stage par Papa ke liye khada hota hai |
+| PRANK (प्रैंक) | 16:9, 5:03, 1920×1080 | Chhota YouTube channel "Rohan Vlogs" (312 subscribers); Aman ke saath Papa par fake accident prank, phir video delete karke maafi |
+
+**PRANK ke baad:** Rohan ka channel "Rohan Vlogs" hai. Papa ka BP high rehta hai. Aman prank ka idea dene wala dost tha – aage ki kahaniyon mein dono is galti se seekh chuke hain.
 
 **Kahani ke tay facts (aage contradict nahi karne):** Papa ek government office mein clerk hain (boss: Mr. Khanna), 25 saal se ek hi post. Papa ne promotion chhoda tha kyunki bachpan mein Rohan beemar tha aur ilaaj isi sheher mein chal raha tha. Ghar ki sawari: Papa ka purana scooter.
