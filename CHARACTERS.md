@@ -89,6 +89,10 @@ Thumbnail **video ka frame nahi** hoga. Har baar alag se ek "poster" banega:
 | BEIZZATI (बेइज़्ज़ती) | 16:9, 5:32, 1920×1080 | College student (B.Com final year); shaadi mein Papa ka mazaak, stage par Papa ke liye khada hota hai |
 | PRANK (प्रैंक) | 16:9, 5:03, 1920×1080 | Chhota YouTube channel "Rohan Vlogs" (312 subscribers); Aman ke saath Papa par fake accident prank, phir video delete karke maafi |
 
+| AJNABI (अजनबी) | 16:9, 4:33, 1920×1080 | PRANK ka sequel; hit-and-run mein bheed video banati hai, Rohan ghayal (Mr. Khanna) ko auto se hospital le jaata hai |
+
+**AJNABI ke baad:** Mr. Khanna ki jaan Rohan ne bachayi; ab Khanna, Papa par chillaate nahi – dono ke beech izzat ka rishta hai. Mr. Khanna scooter chalate hain (laal helmet).
+
 **PRANK ke baad:** Rohan ka channel "Rohan Vlogs" hai. Papa ka BP high rehta hai. Aman prank ka idea dene wala dost tha – aage ki kahaniyon mein dono is galti se seekh chuke hain.
 
 **Kahani ke tay facts (aage contradict nahi karne):** Papa ek government office mein clerk hain (boss: Mr. Khanna), 25 saal se ek hi post. Papa ne promotion chhoda tha kyunki bachpan mein Rohan beemar tha aur ilaaj isi sheher mein chal raha tha. Ghar ki sawari: Papa ka purana scooter.
