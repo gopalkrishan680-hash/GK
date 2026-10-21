@@ -44,6 +44,13 @@ sirf tab aayega jab story ko uski zaroorat ho, aur wo bhi yahan add hoga.
 - **Look:** Chhota (scale 0.62) + **chashma** – taaki pata chale ye Papa hi hain.
 - **Kahan aate hain:** Sirf flashback mein.
 
+### Rakesh Chacha (Papa ka chhota bhai)
+- **Look:** Bada body (scale 1.12), **tond (belly)**, gale mein **sone ki chain**, sar par chadha hua **kaala chashma (sunglasses)**.
+- **Glow:** Sunehra-peela `(240, 190, 90)`.
+- **Personality:** Ameer businessman, dikhawa karta hai, Papa ka mazaak udaata hai – par uska pehla business Papa ke paison se shuru hua tha. BEIZZATI ke end mein maafi maangta hai.
+- **Young Rakesh (flashback):** Scale 1.0, na tond, na chain, na chashma.
+- Beta: **Bunty** (sirf zikr, Canada ja raha hai).
+
 ## Side characters (zaroorat padne par)
 - **Boss (Rohan ka):** Chashma + flat baal, scale 1.06 (Rohan ki office wali kahaniyon mein).
 - **Mr. Khanna (Papa ka boss):** Ganja sar, bada body (scale 1.2), **laal tie**, glow `(220, 140, 100)`. Hamesha naraz.
@@ -79,3 +86,6 @@ Thumbnail **video ka frame nahi** hoga. Har baar alag se ek "poster" banega:
 | JEALOUSY (जलन) | 16:9, 5:03 | Young professional, dost Aman se jalan |
 | RESULT | 9:16, 2:02 | 10th class student, result ka darr, Papa ka saath |
 | ANGRY PAPA (गुस्सा) | 16:9, 5:03, 1920×1080 | Teenager; Papa ka gussa, Dadu wala flashback, balcony par sulah |
+| BEIZZATI (बेइज़्ज़ती) | 16:9, 5:32, 1920×1080 | College student (B.Com final year); shaadi mein Papa ka mazaak, stage par Papa ke liye khada hota hai |
+
+**Kahani ke tay facts (aage contradict nahi karne):** Papa ek government office mein clerk hain (boss: Mr. Khanna), 25 saal se ek hi post. Papa ne promotion chhoda tha kyunki bachpan mein Rohan beemar tha aur ilaaj isi sheher mein chal raha tha. Ghar ki sawari: Papa ka purana scooter.
