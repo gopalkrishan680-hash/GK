@@ -96,3 +96,15 @@ Thumbnail **video ka frame nahi** hoga. Har baar alag se ek "poster" banega:
 **PRANK ke baad:** Rohan ka channel "Rohan Vlogs" hai. Papa ka BP high rehta hai. Aman prank ka idea dene wala dost tha – aage ki kahaniyon mein dono is galti se seekh chuke hain.
 
 **Kahani ke tay facts (aage contradict nahi karne):** Papa ek government office mein clerk hain (boss: Mr. Khanna), 25 saal se ek hi post. Papa ne promotion chhoda tha kyunki bachpan mein Rohan beemar tha aur ilaaj isi sheher mein chal raha tha. Ghar ki sawari: Papa ka purana scooter.
+
+## Stickman explainer series (peela hoodie wala character)
+Psychology / self-improvement narration videos ke liye alag series. Character sheets se kate sprites `stickman/sprites/` mein hain
+(`stickman/make_sprites.py` dono sheet images se dobara bana sakta hai). Render: `python3 stickman/render.py AUDIO.wav OUT.mp4`
+(`--preview` se single frames). Narration ka saaf, timed text `stickman/script.json` mein.
+- **Look:** Bikhre bhoore-kaale baal, **peela hoodie**, dark grey pant, safed joote. Palette: peela, grey, safed, kaala.
+- **Boss:** Wahi body, **navy hoodie** + "BOSS" tag. **Dost:** hara hoodie. **Imaginary insaan / ghost:** grey, aadha transparent.
+- Captions wahi Baloo 2 style; English shabd peele mein.
+
+| Video | Format | Topic |
+|---|---|---|
+| DIMAAG MEIN BAHAS (Imaginary Conversations) | 16:9, 5:45, 1920×1080 | Hum dimaag mein logon se bahas kyun karte hain |
