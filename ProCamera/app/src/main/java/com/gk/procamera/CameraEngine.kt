@@ -221,7 +221,7 @@ class CameraEngine(private val context: Context) {
         }
     }
 
-    fun setZoom(ratio: Float) {
+    fun zoomTo(ratio: Float) {
         camera?.cameraControl?.setZoomRatio(ratio.coerceIn(minZoom, maxZoom))
     }
 

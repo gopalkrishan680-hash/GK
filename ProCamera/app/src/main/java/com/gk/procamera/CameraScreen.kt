@@ -298,7 +298,7 @@ fun CameraScreen(shutterRequests: SharedFlow<Unit>) {
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .pointerInputTransform { zoomChange -> engine.setZoom(engine.zoom * zoomChange) }
+                        .pointerInputTransform { zoomChange -> engine.zoomTo(engine.zoom * zoomChange) }
                         .pointerInputTap { off ->
                             val p = previewView.meteringPointFactory.createPoint(off.x, off.y)
                             engine.focusAt(p)
@@ -505,7 +505,7 @@ private fun ZoomChips(engine: CameraEngine) {
                     .size(if (active) 40.dp else 34.dp)
                     .clip(CircleShape)
                     .background(Color(0x66000000))
-                    .clickable { engine.setZoom(s) },
+                    .clickable { engine.zoomTo(s) },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(label, color = if (active) Accent else Color.White, fontSize = if (active) 12.sp else 11.sp, fontWeight = FontWeight.Bold)
