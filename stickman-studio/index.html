@@ -1,0 +1,1131 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stickman Studio</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Hind:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: sticky studio header + step tabs; each step is one working panel, cards only for grids/batches. */
+:root {
+  --bg: #eef0f3;
+  --surface: #ffffff;
+  --surface-2: #f6f7f9;
+  --ink: #15171c;
+  --muted: #5c6370;
+  --line: #d8dce3;
+  --accent: #f5c518;        /* marker yellow, same as caption highlight */
+  --accent-ink: #15171c;
+  --blue: #2f6fe4;
+  --good: #1f9d55;
+  --warn: #c77700;
+  --bad: #d33a2c;
+  --tl-a: #dfe8fb;
+  --tl-b: #fdf2c9;
+  --wave: #3b4250;
+  --font-display: "Baloo 2", "Hind", system-ui, sans-serif;
+  --font-body: "Hind", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  --r: 10px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111317; --surface: #1a1d23; --surface-2: #22262e; --ink: #eceef2; --muted: #9aa3b2;
+    --line: #2f3440; --accent: #f5c518; --accent-ink: #15171c; --blue: #6c9cff; --good: #45c27d;
+    --warn: #f0a63a; --bad: #ff6b5e; --tl-a: #24324d; --tl-b: #3d3517; --wave: #c9cfda; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111317; --surface: #1a1d23; --surface-2: #22262e; --ink: #eceef2; --muted: #9aa3b2;
+  --line: #2f3440; --accent: #f5c518; --accent-ink: #15171c; --blue: #6c9cff; --good: #45c27d;
+  --warn: #f0a63a; --bad: #ff6b5e; --tl-a: #24324d; --tl-b: #3d3517; --wave: #c9cfda; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line); }
+.top-row { display: flex; align-items: center; gap: 12px; padding-block: 10px; flex-wrap: wrap; }
+.brand { font-family: var(--font-display); font-weight: 800; font-size: 22px; letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px; }
+.brand svg { width: 26px; height: 26px; }
+.top-row .grow { flex: 1; min-width: 140px; }
+#projTitle { width: 100%; max-width: 320px; }
+.status { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { font-family: var(--font-mono); font-size: 11.5px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.chip.ok { border-color: var(--good); color: var(--good); }
+.chip.wait { border-color: var(--warn); color: var(--warn); }
+nav.tabs { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 0; }
+nav.tabs button { background: none; border: 0; border-bottom: 3px solid transparent; padding: 8px 12px; font: 600 14px var(--font-body); color: var(--muted); cursor: pointer; white-space: nowrap; }
+nav.tabs button .n { font-family: var(--font-mono); font-size: 12px; margin-right: 6px; }
+nav.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+main { padding-block: 20px 60px; }
+section.step { display: grid; gap: 18px; }
+h2 { font-family: var(--font-display); font-weight: 800; font-size: 26px; margin: 0; line-height: 1.15; text-wrap: balance; }
+h3 { font-family: var(--font-display); font-weight: 700; font-size: 18px; margin: 0; }
+p.lead { margin: 4px 0 0; color: var(--muted); max-width: 70ch; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: grid; gap: 12px; min-width: 0; }
+.cols { display: grid; grid-template-columns: 1.3fr 1fr; gap: 18px; align-items: start; }
+.cols > * { min-width: 0; }
+@media (max-width: 860px) { .cols { grid-template-columns: 1fr; } }
+label.f { display: grid; gap: 4px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.row > label.f { flex: 1 1 140px; }
+input[type=text], input[type=number], textarea, select {
+  font: inherit; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; min-width: 0;
+}
+textarea { resize: vertical; }
+#script { min-height: 220px; font-size: 16px; line-height: 1.6; }
+input:focus-visible, textarea:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+input[type=range] { width: 100%; accent-color: var(--blue); }
+.btn { font: 600 14px var(--font-body); padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { filter: brightness(0.95); }
+.btn.small { font-size: 12.5px; padding: 4px 9px; }
+.btn.danger { color: var(--bad); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.hint { font-size: 13px; color: var(--muted); }
+.hint b { color: var(--ink); }
+kbd { font-family: var(--font-mono); font-size: 12px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--surface-2); }
+.drop { border: 2px dashed var(--line); border-radius: var(--r); padding: 18px; text-align: center; color: var(--muted); cursor: pointer; background: var(--surface-2); }
+.drop.over { border-color: var(--blue); color: var(--blue); }
+.drop strong { color: var(--ink); display: block; font-size: 15px; }
+audio { width: 100%; }
+
+/* scenes list */
+.scenes { display: grid; gap: 8px; }
+.scene { display: grid; grid-template-columns: 34px 92px 1fr; gap: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); align-items: start; }
+.scene .num { font-family: var(--font-mono); font-weight: 600; font-size: 13px; background: var(--ink); color: var(--surface); border-radius: 6px; text-align: center; padding: 3px 0; }
+.scene .thumb { width: 92px; aspect-ratio: 16/9; border-radius: 5px; background: var(--surface-2); border: 1px solid var(--line); object-fit: cover; display: block; max-width: 100%; }
+.scene .body { display: grid; gap: 6px; min-width: 0; }
+.scene textarea { min-height: 0; padding: 6px 8px; }
+.scene .meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.scene .t { font-family: var(--font-mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; margin-right: auto; }
+@media (max-width: 520px) { .scene { grid-template-columns: 30px 1fr; } .scene .thumb { display: none; } }
+
+/* prompts */
+.batch { border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); overflow: hidden; min-width: 0; }
+.batch-h { display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; background: var(--surface-2); }
+.batch-h h3 { margin-right: auto; }
+pre.prompt { margin: 0; padding: 14px; font: 13px/1.55 var(--font-mono); white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow: auto; }
+.batches { display: grid; gap: 14px; }
+
+/* grids */
+.gridcard .body { padding: 14px; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 14px; }
+@media (max-width: 860px) { .gridcard .body { grid-template-columns: 1fr; } }
+.gridcard canvas.src { width: 100%; height: auto; border-radius: 6px; background: var(--surface-2); display: block; }
+.cells { display: grid; gap: 6px; }
+.cell { position: relative; }
+.cell canvas, .cell img { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 5px; display: block; background: var(--surface-2); border: 1px solid var(--line); max-width: 100%; }
+.cell .tag { position: absolute; left: 4px; top: 4px; font: 600 11px var(--font-mono); background: var(--ink); color: var(--surface); padding: 0 5px; border-radius: 4px; }
+.cell .tag.ov { background: var(--blue); color: #fff; }
+.cell .acts { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+.cell .acts .btn { font-size: 11px; padding: 2px 6px; }
+
+/* timeline */
+.tlwrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
+#tl { display: block; cursor: pointer; touch-action: pan-x; }
+.tapbox { border: 2px solid var(--accent); border-radius: var(--r); padding: 16px; display: grid; gap: 10px; background: var(--surface); }
+.tapbox .cur { font-family: var(--font-display); font-size: 26px; font-weight: 700; line-height: 1.25; }
+.tapbox .nxt { color: var(--muted); }
+#tapBtn { font-size: 20px; padding: 18px; justify-content: center; }
+.times { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px; max-height: 360px; overflow: auto; }
+.times .ti { display: grid; grid-template-columns: 34px 82px 1fr; gap: 6px; align-items: center; font-size: 13px; }
+.times .ti input { padding: 3px 6px; font: 12.5px var(--font-mono); }
+.times .ti span.tx { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.times .ti b { font-family: var(--font-mono); font-size: 12px; }
+
+/* preview */
+.stage { background: #000; border-radius: var(--r); overflow: hidden; display: flex; justify-content: center; }
+#pv { display: block; max-width: 100%; height: auto; max-height: 70vh; }
+.transport { display: flex; gap: 10px; align-items: center; }
+.transport input { flex: 1; }
+.tc { font-family: var(--font-mono); font-size: 13px; font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+progress { width: 100%; height: 10px; accent-color: var(--accent); }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--surface); padding: 9px 16px; border-radius: 8px; font-weight: 600; font-size: 14px; z-index: 20; max-width: calc(100% - 32px); }
+.dl { font-weight: 700; color: var(--blue); }
+details summary { cursor: pointer; font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="top-row">
+      <div class="brand" aria-label="Stickman Studio">
+        <svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="13" cy="6" r="3.6"/><path d="M13 10v8M13 12.5l-5 3.5M13 12.5l5-3M13 18l-4 6M13 18l4 6"/></svg>
+        Stickman Studio
+      </div>
+      <div class="grow"><input type="text" id="projTitle" placeholder="Video ka naam" aria-label="Project title"></div>
+      <div class="status" id="status"></div>
+      <div class="row">
+        <button class="btn small" id="saveFile" title="Poora project (images + audio) ek file mein download karo">Project save</button>
+        <button class="btn small" id="openFileBtn" title="Saved project file kholo">Project open</button>
+        <input type="file" id="openFile" accept=".json,.ssproj" hidden>
+        <button class="btn small danger" id="newProj">Naya</button>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="script" aria-selected="true"><span class="n">1</span>Script + Voice</button>
+      <button role="tab" data-tab="prompts" aria-selected="false"><span class="n">2</span>Image Prompts</button>
+      <button role="tab" data-tab="grids" aria-selected="false"><span class="n">3</span>Grid Upload</button>
+      <button role="tab" data-tab="sync" aria-selected="false"><span class="n">4</span>Voice Sync</button>
+      <button role="tab" data-tab="video" aria-selected="false"><span class="n">5</span>Preview + Export</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+<!-- STEP 1 -->
+<section class="step" data-panel="script">
+  <div>
+    <h2>Script likho, voiceover lagao</h2>
+    <p class="lead">Script ko har comma, full stop, <b>।</b>, ? aur ! par scenes mein toda jayega. Har scene = ek image. Kisi shabd ko caption mein <b>peela highlight</b> karna ho to use <kbd>*star*</kbd> ke beech likho.</p>
+  </div>
+  <div class="cols">
+    <div class="panel">
+      <label class="f" for="script">Script (Hindi / Hinglish / English)</label>
+      <textarea id="script" spellcheck="false"></textarea>
+      <div class="row">
+        <label class="f">Kahan todna hai
+          <select id="splitLevel">
+            <option value="all">Har comma + full stop (fast scenes)</option>
+            <option value="sentences">Sirf full stop / ? / ! (slow scenes)</option>
+          </select>
+        </label>
+        <label class="f">Kam se kam shabd / scene <input type="number" id="minWords" min="1" max="10"></label>
+        <label class="f">Zyada se zyada shabd / scene <input type="number" id="maxWords" min="4" max="60"></label>
+      </div>
+      <div class="row">
+        <button class="btn primary" id="splitBtn">Scenes banao</button>
+        <span class="hint" id="splitInfo"></span>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>Voiceover</h3>
+      <div class="drop" id="voDrop" tabindex="0" role="button"><strong>Voiceover file yahan drop karo</strong>ya click karke chuno (mp3, wav, m4a)</div>
+      <input type="file" id="voFile" accept="audio/*" hidden>
+      <div id="voInfo" class="hint"></div>
+      <audio id="vo" controls preload="auto"></audio>
+      <div class="row">
+        <label class="f">Video shape
+          <select id="aspect">
+            <option value="16:9">16:9 YouTube (landscape)</option>
+            <option value="9:16">9:16 Shorts / Reels</option>
+            <option value="1:1">1:1 Square</option>
+          </select>
+        </label>
+        <label class="f">Grid size
+          <select id="grid">
+            <option value="3">3×3 – 9 scenes ek image mein</option>
+            <option value="2">2×2 – 4 scenes (better quality)</option>
+          </select>
+        </label>
+      </div>
+      <p class="hint">Agla kaam: scenes check karo, phir <b>Image Prompts</b> tab kholo.</p>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="row"><h3 style="margin-right:auto">Scenes <span class="chip" id="sceneCount">0</span></h3>
+      <span class="hint">Text badlo, <b>Merge</b> se do scenes jodo, <b>Split</b> cursor ki jagah par todta hai.</span></div>
+    <div class="scenes" id="scenes"></div>
+  </div>
+</section>
+
+<!-- STEP 2 -->
+<section class="step" data-panel="prompts" hidden>
+  <div>
+    <h2>Grid image prompts</h2>
+    <p class="lead">Har prompt ek hi image mein kai scenes ka grid banwata hai. Prompt copy karke ChatGPT ya Gemini mein do, image download karo, aur <b>Grid Upload</b> tab mein daal do.</p>
+  </div>
+  <div class="cols">
+    <div class="panel">
+      <div class="row">
+        <label class="f">Art style
+          <select id="style">
+            <option value="stickman">Stickman – safed background</option>
+            <option value="glow">Glow silhouette (channel style)</option>
+            <option value="doodle">Whiteboard doodle</option>
+            <option value="cartoon">Colourful stickman cartoon</option>
+            <option value="custom">Apna style</option>
+          </select>
+        </label>
+        <label class="f">Panels ke beech line
+          <select id="gutter">
+            <option value="auto">Auto (style ke hisaab se)</option>
+            <option value="black">Kaali line</option>
+            <option value="white">Safed line</option>
+          </select>
+        </label>
+      </div>
+      <label class="f" for="styleText">Style description (prompt mein jayega)</label>
+      <textarea id="styleText" rows="3"></textarea>
+      <div class="row"><label class="f" for="characters" style="margin-right:auto">Characters (har line: Naam: look) — har image mein same dikhenge</label>
+        <button class="btn small" id="loadChars">Channel characters daalo</button></div>
+      <textarea id="characters" rows="4" placeholder="Rohan: plain round head, no hair, white oval eyes"></textarea>
+    </div>
+    <div class="panel">
+      <h3>AI Scene Director (optional, best result)</h3>
+      <p class="hint">Har scene ke liye achha visual description chahiye? Ye prompt ChatGPT/Gemini mein do. Jo jawab aaye use neeche paste karke <b>Apply</b> dabao. Har scene ka "Visual" khana bhar jayega.</p>
+      <div class="row"><button class="btn" id="copyDirector">Director prompt copy karo</button></div>
+      <textarea id="directorReply" rows="5" placeholder="1: Rohan sits alone on a bench at night, wide shot&#10;2: close-up of Rohan's sad face..."></textarea>
+      <div class="row"><button class="btn primary" id="applyDirector">Apply</button><span class="hint" id="dirInfo"></span></div>
+    </div>
+  </div>
+  <div class="row">
+    <button class="btn primary" id="copyAll">Saare prompts copy karo</button>
+    <button class="btn" id="dlPrompts">Prompts .txt download</button>
+    <span class="hint" id="promptInfo"></span>
+  </div>
+  <div class="batches" id="batches"></div>
+</section>
+
+<!-- STEP 3 -->
+<section class="step" data-panel="grids" hidden>
+  <div>
+    <h2>Grid images upload karo</h2>
+    <p class="lead">App grid ki lines khud dhoondh kar har panel ko alag scene bana deta hai. Agar kaat sahi na lage to <b>Auto-detect</b> band karke barabar hisson mein kaato, ya <b>Trim</b> badhao. Koi ek panel kharab ho to sirf us scene ki single image daal sakte ho.</p>
+  </div>
+  <div class="drop" id="bulkDrop" tabindex="0" role="button"><strong>Saari grid images ek saath yahan drop karo</strong>File naam ke order mein khali grids mein lag jayengi (grid1.png, grid2.png...)</div>
+  <input type="file" id="bulkFile" accept="image/*" multiple hidden>
+  <input type="file" id="oneFile" accept="image/*" hidden>
+  <div class="batches" id="gridCards"></div>
+</section>
+
+<!-- STEP 4 -->
+<section class="step" data-panel="sync" hidden>
+  <div>
+    <h2>Voiceover ke saath sync</h2>
+    <p class="lead"><b>Smart Sync</b> voiceover mein saans/ruk wali jagah dhoondh kar scene wahin badalta hai. Bilkul perfect chahiye to <b>Tap Sync</b> karo: awaaz sunte hue har naye scene par <kbd>Space</kbd> dabao. Timeline par lines ko kheench kar bhi theek kar sakte ho.</p>
+  </div>
+  <div class="row">
+    <button class="btn primary" id="smartSync">Smart Sync (recommended)</button>
+    <button class="btn" id="ratioSync">Text ke hisaab se baanto</button>
+    <button class="btn" id="tapStart">Tap Sync shuru karo</button>
+    <button class="btn" id="srtBtn">SRT import</button>
+    <input type="file" id="srtFile" accept=".srt,.vtt,text/plain" hidden>
+    <button class="btn" id="srtExport">SRT export</button>
+    <span class="hint" id="syncInfo"></span>
+  </div>
+  <div class="tapbox" id="tapBox" hidden>
+    <div class="hint" id="tapCount"></div>
+    <div class="cur" id="tapCur"></div>
+    <div class="nxt" id="tapNext"></div>
+    <div class="row"><button class="btn primary" id="tapBtn" style="flex:1">Agla scene &nbsp;<kbd>Space</kbd></button><button class="btn" id="tapStop">Rok do</button></div>
+  </div>
+  <div class="panel">
+    <div class="row">
+      <button class="btn" id="tlPlay">Play / Pause</button>
+      <span class="tc" id="tlTime">0:00.0</span>
+      <label class="f" style="flex:1 1 200px">Zoom <input type="range" id="tlZoom" min="0" max="100" value="20"></label>
+    </div>
+    <div class="tlwrap" id="tlWrap"><canvas id="tl" height="150"></canvas></div>
+    <p class="hint">Timeline par click = wahan se chalao. Scene ki seedhi line ko pakad kar kheencho = scene ka time badlo.</p>
+  </div>
+  <div class="panel">
+    <h3>Scene start time (seconds)</h3>
+    <div class="times" id="times"></div>
+  </div>
+</section>
+
+<!-- STEP 5 -->
+<section class="step" data-panel="video" hidden>
+  <div>
+    <h2>Preview aur video export</h2>
+    <p class="lead">Har scene par halka camera zoom/pan chalta hai taaki video kabhi ruka hua na lage. Export real-time hota hai (5 min ki video = lagbhag 5 min), tab ko khula rakho.</p>
+  </div>
+  <div class="cols">
+    <div class="panel">
+      <div class="stage"><canvas id="pv" width="960" height="540"></canvas></div>
+      <div class="transport">
+        <button class="btn" id="pvPlay">Play</button>
+        <input type="range" id="pvSeek" min="0" max="1000" value="0" aria-label="Seek">
+        <span class="tc" id="pvTime">0:00 / 0:00</span>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>Look</h3>
+      <div class="row">
+        <label class="f">Captions
+          <select id="captions"><option value="bottom">Neeche</option><option value="center">Beech mein</option><option value="top">Upar</option><option value="off">Band</option></select>
+        </label>
+        <label class="f">Caption size <input type="range" id="capSize" min="0.6" max="1.6" step="0.05"></label>
+      </div>
+      <div class="row">
+        <label class="f">Transition
+          <select id="transition"><option value="fade">Quick fade</option><option value="cut">Hard cut</option><option value="flash">White flash</option><option value="slide">Slide</option><option value="zoom">Zoom punch</option></select>
+        </label>
+        <label class="f">Transition time <input type="range" id="transDur" min="0.05" max="0.6" step="0.05"></label>
+      </div>
+      <label class="f">Camera motion (zoom/pan) <input type="range" id="motion" min="0" max="25" step="1"></label>
+      <h3>Background music</h3>
+      <div class="row"><button class="btn small" id="musicBtn">Music file chuno</button><button class="btn small danger" id="musicDel">Hatao</button><span class="hint" id="musicInfo">Koi music nahi</span></div>
+      <input type="file" id="musicFile" accept="audio/*" hidden>
+      <label class="f">Music volume <input type="range" id="musicVol" min="0" max="0.6" step="0.01"></label>
+      <h3>Export</h3>
+      <div class="row">
+        <label class="f">Quality
+          <select id="res"><option value="720">720p (fast, chhoti file)</option><option value="1080">1080p Full HD</option></select>
+        </label>
+        <label class="f">FPS
+          <select id="fps"><option value="30">30</option><option value="25">25</option><option value="24">24</option></select>
+        </label>
+      </div>
+      <div class="row"><button class="btn primary" id="exportBtn">Video export karo</button><button class="btn" id="exportCancel" hidden>Cancel</button></div>
+      <progress id="exportProg" value="0" max="1" hidden></progress>
+      <div class="hint" id="exportInfo"></div>
+    </div>
+  </div>
+</section>
+</main>
+<audio id="music" loop preload="auto" hidden></audio>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+'use strict';
+/* ============ helpers ============ */
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function fmt(t, dec = 1) { t = Math.max(0, t || 0); const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(dec); }
+function fmtSrt(t) { t = Math.max(0, t); const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = Math.floor(t % 60), ms = Math.round((t % 1) * 1000) % 1000; const p = (n, l = 2) => String(n).padStart(l, '0'); return `${p(h)}:${p(m)}:${p(s)},${p(ms, 3)}`; }
+let toastT;
+function toast(msg) { const el = $('#toast'); el.textContent = msg; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, 2600); }
+async function copyText(txt) {
+  try { await navigator.clipboard.writeText(txt); toast('Copy ho gaya'); }
+  catch (e) { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (_) {} ta.remove(); toast(ok ? 'Copy ho gaya' : 'Copy nahi hua, text select karke copy karo'); }
+}
+function download(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60000); }
+function safeName() { return (S.settings.title || 'stickman-video').replace(/[^\p{L}\p{N}_-]+/gu, '-').replace(/^-+|-+$/g, '') || 'stickman-video'; }
+function pickFile(input) { return new Promise(res => { input.value = ''; input.onchange = () => res([...input.files]); input.click(); }); }
+function setupDrop(el, onFiles, input, multiple) {
+  el.addEventListener('click', async () => { const f = await pickFile(input); if (f.length) onFiles(f); });
+  el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); } });
+  el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('over'); });
+  el.addEventListener('dragleave', () => el.classList.remove('over'));
+  el.addEventListener('drop', e => { e.preventDefault(); el.classList.remove('over'); const f = [...e.dataTransfer.files]; if (f.length) onFiles(multiple ? f : [f[0]]); });
+}
+
+/* ============ presets ============ */
+const STYLES = {
+  stickman: { text: 'Simple hand-drawn stickman illustration. Clean bold black line art on a plain white background, round heads with simple expressive faces (eyes, eyebrows, mouth), minimal props, a few flat accent colours only where they help the story. Clear readable poses and body language.', gutter: 'black' },
+  glow: { text: 'Cinematic silhouette style: pure black silhouette characters with a soft glowing rim-light outline, plain round heads with no hair, big white oval eyes, expressive eyebrows. Moody dark backgrounds with blurred depth of field, warm and cool coloured light, film still look.', gutter: 'white' },
+  doodle: { text: 'Whiteboard explainer doodle: black marker stick figures and simple sketched objects on a clean white board, light hand-drawn shading, occasional red and blue marker accents, minimal and easy to read.', gutter: 'black' },
+  cartoon: { text: 'Colourful flat 2D cartoon with stickman-like characters: round heads, thin limbs, big expressive eyes, bright flat colour backgrounds, soft shadows, playful and clean vector look.', gutter: 'white' },
+  custom: { text: '', gutter: 'white' }
+};
+const CHANNEL_CHARS = `Rohan (hero): black silhouette, plain round head with NO hair, white oval eyes, expressive eyebrows, young man
+Maa (mother): hair tied in a bun at the back, saree pallu over the shoulder, warm golden glow
+Papa (father): glasses, short flat hair, slightly bigger body, cream glow
+Aman (best friend): spiky hair with 5 sharp spikes, warm yellow glow`;
+const SAMPLE = `Rohan ke result ka din tha. Subah se uska dil zor zor se dhadak raha tha, aur haath thande pad gaye the.
+Papa chupchaap akhbaar padh rahe the, par unki nazar baar baar phone par jaa rahi thi.
+Phir phone baja. Rohan ne kaanpte haathon se result khola, aur screen par likha tha, *58 percent*.
+Usne Papa ki taraf dekha. Papa muskuraye, aur bole, "Mujhe tum par garv hai."`;
+
+/* ============ state ============ */
+const DEFAULTS = { title: '', aspect: '16:9', grid: 3, style: 'stickman', styleText: STYLES.stickman.text, characters: '', gutter: 'auto',
+  splitLevel: 'all', minWords: 2, maxWords: 14, captions: 'bottom', capSize: 1, motion: 10, transition: 'fade', transDur: 0.15, res: 1080, fps: 30, musicVol: 0.12 };
+const S = { settings: { ...DEFAULTS }, script: '', segments: [], starts: [], grids: [], overrides: {}, audioBlob: null, audioName: '', musicBlob: null, musicName: '' };
+let uid = 1;
+let audioBuf = null, analysis = null;
+let sceneCache = [];      // canvas / bitmap per scene index
+const R = { grids: [], overrides: {} };   // runtime: decoded images {img, cells}
+const vo = $('#vo'), music = $('#music');
+
+/* ============ storage (IndexedDB autosave) ============ */
+const DB = {
+  db: null,
+  open() { return new Promise((res, rej) => { try { const r = indexedDB.open('stickman-studio', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(this.db = r.result); r.onerror = () => rej(r.error); } catch (e) { rej(e); } }); },
+  tx(mode, fn) { return new Promise((res, rej) => { try { const t = this.db.transaction('kv', mode); const st = t.objectStore('kv'); const r = fn(st); t.oncomplete = () => res(r && r.result); t.onerror = () => rej(t.error); } catch (e) { rej(e); } }); },
+  put(k, v) { return this.db ? this.tx('readwrite', s => s.put(v, k)) : Promise.resolve(); },
+  get(k) { return this.db ? this.tx('readonly', s => s.get(k)) : Promise.resolve(null); },
+  del(k) { return this.db ? this.tx('readwrite', s => s.delete(k)) : Promise.resolve(); }
+};
+function snapshot() {
+  return { v: 1, settings: S.settings, script: S.script, segments: S.segments, starts: S.starts, uid,
+    grids: S.grids.map(g => g ? { blob: g.blob, auto: g.auto, trim: g.trim } : null),
+    overrides: S.overrides, audioBlob: S.audioBlob, audioName: S.audioName, musicBlob: S.musicBlob, musicName: S.musicName };
+}
+let saveT;
+function save() { clearTimeout(saveT); saveT = setTimeout(() => { DB.put('project', snapshot()).catch(() => {}); }, 600); }
+
+/* ============ script splitting ============ */
+const wordCount = s => s.replace(/\*/g, '').split(/\s+/).filter(w => /[\p{L}\p{N}]/u.test(w)).length;
+function splitScript(text, level, minW, maxW) {
+  const P = level === 'all' ? ',.!?।|;:…—' : '.!?।|…';
+  const CLOSE = '"\'”’)»';
+  const t = text.replace(/\r/g, '').replace(/(\d)\.(\d)/g, '$1․$2').replace(/(\d),(\d)/g, '$1‚$2').replace(/\.\.\./g, '…');
+  const pieces = []; let cur = '';
+  const push = () => { const s = cur.trim(); cur = ''; if (!s) return; if (/[\p{L}\p{N}]/u.test(s)) pieces.push(s); else if (pieces.length) pieces[pieces.length - 1] += s; };
+  for (let i = 0; i < t.length; i++) {
+    const ch = t[i];
+    if (ch === '\n') { push(); continue; }
+    cur += ch;
+    if (P.includes(ch)) { while (i + 1 < t.length && (P.includes(t[i + 1]) || CLOSE.includes(t[i + 1]))) cur += t[++i]; push(); }
+  }
+  push();
+  // merge too-short pieces forward
+  const merged = []; let carry = '';
+  for (const p of pieces) { const s = carry ? carry + ' ' + p : p; if (wordCount(s) < minW) carry = s; else { merged.push(s); carry = ''; } }
+  if (carry) { if (merged.length) merged[merged.length - 1] += ' ' + carry; else merged.push(carry); }
+  // split too-long pieces evenly
+  const out = [];
+  for (const s of merged) {
+    const n = wordCount(s);
+    if (n <= maxW) { out.push(s); continue; }
+    const words = s.split(/\s+/); const parts = Math.ceil(n / maxW); const size = Math.ceil(words.length / parts);
+    for (let i = 0; i < words.length; i += size) out.push(words.slice(i, i + size).join(' '));
+  }
+  return out.map(s => s.replace(/․/g, '.').replace(/‚/g, ','));
+}
+function weight(s) {
+  const clean = s.replace(/\*/g, '').trim();
+  let w = (clean.match(/[\p{L}\p{N}\p{M}]/gu) || []).length;
+  const end = clean.replace(/["'”’)»]+$/, '').slice(-1);
+  if (/[.!?।|…]/.test(end)) w += 6; else if (/[,;:—]/.test(end)) w += 3;
+  return Math.max(w, 3);
+}
+const strongEnd = s => /[.!?।|…]["'”’)»]*$/.test(s.trim());
+const plain = s => s.replace(/\*/g, '');
+
+/* ============ timing ============ */
+function duration() { if (audioBuf) return audioBuf.duration; if (vo.duration && isFinite(vo.duration)) return vo.duration; return Math.max(1, S.segments.length * 2.5); }
+function segEnd(i) { return i < S.segments.length - 1 ? S.starts[i + 1] : duration(); }
+function sceneAt(t) { const st = S.starts; let lo = 0, hi = st.length - 1; if (hi < 0) return -1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (st[m] <= t) lo = m; else hi = m - 1; } return lo; }
+function speechBounds() { const D = duration(); if (analysis) return [analysis.speechStart, Math.min(D, analysis.speechEnd)]; return [0, D]; }
+function ratioTiming(fromIdx = 0) {
+  const n = S.segments.length, D = duration(); if (!n) { S.starts = []; return; }
+  const w = S.segments.map(s => weight(s.text));
+  let [a, b] = speechBounds();
+  if (fromIdx > 0) a = S.starts[fromIdx];
+  const st = S.starts.slice(0, fromIdx);
+  const tot = w.slice(fromIdx).reduce((x, y) => x + y, 0);
+  let acc = a;
+  for (let i = fromIdx; i < n; i++) { st[i] = i === 0 ? 0 : acc; acc += (b - a) * w[i] / tot; }
+  S.starts = st.map(v => clamp(v, 0, D));
+}
+function smartTiming() {
+  if (!analysis) { ratioTiming(); return false; }
+  const n = S.segments.length, D = duration(); const w = S.segments.map(s => weight(s.text));
+  const [sStart, sEnd] = speechBounds(); const pauses = analysis.pauses;
+  const st = [0]; let prev = sStart;
+  for (let i = 1; i < n; i++) {
+    const rem = w.slice(i - 1).reduce((x, y) => x + y, 0);
+    const est = prev + (sEnd - prev) * w[i - 1] / rem;
+    const win = clamp((est - prev) * 0.6, 0.6, 2.2);
+    const strong = strongEnd(S.segments[i - 1].text);
+    let best = null, bs = Infinity;
+    for (const p of pauses) {
+      if (p.mid <= prev + 0.25) continue;
+      if (p.mid > est + win) break;
+      const d = Math.abs(p.mid - est); if (d > win) continue;
+      const score = d - Math.min(p.dur, 0.9) * (strong ? 1.4 : 0.7);
+      if (score < bs) { bs = score; best = p; }
+    }
+    let t = best ? Math.min(best.end - 0.02, best.mid + best.dur * 0.25) : est;
+    t = clamp(t, st[i - 1] + 0.15, D - 0.1);
+    st.push(t); prev = best ? best.end : est;
+  }
+  S.starts = st; return true;
+}
+function analyzeAudio(buf) {
+  const sr = buf.sampleRate, len = buf.length, chs = buf.numberOfChannels;
+  const data = buf.getChannelData(0), data2 = chs > 1 ? buf.getChannelData(1) : null;
+  const fr = Math.round(sr * 0.01); const nf = Math.floor(len / fr);
+  const rms = new Float32Array(nf), peak = new Float32Array(nf);
+  for (let f = 0; f < nf; f++) {
+    let s = 0, pk = 0; const o = f * fr;
+    for (let j = 0; j < fr; j++) { let v = data[o + j]; if (data2) v = (v + data2[o + j]) * 0.5; s += v * v; const a = v < 0 ? -v : v; if (a > pk) pk = a; }
+    rms[f] = Math.sqrt(s / fr); peak[f] = pk;
+  }
+  // smooth rms over 30ms
+  const sm = new Float32Array(nf); for (let f = 0; f < nf; f++) { let s = 0, c = 0; for (let k = -1; k <= 1; k++) { const g = f + k; if (g >= 0 && g < nf) { s += rms[g]; c++; } } sm[f] = s / c; }
+  const sorted = Float32Array.from(sm).sort(); const pct = q => sorted[Math.floor(q * (sorted.length - 1))] || 0;
+  const noise = pct(0.1), speech = pct(0.9); const thr = noise + 0.12 * (speech - noise);
+  const silent = f => sm[f] < thr;
+  const pauses = []; let i = 0;
+  while (i < nf) { if (silent(i)) { let j = i; while (j + 1 < nf && silent(j + 1)) j++; const dur = (j - i + 1) * 0.01; if (dur >= 0.12) pauses.push({ start: i * 0.01, end: (j + 1) * 0.01, mid: (i + j + 1) * 0.005, dur }); i = j + 1; } else i++; }
+  let a = 0; while (a < nf && silent(a)) a++;
+  let b = nf - 1; while (b > 0 && silent(b)) b--;
+  let mx = 0; for (let f = 0; f < nf; f++) if (peak[f] > mx) mx = peak[f];
+  return { peak, rate: 100, max: mx || 1, pauses, speechStart: a * 0.01, speechEnd: (b + 1) * 0.01 };
+}
+
+/* ============ segments ============ */
+function setSegmentsFromTexts(texts) {
+  const old = S.segments; const oldVis = new Map(old.map(s => [plain(s.text).trim(), s]));
+  S.segments = texts.map(t => { const o = oldVis.get(plain(t).trim()); return { id: o ? o.id : uid++, text: t, visual: o ? o.visual : '' }; });
+  ratioTiming(); if (analysis) smartTiming();
+  segmentsChanged();
+}
+function segmentsChanged(keepTiming) {
+  if (!keepTiming && S.starts.length !== S.segments.length) { ratioTiming(); if (analysis) smartTiming(); }
+  for (const id of Object.keys(S.overrides)) if (!S.segments.some(s => String(s.id) === id)) { delete S.overrides[id]; delete R.overrides[id]; }
+  rebuildCache(); renderScenes(); renderPrompts(); renderGridCards(); renderTimes(); drawTimeline(); drawPreview(); renderStatus(); save();
+}
+
+/* ============ batches & prompts ============ */
+function batches() {
+  const g = +S.settings.grid, per = g * g, n = S.segments.length, out = [];
+  for (let s = 0; s < n; s += per) { const k = Math.min(per, n - s); let dim = g; if (k <= 1) dim = 1; else if (k <= 4) dim = Math.min(2, g); out.push({ index: out.length, start: s, count: k, rows: dim, cols: dim }); }
+  return out;
+}
+function gutterColor() { const g = S.settings.gutter; if (g !== 'auto') return g; return (STYLES[S.settings.style] || STYLES.custom).gutter; }
+function aspectWords() { const a = S.settings.aspect; return a === '16:9' ? 'landscape 16:9 (if 16:9 is not available, use landscape 3:2)' : a === '9:16' ? 'portrait 9:16 (if 9:16 is not available, use portrait 2:3)' : 'square 1:1'; }
+function sceneLine(seg) { const v = (seg.visual || '').trim(); const line = plain(seg.text).trim(); return v ? `${v} (narration: "${line}")` : `Illustrate this narration line: "${line}"`; }
+function charBlock() { const c = (S.settings.characters || '').trim(); return c ? `\nCHARACTERS (keep exactly the same look in every panel):\n${c}\n` : ''; }
+function buildPrompt(b) {
+  const segs = S.segments.slice(b.start, b.start + b.count);
+  const total = b.rows * b.cols, gc = gutterColor() === 'black' ? 'solid black' : 'pure white';
+  const style = (S.settings.styleText || '').trim();
+  if (total === 1) return `Create ONE single illustration, ${aspectWords()}.\n\nSTYLE: ${style}\n${charBlock()}\nSCENE: ${sceneLine(segs[0])}\n\nRULES: no text, no letters, no captions, no speech bubbles, no watermark. Keep the main subject near the centre (edges may be cropped slightly).`;
+  let lines = segs.map((s, i) => `${i + 1}. ${sceneLine(s)}`);
+  for (let i = segs.length; i < total; i++) lines.push(`${i + 1}. Leave this panel completely empty and plain.`);
+  return `Create ONE image that is a ${b.rows}×${b.cols} storyboard grid: exactly ${total} equal-sized panels in ${b.rows} rows and ${b.cols} columns, separated by thin straight ${gc} gutter lines of equal width. The whole image is ${aspectWords()}, and every panel has that same shape and is filled edge to edge with its scene.
+
+STYLE (same in all panels): ${style}
+${charBlock()}
+RULES: no text, no letters, no numbers, no captions, no speech bubbles, no panel numbers, no watermark, no extra borders or frames. Each panel is its own complete scene with a clear composition and the main subject near the centre (panel edges may be cropped slightly). Keep characters, clothes and colours consistent across all panels. Vary the camera: wide shots, medium shots and close-ups.
+
+PANELS (left to right, top to bottom):
+${lines.join('\n')}`;
+}
+function singlePrompt(i) { return buildPrompt({ start: i, count: 1, rows: 1, cols: 1 }); }
+function directorPrompt() {
+  const scenes = S.segments.map((s, i) => `${i + 1}: "${plain(s.text).trim()}"`).join('\n');
+  return `You are a storyboard director for a stickman story video. Below is a voiceover script split into ${S.segments.length} numbered scenes. Each scene is shown on screen for only 1-3 seconds, so each needs ONE clear, simple image.
+
+For EACH scene write one short visual description in English (max 25 words): who is in the frame, what they are doing, their emotion, the setting and the camera shot (wide / medium / close-up). Show the meaning, never write text in the image. Keep characters consistent and vary the shots so it never feels repetitive.
+
+Art style: ${(S.settings.styleText || '').trim()}
+${charBlock()}
+Reply ONLY in this exact format, one line per scene, nothing else:
+1: description
+2: description
+...
+
+SCENES:
+${scenes}`;
+}
+function renderPrompts() {
+  const bs = batches();
+  $('#promptInfo').textContent = bs.length ? `${S.segments.length} scenes → ${bs.length} image${bs.length > 1 ? 's' : ''} generate karni hain` : 'Pehle Step 1 mein scenes banao';
+  $('#batches').innerHTML = bs.map(b => {
+    const done = !!S.grids[b.index];
+    return `<div class="batch"><div class="batch-h"><h3>Image ${b.index + 1}</h3><span class="chip">Scenes ${b.start + 1}–${b.start + b.count} · ${b.rows}×${b.cols}</span><span class="chip ${done ? 'ok' : 'wait'}">${done ? 'Upload ho gayi' : 'Baaki'}</span><button class="btn small primary" data-copy="${b.index}">Copy prompt</button></div><pre class="prompt">${esc(buildPrompt(b))}</pre></div>`;
+  }).join('');
+}
+
+/* ============ grid detection & slicing ============ */
+function lumaProfile(img) {
+  const sc = Math.min(1, 480 / Math.max(img.width, img.height));
+  const w = Math.max(8, Math.round(img.width * sc)), h = Math.max(8, Math.round(img.height * sc));
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0, w, h);
+  const d = x.getImageData(0, 0, w, h).data; const L = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) L[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
+  const stat = (n, m, get) => { const mean = new Float32Array(n), sd = new Float32Array(n); for (let i = 0; i < n; i++) { let s = 0, s2 = 0; for (let j = 0; j < m; j++) { const v = get(i, j); s += v; s2 += v * v; } mean[i] = s / m; sd[i] = Math.sqrt(Math.max(0, s2 / m - mean[i] * mean[i])); } return { mean, sd }; };
+  return { w, h, sc, col: stat(w, h, (i, j) => L[j * w + i]), row: stat(h, w, (i, j) => L[i * w + j]) };
+}
+function findCuts(prof, len, parts, gutter) {
+  const isG = i => i >= 0 && i < len && prof.sd[i] < 16 && (gutter === 'black' ? prof.mean[i] < 80 : prof.mean[i] > 185);
+  let a = 0; while (a < len * 0.12 && isG(a)) a++;
+  let b = len - 1; while (b > len * 0.88 && isG(b)) b--;
+  const cuts = [];
+  for (let k = 1; k < parts; k++) {
+    const exp = a + (b - a) * k / parts, win = (b - a) * 0.07; let best = null;
+    for (let i = Math.max(0, Math.floor(exp - win)); i <= Math.min(len - 1, exp + win); i++) {
+      if (!isG(i)) continue; let s = i, e = i; while (isG(s - 1)) s--; while (isG(e + 1)) e++;
+      if (e - s + 1 <= len * 0.08) { const d = Math.abs((s + e) / 2 - exp); if (!best || d < best.d) best = { s, e, d }; }
+      i = e;
+    }
+    cuts.push(best ? [best.s, best.e + 1] : [exp, exp]);
+  }
+  const out = [];
+  for (let p = 0; p < parts; p++) out.push([p === 0 ? a : cuts[p - 1][1], p === parts - 1 ? b + 1 : cuts[p][0]]);
+  return { spans: out, found: cuts.filter(c => c[0] !== c[1]).length };
+}
+function computeCells(gi) {
+  const g = S.grids[gi], r = R.grids[gi]; const b = batches()[gi]; if (!g || !r || !r.img || !b) return;
+  const W = r.img.width, H = r.img.height; let xs, ys, found = 0;
+  if (g.auto) {
+    const prof = lumaProfile(r.img); const gut = gutterColor();
+    const cx = findCuts(prof.col, prof.w, b.cols, gut), cy = findCuts(prof.row, prof.h, b.rows, gut);
+    found = cx.found + cy.found;
+    xs = cx.spans.map(([s, e]) => [s / prof.sc, e / prof.sc]); ys = cy.spans.map(([s, e]) => [s / prof.sc, e / prof.sc]);
+  } else {
+    xs = Array.from({ length: b.cols }, (_, i) => [W * i / b.cols, W * (i + 1) / b.cols]);
+    ys = Array.from({ length: b.rows }, (_, i) => [H * i / b.rows, H * (i + 1) / b.rows]);
+  }
+  const t = (g.trim || 0) / 100, cells = [];
+  for (const [y0, y1] of ys) for (const [x0, x1] of xs) { const w = x1 - x0, h = y1 - y0; cells.push({ x: x0 + w * t, y: y0 + h * t, w: w * (1 - 2 * t), h: h * (1 - 2 * t) }); }
+  r.cells = cells; r.found = found; r.expected = (b.cols - 1) + (b.rows - 1); r.layout = b.rows + 'x' + b.cols;
+}
+function cropCell(img, c) {
+  const sc = Math.min(1, 1920 / c.w); const cv = document.createElement('canvas');
+  cv.width = Math.max(1, Math.round(c.w * sc)); cv.height = Math.max(1, Math.round(c.h * sc));
+  const x = cv.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(img, c.x, c.y, c.w, c.h, 0, 0, cv.width, cv.height); return cv;
+}
+function rebuildCache() {
+  const bs = batches(); sceneCache = new Array(S.segments.length).fill(null);
+  bs.forEach(b => {
+    const r = R.grids[b.index]; if (!r || !r.img) return;
+    if (!r.cells || r.layout !== b.rows + 'x' + b.cols) computeCells(b.index);
+    for (let k = 0; k < b.count; k++) if (r.cells[k]) sceneCache[b.start + k] = cropCell(r.img, r.cells[k]);
+  });
+  S.segments.forEach((s, i) => { const o = R.overrides[s.id]; if (o) sceneCache[i] = o; });
+}
+async function loadImage(blob) { return await createImageBitmap(blob); }
+async function setGrid(gi, blob) {
+  try {
+    const img = await loadImage(blob);
+    S.grids[gi] = { blob, auto: true, trim: 1.5 }; R.grids[gi] = { img };
+    computeCells(gi);
+  } catch (e) { toast('Ye image khul nahi rahi. PNG ya JPG try karo.'); }
+}
+async function setOverride(segId, blob) { try { R.overrides[segId] = await loadImage(blob); S.overrides[segId] = blob; } catch (e) { toast('Image khul nahi rahi'); } }
+
+function renderGridCards() {
+  const bs = batches(); const asp = S.settings.aspect.replace(':', '/');
+  if (!bs.length) { $('#gridCards').innerHTML = '<p class="hint">Pehle Step 1 mein scenes banao.</p>'; return; }
+  $('#gridCards').innerHTML = bs.map(b => {
+    const g = S.grids[b.index], r = R.grids[b.index];
+    let body;
+    if (!g) body = `<div class="body" style="grid-template-columns:1fr"><div class="drop" data-griddrop="${b.index}" tabindex="0" role="button"><strong>Image ${b.index + 1} yahan drop karo</strong>Scenes ${b.start + 1}–${b.start + b.count} (${b.rows}×${b.cols} grid)</div></div>`;
+    else {
+      const det = g.auto ? (r && r.found >= r.expected ? `<span class="chip ok">Lines mil gayi</span>` : `<span class="chip wait">Lines poori nahi mili, barabar kaata</span>`) : `<span class="chip">Barabar hisse</span>`;
+      const cells = Array.from({ length: b.count }, (_, k) => { const i = b.start + k, s = S.segments[i]; const ov = R.overrides[s.id];
+        return `<div class="cell"><canvas data-cellcv="${i}" width="160" height="90" style="aspect-ratio:${asp}"></canvas><span class="tag ${ov ? 'ov' : ''}">${i + 1}${ov ? ' · single' : ''}</span><div class="acts"><button class="btn" data-one="${i}">Single image</button>${ov ? `<button class="btn danger" data-oneclear="${i}">Hatao</button>` : `<button class="btn" data-onecopy="${i}">Prompt</button>`}</div></div>`; }).join('');
+      body = `<div class="body"><div style="display:grid;gap:10px;min-width:0"><canvas class="src" data-srccv="${b.index}"></canvas>
+        <div class="row">${det}<label class="row" style="gap:6px"><input type="checkbox" data-auto="${b.index}" ${g.auto ? 'checked' : ''}> Auto-detect lines</label></div>
+        <label class="f">Trim kinaare: <span data-trimv="${b.index}">${g.trim}%</span><input type="range" min="0" max="8" step="0.5" value="${g.trim}" data-trim="${b.index}"></label>
+        <div class="row"><button class="btn small" data-replace="${b.index}">Badlo</button><button class="btn small danger" data-remove="${b.index}">Hatao</button></div></div>
+        <div class="cells" style="grid-template-columns:repeat(${b.cols},minmax(0,1fr))">${cells}</div></div>`;
+    }
+    return `<div class="batch gridcard"><div class="batch-h"><h3>Image ${b.index + 1}</h3><span class="chip">Scenes ${b.start + 1}–${b.start + b.count}</span><span class="chip ${g ? 'ok' : 'wait'}">${g ? 'Ready' : 'Baaki'}</span><button class="btn small" data-copy="${b.index}">Prompt copy</button></div>${body}</div>`;
+  }).join('');
+  $$('[data-griddrop]').forEach(el => { const gi = +el.dataset.griddrop; setupDrop(el, async f => { await setGrid(gi, f[0]); segmentsChanged(true); }, $('#oneFile'), false); });
+  bs.forEach(b => { drawSrc(b.index); });
+  drawCellThumbs();
+}
+function drawSrc(gi) {
+  const cv = document.querySelector(`[data-srccv="${gi}"]`), r = R.grids[gi]; if (!cv || !r || !r.img) return;
+  const sc = Math.min(1, 900 / r.img.width); cv.width = Math.round(r.img.width * sc); cv.height = Math.round(r.img.height * sc);
+  const x = cv.getContext('2d'); x.drawImage(r.img, 0, 0, cv.width, cv.height);
+  x.lineWidth = 2; (r.cells || []).forEach((c, k) => { x.strokeStyle = '#f5c518'; x.strokeRect(c.x * sc, c.y * sc, c.w * sc, c.h * sc); x.fillStyle = '#f5c518'; x.fillRect(c.x * sc, c.y * sc, 22, 18); x.fillStyle = '#15171c'; x.font = '600 12px monospace'; x.fillText(String(k + 1), c.x * sc + 5, c.y * sc + 13); });
+}
+function drawCellThumbs() {
+  $$('[data-cellcv]').forEach(cv => { const i = +cv.dataset.cellcv; const [W, H] = dims(240); cv.width = W; cv.height = H; const x = cv.getContext('2d'); x.fillStyle = '#000'; x.fillRect(0, 0, W, H); const src = sceneCache[i]; if (src) drawCover(x, src, W, H, 1, 0.5, 0.5); });
+}
+
+/* ============ rendering ============ */
+function dims(base) { const a = S.settings.aspect; if (a === '9:16') return [Math.round(base * 9 / 16 / 2) * 2, base]; if (a === '1:1') return [base, base]; return [base, Math.round(base * 9 / 16 / 2) * 2]; }
+function exportDims() { const r = +S.settings.res; const a = S.settings.aspect; if (a === '9:16') return [r, Math.round(r * 16 / 9)]; if (a === '1:1') return [r, r]; return [Math.round(r * 16 / 9), r]; }
+function drawCover(ctx, src, W, H, z, px, py, dx = 0, dy = 0) {
+  const iw = src.width, ih = src.height; const s = Math.max(W / iw, H / ih) * z; const dw = iw * s, dh = ih * s;
+  ctx.drawImage(src, (W - dw) * px + dx, (H - dh) * py + dy, dw, dh);
+}
+function drawScene(ctx, i, t, W, H, o = {}) {
+  const src = sceneCache[i]; const d = Math.max(0.01, segEnd(i) - S.starts[i]); const p = clamp((t - S.starts[i]) / d, 0, 1);
+  ctx.save(); ctx.globalAlpha = o.alpha == null ? 1 : o.alpha;
+  if (!src) {
+    ctx.fillStyle = '#1b1d22'; ctx.fillRect(o.dx || 0, 0, W, H); ctx.fillStyle = '#8a92a0'; ctx.textAlign = 'center';
+    ctx.font = `700 ${Math.round(H * 0.06)}px "Baloo 2", sans-serif`; ctx.fillText(`Scene ${i + 1} — image baaki`, W / 2 + (o.dx || 0), H * 0.42);
+    ctx.restore(); return;
+  }
+  const m = S.settings.motion / 100, mode = i % 4; let z, px = 0.5, py = 0.5;
+  if (mode === 0) z = 1 + m * p; else if (mode === 1) z = 1 + m * (1 - p); else { z = 1 + m; px = mode === 2 ? 0.2 + 0.6 * p : 0.8 - 0.6 * p; py = 0.5 - 0.15 * (p - 0.5); }
+  z *= o.scale || 1;
+  drawCover(ctx, src, W, H, z, px, py, o.dx || 0, 0); ctx.restore();
+}
+function captionTokens(text) {
+  const clean = text.trim().replace(/[,;:।|.—]+["'”’]*$/, m => m.replace(/[,;:।|.—]+/g, ''));
+  const toks = []; clean.split(/(\*[^*]+\*)/).forEach(part => { if (!part) return; const hl = /^\*[^*]+\*$/.test(part); part.replace(/\*/g, '').split(/\s+/).filter(Boolean).forEach(w => toks.push({ w, hl })); });
+  return toks;
+}
+function drawCaption(ctx, W, H, text, lt) {
+  const pos = S.settings.captions; if (pos === 'off' || !text) return;
+  const toks = captionTokens(text); if (!toks.length) return;
+  let fs = Math.min(W, H) * 0.075 * S.settings.capSize; const maxW = W * 0.88; let lines;
+  for (let tries = 0; tries < 5; tries++) {
+    ctx.font = `800 ${fs}px "Baloo 2", "Hind", sans-serif`; const sp = ctx.measureText(' ').width;
+    lines = []; let cur = [], cw = 0;
+    for (const t of toks) { const w = ctx.measureText(t.w).width; if (cur.length && cw + sp + w > maxW) { lines.push({ toks: cur, w: cw }); cur = []; cw = 0; } cw += (cur.length ? sp : 0) + w; cur.push({ ...t, width: w }); }
+    if (cur.length) lines.push({ toks: cur, w: cw });
+    if (lines.length <= 2) break; fs *= 0.86;
+  }
+  const lh = fs * 1.12, total = lh * lines.length;
+  let y0 = pos === 'top' ? H * 0.08 + fs * 0.85 : pos === 'center' ? H / 2 - total / 2 + fs * 0.85 : H - H * 0.08 - total + fs * 0.85;
+  const pop = lt < 0.14 ? 0.82 + 0.18 * (lt / 0.14) : 1;
+  ctx.save(); ctx.translate(W / 2, y0 + total / 2 - fs * 0.85); ctx.scale(pop, pop); ctx.translate(-W / 2, -(y0 + total / 2 - fs * 0.85));
+  ctx.lineJoin = 'round'; ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+  const sp = ctx.measureText(' ').width;
+  lines.forEach((ln, li) => {
+    let x = W / 2 - ln.w / 2; const y = y0 + li * lh;
+    for (const t of ln.toks) {
+      ctx.shadowColor = 'rgba(0,0,0,0.55)'; ctx.shadowBlur = fs * 0.18; ctx.shadowOffsetY = fs * 0.05;
+      ctx.lineWidth = fs * 0.17; ctx.strokeStyle = '#000'; ctx.strokeText(t.w, x, y);
+      ctx.shadowColor = 'transparent'; ctx.fillStyle = t.hl ? '#ffd21f' : '#ffffff'; ctx.fillText(t.w, x, y);
+      x += t.width + sp;
+    }
+  });
+  ctx.restore();
+}
+function drawFrame(ctx, W, H, t) {
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  const n = S.segments.length; if (!n) return;
+  const i = sceneAt(t); if (i < 0) return;
+  const lt = t - S.starts[i], d = segEnd(i) - S.starts[i];
+  const tr = S.settings.transition, td = tr === 'cut' ? 0 : Math.min(S.settings.transDur, d * 0.45);
+  ctx.imageSmoothingQuality = 'high';
+  if (i > 0 && lt < td) {
+    const p = lt / td, e = p * p * (3 - 2 * p);
+    if (tr === 'fade') { drawScene(ctx, i - 1, t, W, H); drawScene(ctx, i, t, W, H, { alpha: e }); }
+    else if (tr === 'flash') { drawScene(ctx, i, t, W, H); ctx.fillStyle = `rgba(255,255,255,${(1 - e) * 0.9})`; ctx.fillRect(0, 0, W, H); }
+    else if (tr === 'slide') { drawScene(ctx, i - 1, t, W, H, { dx: -e * W }); drawScene(ctx, i, t, W, H, { dx: (1 - e) * W }); }
+    else if (tr === 'zoom') { drawScene(ctx, i - 1, t, W, H, { scale: 1 + 0.25 * e }); drawScene(ctx, i, t, W, H, { alpha: e, scale: 1.18 - 0.18 * e }); }
+    else drawScene(ctx, i, t, W, H);
+  } else drawScene(ctx, i, t, W, H);
+  drawCaption(ctx, W, H, S.segments[i].text, lt);
+}
+
+/* ============ preview ============ */
+const pv = $('#pv'), pctx = pv.getContext('2d');
+function sizePreview() { const [W, H] = dims(S.settings.aspect === '16:9' ? 540 : 960); const [w2, h2] = S.settings.aspect === '16:9' ? [960, 540] : [W, H]; pv.width = w2; pv.height = h2; }
+let pvRAF = 0, exporting = null;
+function drawPreview() { if (exporting) return; drawFrame(pctx, pv.width, pv.height, vo.currentTime || 0); const D = duration(); $('#pvTime').textContent = `${fmt(vo.currentTime, 0)} / ${fmt(D, 0)}`; $('#pvSeek').value = D ? Math.round((vo.currentTime / D) * 1000) : 0; }
+function loop() { drawPreview(); if (curTab === 'sync') { drawPlayhead(!vo.paused); $('#tlTime').textContent = fmt(vo.currentTime); } if (tap.active) renderTap(); pvRAF = (!vo.paused) ? requestAnimationFrame(loop) : 0; }
+vo.addEventListener('play', () => { syncMusic(true); if (!pvRAF) pvRAF = requestAnimationFrame(loop); $('#pvPlay').textContent = 'Pause'; });
+vo.addEventListener('pause', () => { syncMusic(false); $('#pvPlay').textContent = 'Play'; loop(); });
+vo.addEventListener('seeked', () => { syncMusic(!vo.paused); loop(); });
+vo.addEventListener('ended', () => { if (tap.active) finishTap(); });
+function syncMusic(play) { if (!S.musicBlob || exporting) return; music.volume = S.settings.musicVol; if (play) { if (music.duration) music.currentTime = vo.currentTime % music.duration; music.play().catch(() => {}); } else music.pause(); }
+$('#pvPlay').onclick = () => { if (!S.audioBlob) return toast('Pehle voiceover upload karo (Step 1)'); vo.paused ? vo.play() : vo.pause(); };
+$('#pvSeek').oninput = e => { vo.currentTime = (+e.target.value / 1000) * duration(); drawPreview(); };
+
+/* ============ timeline ============ */
+const tl = $('#tl'), tctx = tl.getContext('2d');
+function pps() { const wrapW = $('#tlWrap').clientWidth || 800; const D = duration(); const fit = wrapW / D; const z = +$('#tlZoom').value / 100; const v = fit * Math.pow(200 / fit, z); return Math.min(v, 30000 / D); }
+function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+let tlStatic = null;
+function drawTimeline() { buildTimeline(); drawPlayhead(); }
+function buildTimeline() {
+  const D = duration(), k = pps(), W = Math.max(200, Math.round(D * k)), H = 150, dpr = window.devicePixelRatio || 1;
+  tl.width = Math.round(W * dpr); tl.height = H * dpr; tl.style.width = W + 'px'; tl.style.height = H + 'px';
+  const st = tlStatic || (tlStatic = document.createElement('canvas')); st.width = tl.width; st.height = tl.height;
+  const x = st.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, W, H);
+  const ca = cssVar('--tl-a'), cb = cssVar('--tl-b'), ink = cssVar('--ink'), wave = cssVar('--wave'), muted = cssVar('--muted');
+  const n = S.segments.length;
+  for (let i = 0; i < n; i++) { const a = S.starts[i] * k, b = segEnd(i) * k; x.fillStyle = i % 2 ? cb : ca; x.fillRect(a, 0, b - a, H); }
+  for (let i = 0; i < n; i++) { const a = S.starts[i] * k, b = segEnd(i) * k; if (b - a > 18) { x.save(); x.beginPath(); x.rect(a, 0, b - a - 2, H); x.clip(); x.fillStyle = ink; x.font = '600 11px "JetBrains Mono", monospace'; x.fillText(String(i + 1), a + 4, 13); x.fillStyle = muted; x.font = '12px "Hind", sans-serif'; x.fillText(plain(S.segments[i].text), a + 4, H - 8); x.restore(); } }
+  if (analysis) { x.fillStyle = wave; const mid = 78, amp = 52; const step = Math.max(1, Math.ceil(analysis.rate / k)); for (let px = 0; px < W; px++) { const f0 = Math.floor(px / k * analysis.rate); let pk = 0; for (let f = f0; f < f0 + step && f < analysis.peak.length; f++) if (analysis.peak[f] > pk) pk = analysis.peak[f]; const hgt = (pk / analysis.max) * amp; x.fillRect(px, mid - hgt, 1, Math.max(1, hgt * 2)); } }
+  else { x.fillStyle = muted; x.font = '13px "Hind", sans-serif'; x.fillText('Voiceover upload karne par yahan waveform dikhega', 10, 80); }
+  x.fillStyle = ink; for (let i = 1; i < n; i++) { const a = Math.round(S.starts[i] * k); x.fillRect(a - 1, 18, 2, H - 36); x.beginPath(); x.moveTo(a - 6, 18); x.lineTo(a + 6, 18); x.lineTo(a, 26); x.fill(); }
+}
+function drawPlayhead(follow) {
+  if (!tlStatic || tlStatic.width !== tl.width) return buildTimeline(), drawPlayhead(follow);
+  const dpr = window.devicePixelRatio || 1, k = pps(), H = 150;
+  tctx.setTransform(1, 0, 0, 1, 0, 0); tctx.clearRect(0, 0, tl.width, tl.height); tctx.drawImage(tlStatic, 0, 0);
+  tctx.setTransform(dpr, 0, 0, dpr, 0, 0); const ph = (vo.currentTime || 0) * k; tctx.fillStyle = cssVar('--blue'); tctx.fillRect(ph - 1, 0, 2, H);
+  if (follow) { const w = $('#tlWrap'); if (ph < w.scrollLeft || ph > w.scrollLeft + w.clientWidth - 40) w.scrollLeft = Math.max(0, ph - 60); }
+}
+let drag = null;
+tl.addEventListener('pointerdown', e => {
+  const r = tl.getBoundingClientRect(), px = e.clientX - r.left, k = pps();
+  let hit = -1, bd = 7; for (let i = 1; i < S.starts.length; i++) { const d = Math.abs(S.starts[i] * k - px); if (d < bd) { bd = d; hit = i; } }
+  if (hit > 0) { drag = hit; tl.setPointerCapture(e.pointerId); e.preventDefault(); }
+  else { vo.currentTime = clamp(px / k, 0, duration()); loop(); }
+});
+tl.addEventListener('pointermove', e => {
+  const r = tl.getBoundingClientRect(), px = e.clientX - r.left, k = pps();
+  if (drag == null) { let near = false; for (let i = 1; i < S.starts.length; i++) if (Math.abs(S.starts[i] * k - px) < 7) near = true; tl.style.cursor = near ? 'ew-resize' : 'pointer'; return; }
+  const lo = S.starts[drag - 1] + 0.1, hi = (drag + 1 < S.starts.length ? S.starts[drag + 1] : duration()) - 0.1;
+  S.starts[drag] = clamp(px / k, lo, hi); drawTimeline(); $('#tlTime').textContent = 'Scene ' + (drag + 1) + ' @ ' + fmt(S.starts[drag], 2);
+});
+tl.addEventListener('pointerup', () => { if (drag != null) { drag = null; renderTimes(); renderScenes(); drawPreview(); save(); } });
+$('#tlZoom').oninput = drawTimeline;
+$('#tlPlay').onclick = () => { if (!S.audioBlob) return toast('Pehle voiceover upload karo'); vo.paused ? vo.play() : vo.pause(); };
+function renderTimes() {
+  $('#times').innerHTML = S.segments.map((s, i) => `<div class="ti"><b>${i + 1}</b><input type="number" step="0.05" min="0" value="${S.starts[i].toFixed(2)}" data-start="${i}" ${i === 0 ? 'disabled' : ''}><span class="tx" title="${esc(plain(s.text))}">${esc(plain(s.text))}</span></div>`).join('');
+}
+$('#times').addEventListener('change', e => {
+  const i = +e.target.dataset.start; if (!i) return; const lo = S.starts[i - 1] + 0.1, hi = (i + 1 < S.starts.length ? S.starts[i + 1] : duration()) - 0.1;
+  S.starts[i] = clamp(+e.target.value || 0, lo, hi); e.target.value = S.starts[i].toFixed(2); drawTimeline(); renderScenes(); drawPreview(); save();
+});
+
+/* ============ tap sync ============ */
+const tap = { active: false, idx: 0 };
+function renderTap() { const n = S.segments.length; $('#tapCount').textContent = `Scene ${tap.idx + 1} / ${n} · ${fmt(vo.currentTime)}`; $('#tapCur').textContent = plain(S.segments[tap.idx]?.text || ''); $('#tapNext').textContent = tap.idx + 1 < n ? 'Agla: ' + plain(S.segments[tap.idx + 1].text) : 'Ye aakhri scene hai'; }
+$('#tapStart').onclick = () => {
+  if (!S.audioBlob) return toast('Pehle voiceover upload karo'); if (S.segments.length < 2) return toast('Kam se kam 2 scenes chahiye');
+  tap.active = true; tap.idx = 0; S.starts[0] = 0; $('#tapBox').hidden = false; vo.currentTime = 0; vo.play(); renderTap();
+  $('#syncInfo').textContent = 'Jab agla scene shuru ho, Space ya bada button dabao.';
+};
+function doTap() { if (!tap.active) return; const n = S.segments.length; if (tap.idx + 1 >= n) return finishTap(); tap.idx++; S.starts[tap.idx] = Math.max(vo.currentTime - 0.05, S.starts[tap.idx - 1] + 0.1); for (let j = tap.idx + 1; j < n; j++) if (S.starts[j] <= S.starts[j - 1]) S.starts[j] = S.starts[j - 1] + 0.1; renderTap(); if (tap.idx + 1 >= n) { /* last scene placed; let audio finish */ } }
+function finishTap() {
+  if (!tap.active) return; tap.active = false; $('#tapBox').hidden = true; vo.pause();
+  if (tap.idx + 1 < S.segments.length) ratioTiming(tap.idx);
+  $('#syncInfo').textContent = 'Tap Sync ho gaya. Timeline par chhote sudhaar kar sakte ho.'; renderTimes(); renderScenes(); drawTimeline(); drawPreview(); save();
+}
+$('#tapBtn').onclick = doTap; $('#tapStop').onclick = finishTap;
+
+/* ============ SRT ============ */
+function parseSrt(txt) {
+  const cues = []; const re = /(\d{1,2}:)?(\d{1,2}):(\d{2})[,.](\d{1,3})\s*-->\s*(\d{1,2}:)?(\d{1,2}):(\d{2})[,.](\d{1,3})[^\n]*\n([\s\S]*?)(?=\n\s*\n|\n?$)/g;
+  const tt = (h, m, s, ms) => (parseInt(h || '0') * 3600) + parseInt(m) * 60 + parseInt(s) + parseInt(ms.padEnd(3, '0')) / 1000;
+  let m; const src = txt.replace(/\r/g, '') + '\n\n';
+  while ((m = re.exec(src))) { const text = m[9].replace(/<[^>]+>/g, '').replace(/\n+/g, ' ').trim(); if (text) cues.push({ start: tt(m[1] && m[1].slice(0, -1), m[2], m[3], m[4]), end: tt(m[5] && m[5].slice(0, -1), m[6], m[7], m[8]), text }); }
+  return cues;
+}
+$('#srtBtn').onclick = async () => {
+  const [f] = await pickFile($('#srtFile')); if (!f) return; const cues = parseSrt(await f.text()); if (!cues.length) return toast('Is file mein koi subtitle nahi mila');
+  const st = S.settings; const texts = [], starts = [];
+  cues.forEach(c => { const parts = splitScript(c.text, st.splitLevel, st.minWords, st.maxWords); const w = parts.map(weight), tot = w.reduce((a, b) => a + b, 0); let acc = c.start; parts.forEach((p, k) => { texts.push(p); starts.push(acc); acc += (c.end - c.start) * w[k] / tot; }); });
+  S.script = cues.map(c => c.text).join('\n'); $('#script').value = S.script;
+  setSegmentsFromTexts(texts); starts[0] = 0; S.starts = starts; segmentsChanged(true);
+  $('#syncInfo').textContent = `${cues.length} subtitles se ${texts.length} scenes bane, timing SRT se li.`;
+};
+$('#srtExport').onclick = () => {
+  if (!S.segments.length) return; const out = S.segments.map((s, i) => `${i + 1}\n${fmtSrt(S.starts[i])} --> ${fmtSrt(segEnd(i))}\n${captionTokens(s.text).map(t => t.w).join(' ')}\n`).join('\n');
+  download(new Blob([out], { type: 'text/plain' }), safeName() + '.srt');
+};
+$('#smartSync').onclick = () => { if (!S.segments.length) return toast('Pehle scenes banao'); if (!analysis) { ratioTiming(); toast('Voiceover nahi hai, isliye text ke hisaab se baanta'); } else { smartTiming(); $('#syncInfo').textContent = `${analysis.pauses.length} ruk wali jagah mili, scenes unpar set kiye.`; } renderTimes(); renderScenes(); drawTimeline(); drawPreview(); save(); };
+$('#ratioSync').onclick = () => { ratioTiming(); $('#syncInfo').textContent = 'Har scene ko uske text ki lambai ke hisaab se time diya.'; renderTimes(); renderScenes(); drawTimeline(); drawPreview(); save(); };
+
+/* ============ scenes list ============ */
+function renderScenes() {
+  $('#sceneCount').textContent = S.segments.length;
+  const asp = S.settings.aspect.replace(':', '/');
+  $('#scenes').innerHTML = S.segments.map((s, i) => `<div class="scene" data-i="${i}"><div class="num">${i + 1}</div><canvas class="thumb" data-thumb="${i}" width="184" height="104" style="aspect-ratio:${asp}"></canvas><div class="body">
+    <textarea rows="1" data-text="${i}" aria-label="Scene ${i + 1} text">${esc(s.text)}</textarea>
+    <input type="text" data-vis="${i}" value="${esc(s.visual || '')}" placeholder="Visual (optional): image mein kya dikhe, jaise 'Rohan sad, sitting alone on stairs, close-up'">
+    <div class="meta"><span class="t">${fmt(S.starts[i] || 0, 2)} → ${fmt(segEnd(i), 2)} · ${(segEnd(i) - (S.starts[i] || 0)).toFixed(1)}s</span>
+    <button class="btn small" data-split="${i}">Split</button>${i < S.segments.length - 1 ? `<button class="btn small" data-merge="${i}">Merge ↓</button>` : ''}<button class="btn small" data-onecopy="${i}">Prompt</button><button class="btn small danger" data-del="${i}">Delete</button></div></div></div>`).join('') || '<p class="hint">Script likh kar <b>Scenes banao</b> dabao.</p>';
+  $$('[data-thumb]').forEach(cv => { const i = +cv.dataset.thumb; const [W, H] = dims(208); cv.width = W; cv.height = H; const x = cv.getContext('2d'); if (sceneCache[i]) drawCover(x, sceneCache[i], W, H, 1, .5, .5); else { x.fillStyle = cssVar('--surface-2'); x.fillRect(0, 0, W, H); x.fillStyle = cssVar('--muted'); x.font = '600 22px "JetBrains Mono", monospace'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('—', W / 2, H / 2); } });
+}
+$('#scenes').addEventListener('input', e => {
+  const t = e.target; if (t.dataset.text != null) { S.segments[+t.dataset.text].text = t.value; save(); } if (t.dataset.vis != null) { S.segments[+t.dataset.vis].visual = t.value; save(); }
+});
+$('#scenes').addEventListener('change', () => { renderPrompts(); renderStatus(); });
+document.addEventListener('click', async e => {
+  const b = e.target.closest('button'); if (!b) return; const d = b.dataset;
+  if (d.copy != null) { const bt = batches()[+d.copy]; if (bt) copyText(buildPrompt(bt)); }
+  else if (d.onecopy != null) copyText(singlePrompt(+d.onecopy));
+  else if (d.split != null) {
+    const i = +d.split, ta = document.querySelector(`[data-text="${i}"]`), s = S.segments[i].text;
+    let pos = ta && ta.selectionStart > 0 && ta.selectionStart < s.length ? ta.selectionStart : -1;
+    if (pos < 0) { const words = s.split(' '); if (words.length < 2) return toast('Ek shabd ko todna mumkin nahi'); pos = words.slice(0, Math.ceil(words.length / 2)).join(' ').length; }
+    const a = s.slice(0, pos).trim(), c = s.slice(pos).trim(); if (!a || !c) return;
+    const d0 = S.starts[i], d1 = segEnd(i), mid = d0 + (d1 - d0) * weight(a) / (weight(a) + weight(c));
+    S.segments.splice(i, 1, { ...S.segments[i], text: a }, { id: uid++, text: c, visual: '' }); S.starts.splice(i + 1, 0, mid); segmentsChanged(true);
+  }
+  else if (d.merge != null) { const i = +d.merge; const A = S.segments[i], B = S.segments[i + 1]; A.text = A.text.trim() + ' ' + B.text.trim(); A.visual = [A.visual, B.visual].filter(Boolean).join('; '); S.segments.splice(i + 1, 1); S.starts.splice(i + 1, 1); segmentsChanged(true); }
+  else if (d.del != null) { const i = +d.del; S.segments.splice(i, 1); S.starts.splice(i, 1); if (S.starts.length) S.starts[0] = 0; segmentsChanged(true); }
+  else if (d.replace != null) { const [f] = await pickFile($('#oneFile')); if (f) { await setGrid(+d.replace, f); segmentsChanged(true); } }
+  else if (d.remove != null) { S.grids[+d.remove] = null; R.grids[+d.remove] = null; segmentsChanged(true); }
+  else if (d.one != null) { const i = +d.one; const [f] = await pickFile($('#oneFile')); if (f) { await setOverride(S.segments[i].id, f); segmentsChanged(true); } }
+  else if (d.oneclear != null) { const id = S.segments[+d.oneclear].id; delete S.overrides[id]; delete R.overrides[id]; segmentsChanged(true); }
+});
+document.addEventListener('change', e => {
+  const t = e.target, d = t.dataset;
+  if (d.auto != null) { const gi = +d.auto; S.grids[gi].auto = t.checked; computeCells(gi); segmentsChanged(true); }
+});
+document.addEventListener('input', e => {
+  const t = e.target, d = t.dataset;
+  if (d.trim != null) { const gi = +d.trim; S.grids[gi].trim = +t.value; document.querySelector(`[data-trimv="${gi}"]`).textContent = t.value + '%'; computeCells(gi); rebuildCache(); drawSrc(gi); drawCellThumbs(); save(); clearTimeout(trimT); trimT = setTimeout(() => { renderScenes(); drawPreview(); }, 300); }
+});
+let trimT;
+
+$('#splitBtn').onclick = () => {
+  const st = S.settings; S.script = $('#script').value;
+  const texts = splitScript(S.script, st.splitLevel, +st.minWords || 1, +st.maxWords || 14);
+  if (!texts.length) return toast('Script khali hai');
+  setSegmentsFromTexts(texts);
+  const avg = duration() / texts.length;
+  $('#splitInfo').textContent = `${texts.length} scenes bane${S.audioBlob ? ` · har scene ~${avg.toFixed(1)}s` : ''} · ${batches().length} grid images`;
+};
+
+/* ============ status ============ */
+function renderStatus() {
+  const n = S.segments.length, bs = batches(), up = bs.filter(b => S.grids[b.index]).length;
+  const missing = sceneCache.filter(c => !c).length;
+  $('#status').innerHTML = `<span class="chip ${n ? 'ok' : 'wait'}">${n} scenes</span><span class="chip ${S.audioBlob ? 'ok' : 'wait'}">${S.audioBlob ? 'Voice ' + fmt(duration(), 0) : 'Voice baaki'}</span><span class="chip ${bs.length && up === bs.length ? 'ok' : 'wait'}">Grids ${up}/${bs.length}</span>${missing && n ? `<span class="chip wait">${missing} image baaki</span>` : ''}`;
+}
+
+/* ============ audio upload ============ */
+let actxDecode;
+async function setVoice(blob, name) {
+  S.audioBlob = blob; S.audioName = name || S.audioName || 'voiceover';
+  if (vo.src) URL.revokeObjectURL(vo.src); vo.src = URL.createObjectURL(blob);
+  $('#voInfo').textContent = 'Voiceover padh rahe hain...';
+  try {
+    actxDecode = actxDecode || new (window.AudioContext || window.webkitAudioContext)();
+    audioBuf = await actxDecode.decodeAudioData(await blob.arrayBuffer()); analysis = analyzeAudio(audioBuf);
+    $('#voInfo').innerHTML = `<b>${esc(S.audioName)}</b> · ${fmt(audioBuf.duration)} · ${analysis.pauses.length} ruk wali jagah mili`;
+  } catch (e) { audioBuf = null; analysis = null; $('#voInfo').textContent = 'Ye audio decode nahi hua (waveform nahi dikhega), par play ho sakta hai. MP3 ya WAV try karo.'; }
+}
+setupDrop($('#voDrop'), async f => { await setVoice(f[0], f[0].name); if (S.segments.length) smartTiming(); segmentsChanged(true); toast('Voiceover lag gaya, scenes sync ho gaye'); }, $('#voFile'), false);
+async function setMusic(blob, name) { S.musicBlob = blob; S.musicName = name; if (music.src) URL.revokeObjectURL(music.src); music.src = blob ? URL.createObjectURL(blob) : ''; $('#musicInfo').textContent = blob ? name : 'Koi music nahi'; }
+$('#musicBtn').onclick = async () => { const [f] = await pickFile($('#musicFile')); if (f) { await setMusic(f, f.name); save(); } };
+$('#musicDel').onclick = () => { music.pause(); setMusic(null, ''); save(); };
+
+/* ============ bulk grid upload ============ */
+setupDrop($('#bulkDrop'), async files => {
+  files = files.filter(f => f.type.startsWith('image/')).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  const bs = batches(); if (!bs.length) return toast('Pehle scenes banao');
+  let placed = 0;
+  for (const b of bs) { if (!files.length) break; if (S.grids[b.index]) continue; await setGrid(b.index, files.shift()); placed++; }
+  segmentsChanged(true); toast(`${placed} grid image lag gayi${files.length ? `, ${files.length} extra bachi` : ''}`);
+}, $('#bulkFile'), true);
+
+/* ============ director ============ */
+$('#copyDirector').onclick = () => { if (!S.segments.length) return toast('Pehle scenes banao'); copyText(directorPrompt()); };
+$('#applyDirector').onclick = () => {
+  const txt = $('#directorReply').value; let c = 0;
+  txt.split('\n').forEach(l => { const m = l.match(/^\s*(?:scene\s*)?(\d+)\s*[:.)\-–]\s*(.+)$/i); if (m) { const i = +m[1] - 1; if (S.segments[i]) { S.segments[i].visual = m[2].trim().replace(/^["']|["']$/g, ''); c++; } } });
+  $('#dirInfo').textContent = c ? `${c} scenes ka visual bhar diya` : 'Koi line "1: ..." format mein nahi mili';
+  if (c) { renderScenes(); renderPrompts(); save(); }
+};
+$('#copyAll').onclick = () => { const bs = batches(); if (!bs.length) return toast('Pehle scenes banao'); copyText(bs.map(b => `===== IMAGE ${b.index + 1} (Scenes ${b.start + 1}-${b.start + b.count}) =====\n${buildPrompt(b)}`).join('\n\n')); };
+$('#dlPrompts').onclick = () => { const bs = batches(); if (!bs.length) return; download(new Blob([bs.map(b => `===== IMAGE ${b.index + 1} (Scenes ${b.start + 1}-${b.start + b.count}) =====\n${buildPrompt(b)}`).join('\n\n')], { type: 'text/plain' }), safeName() + '-prompts.txt'); };
+$('#loadChars').onclick = () => { const ta = $('#characters'); ta.value = (ta.value.trim() ? ta.value.trim() + '\n' : '') + CHANNEL_CHARS; S.settings.characters = ta.value; renderPrompts(); save(); };
+
+/* ============ settings binding ============ */
+const BIND = ['aspect', 'grid', 'style', 'styleText', 'characters', 'gutter', 'splitLevel', 'minWords', 'maxWords', 'captions', 'capSize', 'motion', 'transition', 'transDur', 'res', 'fps', 'musicVol'];
+const NUM = new Set(['grid', 'minWords', 'maxWords', 'capSize', 'motion', 'transDur', 'res', 'fps', 'musicVol']);
+function applySettingsToUI() { BIND.forEach(k => { const el = $('#' + k); if (el) el.value = S.settings[k]; }); $('#projTitle').value = S.settings.title || ''; }
+BIND.forEach(k => { const el = $('#' + k); if (!el) return; el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => {
+  S.settings[k] = NUM.has(k) ? +el.value : el.value;
+  if (k === 'style') { if (S.settings.style !== 'custom') { S.settings.styleText = STYLES[S.settings.style].text; $('#styleText').value = S.settings.styleText; } }
+  if (k === 'musicVol') music.volume = S.settings.musicVol;
+  if (k === 'aspect') { sizePreview(); }
+  if (['aspect', 'grid', 'gutter', 'style'].includes(k)) { R.grids.forEach((r, gi) => { if (r) { r.cells = null; } }); rebuildCache(); renderGridCards(); renderScenes(); renderStatus(); }
+  if (['style', 'styleText', 'characters', 'gutter', 'aspect', 'grid'].includes(k)) renderPrompts();
+  drawPreview(); save();
+}); });
+$('#projTitle').addEventListener('input', e => { S.settings.title = e.target.value; save(); });
+
+/* ============ tabs ============ */
+let curTab = 'script';
+function showTab(name) {
+  curTab = name; $$('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === name)); $$('section.step').forEach(s => s.hidden = s.dataset.panel !== name);
+  try { localStorage.setItem('ss-tab', name); } catch (_) {}
+  if (name === 'sync') { renderTimes(); requestAnimationFrame(drawTimeline); }
+  if (name === 'video') drawPreview();
+  if (name === 'grids') drawCellThumbs();
+}
+$$('nav.tabs button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+document.addEventListener('keydown', e => {
+  const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '') && document.activeElement.type !== 'range' && document.activeElement.type !== 'checkbox';
+  if (e.code === 'Space' && tap.active) { e.preventDefault(); doTap(); return; }
+  if (e.code === 'Space' && !typing && (curTab === 'video' || curTab === 'sync') && S.audioBlob && !exporting) { e.preventDefault(); vo.paused ? vo.play() : vo.pause(); }
+});
+window.addEventListener('resize', () => { if (curTab === 'sync') drawTimeline(); });
+
+/* ============ export ============ */
+function pickMime() {
+  const c = ['video/mp4;codecs=avc1.640028,mp4a.40.2', 'video/mp4;codecs=avc1,mp4a', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+  return c.find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || '';
+}
+$('#exportBtn').onclick = async () => {
+  if (!S.audioBlob) return toast('Pehle voiceover upload karo'); if (!S.segments.length) return toast('Pehle scenes banao');
+  if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) return toast('Ye browser video export nahi karta. Chrome ya Edge use karo.');
+  const missing = sceneCache.filter(c => !c).length;
+  if (missing && !$('#exportBtn').dataset.confirm) { $('#exportBtn').dataset.confirm = '1'; $('#exportInfo').textContent = `${missing} scenes ki image abhi baaki hai (wahan "image baaki" dikhega). Phir bhi export ke liye dobara dabao.`; return; }
+  delete $('#exportBtn').dataset.confirm;
+  vo.pause(); try { await document.fonts.load('800 40px "Baloo 2"'); } catch (_) {}
+  const [W, H] = exportDims(), fps = +S.settings.fps; const mime = pickMime();
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const ctx = cv.getContext('2d');
+  const actx = new (window.AudioContext || window.webkitAudioContext)(); const dest = actx.createMediaStreamDestination();
+  const a = new Audio(URL.createObjectURL(S.audioBlob)); const srcA = actx.createMediaElementSource(a); srcA.connect(dest);
+  let m = null; if (S.musicBlob) { m = new Audio(URL.createObjectURL(S.musicBlob)); m.loop = true; const g = actx.createGain(); g.gain.value = S.settings.musicVol; actx.createMediaElementSource(m).connect(g).connect(dest); }
+  const stream = cv.captureStream(fps); dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
+  let rec; try { rec = new MediaRecorder(stream, { mimeType: mime || undefined, videoBitsPerSecond: H >= 1080 || W >= 1080 ? 12e6 : 6e6, audioBitsPerSecond: 192000 }); }
+  catch (e) { actx.close(); return toast('Recorder start nahi hua: ' + e.message); }
+  const chunks = []; rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+  const ui = { btn: $('#exportBtn'), cancel: $('#exportCancel'), prog: $('#exportProg'), info: $('#exportInfo') };
+  exporting = { cancelled: false }; ui.btn.disabled = true; ui.cancel.hidden = false; ui.prog.hidden = false; ui.prog.value = 0;
+  ui.info.textContent = `Export chal raha hai (${W}×${H}, ${mime.includes('mp4') ? 'MP4' : 'WebM'}). Ye tab khula rakho.`;
+  let wake = null; try { wake = await navigator.wakeLock?.request('screen'); } catch (_) {}
+  const finish = () => new Promise(res => { rec.onstop = res; setTimeout(() => { try { rec.stop(); } catch (_) { res(); } }, 350); });
+  let done = false;
+  const tick = () => { if (done) return; drawFrame(ctx, W, H, a.currentTime); pctx.drawImage(cv, 0, 0, pv.width, pv.height); ui.prog.value = a.currentTime / (a.duration || duration()); ui.info.textContent = `Export: ${fmt(a.currentTime, 0)} / ${fmt(a.duration || duration(), 0)} · tab khula rakho`; requestAnimationFrame(tick); };
+  // backup ticker for when rAF is throttled
+  const backup = setInterval(() => { if (!done && document.hidden) drawFrame(ctx, W, H, a.currentTime); }, 1000 / fps);
+  drawFrame(ctx, W, H, 0);
+  ui.cancel.onclick = () => { exporting.cancelled = true; a.pause(); a.dispatchEvent(new Event('ended')); };
+  rec.start(500);
+  try { await a.play(); if (m) m.play().catch(() => {}); } catch (e) { toast('Audio start nahi hua'); }
+  tick();
+  await new Promise(res => a.addEventListener('ended', res, { once: true }));
+  drawFrame(ctx, W, H, a.duration || duration()); await finish(); done = true; clearInterval(backup);
+  if (m) m.pause(); actx.close(); try { wake && wake.release(); } catch (_) {}
+  const cancelled = exporting.cancelled; exporting = null; ui.btn.disabled = false; ui.cancel.hidden = true; ui.prog.hidden = true; drawPreview();
+  if (cancelled) { ui.info.textContent = 'Export cancel ho gaya.'; return; }
+  const ext = mime.includes('mp4') ? 'mp4' : 'webm'; const blob = new Blob(chunks, { type: mime || 'video/webm' });
+  download(blob, `${safeName()}.${ext}`);
+  ui.info.innerHTML = `Video ban gayi: <b>${safeName()}.${ext}</b> (${(blob.size / 1048576).toFixed(1)} MB) download ho gayi.${ext === 'webm' ? ' WebM ko MP4 banana ho to: <kbd>ffmpeg -i video.webm -c:v libx264 -c:a aac video.mp4</kbd>' : ''}`;
+};
+
+/* ============ project file ============ */
+const b2d = b => new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(b); });
+const d2b = async d => d ? (await fetch(d)).blob() : null;
+$('#saveFile').onclick = async () => {
+  toast('Project file bana rahe hain...'); const s = snapshot(); const out = { ...s, grids: [], overrides: {} };
+  for (const g of s.grids) out.grids.push(g ? { ...g, blob: await b2d(g.blob) } : null);
+  for (const [k, v] of Object.entries(s.overrides)) out.overrides[k] = await b2d(v);
+  out.audioBlob = s.audioBlob ? await b2d(s.audioBlob) : null; out.musicBlob = s.musicBlob ? await b2d(s.musicBlob) : null;
+  download(new Blob([JSON.stringify(out)], { type: 'application/json' }), safeName() + '.ssproj');
+};
+$('#openFileBtn').onclick = async () => {
+  const [f] = await pickFile($('#openFile')); if (!f) return;
+  try { const p = JSON.parse(await f.text()); p.grids = await Promise.all((p.grids || []).map(async g => g ? { ...g, blob: await d2b(g.blob) } : null));
+    const ov = {}; for (const [k, v] of Object.entries(p.overrides || {})) ov[k] = await d2b(v); p.overrides = ov;
+    p.audioBlob = await d2b(p.audioBlob); p.musicBlob = await d2b(p.musicBlob); await restore(p); save(); toast('Project khul gaya'); }
+  catch (e) { toast('Ye project file sahi nahi hai'); }
+};
+let newArm = 0;
+$('#newProj').onclick = async () => {
+  if (Date.now() - newArm > 3000) { newArm = Date.now(); toast('Sab saaf karna hai? 3 second mein dobara "Naya" dabao'); return; }
+  newArm = 0; vo.pause(); await restore({ settings: { ...DEFAULTS }, script: '', segments: [], starts: [], grids: [], overrides: {} }); save(); toast('Naya project');
+};
+async function restore(p) {
+  S.settings = { ...DEFAULTS, ...(p.settings || {}) }; S.script = p.script || ''; S.segments = p.segments || []; S.starts = p.starts || [];
+  uid = Math.max(p.uid || 1, ...S.segments.map(s => s.id + 1), 1);
+  S.grids = []; R.grids = []; S.overrides = {}; R.overrides = {}; audioBuf = null; analysis = null; S.audioBlob = null;
+  if (vo.src) { URL.revokeObjectURL(vo.src); vo.removeAttribute('src'); vo.load(); }
+  $('#voInfo').textContent = ''; $('#script').value = S.script; applySettingsToUI(); sizePreview();
+  for (let i = 0; i < (p.grids || []).length; i++) { const g = p.grids[i]; if (g && g.blob) { try { R.grids[i] = { img: await loadImage(g.blob) }; S.grids[i] = { blob: g.blob, auto: g.auto !== false, trim: g.trim ?? 1.5 }; } catch (_) {} } }
+  for (const [k, v] of Object.entries(p.overrides || {})) if (v) await setOverride(k, v);
+  if (p.audioBlob) await setVoice(p.audioBlob, p.audioName);
+  await setMusic(p.musicBlob || null, p.musicName || '');
+  if (S.starts.length !== S.segments.length) ratioTiming();
+  segmentsChanged(true);
+}
+
+/* ============ boot ============ */
+(async function boot() {
+  sizePreview();
+  try { await DB.open(); } catch (_) {}
+  let p = null; try { p = await DB.get('project'); } catch (_) {}
+  if (p && (p.script || (p.segments && p.segments.length))) await restore(p);
+  else {
+    S.script = SAMPLE; $('#script').value = SAMPLE; applySettingsToUI();
+    setSegmentsFromTexts(splitScript(SAMPLE, 'all', 2, 14));
+    $('#splitInfo').textContent = 'Ye ek example script hai. Apni script daal kar "Scenes banao" dabao.';
+  }
+  let tab = 'script'; try { tab = localStorage.getItem('ss-tab') || 'script'; } catch (_) {}
+  showTab(tab);
+  document.fonts && document.fonts.ready.then(() => { drawPreview(); });
+})();
+</script>
+</body>
+</html>
