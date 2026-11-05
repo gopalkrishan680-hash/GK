@@ -68,14 +68,14 @@ fun LinesScreen(state: AppState) {
                 modifier = Modifier.padding(16.dp),
             )
         }
-        item { SectionTitle("Chalu lines (${state.data.operationalLines.size})") }
+        item { SectionTitle("Running lines (${state.data.operationalLines.size})") }
         items(state.data.operationalLines, key = { it.id }) { l -> LineRow(l) { open = l.id } }
         item { Spacer(Modifier.height(8.dp)) }
-        item { SectionTitle("🚧 Aane wali lines / under construction") }
+        item { SectionTitle("🚧 Upcoming lines (under construction)") }
         items(state.data.upcomingLines, key = { it.id }) { l -> LineRow(l) { open = l.id } }
         item {
             Text(
-                "Aane wali lines ki jaankari news reports par based hai – stations aur dates badal sakti hain.",
+                "Upcoming line details are based on news reports – stations and dates may change.",
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(16.dp),
@@ -155,7 +155,7 @@ private fun LineDetail(state: AppState, line: MetroLine, onBack: () -> Unit) {
                             }
                         }
                         if (line.upcoming && st.lines.isNotEmpty()) {
-                            Text("Abhi bhi chalu station hai", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                            Text("Already a running station", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
                         }
                     }
                     if (!line.upcoming && line.km.isNotEmpty()) {
@@ -178,16 +178,16 @@ fun InfoScreen() {
         }
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
-        Text("Jaankari", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text("Info", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(12.dp))
 
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
-                Text("Kiraya (DMRC, 25 Aug 2025 se)", style = MaterialTheme.typography.titleMedium)
+                Text("Fares (DMRC, from 25 Aug 2025)", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth()) {
-                    Text("Doori", Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
-                    Text("Aam din", Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                    Text("Distance", Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                    Text("Weekday", Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
                     Text("Sunday/holiday", Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
                 }
                 HorizontalDivider(Modifier.padding(vertical = 6.dp))
@@ -200,8 +200,8 @@ fun InfoScreen() {
                 }
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Smart card / NCMC card par ~10% chhoot. App ka kiraya andaaza hai – asli kiraya DMRC ki official doori par depend karta hai. " +
-                        "Airport Express, Aqua Line (Noida) aur Rapid Metro (Gurugram) ka kiraya alag hai.",
+                    "Smart card / NCMC card gives ~10% off. Fares in this app are estimates – actual fares depend on DMRC's official distances. " +
+                        "Airport Express, Aqua Line (Noida) and Rapid Metro (Gurugram) have separate fares.",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -211,7 +211,7 @@ fun InfoScreen() {
 
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
-                Text("Madad / Helpline", style = MaterialTheme.typography.titleMedium)
+                Text("Help / Helpline", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(8.dp))
                 HelpRow("DMRC helpline", "155370") { dial("155370") }
                 HelpRow("Emergency (Police/Ambulance)", "112") { dial("112") }
@@ -222,15 +222,15 @@ fun InfoScreen() {
 
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
-                Text("Kaam ki baatein", style = MaterialTheme.typography.titleMedium)
+                Text("Useful tips", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(6.dp))
                 listOf(
-                    "🕔 Metro aam taur par subah ~5–6 baje se raat ~11 baje tak chalti hai. Har line/station ki pehli aur aakhri train alag hoti hai, station par check karein.",
-                    "👩 Har train me chalne ki disha me pehla coach mahilaon ke liye reserved hota hai.",
-                    "🎫 Token sirf usi din ke liye valid hai. Roz safar karte hain to smart card ya NCMC card sasta padta hai.",
-                    "🎒 Bag security check ke liye taiyar rakhein. Jwalansheel cheezein le jaana mana hai.",
-                    "🔁 Line badalte waqt 'Interchange' ke signboard follow karein.",
-                    "📶 Ye app bina internet ke chalti hai, isliye tunnel me bhi route dekh sakte hain.",
+                    "🕔 Metro usually runs from ~5–6 AM to ~11 PM. First and last train times differ by line and station – check at the station.",
+                    "👩 The first coach in the direction of travel is reserved for women.",
+                    "🎫 Tokens are valid only for the same day. If you travel daily, a smart card or NCMC card is cheaper.",
+                    "🎒 Keep your bag ready for security check. Inflammable items are not allowed.",
+                    "🔁 When changing lines, follow the 'Interchange' signboards.",
+                    "📶 This app works without internet, so you can check routes even inside tunnels.",
                 ).forEach { Text(it, fontSize = 13.sp, modifier = Modifier.padding(vertical = 4.dp)) }
             }
         }
@@ -238,17 +238,17 @@ fun InfoScreen() {
 
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
-                Text("App ke baare me", style = MaterialTheme.typography.titleMedium)
+                Text("About", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "Metro Saathi ek unofficial app hai, iska DMRC ya kisi metro company se koi sambandh nahi hai. " +
-                        "Samay aur kiraya andaaze hain, isliye zaroori safar se pehle official jaankari zaroor check karein.",
+                    "Metro Saathi is an unofficial app and is not affiliated with DMRC or any metro operator. " +
+                        "Times and fares are estimates – please check official sources before important journeys.",
                     fontSize = 13.sp,
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "Station ka order aur location: © OpenStreetMap contributors (ODbL). " +
-                        "Aane wali lines: PIB press release aur news reports.",
+                    "Station order and locations: © OpenStreetMap contributors (ODbL). " +
+                        "Upcoming lines: PIB press release and news reports.",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

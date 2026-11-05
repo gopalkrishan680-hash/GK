@@ -56,7 +56,7 @@ class Prefs(context: Context) {
         set(v) = sp.edit().putLong("alarm_at", v).apply()
 }
 
-/** "Utarne ka alarm" – wakes you up shortly before your destination station. */
+/** "Get-off alarm" – wakes you up shortly before your destination station. */
 object TripAlarm {
     private const val CHANNEL = "trip_alarm"
     private const val EXTRA_STATION = "station"
@@ -101,8 +101,8 @@ object TripAlarm {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
         if (nm.getNotificationChannel(CHANNEL) != null) return
-        val ch = NotificationChannel(CHANNEL, "Utarne ka alarm", NotificationManager.IMPORTANCE_HIGH).apply {
-            description = "Destination station aane se pehle alarm"
+        val ch = NotificationChannel(CHANNEL, "Get-off alarm", NotificationManager.IMPORTANCE_HIGH).apply {
+            description = "Alarm before your destination station"
             enableVibration(true)
             vibrationPattern = longArrayOf(0, 800, 400, 800, 400, 800)
             setSound(
@@ -121,8 +121,8 @@ object TripAlarm {
         )
         val n = NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle("Uthiye! $station aane wala hai")
-            .setContentText("Agle 1–2 station me utarna hai. Darwaze ki taraf chaliye.")
+            .setContentTitle("Wake up! $station is coming up")
+            .setContentText("Your stop is in the next 1–2 stations. Move towards the door.")
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVibrate(longArrayOf(0, 800, 400, 800, 400, 800))
@@ -142,7 +142,7 @@ object TripAlarm {
 
 class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val station = intent.getStringExtra(TripAlarm.STATION_KEY) ?: "Aapka station"
+        val station = intent.getStringExtra(TripAlarm.STATION_KEY) ?: "Your station"
         TripAlarm.notify(context, station)
         Prefs(context).apply {
             alarmStation = null

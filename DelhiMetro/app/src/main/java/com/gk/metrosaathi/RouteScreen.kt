@@ -95,9 +95,9 @@ fun RouteScreen(state: AppState) {
         Card(Modifier.fillMaxWidth()) {
             Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    PickField("Kahan se", from) { picking = "from" }
+                    PickField("From", from) { picking = "from" }
                     Spacer(Modifier.height(8.dp))
-                    PickField("Kahan tak", to) { picking = "to" }
+                    PickField("To", to) { picking = "to" }
                 }
                 IconButton(onClick = {
                     val f = state.from
@@ -119,8 +119,8 @@ fun RouteScreen(state: AppState) {
                     Icon(Icons.Filled.Alarm, null, tint = Color(0xFF8A6D00))
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("Utarne ka alarm: $alarmStation", fontWeight = FontWeight.SemiBold, color = Color(0xFF5C4600))
-                        Text("Bajega ${timeText(state.alarmAt)} par", fontSize = 12.sp, color = Color(0xFF5C4600))
+                        Text("Get-off alarm: $alarmStation", fontWeight = FontWeight.SemiBold, color = Color(0xFF5C4600))
+                        Text("Rings at ${timeText(state.alarmAt)}", fontSize = 12.sp, color = Color(0xFF5C4600))
                     }
                     IconButton(onClick = {
                         TripAlarm.cancel(context)
@@ -134,13 +134,13 @@ fun RouteScreen(state: AppState) {
 
         if (from != null && to != null) {
             if (options.isEmpty()) {
-                Text("Is route ka rasta nahi mila.", color = MaterialTheme.colorScheme.error)
+                Text("No route found.", color = MaterialTheme.colorScheme.error)
             } else {
                 var selected by remember(from, to) { mutableIntStateOf(0) }
                 if (options.size > 1) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(selected == 0, onClick = { selected = 0 }, label = { Text("Sabse tez") })
-                        FilterChip(selected == 1, onClick = { selected = 1 }, label = { Text("Kam line change") })
+                        FilterChip(selected == 0, onClick = { selected = 0 }, label = { Text("Fastest") })
+                        FilterChip(selected == 1, onClick = { selected = 1 }, label = { Text("Fewer changes") })
                     }
                     Spacer(Modifier.height(8.dp))
                 }
@@ -174,7 +174,7 @@ fun RouteScreen(state: AppState) {
     picking?.let { which ->
         StationPicker(
             state = state,
-            title = if (which == "from") "Kahan se?" else "Kahan tak?",
+            title = if (which == "from") "From where?" else "To where?",
             onPick = { name ->
                 if (which == "from") state.chooseFrom(name) else state.chooseTo(name)
                 picking = null
@@ -196,7 +196,7 @@ private fun PickField(label: String, value: String?, onClick: () -> Unit) {
     ) {
         Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(
-            value ?: "Station chuniye",
+            value ?: "Choose station",
             fontSize = 16.sp,
             fontWeight = if (value != null) FontWeight.SemiBold else FontWeight.Normal,
             color = if (value != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -213,10 +213,10 @@ private fun JourneyCard(state: AppState, j: Journey) {
         Column(Modifier.padding(16.dp)) {
             // Summary
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Stat("${j.minutes} min", "Samay (approx)")
+                Stat("${j.minutes} min", "Time (approx)")
                 Stat("${j.stationCount}", "Stations")
-                Stat("${j.interchanges}", "Line change")
-                Stat(formatKm(j.km), "Doori")
+                Stat("${j.interchanges}", "Changes")
+                Stat(formatKm(j.km), "Distance")
             }
             Spacer(Modifier.height(12.dp))
 
@@ -230,7 +230,7 @@ private fun JourneyCard(state: AppState, j: Journey) {
             ) {
                 if (j.dmrcKm > 0.05) {
                     val sunday = Calendar.getInstance().get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
-                    Text("Kiraya (approx)", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Fare (approx)", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         FareItem("Token", Fare.token(j.dmrcKm), highlight = !sunday)
                         FareItem("Smart card", Fare.smartCard(j.dmrcKm), highlight = false)
@@ -238,7 +238,7 @@ private fun JourneyCard(state: AppState, j: Journey) {
                     }
                 }
                 j.separateFareLines.forEach {
-                    Text("+ ${it.shortName}: ${it.note.ifBlank { "alag kiraya" }}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("+ ${it.shortName}: ${it.note.ifBlank { "separate fare" }}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             Spacer(Modifier.height(16.dp))
@@ -248,11 +248,11 @@ private fun JourneyCard(state: AppState, j: Journey) {
                 when (leg) {
                     is Leg.Ride -> {
                         if (i > 0 && j.legs[i - 1] is Leg.Ride) {
-                            ChangeRow("${leg.stations.first()} par ${leg.line.shortName} ke liye line badlein (~5 min)")
+                            ChangeRow("Change to ${leg.line.shortName} at ${leg.stations.first()} (~5 min)")
                         }
                         RideBlock(state, leg)
                     }
-                    is Leg.Walk -> ChangeRow("${leg.from} se ${leg.to} tak paidal (~${leg.minutes} min)")
+                    is Leg.Walk -> ChangeRow("Walk from ${leg.from} to ${leg.to} (~${leg.minutes} min)")
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -265,18 +265,18 @@ private fun JourneyCard(state: AppState, j: Journey) {
                         val at = System.currentTimeMillis() + mins * 60_000L
                         TripAlarm.schedule(context, j.to, at)
                         state.refreshAlarm()
-                        Toast.makeText(context, "Alarm ${timeText(at)} par bajega (≈$mins min)", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "Alarm set for ${timeText(at)} (≈$mins min)", Toast.LENGTH_LONG).show()
                     },
                     modifier = Modifier.weight(1f),
                 ) {
                     Icon(Icons.Filled.Alarm, null)
                     Spacer(Modifier.width(6.dp))
-                    Text("Utarne ka alarm")
+                    Text("Get-off alarm")
                 }
-                OutlinedButton(onClick = { state.from = null; state.to = null }) { Text("Naya route") }
+                OutlinedButton(onClick = { state.from = null; state.to = null }) { Text("New route") }
             }
             Text(
-                "Alarm abhi metro me baithne ke hisaab se lagta hai, aapke station se ~3 min pehle bajega.",
+                "Set it when you board – it rings ~3 min before your station.",
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 6.dp),
@@ -334,12 +334,12 @@ private fun RideBlock(state: AppState, leg: Leg.Ride) {
             }
             val mid = leg.stations.drop(1).dropLast(1)
             Text(
-                "Agla station: ${leg.stations[1]}  •  ${leg.stations.size - 1} stop  •  ~${Math.round(leg.minutes)} min",
+                "Next: ${leg.stations[1]}  •  ${leg.stations.size - 1} stops  •  ~${Math.round(leg.minutes)} min",
                 fontSize = 12.sp,
             )
             if (mid.isNotEmpty()) {
                 Text(
-                    if (expanded) "▲ Stations chhupaiye" else "▼ ${mid.size} beech ke stations dekhiye",
+                    if (expanded) "▲ Hide stations" else "▼ Show ${mid.size} stations in between",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.clickable { expanded = !expanded }.padding(vertical = 4.dp),
@@ -353,7 +353,7 @@ private fun RideBlock(state: AppState, leg: Leg.Ride) {
                 }
             }
             Spacer(Modifier.height(4.dp))
-            Text("Utrein: ${leg.stations.last()}", fontWeight = FontWeight.Bold)
+            Text("Get off: ${leg.stations.last()}", fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(6.dp))
         }
     }
@@ -363,14 +363,14 @@ private fun RideBlock(state: AppState, leg: Leg.Ride) {
 private fun TipsCard() {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
-            Text("Kaise use karein", style = MaterialTheme.typography.titleMedium)
+            Text("How to use", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(6.dp))
             listOf(
-                "📍 'Kahan se' me GPS se apna sabse paas ka station chuniye",
-                "🔁 Sabse tez ya kam line change wala rasta chuniye",
-                "⏰ Metro me baithte hi 'Utarne ka alarm' lagaiye – so bhi jaayein to station miss nahi hoga",
-                "📶 Ye app poori tarah offline chalti hai – tunnel me bhi",
-                "🗺️ Map tab me zoom karke kisi bhi station par tap kariye",
+                "📍 Use GPS in 'From' to pick your nearest station",
+                "🔁 Choose the fastest route or the one with fewer changes",
+                "⏰ Set the 'Get-off alarm' when you board – you won't miss your stop even if you doze off",
+                "📶 Works fully offline – even inside tunnels",
+                "🗺️ Zoom the map and tap any station for details",
             ).forEach { Text(it, fontSize = 13.sp, modifier = Modifier.padding(vertical = 3.dp)) }
         }
     }

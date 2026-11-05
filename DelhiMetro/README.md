@@ -1,6 +1,6 @@
 # Metro Saathi – Delhi NCR Metro app (unofficial)
 
-Kotlin + Jetpack Compose. **Poori tarah offline** – tunnel me bhi chalti hai.
+Kotlin + Jetpack Compose. **Poori tarah offline** – tunnel me bhi chalti hai. App ki language: English.
 
 ## Features
 - **Saare chalu stations (276)**: Red, Yellow, Blue (+branch), Green (+branch), Violet, Pink (ring), Magenta

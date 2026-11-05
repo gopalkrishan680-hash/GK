@@ -73,7 +73,7 @@ import kotlin.math.min
 
 // ======================================================================== Map tab
 
-/** The Map tab: "Chalu" (running) and "Aane wale" (upcoming) sub-tabs, each with a map or a list. */
+/** The Map tab: "Running" and "Upcoming" sub-tabs, each with a map or a list. */
 @Composable
 fun MapTab(state: AppState) {
     var sub by remember { mutableIntStateOf(0) }       // 0 = running, 1 = upcoming
@@ -83,8 +83,8 @@ fun MapTab(state: AppState) {
 
     Column(Modifier.fillMaxSize()) {
         TabRow(selectedTabIndex = sub) {
-            Tab(sub == 0, onClick = { sub = 0 }, text = { Text("Chalu stations (${state.data.operationalStations.size})") })
-            Tab(sub == 1, onClick = { sub = 1 }, text = { Text("Aane wale ($upcomingCount)") })
+            Tab(sub == 0, onClick = { sub = 0 }, text = { Text("Running (${state.data.operationalStations.size})") })
+            Tab(sub == 1, onClick = { sub = 1 }, text = { Text("Upcoming ($upcomingCount)") })
         }
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
@@ -96,7 +96,7 @@ fun MapTab(state: AppState) {
             Spacer(Modifier.weight(1f))
             if (!listView) {
                 FilterChip(selected = diagram, onClick = { diagram = true }, label = { Text("Diagram") })
-                FilterChip(selected = !diagram, onClick = { diagram = false }, label = { Text("Asli map") })
+                FilterChip(selected = !diagram, onClick = { diagram = false }, label = { Text("Real map") })
             }
         }
         Box(Modifier.fillMaxSize()) {
@@ -117,7 +117,7 @@ private fun RunningList(state: AppState) {
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
-            placeholder = { Text("Station dhoondhiye…") },
+            placeholder = { Text("Search stations…") },
             singleLine = true,
             trailingIcon = {
                 if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Close, "Clear") }
@@ -125,7 +125,7 @@ private fun RunningList(state: AppState) {
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
         )
         Text(
-            "${results.size} chalu stations • tap karke details dekhiye",
+            "${results.size} running stations • tap for details",
             fontSize = 12.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
@@ -141,7 +141,7 @@ private fun UpcomingList(state: AppState) {
     LazyColumn(Modifier.fillMaxSize()) {
         item {
             Text(
-                "Ye stations abhi ban rahe hain. Naam aur tareekh badal sakti hain.",
+                "These stations are under construction. Names and dates may change.",
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(16.dp),
@@ -171,7 +171,7 @@ private fun UpcomingList(state: AppState) {
                 ) {
                     Text(name, modifier = Modifier.weight(1f), fontWeight = if (existing) FontWeight.SemiBold else FontWeight.Normal)
                     Text(
-                        if (existing) "Chalu – interchange banega" else "Naya station",
+                        if (existing) "Running – will be interchange" else "New station",
                         fontSize = 11.sp,
                         color = if (existing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -279,7 +279,7 @@ fun NetworkMap(state: AppState, upcomingMode: Boolean, diagram: Boolean) {
     val (locating, locate) = rememberNearestFinder(data) { res ->
         val st = res?.firstOrNull()?.first
         if (st == null) {
-            Toast.makeText(context, "Location nahi mili", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Couldn't get your location", Toast.LENGTH_SHORT).show()
         } else {
             highlight = st.name
             centerOn(st.name, if (diagram) 4f else 8f)
@@ -424,7 +424,7 @@ fun NetworkMap(state: AppState, upcomingMode: Boolean, diagram: Boolean) {
         }
 
         Text(
-            "Pinch/double-tap se zoom • station par tap",
+            "Pinch or double-tap to zoom • tap a station",
             fontSize = 11.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier

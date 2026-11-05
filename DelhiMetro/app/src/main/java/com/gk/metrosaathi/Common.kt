@@ -151,7 +151,7 @@ fun StationPicker(
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    placeholder = { Text("Station ka naam likhiye…") },
+                    placeholder = { Text("Type a station name…") },
                     singleLine = true,
                     trailingIcon = {
                         if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Close, "Clear") }
@@ -169,7 +169,7 @@ fun StationPicker(
                                 else Icon(Icons.Filled.MyLocation, null, tint = MaterialTheme.colorScheme.primary)
                                 Spacer(Modifier.width(12.dp))
                                 Text(
-                                    if (busy) "Location dhoondh rahe hain…" else "Mere paas ka station (GPS)",
+                                    if (busy) "Finding your location…" else "Nearest station (GPS)",
                                     color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.SemiBold,
                                 )
@@ -177,14 +177,14 @@ fun StationPicker(
                         }
                         if (locError) item {
                             Text(
-                                "Location nahi mili. GPS on karke dobara try karein.",
+                                "Couldn't get your location. Turn on GPS and try again.",
                                 color = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.padding(horizontal = 16.dp),
                             )
                         }
                         nearest?.let { list ->
                             items(list, key = { "n_" + it.first.name }) { (st, d) ->
-                                StationRow(state, st, subtitle = "${formatKm(d)} door") { onPick(st.name) }
+                                StationRow(state, st, subtitle = "${formatKm(d)} away") { onPick(st.name) }
                             }
                             item { HorizontalDivider() }
                         }
@@ -193,7 +193,7 @@ fun StationPicker(
                             items(favs, key = { "f_" + it.name }) { st -> StationRow(state, st) { onPick(st.name) } }
                             item { HorizontalDivider() }
                         }
-                        item { SectionTitle("Saare stations (${results.size})") }
+                        item { SectionTitle("All stations (${results.size})") }
                     }
                     items(results, key = { it.name }) { st -> StationRow(state, st) { onPick(st.name) } }
                 }
@@ -273,15 +273,15 @@ fun StationSheet(state: AppState, name: String, onDismiss: () -> Unit, onOpenMap
             Spacer(Modifier.height(16.dp))
             if (st.lines.isNotEmpty()) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Button(onClick = { state.chooseFrom(st.name); onDismiss() }, modifier = Modifier.weight(1f)) { Text("Yahan se") }
-                    Button(onClick = { state.chooseTo(st.name); onDismiss() }, modifier = Modifier.weight(1f)) { Text("Yahan tak") }
+                    Button(onClick = { state.chooseFrom(st.name); onDismiss() }, modifier = Modifier.weight(1f)) { Text("From here") }
+                    Button(onClick = { state.chooseTo(st.name); onDismiss() }, modifier = Modifier.weight(1f)) { Text("To here") }
                 }
                 Spacer(Modifier.height(8.dp))
             }
             OutlinedButton(onClick = { onOpenMaps(st) }, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Filled.Directions, null)
                 Spacer(Modifier.width(8.dp))
-                Text("Station tak ka rasta (Maps)")
+                Text("Directions to station (Maps)")
             }
         }
     }
