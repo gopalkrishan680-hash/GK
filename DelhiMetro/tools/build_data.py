@@ -14,7 +14,11 @@ Usage: build_data.py <path-to-delhi-metro-repo> <output-file>
 """
 import json
 import math
+import os
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import schematic  # noqa: E402
 
 repo, out_path = sys.argv[1], sys.argv[2]
 routes = json.load(open(f"{repo}/public/data/routes.json"))
@@ -80,7 +84,7 @@ def fill(names, anchors):
 
 
 out = ["# Metro Saathi data. Station order/coords © OpenStreetMap contributors (ODbL).",
-       "# L|id|name|color|status|note   S|name|lat|lon|kmFromStart|layout   W|a|b|walkMin   C|line|a|b|km (extra link)"]
+       "# L|id|name|color|status|note   S|name|lat|lon|kmFromStart|layout|schematicX|schematicY   W|a|b|walkMin   C|line|a|b|km (extra link)"]
 
 for lid, name, key in LINES:
     st = routes[key]
@@ -110,7 +114,7 @@ UPCOMING = [
      ["Rithala", "Rohini Sector 25", "Rohini Sector 26", "Rohini Sector 31", "Rohini Sector 32",
       "Rohini Sector 36", "Barwala", "Rohini Sector 35", "Rohini Sector 34",
       "Bawana Industrial Area-1 Sector 3,4", "Bawana Industrial Area-1 Sector 1,2", "Bawana JJ Colony",
-      "Sanoth", "New Sanoth", "Depot Station", "Bhorgarh Village", "Anaj Mandi Narela",
+      "Sanoth", "New Sanoth", "Narela Depot", "Bhorgarh Village", "Anaj Mandi Narela",
       "Narela DDA Sports Complex", "Narela", "Narela Sector 5", "Kundli", "Nathpur"],
      {"Narela": (28.8530, 77.0930), "Nathpur": (28.8880, 77.1150)}),
     ("UP_GOLDEN", "Golden Line (Aerocity–Tughlakabad)", "#C9A227",
@@ -132,6 +136,13 @@ UPCOMING = [
 ]
 known = dict(coord)
 known.update(c)
+# Names that are intentionally shared with existing stations (interchanges / extensions).
+INTENDED_SHARED = {"Rithala", "Delhi Aerocity", "Chhatarpur", "Tughlakabad", "Krishna Park Extension",
+                   "Deepali Chowk", "Majlis Park", "Azadpur", "Pul Bangash", "Ramakrishna Ashram Marg",
+                   "Peeragarhi"}
+for _, _, _, _, stations, _ in UPCOMING:
+    clash = [x for x in stations if x in known and x not in INTENDED_SHARED]
+    assert not clash, f"upcoming station names clash with existing stations: {clash}"
 for lid, name, color, note, stations, extra in UPCOMING:
     anchors = dict(known)
     anchors.update(extra)
@@ -153,6 +164,38 @@ out += [
     "W|Dhaula Kuan|Durgabai Deshmukh South Campus|12",
     "W|Noida Sector 52|Noida Sector 51|8",
 ]
+# ---------------------------------------------------------------- DMRC-style schematic
+# Add schematic coordinates (sx, sy) to every station row.
+rows_lines, cur = [], None
+for row in out:
+    p = row.split("|")
+    if p[0] == "L":
+        cur = []
+        rows_lines.append(cur)
+    elif p[0] == "S":
+        cur.append(p[1])
+geo_ll = {}
+for row in out:
+    p = row.split("|")
+    if p[0] == "S":
+        geo_ll.setdefault(p[1], (float(p[2]), float(p[3])))
+lat0 = sum(v[0] for v in geo_ll.values()) / len(geo_ll)
+geo_xy = {n: (lo * math.cos(math.radians(lat0)), -la) for n, (la, lo) in geo_ll.items()}
+edges = set()
+for run in rows_lines:
+    for a, b in zip(run, run[1:]):
+        edges.add(tuple(sorted((a, b))))
+for row in out:
+    p = row.split("|")
+    if p[0] == "C":
+        edges.add(tuple(sorted((p[2], p[3]))))
+pos = schematic.layout(list(geo_ll), geo_xy, edges, rows_lines, iterations=3000, max_len=2.5, min_gap=1.0)
+for i, row in enumerate(out):
+    p = row.split("|")
+    if p[0] == "S":
+        sx, sy = pos[p[1]]
+        out[i] = row + f"|{sx:.2f}|{sy:.2f}"
+
 missing = [w for w in out if w.startswith("W|") and any(x not in coord for x in w.split("|")[1:3])]
 assert not missing, missing
 open(out_path, "w").write("\n".join(out) + "\n")

@@ -22,6 +22,9 @@ class Station(
     val lat: Double,
     val lon: Double,
     val layout: String,
+    /** Position on the DMRC-style schematic diagram (units ≈ one station spacing). */
+    val sx: Float,
+    val sy: Float,
 ) {
     /** Operational line ids serving this station. */
     val lines = linkedSetOf<String>()
@@ -114,7 +117,11 @@ class MetroData(
                         "S" -> {
                             val name = p[1]
                             if (name !in stations) {
-                                stations[name] = Station(name, p[2].toDouble(), p[3].toDouble(), p.getOrElse(5) { "" })
+                                stations[name] = Station(
+                                    name, p[2].toDouble(), p[3].toDouble(), p.getOrElse(5) { "" },
+                                    p.getOrElse(6) { "0" }.toFloatOrNull() ?: 0f,
+                                    p.getOrElse(7) { "0" }.toFloatOrNull() ?: 0f,
+                                )
                             }
                             names += name
                             kms += p.getOrElse(4) { "" }.toDoubleOrNull() ?: 0.0

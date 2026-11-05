@@ -5,35 +5,50 @@ import android.graphics.Typeface
 import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CenterFocusStrong
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -48,59 +63,203 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.min
 
-/** Geographic projection of the whole network into "world units" (degrees, lon scaled by cos(lat)). */
-private class Projection(data: MetroData) {
-    private val all = data.stations.values
-    val minLat = all.minOf { it.lat }
-    val maxLat = all.maxOf { it.lat }
-    val minLon = all.minOf { it.lon }
-    val maxLon = all.maxOf { it.lon }
-    private val cosLat = cos(Math.toRadians((minLat + maxLat) / 2))
-    val worldW = ((maxLon - minLon) * cosLat).toFloat()
-    val worldH = (maxLat - minLat).toFloat()
-    fun wx(lon: Double) = ((lon - minLon) * cosLat).toFloat()
-    fun wy(lat: Double) = (maxLat - lat).toFloat()
+// ======================================================================== Map tab
+
+/** The Map tab: "Chalu" (running) and "Aane wale" (upcoming) sub-tabs, each with a map or a list. */
+@Composable
+fun MapTab(state: AppState) {
+    var sub by remember { mutableIntStateOf(0) }       // 0 = running, 1 = upcoming
+    var listView by remember { mutableStateOf(false) }
+    var diagram by remember { mutableStateOf(true) }
+    val upcomingCount = state.data.stations.values.count { it.lines.isEmpty() }
+
+    Column(Modifier.fillMaxSize()) {
+        TabRow(selectedTabIndex = sub) {
+            Tab(sub == 0, onClick = { sub = 0 }, text = { Text("Chalu stations (${state.data.operationalStations.size})") })
+            Tab(sub == 1, onClick = { sub = 1 }, text = { Text("Aane wale ($upcomingCount)") })
+        }
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            FilterChip(selected = !listView, onClick = { listView = false }, label = { Text("Map") })
+            FilterChip(selected = listView, onClick = { listView = true }, label = { Text("List") })
+            Spacer(Modifier.weight(1f))
+            if (!listView) {
+                FilterChip(selected = diagram, onClick = { diagram = true }, label = { Text("Diagram") })
+                FilterChip(selected = !diagram, onClick = { diagram = false }, label = { Text("Asli map") })
+            }
+        }
+        Box(Modifier.fillMaxSize()) {
+            when {
+                !listView -> NetworkMap(state, upcomingMode = sub == 1, diagram = diagram)
+                sub == 0 -> RunningList(state)
+                else -> UpcomingList(state)
+            }
+        }
+    }
 }
 
 @Composable
-fun MapScreen(state: AppState) {
+private fun RunningList(state: AppState) {
+    var query by remember { mutableStateOf("") }
+    val results = remember(query) { state.data.search(query) }
+    Column(Modifier.fillMaxSize()) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            placeholder = { Text("Station dhoondhiye…") },
+            singleLine = true,
+            trailingIcon = {
+                if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Close, "Clear") }
+            },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+        )
+        Text(
+            "${results.size} chalu stations • tap karke details dekhiye",
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+        )
+        LazyColumn(Modifier.fillMaxSize()) {
+            items(results, key = { it.name }) { st -> StationRow(state, st) { state.sheetStation = st.name } }
+        }
+    }
+}
+
+@Composable
+private fun UpcomingList(state: AppState) {
+    LazyColumn(Modifier.fillMaxSize()) {
+        item {
+            Text(
+                "Ye stations abhi ban rahe hain. Naam aur tareekh badal sakti hain.",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(16.dp),
+            )
+        }
+        state.data.upcomingLines.forEach { line ->
+            item(key = "h_" + line.id) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.width(8.dp).height(40.dp).clip(RoundedCornerShape(4.dp)).background(line.composeColor()))
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text(line.name, fontWeight = FontWeight.Bold)
+                        Text(line.note, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            items(line.stations, key = { line.id + "_" + it }) { name ->
+                val st = state.data.stations.getValue(name)
+                val existing = st.lines.isNotEmpty()
+                Row(
+                    Modifier.fillMaxWidth().clickable { state.sheetStation = name }
+                        .padding(start = 36.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(name, modifier = Modifier.weight(1f), fontWeight = if (existing) FontWeight.SemiBold else FontWeight.Normal)
+                    Text(
+                        if (existing) "Chalu – interchange banega" else "Naya station",
+                        fontSize = 11.sp,
+                        color = if (existing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ======================================================================== Map canvas
+
+private class Projection(points: Collection<Pair<Float, Float>>) {
+    val minX = points.minOf { it.first }
+    val maxX = points.maxOf { it.first }
+    val minY = points.minOf { it.second }
+    val maxY = points.maxOf { it.second }
+    val w = (maxX - minX).coerceAtLeast(0.0001f)
+    val h = (maxY - minY).coerceAtLeast(0.0001f)
+}
+
+/**
+ * Zoomable network map.
+ * @param upcomingMode true = highlight under-construction lines, false = running network only
+ * @param diagram true = DMRC-style schematic, false = geographic positions
+ */
+@Composable
+fun NetworkMap(state: AppState, upcomingMode: Boolean, diagram: Boolean) {
     val data = state.data
     val context = LocalContext.current
     val density = LocalDensity.current
-    val proj = remember(data) { Projection(data) }
 
-    var showUpcoming by remember { mutableStateOf(true) }
-    var scale by remember { mutableFloatStateOf(1f) }
-    var offset by remember { mutableStateOf(Offset.Zero) }
+    // World coordinates per station for the chosen style (y grows downwards).
+    val world: Map<String, Pair<Float, Float>> = remember(diagram) {
+        if (diagram) {
+            data.stations.values.associate { it.name to (it.sx to it.sy) }
+        } else {
+            val lat0 = data.stations.values.map { it.lat }.average()
+            val k = cos(Math.toRadians(lat0)).toFloat()
+            data.stations.values.associate { it.name to ((it.lon.toFloat() * k) to (-it.lat.toFloat())) }
+        }
+    }
+    val proj = remember(world) { Projection(world.values) }
+
+    // In the diagram, labels next to horizontal track are drawn diagonally (like the DMRC map).
+    val rotateLabel: Set<String> = remember(world) {
+        val res = mutableSetOf<String>()
+        for (st in data.stations.values) {
+            val (x, y) = world.getValue(st.name)
+            var horizontal = 0
+            var other = 0
+            for (l in data.lines) {
+                val i = l.stations.indexOf(st.name)
+                if (i < 0) continue
+                for (j in listOf(i - 1, i + 1)) {
+                    val n = l.stations.getOrNull(j) ?: continue
+                    val (nx, ny) = world.getValue(n)
+                    if (abs(ny - y) < abs(nx - x) * 0.4f) horizontal++ else other++
+                }
+            }
+            if (horizontal > 0 && other == 0) res += st.name
+        }
+        res
+    }
+
+    var scale by remember(diagram) { mutableFloatStateOf(1f) }
+    var offset by remember(diagram) { mutableStateOf(Offset.Zero) }
     var size by remember { mutableStateOf(IntSize.Zero) }
     var highlight by remember { mutableStateOf<String?>(null) }
+    var initialised by remember(diagram) { mutableStateOf(false) }
 
-    fun base(): Float = if (size.width == 0) 1f else min(size.width / proj.worldW, size.height / proj.worldH) * 0.92f
+    fun base(): Float = if (size.width == 0) 1f else min(size.width / proj.w, size.height / proj.h) * 0.92f
 
-    fun screen(st: Station): Offset = Offset(
-        proj.wx(st.lon) * base() * scale + offset.x,
-        proj.wy(st.lat) * base() * scale + offset.y,
-    )
+    fun screen(name: String): Offset {
+        val (x, y) = world.getValue(name)
+        return Offset((x - proj.minX) * base() * scale + offset.x, (y - proj.minY) * base() * scale + offset.y)
+    }
 
     fun resetView() {
         scale = 1f
         val b = base()
-        offset = Offset((size.width - proj.worldW * b) / 2f, (size.height - proj.worldH * b) / 2f)
+        offset = Offset((size.width - proj.w * b) / 2f, (size.height - proj.h * b) / 2f)
     }
 
-    fun centerOn(st: Station, newScale: Float) {
+    fun centerOn(name: String, newScale: Float) {
         scale = newScale
         val b = base()
-        offset = Offset(
-            size.width / 2f - proj.wx(st.lon) * b * newScale,
-            size.height / 2f - proj.wy(st.lat) * b * newScale,
-        )
+        val (x, y) = world.getValue(name)
+        offset = Offset(size.width / 2f - (x - proj.minX) * b * newScale, size.height / 2f - (y - proj.minY) * b * newScale)
     }
 
     fun zoomBy(f: Float, center: Offset) {
@@ -110,13 +269,20 @@ fun MapScreen(state: AppState) {
         scale = ns
     }
 
+    LaunchedEffect(size, diagram) {
+        if (!initialised && size != IntSize.Zero) {
+            resetView()
+            initialised = true
+        }
+    }
+
     val (locating, locate) = rememberNearestFinder(data) { res ->
         val st = res?.firstOrNull()?.first
         if (st == null) {
             Toast.makeText(context, "Location nahi mili", Toast.LENGTH_SHORT).show()
         } else {
             highlight = st.name
-            centerOn(st, 8f)
+            centerOn(st.name, if (diagram) 4f else 8f)
             state.sheetStation = st.name
         }
     }
@@ -127,28 +293,28 @@ fun MapScreen(state: AppState) {
     val haloPaint = remember { Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE } }
     val hitRadius = with(density) { 26.dp.toPx() }
 
+    // Which stations are shown / tappable in this mode.
+    fun visible(st: Station) = if (upcomingMode) true else st.lines.isNotEmpty()
+    fun emphasised(st: Station) = if (upcomingMode) st.upcomingLines.isNotEmpty() else true
+
     Box(Modifier.fillMaxSize().background(bg)) {
         Canvas(
             Modifier
                 .fillMaxSize()
-                .onSizeChanged {
-                    val first = size == IntSize.Zero
-                    size = it
-                    if (first) resetView()
-                }
-                .pointerInput(Unit) {
+                .onSizeChanged { size = it }
+                .pointerInput(diagram) {
                     detectTransformGestures { centroid, pan, zoom, _ ->
                         if (zoom != 1f) zoomBy(zoom, centroid)
                         offset += pan
                     }
                 }
-                .pointerInput(Unit) {
+                .pointerInput(diagram, upcomingMode) {
                     detectTapGestures(
                         onDoubleTap = { p -> zoomBy(2f, p) },
                         onTap = { p ->
                             val hit = data.stations.values
-                                .filter { showUpcoming || it.lines.isNotEmpty() }
-                                .map { it to (screen(it) - p).getDistance() }
+                                .filter { visible(it) }
+                                .map { it to (screen(it.name) - p).getDistance() }
                                 .minByOrNull { it.second }
                             if (hit != null && hit.second < hitRadius) {
                                 highlight = hit.first.name
@@ -158,39 +324,41 @@ fun MapScreen(state: AppState) {
                     )
                 },
         ) {
-            val line = 4.dp.toPx() * (1f + (scale - 1f) * 0.08f).coerceIn(1f, 1.8f)
-            val dash = PathEffect.dashPathEffect(floatArrayOf(14f, 10f))
+            val lineW = (if (diagram) 5.dp.toPx() else 4.dp.toPx()) * (1f + (scale - 1f) * 0.08f).coerceIn(1f, 1.8f)
+            val dash = PathEffect.dashPathEffect(floatArrayOf(16f, 10f))
+            val faded = Color(0xFF9E9E9E).copy(alpha = 0.35f)
 
-            // Upcoming first (underneath), then operational.
-            val toDraw = (if (showUpcoming) data.upcomingLines else emptyList()) + data.operationalLines
-            for (l in toDraw) {
+            fun drawLineRun(l: MetroLine, color: Color, width: Float, dashed: Boolean) {
                 val path = Path()
                 l.stations.forEachIndexed { i, n ->
-                    val p = screen(data.stations.getValue(n))
+                    val p = screen(n)
                     if (i == 0) path.moveTo(p.x, p.y) else path.lineTo(p.x, p.y)
                 }
                 drawPath(
-                    path,
-                    color = l.composeColor().copy(alpha = if (l.upcoming) 0.55f else 1f),
-                    style = Stroke(
-                        width = if (l.upcoming) line * 0.75f else line,
-                        cap = StrokeCap.Round,
-                        join = StrokeJoin.Round,
-                        pathEffect = if (l.upcoming) dash else null,
-                    ),
+                    path, color,
+                    style = Stroke(width = width, cap = StrokeCap.Round, join = StrokeJoin.Round, pathEffect = if (dashed) dash else null),
                 )
             }
-            for (c in data.connectors) {
-                val col = data.lineById[c.line]?.composeColor() ?: Color.Gray
-                drawLine(col, screen(data.stations.getValue(c.a)), screen(data.stations.getValue(c.b)), line, StrokeCap.Round)
+
+            if (upcomingMode) {
+                // Running network as faded context, upcoming lines bold on top.
+                data.operationalLines.forEach { drawLineRun(it, faded, lineW * 0.8f, false) }
+                data.connectors.forEach { drawLine(faded, screen(it.a), screen(it.b), lineW * 0.8f, StrokeCap.Round) }
+                data.upcomingLines.forEach { drawLineRun(it, it.composeColor(), lineW * 1.1f, true) }
+            } else {
+                data.operationalLines.forEach { drawLineRun(it, it.composeColor(), lineW, false) }
+                data.connectors.forEach {
+                    val col = data.lineById[it.line]?.composeColor() ?: Color.Gray
+                    drawLine(col, screen(it.a), screen(it.b), lineW, StrokeCap.Round)
+                }
             }
 
-            // Stations
-            val r = 3.2.dp.toPx()
-            val rIc = 5.dp.toPx()
-            val margin = 40f
-            val showAllLabels = scale > 4.5f
-            val showIcLabels = scale > 1.7f
+            // Stations + labels
+            val r = (if (diagram) 3.6.dp else 3.2.dp).toPx()
+            val rIc = 5.5.dp.toPx()
+            val margin = 60f
+            val labelAll = if (diagram) scale > 2.2f else scale > 4.5f
+            val labelIc = if (diagram) scale > 1.2f else scale > 1.7f
             labelPaint.textSize = 11.sp.toPx()
             labelPaint.color = onBg.toArgb()
             haloPaint.textSize = labelPaint.textSize
@@ -198,45 +366,63 @@ fun MapScreen(state: AppState) {
             haloPaint.color = bg.toArgb()
 
             for (st in data.stations.values) {
-                val upcomingOnly = st.lines.isEmpty()
-                if (upcomingOnly && !showUpcoming) continue
-                val p = screen(st)
+                if (!visible(st)) continue
+                val p = screen(st.name)
                 if (p.x < -margin || p.y < -margin || p.x > this.size.width + margin || p.y > this.size.height + margin) continue
-                val ic = st.isInterchange
-                val mainLine = data.lineById[(st.lines.firstOrNull() ?: st.upcomingLines.firstOrNull()) ?: ""]
+                val strong = emphasised(st)
+                val ic = st.isInterchange || (upcomingMode && st.lines.isNotEmpty() && st.upcomingLines.isNotEmpty())
+                val lineId = if (upcomingMode) st.upcomingLines.firstOrNull() ?: st.lines.firstOrNull()
+                else st.lines.firstOrNull()
+                val col = data.lineById[lineId ?: ""]?.composeColor() ?: Color.Gray
                 val radius = if (ic) rIc else r
+                if (!strong) {
+                    drawCircle(faded, radius * 0.7f, p)
+                    continue
+                }
                 drawCircle(Color.White, radius, p)
-                drawCircle(
-                    if (ic) Color.Black else (mainLine?.composeColor() ?: Color.Gray).copy(alpha = if (upcomingOnly) 0.6f else 1f),
-                    radius, p, style = Stroke(width = if (ic) 2.dp.toPx() else 1.6.dp.toPx()),
-                )
+                drawCircle(if (ic) Color.Black else col, radius, p, style = Stroke(width = if (ic) 2.dp.toPx() else 1.8.dp.toPx()))
                 if (st.name == highlight) {
                     drawCircle(Color(0xFFFF6D00), radius + 6.dp.toPx(), p, style = Stroke(width = 3.dp.toPx()))
                 }
-                if (showAllLabels || (showIcLabels && ic) || st.name == highlight) {
+                val showLabel = labelAll || (labelIc && ic) || st.name == highlight ||
+                    (upcomingMode && scale > 1.4f)
+                if (showLabel) {
                     labelPaint.typeface = if (ic) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
                     haloPaint.typeface = labelPaint.typeface
-                    val tx = p.x + radius + 4.dp.toPx()
-                    val ty = p.y + labelPaint.textSize / 3f
+                    val gap = radius + 4.dp.toPx()
                     drawIntoCanvas {
-                        it.nativeCanvas.drawText(st.name, tx, ty, haloPaint)
-                        it.nativeCanvas.drawText(st.name, tx, ty, labelPaint)
+                        val c = it.nativeCanvas
+                        if (diagram && st.name in rotateLabel) {
+                            c.save()
+                            c.rotate(-45f, p.x, p.y)
+                            c.drawText(st.name, p.x + gap, p.y + labelPaint.textSize / 3f, haloPaint)
+                            c.drawText(st.name, p.x + gap, p.y + labelPaint.textSize / 3f, labelPaint)
+                            c.restore()
+                        } else {
+                            c.drawText(st.name, p.x + gap, p.y + labelPaint.textSize / 3f, haloPaint)
+                            c.drawText(st.name, p.x + gap, p.y + labelPaint.textSize / 3f, labelPaint)
+                        }
                     }
                 }
             }
         }
 
-        // Overlay controls
-        Row(
-            Modifier.align(Alignment.TopStart).padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            FilterChip(
-                selected = showUpcoming,
-                onClick = { showUpcoming = !showUpcoming },
-                label = { Text("Aane wali lines") },
-            )
+        // Legend for upcoming mode
+        if (upcomingMode) {
+            Column(
+                Modifier.align(Alignment.TopStart).padding(10.dp)
+                    .background(bg.copy(alpha = 0.9f), RoundedCornerShape(8.dp)).padding(8.dp),
+            ) {
+                data.upcomingLines.forEach { l ->
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
+                        Box(Modifier.width(16.dp).height(4.dp).background(l.composeColor()))
+                        Spacer(Modifier.width(6.dp))
+                        Text(l.name, fontSize = 11.sp)
+                    }
+                }
+            }
         }
+
         Text(
             "Pinch/double-tap se zoom • station par tap",
             fontSize = 11.sp,

@@ -176,7 +176,7 @@ fun RouteScreen(state: AppState) {
             state = state,
             title = if (which == "from") "Kahan se?" else "Kahan tak?",
             onPick = { name ->
-                if (which == "from") state.setFrom(name) else state.setTo(name)
+                if (which == "from") state.chooseFrom(name) else state.chooseTo(name)
                 picking = null
             },
             onDismiss = { picking = null },

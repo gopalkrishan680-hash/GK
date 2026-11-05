@@ -13,7 +13,13 @@ Kotlin + Jetpack Compose. **Poori tarah offline** – tunnel me bhi chalti hai.
 - **Kiraya**: token, smart card, aur Sunday/holiday (DMRC ke 25 Aug 2025 wale slab). Ye andaaza hai.
 - **Utarne ka alarm**: metro me baithte hi lagaiye, destination se ~3 minute pehle bajega
 - **GPS se sabse paas ka station** (bina Google services ke chalta hai)
-- **Interactive map**: pinch zoom, double-tap, station par tap, aur dark mode support
+- **Map app kholte hi khulta hai**, 2 style me:
+  - **Diagram (DMRC style)**: lines sirf seedhi aur 45° par, stations ke beech barabar doori. Ye
+    `tools/schematic.py` ke layout algorithm se banta hai.
+  - **Asli map**: stations apni asli location par
+- **Chalu / Aane wale tabs**: dono me map aur list view. Aane wale tab me nayi lines highlight hoti hain
+  aur chalu network halka (faded) dikhta hai.
+- Pinch zoom, double-tap, station par tap, aur dark mode support
 - **Line-wise station list**: interchanges aur km ke saath
 - **Favourites aur recent routes**
 - **Info**: fare chart, helpline (tap karke call), aur kaam ki tips

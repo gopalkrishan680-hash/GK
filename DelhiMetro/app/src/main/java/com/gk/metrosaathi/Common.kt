@@ -273,8 +273,8 @@ fun StationSheet(state: AppState, name: String, onDismiss: () -> Unit, onOpenMap
             Spacer(Modifier.height(16.dp))
             if (st.lines.isNotEmpty()) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Button(onClick = { state.setFrom(st.name); onDismiss() }, modifier = Modifier.weight(1f)) { Text("Yahan se") }
-                    Button(onClick = { state.setTo(st.name); onDismiss() }, modifier = Modifier.weight(1f)) { Text("Yahan tak") }
+                    Button(onClick = { state.chooseFrom(st.name); onDismiss() }, modifier = Modifier.weight(1f)) { Text("Yahan se") }
+                    Button(onClick = { state.chooseTo(st.name); onDismiss() }, modifier = Modifier.weight(1f)) { Text("Yahan tak") }
                 }
                 Spacer(Modifier.height(8.dp))
             }

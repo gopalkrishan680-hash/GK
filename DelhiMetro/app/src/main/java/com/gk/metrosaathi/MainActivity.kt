@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 val Brand = Color(0xFF0B3D91)
+const val ROUTE_TAB = 1
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,7 +56,7 @@ class AppState(
     val planner: RoutePlanner,
     val prefs: Prefs,
 ) {
-    var tab by mutableIntStateOf(0)
+    var tab by mutableIntStateOf(0) // Map opens first
     var from by mutableStateOf<String?>(null)
     var to by mutableStateOf<String?>(null)
     var sheetStation by mutableStateOf<String?>(null)
@@ -76,16 +77,16 @@ class AppState(
         favorites = prefs.toggleFavorite(name)
     }
 
-    fun setFrom(name: String) {
+    fun chooseFrom(name: String) {
         from = name
         if (to == name) to = null
-        tab = 0
+        tab = ROUTE_TAB
     }
 
-    fun setTo(name: String) {
+    fun chooseTo(name: String) {
         to = name
         if (from == name) from = null
-        tab = 0
+        tab = ROUTE_TAB
     }
 }
 
@@ -97,8 +98,8 @@ private fun App() {
         AppState(data, RoutePlanner(data), Prefs(context.applicationContext))
     }
     val tabs = listOf(
-        Triple("Route", Icons.Filled.AltRoute, 0),
-        Triple("Map", Icons.Filled.Map, 1),
+        Triple("Map", Icons.Filled.Map, 0),
+        Triple("Route", Icons.Filled.AltRoute, 1),
         Triple("Lines", Icons.Filled.List, 2),
         Triple("Info", Icons.Filled.Info, 3),
     )
@@ -118,8 +119,8 @@ private fun App() {
     ) { pad ->
         Box(Modifier.fillMaxSize().padding(pad)) {
             when (state.tab) {
-                0 -> RouteScreen(state)
-                1 -> MapScreen(state)
+                0 -> MapTab(state)
+                1 -> RouteScreen(state)
                 2 -> LinesScreen(state)
                 else -> InfoScreen()
             }
