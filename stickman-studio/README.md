@@ -1,43 +1,43 @@
 # Stickman Studio
 
-Script + voiceover se stickman video banane ka app. Ek hi file (`index.html`), koi install nahi.
-**Chrome ya Edge** mein kholo (file par double-click). Sab kuch aapke computer par hi chalta hai.
+An app for turning a script + voiceover into a stickman video. It is a single file (`index.html`) with nothing to install.
+Open it in **Chrome or Edge** (double-click the file). Everything runs locally on your computer.
 
-## Kaise use karein
+## How to use
 
-1. **Script + Voice:** Script paste karo, voiceover (mp3/wav/m4a) drop karo, **Scenes banao** dabao.
-   Script har `,` `.` `।` `?` `!` `;` par toot-ti hai. Har tukda ek scene (ek image) banta hai.
-   - Bahut chhote tukde (jaise "aur bole,") agle scene se jud jaate hain (*Kam se kam shabd*).
-   - Bahut lambe tukde barabar hisson mein toot jaate hain (*Zyada se zyada shabd*).
-   - Caption mein kisi shabd ko peela karna ho to `*58 percent*` jaise star ke beech likho.
-2. **Image Prompts:** Style aur characters chuno. Har prompt **ek image mein 3×3 = 9 scenes** ka grid banwata hai.
-   Prompt copy karke ChatGPT ya Gemini mein do aur image download karo.
-   - *AI Scene Director:* poori script ka ek prompt ChatGPT ko do. Woh har scene ka visual likh dega.
-     Jawab wapas paste karke **Apply** dabao, to prompts aur behtar ho jaate hain.
-3. **Grid Upload:** Saari grid images ek saath drop karo. App panels ke beech ki lines dhoondh kar
-   har panel ko alag kaat leta hai. Agar kaat galat lage to *Auto-detect* band karo ya *Trim* badhao.
-   Koi ek panel kharab ho to **Single image** se sirf us scene ki image daal do.
+1. **Script + Voice:** Paste the script, drop in the voiceover (mp3/wav/m4a) and press **Create scenes**.
+   The script is split at every `,` `.` `।` `?` `!` `;`. Each piece becomes one scene (one image).
+   - Very short pieces (like "and said,") are joined with the next scene (*Min words per scene*).
+   - Very long pieces are split into equal parts (*Max words per scene*).
+   - To highlight a word in yellow in the captions, wrap it in stars: `*58 percent*`.
+2. **Image Prompts:** Pick a style and characters. Each prompt asks for **one image with a 3×3 grid = 9 scenes**.
+   Copy a prompt into ChatGPT or Gemini and download the image.
+   - *AI Scene Director:* give ChatGPT one prompt covering the whole script and it writes a visual for every scene.
+     Paste the reply back and press **Apply** to get better prompts.
+3. **Grid Upload:** Drop all grid images at once. The app finds the lines between panels and cuts each
+   panel out. If a cut looks wrong, turn off *Auto-detect* or increase *Trim*.
+   If one panel is bad, use **Single image** to replace just that scene.
 4. **Voice Sync:**
-   - **Smart Sync:** voiceover mein ruk (pause) wali jagah dhoondh kar scene wahin badalta hai.
-   - **Tap Sync:** awaaz sunte hue har naye scene par `Space` dabao. Ye sabse accurate hai.
-   - Timeline par lines kheench kar ya number badal kar time theek karo.
-   - **SRT import/export:** SRT file ho to usse timing lo. YouTube ke liye SRT bhi nikal sakte ho.
-5. **Preview + Export:** captions, transition, camera zoom/pan aur background music set karo, phir
-   **Video export karo**. Export real-time hota hai, isliye tab khula rakho.
-   Chrome mein MP4 milta hai. Kisi browser mein WebM mile to:
+   - **Smart Sync:** finds the pauses in the voiceover and changes scenes there.
+   - **Tap Sync:** listen and press `Space` at the start of each new scene. This is the most accurate.
+   - Drag the lines on the timeline, or edit the numbers, to fine-tune.
+   - **SRT import/export:** take timing from an SRT file, or export an SRT for YouTube.
+5. **Preview + Export:** set captions, transition, camera zoom/pan and background music, then press
+   **Export video**. Export runs in real time, so keep the tab open.
+   Chrome produces MP4. If a browser gives WebM instead:
    `ffmpeg -i video.webm -c:v libx264 -c:a aac video.mp4`
 
 ## Extra features
-- 16:9, 9:16 (Shorts) aur 1:1. 3×3 ya 2×2 grid (2×2 = har scene ki quality zyada).
-- Aakhri batch mein kam scenes hon to 2×2 ya single image ka prompt banta hai.
-- Har scene par halka Ken Burns zoom/pan, taaki video kabhi ruki hui na lage (no-freeze rule).
-- Bade caption (Baloo 2, safed + kaala outline, pop animation), upar/beech/neeche ya band.
+- 16:9, 9:16 (Shorts) and 1:1. 3×3 or 2×2 grid (2×2 = higher quality per scene).
+- If the last batch has fewer scenes, it gets a 2×2 or single-image prompt.
+- A gentle Ken Burns zoom/pan on every scene so the video never looks frozen (no-freeze rule).
+- Big captions (Baloo 2, white with black outline, pop animation) at the top, center or bottom, or off.
 - Transitions: quick fade, hard cut, white flash, slide, zoom punch.
-- Autosave browser mein hota hai. **Project save** se poora project (images + audio) ek file mein bachao.
-- "Channel characters daalo" button se Rohan, Maa, Papa aur Aman ka look prompt mein aa jata hai.
+- Autosaves in the browser. **Project save** stores the whole project (images + audio) in one file.
+- The "Add channel characters" button adds the looks of Rohan, Maa, Papa and Aman to the prompt.
 
 ## Tips
-- ChatGPT ki image aksar 1536×1024 hoti hai, to 3×3 mein har scene ~512px ka hota hai.
-  Zyada sharp chahiye to 2×2 grid lo, ya Gemini se badi image banwao.
-- Safed background wale styles mein panels ke beech **kaali line** maangi jaati hai, aur dark styles
-  mein **safed line**, taaki app lines aasani se dhoondh sake.
+- ChatGPT images are often 1536×1024, so in a 3×3 grid each scene is about 512px wide.
+  For sharper scenes use the 2×2 grid, or have Gemini generate a larger image.
+- White-background styles ask for **black lines** between panels and dark styles ask for **white lines**,
+  so the app can find the lines easily.

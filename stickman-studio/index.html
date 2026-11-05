@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="hi">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -162,13 +162,13 @@ details summary { cursor: pointer; font-weight: 600; }
         <svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="13" cy="6" r="3.6"/><path d="M13 10v8M13 12.5l-5 3.5M13 12.5l5-3M13 18l-4 6M13 18l4 6"/></svg>
         Stickman Studio
       </div>
-      <div class="grow"><input type="text" id="projTitle" placeholder="Video ka naam" aria-label="Project title"></div>
+      <div class="grow"><input type="text" id="projTitle" placeholder="Video title" aria-label="Project title"></div>
       <div class="status" id="status"></div>
       <div class="row">
-        <button class="btn small" id="saveFile" title="Poora project (images + audio) ek file mein download karo">Project save</button>
-        <button class="btn small" id="openFileBtn" title="Saved project file kholo">Project open</button>
+        <button class="btn small" id="saveFile" title="Download the whole project (images + audio) as one file">Project save</button>
+        <button class="btn small" id="openFileBtn" title="Open a saved project file">Project open</button>
         <input type="file" id="openFile" accept=".json,.ssproj" hidden>
-        <button class="btn small danger" id="newProj">Naya</button>
+        <button class="btn small danger" id="newProj">New</button>
       </div>
     </div>
     <nav class="tabs" role="tablist">
@@ -186,31 +186,31 @@ details summary { cursor: pointer; font-weight: 600; }
 <!-- STEP 1 -->
 <section class="step" data-panel="script">
   <div>
-    <h2>Script likho, voiceover lagao</h2>
-    <p class="lead">Script ko har comma, full stop, <b>।</b>, ? aur ! par scenes mein toda jayega. Har scene = ek image. Kisi shabd ko caption mein <b>peela highlight</b> karna ho to use <kbd>*star*</kbd> ke beech likho.</p>
+    <h2>Write the script, add the voiceover</h2>
+    <p class="lead">The script is split into scenes at every comma, full stop, <b>।</b>, ? and !. One scene = one image. To <b>highlight a word in yellow</b> in the captions, wrap it in <kbd>*stars*</kbd>.</p>
   </div>
   <div class="cols">
     <div class="panel">
       <label class="f" for="script">Script (Hindi / Hinglish / English)</label>
       <textarea id="script" spellcheck="false"></textarea>
       <div class="row">
-        <label class="f">Kahan todna hai
+        <label class="f">Split at
           <select id="splitLevel">
-            <option value="all">Har comma + full stop (fast scenes)</option>
-            <option value="sentences">Sirf full stop / ? / ! (slow scenes)</option>
+            <option value="all">Every comma + full stop (fast scenes)</option>
+            <option value="sentences">Only full stop / ? / ! (slower scenes)</option>
           </select>
         </label>
-        <label class="f">Kam se kam shabd / scene <input type="number" id="minWords" min="1" max="10"></label>
-        <label class="f">Zyada se zyada shabd / scene <input type="number" id="maxWords" min="4" max="60"></label>
+        <label class="f">Min words per scene <input type="number" id="minWords" min="1" max="10"></label>
+        <label class="f">Max words per scene <input type="number" id="maxWords" min="4" max="60"></label>
       </div>
       <div class="row">
-        <button class="btn primary" id="splitBtn">Scenes banao</button>
+        <button class="btn primary" id="splitBtn">Create scenes</button>
         <span class="hint" id="splitInfo"></span>
       </div>
     </div>
     <div class="panel">
       <h3>Voiceover</h3>
-      <div class="drop" id="voDrop" tabindex="0" role="button"><strong>Voiceover file yahan drop karo</strong>ya click karke chuno (mp3, wav, m4a)</div>
+      <div class="drop" id="voDrop" tabindex="0" role="button"><strong>Drop the voiceover file here</strong>or click to choose (mp3, wav, m4a)</div>
       <input type="file" id="voFile" accept="audio/*" hidden>
       <div id="voInfo" class="hint"></div>
       <audio id="vo" controls preload="auto"></audio>
@@ -224,17 +224,17 @@ details summary { cursor: pointer; font-weight: 600; }
         </label>
         <label class="f">Grid size
           <select id="grid">
-            <option value="3">3×3 – 9 scenes ek image mein</option>
+            <option value="3">3×3 – 9 scenes per image</option>
             <option value="2">2×2 – 4 scenes (better quality)</option>
           </select>
         </label>
       </div>
-      <p class="hint">Agla kaam: scenes check karo, phir <b>Image Prompts</b> tab kholo.</p>
+      <p class="hint">Next: check the scenes, then open the <b>Image Prompts</b> tab.</p>
     </div>
   </div>
   <div class="panel">
     <div class="row"><h3 style="margin-right:auto">Scenes <span class="chip" id="sceneCount">0</span></h3>
-      <span class="hint">Text badlo, <b>Merge</b> se do scenes jodo, <b>Split</b> cursor ki jagah par todta hai.</span></div>
+      <span class="hint">Edit the text, <b>Merge</b> joins two scenes, <b>Split</b> breaks a scene at the cursor.</span></div>
     <div class="scenes" id="scenes"></div>
   </div>
 </section>
@@ -243,44 +243,44 @@ details summary { cursor: pointer; font-weight: 600; }
 <section class="step" data-panel="prompts" hidden>
   <div>
     <h2>Grid image prompts</h2>
-    <p class="lead">Har prompt ek hi image mein kai scenes ka grid banwata hai. Prompt copy karke ChatGPT ya Gemini mein do, image download karo, aur <b>Grid Upload</b> tab mein daal do.</p>
+    <p class="lead">Each prompt asks for a grid of several scenes in a single image. Copy a prompt into ChatGPT or Gemini, download the image, and add it in the <b>Grid Upload</b> tab.</p>
   </div>
   <div class="cols">
     <div class="panel">
       <div class="row">
         <label class="f">Art style
           <select id="style">
-            <option value="stickman">Stickman – safed background</option>
+            <option value="stickman">Stickman – white background</option>
             <option value="glow">Glow silhouette (channel style)</option>
             <option value="doodle">Whiteboard doodle</option>
             <option value="cartoon">Colourful stickman cartoon</option>
-            <option value="custom">Apna style</option>
+            <option value="custom">Custom style</option>
           </select>
         </label>
-        <label class="f">Panels ke beech line
+        <label class="f">Line between panels
           <select id="gutter">
-            <option value="auto">Auto (style ke hisaab se)</option>
-            <option value="black">Kaali line</option>
-            <option value="white">Safed line</option>
+            <option value="auto">Auto (based on style)</option>
+            <option value="black">Black line</option>
+            <option value="white">White line</option>
           </select>
         </label>
       </div>
-      <label class="f" for="styleText">Style description (prompt mein jayega)</label>
+      <label class="f" for="styleText">Style description (goes into the prompt)</label>
       <textarea id="styleText" rows="3"></textarea>
-      <div class="row"><label class="f" for="characters" style="margin-right:auto">Characters (har line: Naam: look) — har image mein same dikhenge</label>
-        <button class="btn small" id="loadChars">Channel characters daalo</button></div>
+      <div class="row"><label class="f" for="characters" style="margin-right:auto">Characters (one per line, Name: look) — kept the same in every image</label>
+        <button class="btn small" id="loadChars">Add channel characters</button></div>
       <textarea id="characters" rows="4" placeholder="Rohan: plain round head, no hair, white oval eyes"></textarea>
     </div>
     <div class="panel">
       <h3>AI Scene Director (optional, best result)</h3>
-      <p class="hint">Har scene ke liye achha visual description chahiye? Ye prompt ChatGPT/Gemini mein do. Jo jawab aaye use neeche paste karke <b>Apply</b> dabao. Har scene ka "Visual" khana bhar jayega.</p>
-      <div class="row"><button class="btn" id="copyDirector">Director prompt copy karo</button></div>
+      <p class="hint">Want a good visual description for every scene? Give this prompt to ChatGPT/Gemini, paste the reply below and press <b>Apply</b>. Each scene's "Visual" field gets filled in.</p>
+      <div class="row"><button class="btn" id="copyDirector">Copy director prompt</button></div>
       <textarea id="directorReply" rows="5" placeholder="1: Rohan sits alone on a bench at night, wide shot&#10;2: close-up of Rohan's sad face..."></textarea>
       <div class="row"><button class="btn primary" id="applyDirector">Apply</button><span class="hint" id="dirInfo"></span></div>
     </div>
   </div>
   <div class="row">
-    <button class="btn primary" id="copyAll">Saare prompts copy karo</button>
+    <button class="btn primary" id="copyAll">Copy all prompts</button>
     <button class="btn" id="dlPrompts">Prompts .txt download</button>
     <span class="hint" id="promptInfo"></span>
   </div>
@@ -290,10 +290,10 @@ details summary { cursor: pointer; font-weight: 600; }
 <!-- STEP 3 -->
 <section class="step" data-panel="grids" hidden>
   <div>
-    <h2>Grid images upload karo</h2>
-    <p class="lead">App grid ki lines khud dhoondh kar har panel ko alag scene bana deta hai. Agar kaat sahi na lage to <b>Auto-detect</b> band karke barabar hisson mein kaato, ya <b>Trim</b> badhao. Koi ek panel kharab ho to sirf us scene ki single image daal sakte ho.</p>
+    <h2>Upload grid images</h2>
+    <p class="lead">The app finds the grid lines and cuts each panel into its own scene. If a cut looks wrong, turn off <b>Auto-detect</b> to split into equal parts, or increase <b>Trim</b>. If one panel is bad, upload a single image for just that scene.</p>
   </div>
-  <div class="drop" id="bulkDrop" tabindex="0" role="button"><strong>Saari grid images ek saath yahan drop karo</strong>File naam ke order mein khali grids mein lag jayengi (grid1.png, grid2.png...)</div>
+  <div class="drop" id="bulkDrop" tabindex="0" role="button"><strong>Drop all grid images here at once</strong>They fill the empty grids in file-name order (grid1.png, grid2.png...)</div>
   <input type="file" id="bulkFile" accept="image/*" multiple hidden>
   <input type="file" id="oneFile" accept="image/*" hidden>
   <div class="batches" id="gridCards"></div>
@@ -302,13 +302,13 @@ details summary { cursor: pointer; font-weight: 600; }
 <!-- STEP 4 -->
 <section class="step" data-panel="sync" hidden>
   <div>
-    <h2>Voiceover ke saath sync</h2>
-    <p class="lead"><b>Smart Sync</b> voiceover mein saans/ruk wali jagah dhoondh kar scene wahin badalta hai. Bilkul perfect chahiye to <b>Tap Sync</b> karo: awaaz sunte hue har naye scene par <kbd>Space</kbd> dabao. Timeline par lines ko kheench kar bhi theek kar sakte ho.</p>
+    <h2>Sync with the voiceover</h2>
+    <p class="lead"><b>Smart Sync</b> finds the pauses and breaths in the voiceover and changes scenes there. For perfect timing use <b>Tap Sync</b>: listen and press <kbd>Space</kbd> at the start of each new scene. You can also drag the lines on the timeline to fine-tune.</p>
   </div>
   <div class="row">
     <button class="btn primary" id="smartSync">Smart Sync (recommended)</button>
-    <button class="btn" id="ratioSync">Text ke hisaab se baanto</button>
-    <button class="btn" id="tapStart">Tap Sync shuru karo</button>
+    <button class="btn" id="ratioSync">Split by text length</button>
+    <button class="btn" id="tapStart">Start Tap Sync</button>
     <button class="btn" id="srtBtn">SRT import</button>
     <input type="file" id="srtFile" accept=".srt,.vtt,text/plain" hidden>
     <button class="btn" id="srtExport">SRT export</button>
@@ -318,7 +318,7 @@ details summary { cursor: pointer; font-weight: 600; }
     <div class="hint" id="tapCount"></div>
     <div class="cur" id="tapCur"></div>
     <div class="nxt" id="tapNext"></div>
-    <div class="row"><button class="btn primary" id="tapBtn" style="flex:1">Agla scene &nbsp;<kbd>Space</kbd></button><button class="btn" id="tapStop">Rok do</button></div>
+    <div class="row"><button class="btn primary" id="tapBtn" style="flex:1">Next scene &nbsp;<kbd>Space</kbd></button><button class="btn" id="tapStop">Stop</button></div>
   </div>
   <div class="panel">
     <div class="row">
@@ -327,7 +327,7 @@ details summary { cursor: pointer; font-weight: 600; }
       <label class="f" style="flex:1 1 200px">Zoom <input type="range" id="tlZoom" min="0" max="100" value="20"></label>
     </div>
     <div class="tlwrap" id="tlWrap"><canvas id="tl" height="150"></canvas></div>
-    <p class="hint">Timeline par click = wahan se chalao. Scene ki seedhi line ko pakad kar kheencho = scene ka time badlo.</p>
+    <p class="hint">Click the timeline to play from there. Drag a scene line to change when that scene starts.</p>
   </div>
   <div class="panel">
     <h3>Scene start time (seconds)</h3>
@@ -338,8 +338,8 @@ details summary { cursor: pointer; font-weight: 600; }
 <!-- STEP 5 -->
 <section class="step" data-panel="video" hidden>
   <div>
-    <h2>Preview aur video export</h2>
-    <p class="lead">Har scene par halka camera zoom/pan chalta hai taaki video kabhi ruka hua na lage. Export real-time hota hai (5 min ki video = lagbhag 5 min), tab ko khula rakho.</p>
+    <h2>Preview and export video</h2>
+    <p class="lead">Every scene gets a gentle camera zoom/pan so the video never looks frozen. Export runs in real time (a 5 min video takes about 5 min), so keep this tab open.</p>
   </div>
   <div class="cols">
     <div class="panel">
@@ -354,7 +354,7 @@ details summary { cursor: pointer; font-weight: 600; }
       <h3>Look</h3>
       <div class="row">
         <label class="f">Captions
-          <select id="captions"><option value="bottom">Neeche</option><option value="center">Beech mein</option><option value="top">Upar</option><option value="off">Band</option></select>
+          <select id="captions"><option value="bottom">Bottom</option><option value="center">Center</option><option value="top">Top</option><option value="off">Off</option></select>
         </label>
         <label class="f">Caption size <input type="range" id="capSize" min="0.6" max="1.6" step="0.05"></label>
       </div>
@@ -366,19 +366,19 @@ details summary { cursor: pointer; font-weight: 600; }
       </div>
       <label class="f">Camera motion (zoom/pan) <input type="range" id="motion" min="0" max="25" step="1"></label>
       <h3>Background music</h3>
-      <div class="row"><button class="btn small" id="musicBtn">Music file chuno</button><button class="btn small danger" id="musicDel">Hatao</button><span class="hint" id="musicInfo">Koi music nahi</span></div>
+      <div class="row"><button class="btn small" id="musicBtn">Choose music file</button><button class="btn small danger" id="musicDel">Remove</button><span class="hint" id="musicInfo">No music</span></div>
       <input type="file" id="musicFile" accept="audio/*" hidden>
       <label class="f">Music volume <input type="range" id="musicVol" min="0" max="0.6" step="0.01"></label>
       <h3>Export</h3>
       <div class="row">
         <label class="f">Quality
-          <select id="res"><option value="720">720p (fast, chhoti file)</option><option value="1080">1080p Full HD</option></select>
+          <select id="res"><option value="720">720p (fast, smaller file)</option><option value="1080">1080p Full HD</option></select>
         </label>
         <label class="f">FPS
           <select id="fps"><option value="30">30</option><option value="25">25</option><option value="24">24</option></select>
         </label>
       </div>
-      <div class="row"><button class="btn primary" id="exportBtn">Video export karo</button><button class="btn" id="exportCancel" hidden>Cancel</button></div>
+      <div class="row"><button class="btn primary" id="exportBtn">Export video</button><button class="btn" id="exportCancel" hidden>Cancel</button></div>
       <progress id="exportProg" value="0" max="1" hidden></progress>
       <div class="hint" id="exportInfo"></div>
     </div>
@@ -400,8 +400,8 @@ function fmtSrt(t) { t = Math.max(0, t); const h = Math.floor(t / 3600), m = Mat
 let toastT;
 function toast(msg) { const el = $('#toast'); el.textContent = msg; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, 2600); }
 async function copyText(txt) {
-  try { await navigator.clipboard.writeText(txt); toast('Copy ho gaya'); }
-  catch (e) { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (_) {} ta.remove(); toast(ok ? 'Copy ho gaya' : 'Copy nahi hua, text select karke copy karo'); }
+  try { await navigator.clipboard.writeText(txt); toast('Copied'); }
+  catch (e) { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (_) {} ta.remove(); toast(ok ? 'Copied' : 'Copy failed, select the text and copy it manually'); }
 }
 function download(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60000); }
 function safeName() { return (S.settings.title || 'stickman-video').replace(/[^\p{L}\p{N}_-]+/gu, '-').replace(/^-+|-+$/g, '') || 'stickman-video'; }
@@ -426,10 +426,10 @@ const CHANNEL_CHARS = `Rohan (hero): black silhouette, plain round head with NO 
 Maa (mother): hair tied in a bun at the back, saree pallu over the shoulder, warm golden glow
 Papa (father): glasses, short flat hair, slightly bigger body, cream glow
 Aman (best friend): spiky hair with 5 sharp spikes, warm yellow glow`;
-const SAMPLE = `Rohan ke result ka din tha. Subah se uska dil zor zor se dhadak raha tha, aur haath thande pad gaye the.
-Papa chupchaap akhbaar padh rahe the, par unki nazar baar baar phone par jaa rahi thi.
-Phir phone baja. Rohan ne kaanpte haathon se result khola, aur screen par likha tha, *58 percent*.
-Usne Papa ki taraf dekha. Papa muskuraye, aur bole, "Mujhe tum par garv hai."`;
+const SAMPLE = `It was Rohan's result day. Since morning his heart had been racing, and his hands had gone cold.
+Papa was quietly reading the newspaper, but his eyes kept drifting to the phone.
+Then the phone rang. Rohan opened the result with shaking hands, and the screen said, *58 percent*.
+He looked at Papa. Papa smiled, and said, "I am proud of you."`;
 
 /* ============ state ============ */
 const DEFAULTS = { title: '', aspect: '16:9', grid: 3, style: 'stickman', styleText: STYLES.stickman.text, characters: '', gutter: 'auto',
@@ -618,10 +618,10 @@ ${scenes}`;
 }
 function renderPrompts() {
   const bs = batches();
-  $('#promptInfo').textContent = bs.length ? `${S.segments.length} scenes → ${bs.length} image${bs.length > 1 ? 's' : ''} generate karni hain` : 'Pehle Step 1 mein scenes banao';
+  $('#promptInfo').textContent = bs.length ? `${S.segments.length} scenes → ${bs.length} image${bs.length > 1 ? 's' : ''} to generate` : 'Create scenes in Step 1 first';
   $('#batches').innerHTML = bs.map(b => {
     const done = !!S.grids[b.index];
-    return `<div class="batch"><div class="batch-h"><h3>Image ${b.index + 1}</h3><span class="chip">Scenes ${b.start + 1}–${b.start + b.count} · ${b.rows}×${b.cols}</span><span class="chip ${done ? 'ok' : 'wait'}">${done ? 'Upload ho gayi' : 'Baaki'}</span><button class="btn small primary" data-copy="${b.index}">Copy prompt</button></div><pre class="prompt">${esc(buildPrompt(b))}</pre></div>`;
+    return `<div class="batch"><div class="batch-h"><h3>Image ${b.index + 1}</h3><span class="chip">Scenes ${b.start + 1}–${b.start + b.count} · ${b.rows}×${b.cols}</span><span class="chip ${done ? 'ok' : 'wait'}">${done ? 'Uploaded' : 'Pending'}</span><button class="btn small primary" data-copy="${b.index}">Copy prompt</button></div><pre class="prompt">${esc(buildPrompt(b))}</pre></div>`;
   }).join('');
 }
 
@@ -689,28 +689,28 @@ async function setGrid(gi, blob) {
     const img = await loadImage(blob);
     S.grids[gi] = { blob, auto: true, trim: 1.5 }; R.grids[gi] = { img };
     computeCells(gi);
-  } catch (e) { toast('Ye image khul nahi rahi. PNG ya JPG try karo.'); }
+  } catch (e) { toast('Could not open this image. Try PNG or JPG.'); }
 }
-async function setOverride(segId, blob) { try { R.overrides[segId] = await loadImage(blob); S.overrides[segId] = blob; } catch (e) { toast('Image khul nahi rahi'); } }
+async function setOverride(segId, blob) { try { R.overrides[segId] = await loadImage(blob); S.overrides[segId] = blob; } catch (e) { toast('Could not open the image'); } }
 
 function renderGridCards() {
   const bs = batches(); const asp = S.settings.aspect.replace(':', '/');
-  if (!bs.length) { $('#gridCards').innerHTML = '<p class="hint">Pehle Step 1 mein scenes banao.</p>'; return; }
+  if (!bs.length) { $('#gridCards').innerHTML = '<p class="hint">Create scenes in Step 1 first.</p>'; return; }
   $('#gridCards').innerHTML = bs.map(b => {
     const g = S.grids[b.index], r = R.grids[b.index];
     let body;
-    if (!g) body = `<div class="body" style="grid-template-columns:1fr"><div class="drop" data-griddrop="${b.index}" tabindex="0" role="button"><strong>Image ${b.index + 1} yahan drop karo</strong>Scenes ${b.start + 1}–${b.start + b.count} (${b.rows}×${b.cols} grid)</div></div>`;
+    if (!g) body = `<div class="body" style="grid-template-columns:1fr"><div class="drop" data-griddrop="${b.index}" tabindex="0" role="button"><strong>Drop image ${b.index + 1} here</strong>Scenes ${b.start + 1}–${b.start + b.count} (${b.rows}×${b.cols} grid)</div></div>`;
     else {
-      const det = g.auto ? (r && r.found >= r.expected ? `<span class="chip ok">Lines mil gayi</span>` : `<span class="chip wait">Lines poori nahi mili, barabar kaata</span>`) : `<span class="chip">Barabar hisse</span>`;
+      const det = g.auto ? (r && r.found >= r.expected ? `<span class="chip ok">Lines found</span>` : `<span class="chip wait">Lines not fully found, split equally</span>`) : `<span class="chip">Equal split</span>`;
       const cells = Array.from({ length: b.count }, (_, k) => { const i = b.start + k, s = S.segments[i]; const ov = R.overrides[s.id];
-        return `<div class="cell"><canvas data-cellcv="${i}" width="160" height="90" style="aspect-ratio:${asp}"></canvas><span class="tag ${ov ? 'ov' : ''}">${i + 1}${ov ? ' · single' : ''}</span><div class="acts"><button class="btn" data-one="${i}">Single image</button>${ov ? `<button class="btn danger" data-oneclear="${i}">Hatao</button>` : `<button class="btn" data-onecopy="${i}">Prompt</button>`}</div></div>`; }).join('');
+        return `<div class="cell"><canvas data-cellcv="${i}" width="160" height="90" style="aspect-ratio:${asp}"></canvas><span class="tag ${ov ? 'ov' : ''}">${i + 1}${ov ? ' · single' : ''}</span><div class="acts"><button class="btn" data-one="${i}">Single image</button>${ov ? `<button class="btn danger" data-oneclear="${i}">Remove</button>` : `<button class="btn" data-onecopy="${i}">Prompt</button>`}</div></div>`; }).join('');
       body = `<div class="body"><div style="display:grid;gap:10px;min-width:0"><canvas class="src" data-srccv="${b.index}"></canvas>
         <div class="row">${det}<label class="row" style="gap:6px"><input type="checkbox" data-auto="${b.index}" ${g.auto ? 'checked' : ''}> Auto-detect lines</label></div>
-        <label class="f">Trim kinaare: <span data-trimv="${b.index}">${g.trim}%</span><input type="range" min="0" max="8" step="0.5" value="${g.trim}" data-trim="${b.index}"></label>
-        <div class="row"><button class="btn small" data-replace="${b.index}">Badlo</button><button class="btn small danger" data-remove="${b.index}">Hatao</button></div></div>
+        <label class="f">Trim edges: <span data-trimv="${b.index}">${g.trim}%</span><input type="range" min="0" max="8" step="0.5" value="${g.trim}" data-trim="${b.index}"></label>
+        <div class="row"><button class="btn small" data-replace="${b.index}">Replace</button><button class="btn small danger" data-remove="${b.index}">Remove</button></div></div>
         <div class="cells" style="grid-template-columns:repeat(${b.cols},minmax(0,1fr))">${cells}</div></div>`;
     }
-    return `<div class="batch gridcard"><div class="batch-h"><h3>Image ${b.index + 1}</h3><span class="chip">Scenes ${b.start + 1}–${b.start + b.count}</span><span class="chip ${g ? 'ok' : 'wait'}">${g ? 'Ready' : 'Baaki'}</span><button class="btn small" data-copy="${b.index}">Prompt copy</button></div>${body}</div>`;
+    return `<div class="batch gridcard"><div class="batch-h"><h3>Image ${b.index + 1}</h3><span class="chip">Scenes ${b.start + 1}–${b.start + b.count}</span><span class="chip ${g ? 'ok' : 'wait'}">${g ? 'Ready' : 'Pending'}</span><button class="btn small" data-copy="${b.index}">Copy prompt</button></div>${body}</div>`;
   }).join('');
   $$('[data-griddrop]').forEach(el => { const gi = +el.dataset.griddrop; setupDrop(el, async f => { await setGrid(gi, f[0]); segmentsChanged(true); }, $('#oneFile'), false); });
   bs.forEach(b => { drawSrc(b.index); });
@@ -738,7 +738,7 @@ function drawScene(ctx, i, t, W, H, o = {}) {
   ctx.save(); ctx.globalAlpha = o.alpha == null ? 1 : o.alpha;
   if (!src) {
     ctx.fillStyle = '#1b1d22'; ctx.fillRect(o.dx || 0, 0, W, H); ctx.fillStyle = '#8a92a0'; ctx.textAlign = 'center';
-    ctx.font = `700 ${Math.round(H * 0.06)}px "Baloo 2", sans-serif`; ctx.fillText(`Scene ${i + 1} — image baaki`, W / 2 + (o.dx || 0), H * 0.42);
+    ctx.font = `700 ${Math.round(H * 0.06)}px "Baloo 2", sans-serif`; ctx.fillText(`Scene ${i + 1} — image missing`, W / 2 + (o.dx || 0), H * 0.42);
     ctx.restore(); return;
   }
   const m = S.settings.motion / 100, mode = i % 4; let z, px = 0.5, py = 0.5;
@@ -808,7 +808,7 @@ vo.addEventListener('pause', () => { syncMusic(false); $('#pvPlay').textContent 
 vo.addEventListener('seeked', () => { syncMusic(!vo.paused); loop(); });
 vo.addEventListener('ended', () => { if (tap.active) finishTap(); });
 function syncMusic(play) { if (!S.musicBlob || exporting) return; music.volume = S.settings.musicVol; if (play) { if (music.duration) music.currentTime = vo.currentTime % music.duration; music.play().catch(() => {}); } else music.pause(); }
-$('#pvPlay').onclick = () => { if (!S.audioBlob) return toast('Pehle voiceover upload karo (Step 1)'); vo.paused ? vo.play() : vo.pause(); };
+$('#pvPlay').onclick = () => { if (!S.audioBlob) return toast('Upload the voiceover first (Step 1)'); vo.paused ? vo.play() : vo.pause(); };
 $('#pvSeek').oninput = e => { vo.currentTime = (+e.target.value / 1000) * duration(); drawPreview(); };
 
 /* ============ timeline ============ */
@@ -852,7 +852,7 @@ tl.addEventListener('pointermove', e => {
 });
 tl.addEventListener('pointerup', () => { if (drag != null) { drag = null; renderTimes(); renderScenes(); drawPreview(); save(); } });
 $('#tlZoom').oninput = drawTimeline;
-$('#tlPlay').onclick = () => { if (!S.audioBlob) return toast('Pehle voiceover upload karo'); vo.paused ? vo.play() : vo.pause(); };
+$('#tlPlay').onclick = () => { if (!S.audioBlob) return toast('Upload the voiceover first'); vo.paused ? vo.play() : vo.pause(); };
 function renderTimes() {
   $('#times').innerHTML = S.segments.map((s, i) => `<div class="ti"><b>${i + 1}</b><input type="number" step="0.05" min="0" value="${S.starts[i].toFixed(2)}" data-start="${i}" ${i === 0 ? 'disabled' : ''}><span class="tx" title="${esc(plain(s.text))}">${esc(plain(s.text))}</span></div>`).join('');
 }
@@ -863,17 +863,17 @@ $('#times').addEventListener('change', e => {
 
 /* ============ tap sync ============ */
 const tap = { active: false, idx: 0 };
-function renderTap() { const n = S.segments.length; $('#tapCount').textContent = `Scene ${tap.idx + 1} / ${n} · ${fmt(vo.currentTime)}`; $('#tapCur').textContent = plain(S.segments[tap.idx]?.text || ''); $('#tapNext').textContent = tap.idx + 1 < n ? 'Agla: ' + plain(S.segments[tap.idx + 1].text) : 'Ye aakhri scene hai'; }
+function renderTap() { const n = S.segments.length; $('#tapCount').textContent = `Scene ${tap.idx + 1} / ${n} · ${fmt(vo.currentTime)}`; $('#tapCur').textContent = plain(S.segments[tap.idx]?.text || ''); $('#tapNext').textContent = tap.idx + 1 < n ? 'Next: ' + plain(S.segments[tap.idx + 1].text) : 'This is the last scene'; }
 $('#tapStart').onclick = () => {
-  if (!S.audioBlob) return toast('Pehle voiceover upload karo'); if (S.segments.length < 2) return toast('Kam se kam 2 scenes chahiye');
+  if (!S.audioBlob) return toast('Upload the voiceover first'); if (S.segments.length < 2) return toast('You need at least 2 scenes');
   tap.active = true; tap.idx = 0; S.starts[0] = 0; $('#tapBox').hidden = false; vo.currentTime = 0; vo.play(); renderTap();
-  $('#syncInfo').textContent = 'Jab agla scene shuru ho, Space ya bada button dabao.';
+  $('#syncInfo').textContent = 'When the next scene starts, press Space or the big button.';
 };
 function doTap() { if (!tap.active) return; const n = S.segments.length; if (tap.idx + 1 >= n) return finishTap(); tap.idx++; S.starts[tap.idx] = Math.max(vo.currentTime - 0.05, S.starts[tap.idx - 1] + 0.1); for (let j = tap.idx + 1; j < n; j++) if (S.starts[j] <= S.starts[j - 1]) S.starts[j] = S.starts[j - 1] + 0.1; renderTap(); if (tap.idx + 1 >= n) { /* last scene placed; let audio finish */ } }
 function finishTap() {
   if (!tap.active) return; tap.active = false; $('#tapBox').hidden = true; vo.pause();
   if (tap.idx + 1 < S.segments.length) ratioTiming(tap.idx);
-  $('#syncInfo').textContent = 'Tap Sync ho gaya. Timeline par chhote sudhaar kar sakte ho.'; renderTimes(); renderScenes(); drawTimeline(); drawPreview(); save();
+  $('#syncInfo').textContent = 'Tap Sync done. You can fine-tune on the timeline.'; renderTimes(); renderScenes(); drawTimeline(); drawPreview(); save();
 }
 $('#tapBtn').onclick = doTap; $('#tapStop').onclick = finishTap;
 
@@ -886,19 +886,19 @@ function parseSrt(txt) {
   return cues;
 }
 $('#srtBtn').onclick = async () => {
-  const [f] = await pickFile($('#srtFile')); if (!f) return; const cues = parseSrt(await f.text()); if (!cues.length) return toast('Is file mein koi subtitle nahi mila');
+  const [f] = await pickFile($('#srtFile')); if (!f) return; const cues = parseSrt(await f.text()); if (!cues.length) return toast('No subtitles found in this file');
   const st = S.settings; const texts = [], starts = [];
   cues.forEach(c => { const parts = splitScript(c.text, st.splitLevel, st.minWords, st.maxWords); const w = parts.map(weight), tot = w.reduce((a, b) => a + b, 0); let acc = c.start; parts.forEach((p, k) => { texts.push(p); starts.push(acc); acc += (c.end - c.start) * w[k] / tot; }); });
   S.script = cues.map(c => c.text).join('\n'); $('#script').value = S.script;
   setSegmentsFromTexts(texts); starts[0] = 0; S.starts = starts; segmentsChanged(true);
-  $('#syncInfo').textContent = `${cues.length} subtitles se ${texts.length} scenes bane, timing SRT se li.`;
+  $('#syncInfo').textContent = `${cues.length} subtitles became ${texts.length} scenes, timing taken from the SRT.`;
 };
 $('#srtExport').onclick = () => {
   if (!S.segments.length) return; const out = S.segments.map((s, i) => `${i + 1}\n${fmtSrt(S.starts[i])} --> ${fmtSrt(segEnd(i))}\n${captionTokens(s.text).map(t => t.w).join(' ')}\n`).join('\n');
   download(new Blob([out], { type: 'text/plain' }), safeName() + '.srt');
 };
-$('#smartSync').onclick = () => { if (!S.segments.length) return toast('Pehle scenes banao'); if (!analysis) { ratioTiming(); toast('Voiceover nahi hai, isliye text ke hisaab se baanta'); } else { smartTiming(); $('#syncInfo').textContent = `${analysis.pauses.length} ruk wali jagah mili, scenes unpar set kiye.`; } renderTimes(); renderScenes(); drawTimeline(); drawPreview(); save(); };
-$('#ratioSync').onclick = () => { ratioTiming(); $('#syncInfo').textContent = 'Har scene ko uske text ki lambai ke hisaab se time diya.'; renderTimes(); renderScenes(); drawTimeline(); drawPreview(); save(); };
+$('#smartSync').onclick = () => { if (!S.segments.length) return toast('Create scenes first'); if (!analysis) { ratioTiming(); toast('No voiceover, so timing is split by text length'); } else { smartTiming(); $('#syncInfo').textContent = `Found ${analysis.pauses.length} pauses and placed scene changes on them.`; } renderTimes(); renderScenes(); drawTimeline(); drawPreview(); save(); };
+$('#ratioSync').onclick = () => { ratioTiming(); $('#syncInfo').textContent = 'Each scene got time based on its text length.'; renderTimes(); renderScenes(); drawTimeline(); drawPreview(); save(); };
 
 /* ============ scenes list ============ */
 function renderScenes() {
@@ -906,9 +906,9 @@ function renderScenes() {
   const asp = S.settings.aspect.replace(':', '/');
   $('#scenes').innerHTML = S.segments.map((s, i) => `<div class="scene" data-i="${i}"><div class="num">${i + 1}</div><canvas class="thumb" data-thumb="${i}" width="184" height="104" style="aspect-ratio:${asp}"></canvas><div class="body">
     <textarea rows="1" data-text="${i}" aria-label="Scene ${i + 1} text">${esc(s.text)}</textarea>
-    <input type="text" data-vis="${i}" value="${esc(s.visual || '')}" placeholder="Visual (optional): image mein kya dikhe, jaise 'Rohan sad, sitting alone on stairs, close-up'">
+    <input type="text" data-vis="${i}" value="${esc(s.visual || '')}" placeholder="Visual (optional): what the image should show, e.g. 'Rohan sad, sitting alone on stairs, close-up'">
     <div class="meta"><span class="t">${fmt(S.starts[i] || 0, 2)} → ${fmt(segEnd(i), 2)} · ${(segEnd(i) - (S.starts[i] || 0)).toFixed(1)}s</span>
-    <button class="btn small" data-split="${i}">Split</button>${i < S.segments.length - 1 ? `<button class="btn small" data-merge="${i}">Merge ↓</button>` : ''}<button class="btn small" data-onecopy="${i}">Prompt</button><button class="btn small danger" data-del="${i}">Delete</button></div></div></div>`).join('') || '<p class="hint">Script likh kar <b>Scenes banao</b> dabao.</p>';
+    <button class="btn small" data-split="${i}">Split</button>${i < S.segments.length - 1 ? `<button class="btn small" data-merge="${i}">Merge ↓</button>` : ''}<button class="btn small" data-onecopy="${i}">Prompt</button><button class="btn small danger" data-del="${i}">Delete</button></div></div></div>`).join('') || '<p class="hint">Write a script and press <b>Create scenes</b>.</p>';
   $$('[data-thumb]').forEach(cv => { const i = +cv.dataset.thumb; const [W, H] = dims(208); cv.width = W; cv.height = H; const x = cv.getContext('2d'); if (sceneCache[i]) drawCover(x, sceneCache[i], W, H, 1, .5, .5); else { x.fillStyle = cssVar('--surface-2'); x.fillRect(0, 0, W, H); x.fillStyle = cssVar('--muted'); x.font = '600 22px "JetBrains Mono", monospace'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('—', W / 2, H / 2); } });
 }
 $('#scenes').addEventListener('input', e => {
@@ -922,7 +922,7 @@ document.addEventListener('click', async e => {
   else if (d.split != null) {
     const i = +d.split, ta = document.querySelector(`[data-text="${i}"]`), s = S.segments[i].text;
     let pos = ta && ta.selectionStart > 0 && ta.selectionStart < s.length ? ta.selectionStart : -1;
-    if (pos < 0) { const words = s.split(' '); if (words.length < 2) return toast('Ek shabd ko todna mumkin nahi'); pos = words.slice(0, Math.ceil(words.length / 2)).join(' ').length; }
+    if (pos < 0) { const words = s.split(' '); if (words.length < 2) return toast('A single word cannot be split'); pos = words.slice(0, Math.ceil(words.length / 2)).join(' ').length; }
     const a = s.slice(0, pos).trim(), c = s.slice(pos).trim(); if (!a || !c) return;
     const d0 = S.starts[i], d1 = segEnd(i), mid = d0 + (d1 - d0) * weight(a) / (weight(a) + weight(c));
     S.segments.splice(i, 1, { ...S.segments[i], text: a }, { id: uid++, text: c, visual: '' }); S.starts.splice(i + 1, 0, mid); segmentsChanged(true);
@@ -947,17 +947,17 @@ let trimT;
 $('#splitBtn').onclick = () => {
   const st = S.settings; S.script = $('#script').value;
   const texts = splitScript(S.script, st.splitLevel, +st.minWords || 1, +st.maxWords || 14);
-  if (!texts.length) return toast('Script khali hai');
+  if (!texts.length) return toast('The script is empty');
   setSegmentsFromTexts(texts);
   const avg = duration() / texts.length;
-  $('#splitInfo').textContent = `${texts.length} scenes bane${S.audioBlob ? ` · har scene ~${avg.toFixed(1)}s` : ''} · ${batches().length} grid images`;
+  $('#splitInfo').textContent = `${texts.length} scenes created${S.audioBlob ? ` · ~${avg.toFixed(1)}s per scene` : ''} · ${batches().length} grid images`;
 };
 
 /* ============ status ============ */
 function renderStatus() {
   const n = S.segments.length, bs = batches(), up = bs.filter(b => S.grids[b.index]).length;
   const missing = sceneCache.filter(c => !c).length;
-  $('#status').innerHTML = `<span class="chip ${n ? 'ok' : 'wait'}">${n} scenes</span><span class="chip ${S.audioBlob ? 'ok' : 'wait'}">${S.audioBlob ? 'Voice ' + fmt(duration(), 0) : 'Voice baaki'}</span><span class="chip ${bs.length && up === bs.length ? 'ok' : 'wait'}">Grids ${up}/${bs.length}</span>${missing && n ? `<span class="chip wait">${missing} image baaki</span>` : ''}`;
+  $('#status').innerHTML = `<span class="chip ${n ? 'ok' : 'wait'}">${n} scenes</span><span class="chip ${S.audioBlob ? 'ok' : 'wait'}">${S.audioBlob ? 'Voice ' + fmt(duration(), 0) : 'No voice yet'}</span><span class="chip ${bs.length && up === bs.length ? 'ok' : 'wait'}">Grids ${up}/${bs.length}</span>${missing && n ? `<span class="chip wait">${missing} images missing</span>` : ''}`;
 }
 
 /* ============ audio upload ============ */
@@ -965,36 +965,36 @@ let actxDecode;
 async function setVoice(blob, name) {
   S.audioBlob = blob; S.audioName = name || S.audioName || 'voiceover';
   if (vo.src) URL.revokeObjectURL(vo.src); vo.src = URL.createObjectURL(blob);
-  $('#voInfo').textContent = 'Voiceover padh rahe hain...';
+  $('#voInfo').textContent = 'Reading the voiceover...';
   try {
     actxDecode = actxDecode || new (window.AudioContext || window.webkitAudioContext)();
     audioBuf = await actxDecode.decodeAudioData(await blob.arrayBuffer()); analysis = analyzeAudio(audioBuf);
-    $('#voInfo').innerHTML = `<b>${esc(S.audioName)}</b> · ${fmt(audioBuf.duration)} · ${analysis.pauses.length} ruk wali jagah mili`;
-  } catch (e) { audioBuf = null; analysis = null; $('#voInfo').textContent = 'Ye audio decode nahi hua (waveform nahi dikhega), par play ho sakta hai. MP3 ya WAV try karo.'; }
+    $('#voInfo').innerHTML = `<b>${esc(S.audioName)}</b> · ${fmt(audioBuf.duration)} · ${analysis.pauses.length} pauses found`;
+  } catch (e) { audioBuf = null; analysis = null; $('#voInfo').textContent = 'Could not decode this audio (no waveform), but it may still play. Try MP3 or WAV.'; }
 }
-setupDrop($('#voDrop'), async f => { await setVoice(f[0], f[0].name); if (S.segments.length) smartTiming(); segmentsChanged(true); toast('Voiceover lag gaya, scenes sync ho gaye'); }, $('#voFile'), false);
-async function setMusic(blob, name) { S.musicBlob = blob; S.musicName = name; if (music.src) URL.revokeObjectURL(music.src); music.src = blob ? URL.createObjectURL(blob) : ''; $('#musicInfo').textContent = blob ? name : 'Koi music nahi'; }
+setupDrop($('#voDrop'), async f => { await setVoice(f[0], f[0].name); if (S.segments.length) smartTiming(); segmentsChanged(true); toast('Voiceover added, scenes synced'); }, $('#voFile'), false);
+async function setMusic(blob, name) { S.musicBlob = blob; S.musicName = name; if (music.src) URL.revokeObjectURL(music.src); music.src = blob ? URL.createObjectURL(blob) : ''; $('#musicInfo').textContent = blob ? name : 'No music'; }
 $('#musicBtn').onclick = async () => { const [f] = await pickFile($('#musicFile')); if (f) { await setMusic(f, f.name); save(); } };
 $('#musicDel').onclick = () => { music.pause(); setMusic(null, ''); save(); };
 
 /* ============ bulk grid upload ============ */
 setupDrop($('#bulkDrop'), async files => {
   files = files.filter(f => f.type.startsWith('image/')).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-  const bs = batches(); if (!bs.length) return toast('Pehle scenes banao');
+  const bs = batches(); if (!bs.length) return toast('Create scenes first');
   let placed = 0;
   for (const b of bs) { if (!files.length) break; if (S.grids[b.index]) continue; await setGrid(b.index, files.shift()); placed++; }
-  segmentsChanged(true); toast(`${placed} grid image lag gayi${files.length ? `, ${files.length} extra bachi` : ''}`);
+  segmentsChanged(true); toast(`${placed} grid image(s) added${files.length ? `, ${files.length} left over` : ''}`);
 }, $('#bulkFile'), true);
 
 /* ============ director ============ */
-$('#copyDirector').onclick = () => { if (!S.segments.length) return toast('Pehle scenes banao'); copyText(directorPrompt()); };
+$('#copyDirector').onclick = () => { if (!S.segments.length) return toast('Create scenes first'); copyText(directorPrompt()); };
 $('#applyDirector').onclick = () => {
   const txt = $('#directorReply').value; let c = 0;
   txt.split('\n').forEach(l => { const m = l.match(/^\s*(?:scene\s*)?(\d+)\s*[:.)\-–]\s*(.+)$/i); if (m) { const i = +m[1] - 1; if (S.segments[i]) { S.segments[i].visual = m[2].trim().replace(/^["']|["']$/g, ''); c++; } } });
-  $('#dirInfo').textContent = c ? `${c} scenes ka visual bhar diya` : 'Koi line "1: ..." format mein nahi mili';
+  $('#dirInfo').textContent = c ? `Filled visuals for ${c} scenes` : 'No lines in "1: ..." format found';
   if (c) { renderScenes(); renderPrompts(); save(); }
 };
-$('#copyAll').onclick = () => { const bs = batches(); if (!bs.length) return toast('Pehle scenes banao'); copyText(bs.map(b => `===== IMAGE ${b.index + 1} (Scenes ${b.start + 1}-${b.start + b.count}) =====\n${buildPrompt(b)}`).join('\n\n')); };
+$('#copyAll').onclick = () => { const bs = batches(); if (!bs.length) return toast('Create scenes first'); copyText(bs.map(b => `===== IMAGE ${b.index + 1} (Scenes ${b.start + 1}-${b.start + b.count}) =====\n${buildPrompt(b)}`).join('\n\n')); };
 $('#dlPrompts').onclick = () => { const bs = batches(); if (!bs.length) return; download(new Blob([bs.map(b => `===== IMAGE ${b.index + 1} (Scenes ${b.start + 1}-${b.start + b.count}) =====\n${buildPrompt(b)}`).join('\n\n')], { type: 'text/plain' }), safeName() + '-prompts.txt'); };
 $('#loadChars').onclick = () => { const ta = $('#characters'); ta.value = (ta.value.trim() ? ta.value.trim() + '\n' : '') + CHANNEL_CHARS; S.settings.characters = ta.value; renderPrompts(); save(); };
 
@@ -1036,10 +1036,10 @@ function pickMime() {
   return c.find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || '';
 }
 $('#exportBtn').onclick = async () => {
-  if (!S.audioBlob) return toast('Pehle voiceover upload karo'); if (!S.segments.length) return toast('Pehle scenes banao');
-  if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) return toast('Ye browser video export nahi karta. Chrome ya Edge use karo.');
+  if (!S.audioBlob) return toast('Upload the voiceover first'); if (!S.segments.length) return toast('Create scenes first');
+  if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) return toast('This browser cannot export video. Use Chrome or Edge.');
   const missing = sceneCache.filter(c => !c).length;
-  if (missing && !$('#exportBtn').dataset.confirm) { $('#exportBtn').dataset.confirm = '1'; $('#exportInfo').textContent = `${missing} scenes ki image abhi baaki hai (wahan "image baaki" dikhega). Phir bhi export ke liye dobara dabao.`; return; }
+  if (missing && !$('#exportBtn').dataset.confirm) { $('#exportBtn').dataset.confirm = '1'; $('#exportInfo').textContent = `${missing} scenes still have no image (they will show "image missing"). Press again to export anyway.`; return; }
   delete $('#exportBtn').dataset.confirm;
   vo.pause(); try { await document.fonts.load('800 40px "Baloo 2"'); } catch (_) {}
   const [W, H] = exportDims(), fps = +S.settings.fps; const mime = pickMime();
@@ -1049,37 +1049,37 @@ $('#exportBtn').onclick = async () => {
   let m = null; if (S.musicBlob) { m = new Audio(URL.createObjectURL(S.musicBlob)); m.loop = true; const g = actx.createGain(); g.gain.value = S.settings.musicVol; actx.createMediaElementSource(m).connect(g).connect(dest); }
   const stream = cv.captureStream(fps); dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
   let rec; try { rec = new MediaRecorder(stream, { mimeType: mime || undefined, videoBitsPerSecond: H >= 1080 || W >= 1080 ? 12e6 : 6e6, audioBitsPerSecond: 192000 }); }
-  catch (e) { actx.close(); return toast('Recorder start nahi hua: ' + e.message); }
+  catch (e) { actx.close(); return toast('Could not start the recorder: ' + e.message); }
   const chunks = []; rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
   const ui = { btn: $('#exportBtn'), cancel: $('#exportCancel'), prog: $('#exportProg'), info: $('#exportInfo') };
   exporting = { cancelled: false }; ui.btn.disabled = true; ui.cancel.hidden = false; ui.prog.hidden = false; ui.prog.value = 0;
-  ui.info.textContent = `Export chal raha hai (${W}×${H}, ${mime.includes('mp4') ? 'MP4' : 'WebM'}). Ye tab khula rakho.`;
+  ui.info.textContent = `Exporting (${W}×${H}, ${mime.includes('mp4') ? 'MP4' : 'WebM'}). Keep this tab open.`;
   let wake = null; try { wake = await navigator.wakeLock?.request('screen'); } catch (_) {}
   const finish = () => new Promise(res => { rec.onstop = res; setTimeout(() => { try { rec.stop(); } catch (_) { res(); } }, 350); });
   let done = false;
-  const tick = () => { if (done) return; drawFrame(ctx, W, H, a.currentTime); pctx.drawImage(cv, 0, 0, pv.width, pv.height); ui.prog.value = a.currentTime / (a.duration || duration()); ui.info.textContent = `Export: ${fmt(a.currentTime, 0)} / ${fmt(a.duration || duration(), 0)} · tab khula rakho`; requestAnimationFrame(tick); };
+  const tick = () => { if (done) return; drawFrame(ctx, W, H, a.currentTime); pctx.drawImage(cv, 0, 0, pv.width, pv.height); ui.prog.value = a.currentTime / (a.duration || duration()); ui.info.textContent = `Export: ${fmt(a.currentTime, 0)} / ${fmt(a.duration || duration(), 0)} · keep this tab open`; requestAnimationFrame(tick); };
   // backup ticker for when rAF is throttled
   const backup = setInterval(() => { if (!done && document.hidden) drawFrame(ctx, W, H, a.currentTime); }, 1000 / fps);
   drawFrame(ctx, W, H, 0);
   ui.cancel.onclick = () => { exporting.cancelled = true; a.pause(); a.dispatchEvent(new Event('ended')); };
   rec.start(500);
-  try { await a.play(); if (m) m.play().catch(() => {}); } catch (e) { toast('Audio start nahi hua'); }
+  try { await a.play(); if (m) m.play().catch(() => {}); } catch (e) { toast('Could not start the audio'); }
   tick();
   await new Promise(res => a.addEventListener('ended', res, { once: true }));
   drawFrame(ctx, W, H, a.duration || duration()); await finish(); done = true; clearInterval(backup);
   if (m) m.pause(); actx.close(); try { wake && wake.release(); } catch (_) {}
   const cancelled = exporting.cancelled; exporting = null; ui.btn.disabled = false; ui.cancel.hidden = true; ui.prog.hidden = true; drawPreview();
-  if (cancelled) { ui.info.textContent = 'Export cancel ho gaya.'; return; }
+  if (cancelled) { ui.info.textContent = 'Export cancelled.'; return; }
   const ext = mime.includes('mp4') ? 'mp4' : 'webm'; const blob = new Blob(chunks, { type: mime || 'video/webm' });
   download(blob, `${safeName()}.${ext}`);
-  ui.info.innerHTML = `Video ban gayi: <b>${safeName()}.${ext}</b> (${(blob.size / 1048576).toFixed(1)} MB) download ho gayi.${ext === 'webm' ? ' WebM ko MP4 banana ho to: <kbd>ffmpeg -i video.webm -c:v libx264 -c:a aac video.mp4</kbd>' : ''}`;
+  ui.info.innerHTML = `Video ready: <b>${safeName()}.${ext}</b> (${(blob.size / 1048576).toFixed(1)} MB) downloaded.${ext === 'webm' ? ' To convert WebM to MP4: <kbd>ffmpeg -i video.webm -c:v libx264 -c:a aac video.mp4</kbd>' : ''}`;
 };
 
 /* ============ project file ============ */
 const b2d = b => new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(b); });
 const d2b = async d => d ? (await fetch(d)).blob() : null;
 $('#saveFile').onclick = async () => {
-  toast('Project file bana rahe hain...'); const s = snapshot(); const out = { ...s, grids: [], overrides: {} };
+  toast('Building the project file...'); const s = snapshot(); const out = { ...s, grids: [], overrides: {} };
   for (const g of s.grids) out.grids.push(g ? { ...g, blob: await b2d(g.blob) } : null);
   for (const [k, v] of Object.entries(s.overrides)) out.overrides[k] = await b2d(v);
   out.audioBlob = s.audioBlob ? await b2d(s.audioBlob) : null; out.musicBlob = s.musicBlob ? await b2d(s.musicBlob) : null;
@@ -1089,13 +1089,13 @@ $('#openFileBtn').onclick = async () => {
   const [f] = await pickFile($('#openFile')); if (!f) return;
   try { const p = JSON.parse(await f.text()); p.grids = await Promise.all((p.grids || []).map(async g => g ? { ...g, blob: await d2b(g.blob) } : null));
     const ov = {}; for (const [k, v] of Object.entries(p.overrides || {})) ov[k] = await d2b(v); p.overrides = ov;
-    p.audioBlob = await d2b(p.audioBlob); p.musicBlob = await d2b(p.musicBlob); await restore(p); save(); toast('Project khul gaya'); }
-  catch (e) { toast('Ye project file sahi nahi hai'); }
+    p.audioBlob = await d2b(p.audioBlob); p.musicBlob = await d2b(p.musicBlob); await restore(p); save(); toast('Project opened'); }
+  catch (e) { toast('This is not a valid project file'); }
 };
 let newArm = 0;
 $('#newProj').onclick = async () => {
-  if (Date.now() - newArm > 3000) { newArm = Date.now(); toast('Sab saaf karna hai? 3 second mein dobara "Naya" dabao'); return; }
-  newArm = 0; vo.pause(); await restore({ settings: { ...DEFAULTS }, script: '', segments: [], starts: [], grids: [], overrides: {} }); save(); toast('Naya project');
+  if (Date.now() - newArm > 3000) { newArm = Date.now(); toast('Clear everything? Press "New" again within 3 seconds'); return; }
+  newArm = 0; vo.pause(); await restore({ settings: { ...DEFAULTS }, script: '', segments: [], starts: [], grids: [], overrides: {} }); save(); toast('New project');
 };
 async function restore(p) {
   S.settings = { ...DEFAULTS, ...(p.settings || {}) }; S.script = p.script || ''; S.segments = p.segments || []; S.starts = p.starts || [];
@@ -1120,7 +1120,7 @@ async function restore(p) {
   else {
     S.script = SAMPLE; $('#script').value = SAMPLE; applySettingsToUI();
     setSegmentsFromTexts(splitScript(SAMPLE, 'all', 2, 14));
-    $('#splitInfo').textContent = 'Ye ek example script hai. Apni script daal kar "Scenes banao" dabao.';
+    $('#splitInfo').textContent = 'This is an example script. Paste your own and press "Create scenes".';
   }
   let tab = 'script'; try { tab = localStorage.getItem('ss-tab') || 'script'; } catch (_) {}
   showTab(tab);
