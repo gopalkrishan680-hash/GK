@@ -1,0 +1,383 @@
+# Metro Saathi data. Station order/coords © OpenStreetMap contributors (ODbL).
+# L|id|name|color|status|note   S|name|lat|lon|kmFromStart|layout   W|a|b|walkMin   C|line|a|b|km (extra link)
+L|RED|Red Line|#E31E24|op|
+S|Rithala|28.720788|77.107161|0.00|Elevated
+S|Rohini West|28.714957|77.115385|1.16|Elevated
+S|Rohini East|28.707597|77.126022|2.63|Underground
+S|Madhuban Chowk|28.703268|77.132250|3.50|Elevated
+S|Kohat Enclave|28.698042|77.140539|4.62|Elevated
+S|Netaji Subhash Place|28.695399|77.153351|6.06|Underground
+S|Keshav Puram|28.688926|77.161683|7.27|Elevated
+S|Kanhaiya Nagar|28.682408|77.164775|8.15|Elevated
+S|Inderlok|28.673111|77.169742|9.43|Elevated
+S|Shastri Nagar|28.670089|77.181859|10.81|Elevated
+S|Pratap Nagar|28.666718|77.198897|12.71|Elevated
+S|Pul Bangash|28.666407|77.207416|13.65|Elevated
+S|Tis Hazari|28.667163|77.216631|14.66|At Grade
+S|Kashmere Gate|28.667897|77.228180|15.92|Underground
+S|Shastri Park|28.668455|77.250539|18.37|At Grade
+S|Seelampur|28.669917|77.266763|20.15|Elevated
+S|Welcome|28.672135|77.277375|21.34|Elevated
+S|Shahdara|28.673460|77.289882|22.72|Elevated
+S|Mansarovar Park|28.675415|77.300869|23.94|Elevated
+S|Jhilmil|28.675751|77.312394|25.20|Elevated
+S|Dilshad Garden|28.675885|77.321514|26.20|Elevated
+S|Shaheed Nagar|28.676691|77.333915|27.56|Elevated
+S|Raj Bagh|28.677119|77.346863|28.97|Elevated
+S|Rajendra Nagar|28.677641|77.358138|30.21|Elevated
+S|Shyam Park|28.678239|77.370485|31.56|Elevated
+S|Mohan Nagar|28.678563|77.383902|33.03|Elevated
+S|Arthala|28.677027|77.391894|33.92|Elevated
+S|Hindon River|28.673456|77.406548|35.58|Elevated
+S|Shaheed Sthal|28.670706|77.415390|36.61|Elevated
+L|YELLOW|Yellow Line|#FFD200|op|
+S|Samaypur Badli|28.744639|77.138299|0.00|Elevated
+S|Rohini Sector 18, 19|28.738344|77.139864|0.80|Elevated
+S|Haiderpur Badli Mor|28.729917|77.148872|2.24|Elevated
+S|Jahangirpuri|28.725987|77.162683|3.83|Elevated
+S|Adarsh Nagar|28.716598|77.170447|5.27|At Grade
+S|Azadpur|28.706443|77.181164|6.99|Underground
+S|Model Town|28.702739|77.194006|8.47|Elevated
+S|GTB Nagar|28.698156|77.206423|9.94|Underground
+S|Vishwa Vidyalaya|28.695099|77.214748|10.93|Underground
+S|Vidhan Sabha|28.686327|77.221758|12.26|Underground
+S|Civil Lines|28.676857|77.225057|13.50|Underground
+S|Kashmere Gate|28.667897|77.228180|14.66|Underground
+S|Chandni Chowk|28.658421|77.230366|15.87|Underground
+S|Chawri Bazaar|28.649251|77.226544|17.08|Underground
+S|New Delhi|28.643471|77.222771|17.91|Underground
+S|Rajiv Chowk|28.632770|77.219567|19.29|Underground
+S|Patel Chowk|28.622954|77.214059|20.65|Underground
+S|Central Secretariat|28.615875|77.212351|21.55|Underground
+S|Seva Teerth|28.609512|77.211825|22.35|Underground
+S|Lok Kalyan Marg|28.597355|77.211127|23.86|Underground
+S|Jor Bagh|28.586594|77.212564|25.21|Underground
+S|Dilli Haat - INA|28.573893|77.208455|26.86|Underground
+S|A.I.I.M.S.|28.566854|77.207832|27.74|Underground
+S|Green Park|28.558002|77.206821|28.85|Underground
+S|Hauz Khas|28.543804|77.205880|30.62|Underground
+S|Malviya Nagar|28.529067|77.204855|32.46|Underground
+S|Saket|28.520873|77.201898|33.53|Underground
+S|Qutab Minar|28.512930|77.186472|35.48|Elevated
+S|Chhatarpur|28.506755|77.174936|36.96|Elevated
+S|Sultanpur|28.498971|77.160910|38.78|Elevated
+S|Ghitorni|28.493728|77.149198|40.21|Elevated
+S|Arjan Garh|28.480716|77.125784|43.25|Elevated
+S|Guru Dronacharya|28.481998|77.102272|45.83|Elevated
+S|Sikanderpur|28.481122|77.093714|46.77|Elevated
+S|M G Road|28.479524|77.079899|48.29|Elevated
+S|IFFCO Chowk|28.472331|77.072452|49.51|Elevated
+S|Millennium City Centre Gurugram|28.459331|77.072686|51.12|Elevated
+L|BLUE|Blue Line|#0072CE|op|
+S|Dwarka Sector 21|28.551913|77.058556|0.00|Underground
+S|Dwarka Sector 8|28.565613|77.067015|1.94|Elevated
+S|Dwarka Sector 9|28.574263|77.065309|3.03|Elevated
+S|Dwarka Sector 10|28.581040|77.057486|4.24|Elevated
+S|Dwarka Sector 11|28.586429|77.049427|5.34|Elevated
+S|Dwarka Sector 12|28.592219|77.040718|6.54|Elevated
+S|Dwarka Sector 13|28.596992|77.033527|7.52|Elevated
+S|Dwarka Sector 14|28.602204|77.025961|8.58|Elevated
+S|Dwarka - Kakrola|28.615428|77.022553|10.26|Elevated
+S|Dwarka Mor|28.619332|77.033276|11.53|Elevated
+S|Nawada|28.620297|77.045078|12.83|Elevated
+S|Uttam Nagar West|28.621777|77.055708|14.01|Elevated
+S|Uttam Nagar East|28.624868|77.065278|15.12|Elevated
+S|Janakpuri West|28.629277|77.077999|16.62|Underground
+S|Janakpuri East|28.633027|77.086709|17.68|Elevated
+S|Tilak Nagar|28.636564|77.096462|18.83|Elevated
+S|Subhash Nagar|28.640501|77.105216|19.90|Elevated
+S|Tagore Garden|28.643764|77.112845|20.83|Elevated
+S|Rajouri Garden|28.650125|77.123473|22.24|Elevated
+S|Ramesh Nagar|28.652765|77.131644|23.19|Elevated
+S|Moti Nagar|28.657878|77.142419|24.53|Elevated
+S|Kirti Nagar|28.655159|77.151007|25.53|Elevated
+S|Shadipur|28.651601|77.158269|26.44|Elevated
+S|Patel Nagar|28.645029|77.169292|27.89|Elevated
+S|Rajendra Place|28.642517|77.178271|28.92|Elevated
+S|Karol Bagh|28.644031|77.188520|30.06|Elevated
+S|Jhandewalan|28.644336|77.199927|31.30|Elevated
+S|Ramakrishna Ashram Marg|28.639259|77.208594|32.44|Elevated
+S|Rajiv Chowk|28.632770|77.219567|33.89|Underground
+S|Barakhambha Road|28.629787|77.225021|34.59|Underground
+S|Mandi House|28.625563|77.234195|35.72|Underground
+S|Supreme Court|28.623488|77.242546|36.67|Elevated
+S|Indraprastha|28.620623|77.249556|37.52|Elevated
+S|Yamuna Bank|28.623307|77.267952|39.56|At Grade
+S|Akshardham|28.617892|77.279565|41.00|Elevated
+S|Mayur Vihar - I|28.603791|77.290149|43.10|Elevated
+S|Mayur Vihar Extension|28.594508|77.294549|44.35|Elevated
+S|New Ashok Nagar|28.589158|77.301599|45.37|Elevated
+S|Noida Sector 15|28.584960|77.311735|46.60|Elevated
+S|Noida Sector 16|28.578148|77.317876|47.68|Elevated
+S|Noida Sector 18|28.570824|77.326174|48.96|Elevated
+S|Botanical Garden|28.563937|77.334136|50.19|Elevated
+S|Noida Golf Course|28.567474|77.346376|51.60|Elevated
+S|Noida City Centre|28.574837|77.356209|53.01|Elevated
+S|Noida Sector 34|28.580276|77.363480|54.05|Elevated
+S|Noida Sector 52|28.586782|77.372775|55.35|Elevated
+S|Noida Sector 61|28.597586|77.372230|56.70|Elevated
+S|Noida Sector 59|28.606529|77.372642|57.81|Elevated
+S|Noida Sector 62|28.616988|77.373555|59.12|Elevated
+S|Noida Electronic City|28.628262|77.375044|60.53|Elevated
+L|BLUE_B|Blue Line (Vaishali branch)|#0072CE|op|
+S|Yamuna Bank|28.623307|77.267952|0.00|At Grade
+S|Laxmi Nagar|28.630622|77.277502|1.39|Elevated
+S|Nirman Vihar|28.636558|77.286752|2.64|Elevated
+S|Preet Vihar|28.641441|77.295259|3.75|Elevated
+S|Karkarduma|28.648872|77.305833|5.23|Elevated
+S|Anand Vihar|28.646803|77.315730|6.34|Elevated
+S|Kaushambi|28.645408|77.324339|7.30|Elevated
+S|Vaishali|28.649765|77.339506|9.04|Elevated
+L|GREEN|Green Line|#00A651|op|
+S|Inderlok|28.673111|77.169742|0.00|Elevated
+S|Ashok Park Main|28.671537|77.155281|1.59|Elevated
+S|Punjabi Bagh|28.672927|77.146115|2.61|Elevated
+S|Punjabi Bagh West|28.673395|77.139864|3.29|Elevated
+S|Shivaji Park|28.674960|77.130457|4.34|Elevated
+S|Madipur|28.676405|77.119345|5.57|Elevated
+S|Paschim Vihar East|28.677329|77.112278|6.35|Elevated
+S|Paschim Vihar West|28.678585|77.102211|7.46|Elevated
+S|Peeragarhi|28.679712|77.092658|8.51|Elevated
+S|Udyog Nagar|28.681039|77.080842|9.81|Elevated
+S|Surajmal Stadium|28.681828|77.074004|10.57|Elevated
+S|Nangloi|28.682334|77.064726|11.58|Elevated
+S|Nangloi Railway Station|28.682130|77.056237|12.51|Elevated
+S|Rajdhani Park|28.682241|77.043936|13.86|Elevated
+S|Mundka|28.682351|77.030571|15.32|Elevated
+S|Mundka Industrial Area|28.683353|77.017114|16.79|Elevated
+S|Ghevra|28.685233|76.996122|19.10|Elevated
+S|Tikri Kalan|28.686819|76.977201|21.17|Elevated
+S|Tikri Border|28.687898|76.964068|22.61|Elevated
+S|Pandit Shree Ram Sharma|28.689211|76.951161|24.03|Elevated
+S|Bahadurgarh City|28.690658|76.935440|25.76|Elevated
+S|Brigadier Hoshiyar Singh|28.697343|76.919144|27.73|Elevated
+L|GREEN_B|Green Line (branch)|#00A651|op|
+S|Kirti Nagar|28.655159|77.151007|0.00|Elevated
+S|Satguru Ramsingh Marg|28.662079|77.157553|1.12|Elevated
+S|Ashok Park Main|28.671537|77.155281|2.32|Elevated
+L|VIOLET|Violet Line|#8E44AD|op|
+S|Kashmere Gate|28.667897|77.228180|0.00|Underground
+S|Lal Quila|28.657480|77.236728|1.60|Underground
+S|Jama Masjid|28.650045|77.237686|2.53|Underground
+S|Delhi Gate|28.639221|77.240810|3.92|Underground
+S|ITO|28.628191|77.241073|5.29|Underground
+S|Mandi House|28.625563|77.234195|6.12|Underground
+S|Janpath|28.624047|77.219288|7.76|Underground
+S|Central Secretariat|28.615875|77.212351|9.02|Underground
+S|Khan Market|28.602264|77.229142|11.52|Underground
+S|Jawaharlal Nehru Stadium|28.588249|77.233808|13.34|Underground
+S|Jangpura|28.583041|77.239346|14.23|Underground
+S|Lajpat Nagar|28.570055|77.237342|15.86|Underground
+S|Moolchand|28.564404|77.234278|16.64|Elevated
+S|Kailash Colony|28.555344|77.241984|18.05|Elevated
+S|Nehru Place|28.551441|77.251739|19.22|Elevated
+S|Kalkaji Mandir|28.549787|77.257896|19.93|Underground
+S|Govind Puri|28.544377|77.264266|20.90|Elevated
+S|Harkesh Nagar Okhla|28.543282|77.275668|22.15|Elevated
+S|Jasola Apollo|28.538425|77.283038|23.16|Elevated
+S|Sarita Vihar|28.528588|77.288316|24.51|Elevated
+S|Mohan Estate|28.519725|77.294480|25.81|Elevated
+S|Tughlakabad|28.502360|77.299240|28.03|Elevated
+S|Badarpur|28.493170|77.303024|29.25|Elevated
+S|Sarai|28.477970|77.304918|31.15|Elevated
+S|N.H.P.C. Chowk|28.457779|77.307393|33.68|Elevated
+S|Mewala Maharajpur|28.448620|77.308095|34.82|Elevated
+S|Sector 28|28.438160|77.309063|36.13|Elevated
+S|Badhkal Mor|28.422714|77.310377|38.06|Elevated
+S|Old Faridabad|28.410836|77.311462|39.54|Elevated
+S|Neelam Chowk Ajronda|28.397488|77.312435|41.21|Elevated
+S|Bata Chowk|28.385836|77.313462|42.67|Elevated
+S|Escorts Mujesar|28.370234|77.314920|44.62|Elevated
+S|Sant Surdas (Sihi)|28.354651|77.316226|46.56|Elevated
+S|Raja Nahar Singh|28.340005|77.316479|48.39|Elevated
+L|PINK|Pink Line|#FF69B4|op|
+S|Shiv Vihar|28.721431|77.289457|0.00|Elevated
+S|Johri Enclave|28.712887|77.290156|1.07|Elevated
+S|Gokulpuri|28.702422|77.286131|2.44|Elevated
+S|Maujpur - Babarpur|28.692093|77.279687|3.91|Elevated
+S|Jaffrabad|28.682711|77.274872|5.19|Elevated
+S|Welcome|28.672135|77.277375|6.54|Elevated
+S|East Azad Nagar|28.664686|77.284860|7.77|Elevated
+S|Krishna Nagar|28.657795|77.290163|8.81|Elevated
+S|Karkarduma Court|28.653646|77.295788|9.61|Elevated
+S|Karkarduma|28.648872|77.305833|10.86|Elevated
+S|Anand Vihar|28.646803|77.315730|11.97|Elevated
+S|IP Extension|28.631898|77.310760|13.91|Elevated
+S|Mandawali - West Vinod Nagar|28.624961|77.304479|15.01|Elevated
+S|East Vinod Nagar - Mayur Vihar - II|28.620097|77.305420|15.62|Elevated
+S|Trilokpuri Sanjay Lake|28.613435|77.308880|16.53|Elevated
+S|Shree Ram Mandir Mayur Vihar|28.605631|77.298042|18.07|Elevated
+S|Mayur Vihar - I|28.603791|77.290149|18.96|Elevated
+S|Sarai Kale Khan - Nizamuddin|28.588300|77.257386|23.03|Underground
+S|Ashram|28.572003|77.258122|25.06|Underground
+S|Vinobapuri|28.565794|77.248735|26.35|Underground
+S|Lajpat Nagar|28.570055|77.237342|27.70|Underground
+S|South Extension|28.568543|77.220560|29.55|Underground
+S|Dilli Haat - INA|28.573893|77.208455|31.03|Underground
+S|Sarojini Nagar|28.575794|77.198077|32.19|Underground
+S|Bhikaji Cama Place|28.570239|77.187860|33.50|Underground
+S|Sir M. Vishweshwaraiah Moti Bagh|28.578525|77.175709|35.18|Elevated
+S|Durgabai Deshmukh South Campus|28.589282|77.169438|36.69|Elevated
+S|Delhi Cantt|28.608600|77.140378|40.67|Elevated
+S|Naraina Vihar|28.624373|77.136413|42.69|Underground
+S|Mayapuri|28.637166|77.129701|44.44|Elevated
+S|Rajouri Garden|28.650125|77.123473|46.19|Elevated
+S|ESI - Basaidarapur|28.658081|77.127230|47.26|Elevated
+S|Punjabi Bagh West|28.673395|77.139864|49.62|Elevated
+S|Shakurpur|28.685910|77.149475|51.50|Elevated
+S|Netaji Subhash Place|28.695399|77.153351|52.75|Underground
+S|Shalimar Bagh|28.701988|77.165429|54.31|Underground
+S|Azadpur|28.706443|77.181164|56.11|Underground
+S|Majlis Park|28.724605|77.181817|58.38|Elevated
+S|Burari|28.729798|77.199837|60.45|Elevated
+S|Jharoda Majra|28.724905|77.213683|62.08|Elevated
+S|Jagatpur - Wazirabad|28.721169|77.223944|63.29|Elevated
+S|Soorghat|28.710249|77.227534|64.71|Elevated
+S|Nanaksar - Sonia Vihar|28.708759|77.242523|66.35|Elevated
+S|Khajuri Khas|28.705220|77.254483|67.73|Elevated
+S|Bhajanpura|28.703620|77.262644|68.65|Elevated
+S|Yamuna Vihar|28.702400|77.277308|70.26|Elevated
+L|MAGENTA|Magenta Line|#D6007F|op|
+S|Botanical Garden|28.563937|77.334136|0.00|Elevated
+S|Okhla Bird Sanctuary|28.552924|77.321614|1.94|Elevated
+S|Kalindi Kunj|28.542898|77.310131|3.71|Elevated
+S|Jasola Vihar Shaheen Bagh|28.545819|77.296635|5.23|Elevated
+S|Okhla Vihar|28.561302|77.291848|7.23|Elevated
+S|Jamia Millia Islamia|28.563034|77.286359|7.87|Elevated
+S|Sukhdev Vihar|28.559784|77.274969|9.18|Elevated
+S|Okhla NSIC|28.554448|77.264837|10.47|Elevated
+S|Kalkaji Mandir|28.549787|77.257896|11.42|Underground
+S|Nehru Enclave|28.546037|77.251518|12.26|Underground
+S|Greater Kailash|28.541872|77.238464|13.78|Underground
+S|Chirag Delhi|28.541091|77.230291|14.68|Underground
+S|Panchsheel Park|28.542353|77.221092|15.70|Underground
+S|Hauz Khas|28.543804|77.205880|17.38|Underground
+S|IIT Delhi|28.547003|77.194515|18.68|Underground
+S|R. K. Puram|28.550363|77.185505|19.75|Underground
+S|Munirka|28.556881|77.175041|21.15|Underground
+S|Vasant Vihar|28.557808|77.161090|22.69|Underground
+S|Shankar Vihar|28.560828|77.140254|25.00|Elevated
+S|Terminal 1 IGI Airport|28.564860|77.122621|26.99|Underground
+S|Sadar Bazar Cantonment|28.577090|77.111125|28.96|Elevated
+S|Palam|28.588910|77.083049|32.37|Underground
+S|Dashrath Puri|28.601875|77.082356|33.98|Underground
+S|Dabri Mor - Janakpuri South|28.615756|77.085178|35.74|Underground
+S|Janakpuri West|28.629277|77.077999|37.60|Underground
+S|Krishna Park Extension|28.647802|77.084310|40.01|Underground
+L|GREY|Grey Line|#808080|op|
+S|Dwarka - Kakrola|28.615428|77.022553|0.00|Elevated
+S|Nangli|28.617278|77.010452|1.34|Elevated
+S|Najafgarh|28.612426|76.986563|4.02|Underground
+S|Dhansa Bus Stand|28.611883|76.978550|4.90|Underground
+L|AIRPORT|Airport Express|#F7941D|op|Separate (higher) fare
+S|New Delhi Airport Express Terminal|28.642471|77.223133|0.00|Underground
+S|Shivaji Stadium|28.628880|77.211331|2.13|Underground
+S|Dhaula Kuan|28.591879|77.161702|9.25|Elevated
+S|Delhi Aerocity|28.548760|77.120804|16.24|Underground
+S|IGI Airport|28.556424|77.086710|20.09|Underground
+S|Dwarka Sector 21|28.551913|77.058556|23.22|Underground
+S|Yashobhoomi Dwarka Sector 25|28.550807|77.045291|24.67|Underground
+L|AQUA|Aqua Line (Noida Metro)|#00B9F1|op|Operated by NMRC – separate ticket
+S|Noida Sector 51|28.585725|77.375279|0.00|Elevated
+S|Rainbow Metro Station|28.574361|77.378258|1.45|Elevated
+S|Noida Sector 76|28.565340|77.379686|2.59|Elevated
+S|Noida Sector 101|28.556068|77.384970|3.88|Elevated
+S|Noida Sector 81|28.549310|77.389964|4.88|Elevated
+S|NSEZ|28.532416|77.394783|7.05|Elevated
+S|Noida Sector 83|28.522295|77.396459|8.32|Elevated
+S|Noida Sector 137|28.510788|77.403629|9.96|Elevated
+S|Noida Sector 142|28.499014|77.412868|11.74|Elevated
+S|Noida Sector 143|28.494281|77.422392|12.94|Elevated
+S|Noida Sector 144|28.486313|77.433088|14.47|Elevated
+S|Noida Sector 145|28.479022|77.442423|15.84|Elevated
+S|Noida Sector 146|28.468875|77.455189|17.72|Elevated
+S|Noida Sector 147|28.459342|77.466208|19.41|Elevated
+S|Noida Sector 148|28.448079|77.476623|21.22|Elevated
+S|Knowledge Park II|28.457073|77.500298|24.05|Elevated
+S|Pari Chowk|28.463414|77.508335|25.23|Elevated
+S|Alpha 1|28.471050|77.512708|26.29|Elevated
+S|Delta 1|28.478491|77.525693|27.99|Elevated
+S|GNIDA Office|28.484701|77.536480|29.40|Elevated
+S|Depot Station|28.489030|77.543980|30.38|Elevated
+L|RAPID|Rapid Metro Gurugram|#E4002B|op|Operated separately – separate ticket
+S|Sector 55 - 56|28.423299|77.105089|0.00|Elevated
+S|Sector 54 Chowk|28.432964|77.104810|1.20|Elevated
+S|Sector 53 - 54|28.446379|77.100441|2.94|Elevated
+S|Sector 42 - 43|28.457423|77.096929|4.37|Elevated
+S|DLF Phase 1|28.471426|77.093937|6.14|Elevated
+S|Sikanderpur|28.481122|77.093714|7.35|Elevated
+S|DLF Phase 2|28.487541|77.092972|8.16|Elevated
+S|Belvedere Towers|28.491702|77.088132|8.90|Elevated
+S|Cyber City|28.498061|77.089160|9.70|Elevated
+S|Moulsari Avenue Station|28.500778|77.094631|10.38|Elevated
+S|Phase 3 Station|28.493568|77.093661|11.29|Elevated
+L|MAGENTA_N|Magenta Line (Majlis Park–Deepali Chowk)|#D6007F|op|New Phase-4 section (2026) – station names/order unverified, please check DMRC
+S|Majlis Park|28.724605|77.181817|0.00|
+S|Bhalswa|28.727261|77.165345|1.83|
+S|Haiderpur Badli Mor|28.729917|77.148872|3.66|
+S|North Pitampura|28.721034|77.143331|4.92|
+S|Prashant Vihar|28.712151|77.137791|6.18|
+S|Madhuban Chowk|28.703268|77.132250|7.44|
+S|Deepali Chowk|28.694385|77.126709|8.70|
+L|UP_RED|Red Line extension (Rithala–Narela–Kundli)|#E31E24|up|Approved Dec 2024 (PIB). Under construction.
+S|Rithala|28.720788|77.107161||
+S|Rohini Sector 25|28.704234|77.138362||
+S|Rohini Sector 26|28.687680|77.169564||
+S|Rohini Sector 31|28.671126|77.200765||
+S|Rohini Sector 32|28.654571|77.231966||
+S|Rohini Sector 36|28.638017|77.263168||
+S|Barwala|28.621463|77.294369||
+S|Rohini Sector 35|28.604909|77.325570||
+S|Rohini Sector 34|28.588355|77.356772||
+S|Bawana Industrial Area-1 Sector 3,4|28.571801|77.387973||
+S|Bawana Industrial Area-1 Sector 1,2|28.555247|77.419175||
+S|Bawana JJ Colony|28.538692|77.450376||
+S|Sanoth|28.522138|77.481577||
+S|New Sanoth|28.505584|77.512779||
+S|Depot Station|28.489030|77.543980||
+S|Bhorgarh Village|28.580022|77.431235||
+S|Anaj Mandi Narela|28.671015|77.318490||
+S|Narela DDA Sports Complex|28.762008|77.205745||
+S|Narela|28.853000|77.093000||
+S|Narela Sector 5|28.864667|77.100333||
+S|Kundli|28.876333|77.107667||
+S|Nathpur|28.888000|77.115000||
+L|UP_GOLDEN|Golden Line (Aerocity–Tughlakabad)|#C9A227|up|Phase 4, under construction. First section expected end-2026 (dates often change).
+S|Delhi Aerocity|28.548760|77.120804||
+S|Mahipalpur|28.538259|77.134337||
+S|Vasant Kunj|28.527757|77.147870||
+S|Kishangarh|28.517256|77.161403||
+S|Chhatarpur|28.506755|77.174936||
+S|Chhatarpur Mandir|28.506315|77.187366||
+S|IGNOU|28.505876|77.199797||
+S|Neb Sarai|28.505436|77.212227||
+S|Saket G Block|28.504997|77.224658||
+S|Ambedkar Nagar|28.504557|77.237088||
+S|Khanpur|28.504118|77.249518||
+S|Sangam Vihar - Tigri|28.503678|77.261949||
+S|Anandmayee Marg Junction|28.503239|77.274379||
+S|Tughlakabad Railway Colony|28.502799|77.286810||
+S|Tughlakabad|28.502360|77.299240||
+L|UP_MAGENTA_W|Magenta Line extension (Krishna Park Ext.–Deepali Chowk)|#D6007F|up|Under construction, expected late 2026.
+S|Krishna Park Extension|28.647802|77.084310||
+S|Keshopur|28.658439|77.087093||
+S|Paschim Vihar|28.669075|77.089875||
+S|Peeragarhi|28.679712|77.092658||
+S|Mangolpuri|28.683380|77.101171||
+S|West Enclave|28.687048|77.109684||
+S|Pushpanjali|28.690717|77.118197||
+S|Deepali Chowk|28.694385|77.126709||
+L|UP_MAGENTA_E|Magenta Line extension (Majlis Park–R.K. Ashram Marg)|#D6007F|up|Under construction (partly underground), expected 2027.
+S|Majlis Park|28.724605|77.181817||
+S|Azadpur|28.706443|77.181164||
+S|Ashok Vihar|28.696434|77.187727||
+S|Derawal Nagar|28.686425|77.194290||
+S|Ghanta Ghar|28.676416|77.200853||
+S|Pul Bangash|28.666407|77.207416||
+S|Sadar Bazar|28.657358|77.207809||
+S|Nabi Karim|28.648308|77.208201||
+S|Ramakrishna Ashram Marg|28.639259|77.208594||
+C|PINK|Yamuna Vihar|Maujpur - Babarpur|1.31
+W|New Delhi|New Delhi Airport Express Terminal|8
+W|Dhaula Kuan|Durgabai Deshmukh South Campus|12
+W|Noida Sector 52|Noida Sector 51|8
