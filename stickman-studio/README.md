@@ -60,6 +60,20 @@ Open it in **Chrome or Edge** (double-click the file). Everything runs locally o
   (no GPU or download needed) and can be turned off under *Picture quality*.
 - Each grid card shows how many pixels wide one scene is.
 
+## On a phone
+A downloaded HTML file is hard to open on a phone (iPhone cannot run it from the Files app at all), so put
+the app online once and open the link instead. The repository is public, so GitHub Pages is free:
+GitHub → **Settings → Pages → Build and deployment → Deploy from a branch**, pick the branch and `/ (root)`,
+then open `https://gopalkrishan680-hash.github.io/GK/stickman-studio/`.
+
+What changes on a phone:
+- Copy the image in ChatGPT/Gemini (long-press → Copy), tap the card, then tap **Paste image**.
+  If the phone will not share the copied image, save it and use **Choose file…**.
+- Tap Sync uses the big **Next scene** button. Timeline lines can be dragged with a finger; swipe to scroll.
+- Export defaults to 720p (faster, less memory). Keep the screen on and the browser in front while it runs.
+- Projects are saved in that phone's browser only. Use **Project save / Project open** to move a project
+  between phone and computer.
+
 ## Tips
 - Each scene gets a ninth of the image. Gemini can generate 4K images (about 1280×720 per scene, already sharp).
   ChatGPT makes at most 1536×1024 (about 500px per scene); the app sharpens those panels. The prompts ask for
