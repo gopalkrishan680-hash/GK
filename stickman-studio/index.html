@@ -295,7 +295,7 @@ details summary { cursor: pointer; font-weight: 600; }
     <div class="row">
       <label class="f">Language <select id="ttsLang"><option value="hi">Hindi / Hinglish</option><option value="en">English</option></select></label>
       <label class="f">Voice <select id="ttsVoice"><option value="default">Ready-made voice</option><option value="mine">My cloned voice</option></select></label>
-      <label class="f">Expression strength <input type="range" id="ttsExpr" min="0.6" max="1.6" step="0.05"></label>
+      <label class="f">Expression strength <span class="tc" id="ttsExprV"></span><input type="range" id="ttsExpr" min="0.6" max="1.6" step="0.05"></label>
     </div>
     <div class="slot" id="sampleBox" hidden>
       <div><div class="nm">Your voice sample</div><div class="ds" id="sampleInfo">Upload a clear recording of your own voice (10–30 s is best; mp3, wav, m4a, a WhatsApp voice note or even a video). <b>Speak it the way you narrate your videos</b>, with feeling and at your normal pace: the clone copies the style of the sample, so a flat, rushed reading gives a flat, rushed voice.</div></div>
@@ -303,9 +303,10 @@ details summary { cursor: pointer; font-weight: 600; }
     </div>
     <div class="row">
       <label class="f">Speaking pace <select id="ttsPace"><option value="relaxed">Relaxed (slowest, most human)</option><option value="normal">Normal</option><option value="fast">Fast</option></select></label>
-      <label class="f">Pause after a sentence <input type="range" id="ttsSentPause" min="0.15" max="1.2" step="0.05"></label>
-      <label class="f">Pause at a comma <input type="range" id="ttsCommaPause" min="0" max="0.5" step="0.05"></label>
+      <label class="f">Pause after a sentence <span class="tc" id="ttsSentPauseV"></span><input type="range" id="ttsSentPause" min="0.15" max="1.2" step="0.05"></label>
+      <label class="f">Pause at a comma <span class="tc" id="ttsCommaPauseV"></span><input type="range" id="ttsCommaPause" min="0" max="0.5" step="0.05"></label>
     </div>
+    <div class="row"><button class="btn small" id="ttsRecommended">Use recommended settings</button><span class="hint" id="ttsPaceHint"></span></div>
     <div class="f" style="font-size:13px;font-weight:600;color:var(--muted)">Add to the script at the cursor (tags are spoken, never shown in captions):</div>
     <div class="tagbtns" id="tagBtns"></div>
     <details id="myVoice">
@@ -1641,9 +1642,20 @@ const ttsBase = () => (VP.url || '').trim().replace(/\/+$/, '');
 function saveVP() { DB.put('voiceProfile', VP).catch(() => {}); }
 async function loadVP() { try { const v = await DB.get('voiceProfile'); if (v) Object.assign(VP, v); } catch (_) {}
   if ((VP.pv || 1) < 2) { if (VP.sentPause === 0.45) VP.sentPause = 0.6; if (VP.commaPause === 0.15) VP.commaPause = 0.25; VP.pace = VP.pace || 'normal'; VP.pv = 2; } for (const v of Object.values(VP.slots || {})) if (v) v.cleaning = false; }
-function vpToUI() { $('#ttsUrl').value = VP.url; $('#ttsLang').value = VP.lang; $('#ttsVoice').value = VP.voice; $('#ttsExpr').value = VP.expr; $('#ttsSentPause').value = VP.sentPause; $('#ttsCommaPause').value = VP.commaPause; $('#ttsPace').value = VP.pace || 'normal'; $('#ttsConsent').checked = VP.consent; $('#ttsClean').checked = VP.clean !== false; $('#ttsEnhance').checked = VP.enhance !== false; $('#ttsEnhance').disabled = VP.clean === false; renderSlots(); }
+// Natural-sounding defaults: relaxed pace, real pauses, a little more expression.
+const TTS_RECOMMENDED = { pace: 'relaxed', sentPause: 0.6, commaPause: 0.25, expr: 1.1 };
+function showTtsValues() {
+  $('#ttsExprV').textContent = '× ' + (+VP.expr).toFixed(2);
+  $('#ttsSentPauseV').textContent = (+VP.sentPause).toFixed(2) + ' s';
+  $('#ttsCommaPauseV').textContent = (+VP.commaPause).toFixed(2) + ' s';
+  const flat = VP.sentPause < 0.4 || VP.commaPause < 0.1;
+  $('#ttsPaceHint').textContent = flat ? 'Pauses are very short: speech without breaths sounds robotic.' : '';
+  $('#ttsPaceHint').style.color = flat ? 'var(--warn)' : '';
+}
+$('#ttsRecommended').onclick = () => { Object.assign(VP, TTS_RECOMMENDED); saveVP(); vpToUI(); toast('Recommended settings applied: relaxed pace, 0.6 s / 0.25 s pauses'); };
+function vpToUI() { $('#ttsUrl').value = VP.url; $('#ttsLang').value = VP.lang; $('#ttsVoice').value = VP.voice; $('#ttsExpr').value = VP.expr; $('#ttsSentPause').value = VP.sentPause; $('#ttsCommaPause').value = VP.commaPause; $('#ttsPace').value = VP.pace || 'normal'; showTtsValues(); $('#ttsConsent').checked = VP.consent; $('#ttsClean').checked = VP.clean !== false; $('#ttsEnhance').checked = VP.enhance !== false; $('#ttsEnhance').disabled = VP.clean === false; renderSlots(); }
 [['ttsUrl', 'url'], ['ttsLang', 'lang'], ['ttsVoice', 'voice'], ['ttsExpr', 'expr', 1], ['ttsSentPause', 'sentPause', 1], ['ttsCommaPause', 'commaPause', 1], ['ttsPace', 'pace']].forEach(([id, key, num]) => {
-  const el = $('#' + id); el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => { VP[key] = num ? +el.value : el.value; saveVP(); });
+  const el = $('#' + id); el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => { VP[key] = num ? +el.value : el.value; saveVP(); showTtsValues(); });
 });
 $('#sampleUp').onclick = async () => {
   if (!VP.consent) { $('#myVoice').open = true; $('#ttsConsent').focus(); return toast('First tick the box: this is my own voice (or I have permission)'); }
