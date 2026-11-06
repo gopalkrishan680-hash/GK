@@ -13,8 +13,10 @@ Open it in **Chrome or Edge** (double-click the file). Everything runs locally o
 2. **Image Prompts:** Pick a style and characters. Each prompt asks for **one image with a 3×3 grid = 9 scenes**,
    so 120 scenes need only 14 prompts.
    - Press **Copy next prompt** and paste it into ChatGPT or Gemini.
-   - Copy the generated image (right-click → Copy image) and press `Ctrl+V` anywhere in the app.
-     It goes into the right card and is cut into its 9 scenes. Repeat until the progress bar is full.
+   - Copy the generated image (right-click → Copy image), **click the card it belongs to** (it turns yellow)
+     and press `Ctrl+V`. The yellow box at the bottom right always shows which card the paste goes to.
+     The image is cut into its 9 scenes and the next empty card is selected for you.
+   - Clicking a card that already has an image and pressing `Ctrl+V` replaces that image.
    - Wrong image pasted? Press **Remove** on that card, then `Ctrl+V` the right image. It goes back into the same card.
    - You can also drop the downloaded file on its card.
    - *AI Scene Director:* give ChatGPT one prompt covering the whole script and it writes a visual for every scene.

@@ -122,7 +122,14 @@ pre.prompt { margin: 0; padding: 14px; font: 13px/1.55 var(--font-mono); white-s
 .flow ol { margin: 0; padding-left: 20px; display: grid; gap: 2px; }
 .bar { height: 10px; border-radius: 99px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; }
 .bar > i { display: block; height: 100%; background: var(--good); width: 0; transition: width .3s; }
-.batch.current { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.batch.current { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent); }
+.batch[data-card] { cursor: pointer; }
+.batch:not(.current) .sel-only, .batch.current .unsel-only { display: none !important; }
+.chip.sel { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.batch.current .drop { border-color: var(--accent); border-style: solid; color: var(--ink); }
+.drop strong, .drop span { display: block; }
+.pastebadge { position: fixed; right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 15; background: var(--accent); color: var(--accent-ink); border-radius: 10px; padding: 9px 14px; font-weight: 700; font-size: 14px; box-shadow: 0 4px 16px rgba(0,0,0,.25); max-width: calc(100% - 32px); border: 0; cursor: pointer; text-align: left; font-family: var(--font-body); }
+.pastebadge small { display: block; font-weight: 500; font-size: 12px; }
 .batch .pbody { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 0; }
 .batch .pbody > * { min-width: 0; }
 .batch .pbody.done { grid-template-columns: minmax(0, 1fr) minmax(0, 300px); align-items: start; }
@@ -304,8 +311,8 @@ details summary { cursor: pointer; font-weight: 600; }
     <div class="bar"><i id="flowBar"></i></div>
     <ol class="hint">
       <li>Press <b>Copy next prompt</b> and paste it into ChatGPT or Gemini.</li>
-      <li>When the image is ready, copy it (right-click → Copy image) and press <kbd>Ctrl</kbd>+<kbd>V</kbd> anywhere on this page. Or drop the downloaded file on its card.</li>
-      <li>The app puts it in the right card and cuts it into its 9 scenes. Repeat until all are done.</li>
+      <li>When the image is ready, copy it (right-click → Copy image). <b>Click the card</b> it belongs to (it turns yellow), then press <kbd>Ctrl</kbd>+<kbd>V</kbd>. The yellow box at the bottom right always shows where the paste will go.</li>
+      <li>The app cuts it into its 9 scenes and selects the next empty card for you. Repeat until all are done.</li>
     </ol>
     <div class="row">
       <button class="btn primary" id="copyNext">Copy next prompt</button>
@@ -416,6 +423,7 @@ details summary { cursor: pointer; font-weight: 600; }
 </section>
 </main>
 <audio id="music" loop preload="auto" hidden></audio>
+<button class="pastebadge" id="pasteBadge" hidden title="Scroll to this card"></button>
 <div class="toast" id="toast" hidden></div>
 
 <script>
@@ -436,8 +444,8 @@ async function copyText(txt) {
 function download(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60000); }
 function safeName() { return (S.settings.title || 'stickman-video').replace(/[^\p{L}\p{N}_-]+/gu, '-').replace(/^-+|-+$/g, '') || 'stickman-video'; }
 function pickFile(input) { return new Promise(res => { input.value = ''; input.onchange = () => res([...input.files]); input.click(); }); }
-function setupDrop(el, onFiles, input, multiple) {
-  el.addEventListener('click', async () => { const f = await pickFile(input); if (f.length) onFiles(f); });
+function setupDrop(el, onFiles, input, multiple, pickOnClick = true) {
+  if (pickOnClick) el.addEventListener('click', async () => { const f = await pickFile(input); if (f.length) onFiles(f); });
   el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); } });
   el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('over'); });
   el.addEventListener('dragleave', () => el.classList.remove('over'));
@@ -657,38 +665,55 @@ function renderPrompts() {
   const nx = nextPending();
   $('#copyNext').textContent = nx == null ? (bs.length ? 'All images done' : 'Copy next prompt') : `Copy next prompt (Image ${nx + 1} of ${bs.length})`;
   $('#copyNext').disabled = nx == null;
-  if (pasteTarget != null && (pasteTarget >= bs.length || S.grids[pasteTarget])) pasteTarget = null;
+  if (pasteTarget == null || pasteTarget >= bs.length) pasteTarget = nextPending();
   $('#batches').innerHTML = bs.map(b => {
     const ok = !!S.grids[b.index], cur = b.index === pasteTarget;
     const side = ok
       ? `<canvas data-psrc="${b.index}"></canvas><div class="row"><span class="chip ok">Cut into ${b.count} scenes</span><button class="btn small" data-replace="${b.index}">Replace</button><button class="btn small danger" data-remove="${b.index}">Remove</button><button class="btn small" data-goto="grids">Check cuts</button></div>`
-      : `<div class="drop" data-griddrop="${b.index}" tabindex="0" role="button"><strong>${cur ? 'Press Ctrl+V to paste the image' : 'Drop or click to add image ' + (b.index + 1)}</strong>${cur ? 'or drop / click to choose the file' : 'or copy its prompt and paste the image with Ctrl+V'}</div>`;
-    return `<div class="batch${cur ? ' current' : ''}" id="batch-${b.index}"><div class="batch-h"><h3>Image ${b.index + 1} <span class="hint">of ${bs.length}</span></h3><span class="chip">Scenes ${b.start + 1}–${b.start + b.count} · ${b.rows}×${b.cols}</span><span class="chip ${ok ? 'ok' : cur ? '' : 'wait'}">${ok ? 'Done' : cur ? 'Waiting for image' : 'Pending'}</span><button class="btn small ${ok ? '' : 'primary'}" data-copy="${b.index}">Copy prompt</button></div>
+      : dropBox(b);
+    return `<div class="batch${cur ? ' current' : ''}" id="batch-${b.index}" data-card="${b.index}"><div class="batch-h"><h3>Image ${b.index + 1} <span class="hint">of ${bs.length}</span></h3><span class="chip">Scenes ${b.start + 1}–${b.start + b.count} · ${b.rows}×${b.cols}</span>${selChip(ok)}<span class="chip unsel-only ${ok ? 'ok' : 'wait'}">${ok ? 'Done' : 'Pending'}</span><button class="btn small ${ok ? '' : 'primary'}" data-copy="${b.index}">Copy prompt</button></div>
       <div class="pbody${ok ? ' done' : ''}"><details class="ptext"${ok ? '' : ' open'}><summary>Prompt text</summary><pre class="prompt">${esc(buildPrompt(b))}</pre></details><div class="pside">${side}</div></div></div>`;
   }).join('');
-  $$('#batches [data-griddrop]').forEach(el => { const gi = +el.dataset.griddrop; setupDrop(el, f => placeGrid(gi, f[0]), $('#oneFile'), false); });
+  $$('#batches [data-griddrop]').forEach(el => { const gi = +el.dataset.griddrop; setupDrop(el, f => placeGrid(gi, f[0]), $('#oneFile'), false, false); });
+  updateTargetUI();
   $$('[data-psrc]').forEach(cv => { const r = R.grids[+cv.dataset.psrc]; if (!r || !r.img) return; const sc = Math.min(1, 480 / r.img.width); cv.width = Math.round(r.img.width * sc); cv.height = Math.round(r.img.height * sc); const x = cv.getContext('2d'); x.drawImage(r.img, 0, 0, cv.width, cv.height); x.strokeStyle = '#f5c518'; x.lineWidth = 2; (r.cells || []).forEach(c => x.strokeRect(c.x * sc, c.y * sc, c.w * sc, c.h * sc)); });
 }
 async function placeGrid(gi, blob) {
   await setGrid(gi, blob); if (!S.grids[gi]) return;
-  const b = batches()[gi]; if (pasteTarget === gi) pasteTarget = null;
+  const b = batches()[gi]; const nx = nextPending(); pasteTarget = nx;
   segmentsChanged(true);
-  const nx = nextPending();
-  toast(`Image ${gi + 1} added → scenes ${b.start + 1}–${b.start + b.count} cut.` + (nx == null ? ' All images done!' : ` Next: image ${nx + 1}`));
+  toast(`Image ${gi + 1} added → scenes ${b.start + 1}–${b.start + b.count} cut.` + (nx == null ? ' All images done!' : ` Next Ctrl+V goes to image ${nx + 1}`));
 }
 function copyBatch(gi) {
   const b = batches()[gi]; if (!b) return;
-  copyText(buildPrompt(b)); if (!S.grids[gi]) { pasteTarget = gi; renderPrompts(); }
+  copyText(buildPrompt(b)); selectCard(gi);
 }
 document.addEventListener('paste', e => {
   const items = [...(e.clipboardData?.items || [])]; const it = items.find(i => i.kind === 'file' && i.type.startsWith('image/'));
   if (!it) return; const f = it.getAsFile(); if (!f) return;
   e.preventDefault();
   if (!S.segments.length) return toast('Create scenes first');
-  const gi = pasteTarget != null && !S.grids[pasteTarget] ? pasteTarget : nextPending();
-  if (gi == null) return toast('All grid images are already added. Use Replace on a card to change one.');
+  const gi = pasteTarget != null && pasteTarget < batches().length ? pasteTarget : nextPending();
+  if (gi == null) return toast('All grid images are added. Click a card first to replace its image.');
   placeGrid(gi, f);
 });
+function selChip(ok) { return `<span class="chip sel sel-only">Selected · Ctrl+V ${ok ? 'replaces this' : 'goes here'}</span>`; }
+function dropBox(b) {
+  return `<div class="drop" data-griddrop="${b.index}" tabindex="0" role="button"><strong class="sel-only">Selected. Now press Ctrl+V to paste image ${b.index + 1}</strong><strong class="unsel-only">Click here to select this card, then press Ctrl+V</strong><span>or drop the file here</span><div style="margin-top:8px"><button class="btn small" data-pick="${b.index}">Choose file…</button></div></div>`;
+}
+function selectCard(gi) { pasteTarget = gi; updateTargetUI(); }
+function updateTargetUI() {
+  $$('[data-card]').forEach(el => el.classList.toggle('current', +el.dataset.card === pasteTarget));
+  const badge = $('#pasteBadge'), b = pasteTarget != null ? batches()[pasteTarget] : null;
+  badge.hidden = !b || !(curTab === 'prompts' || curTab === 'grids');
+  if (b) badge.innerHTML = `Ctrl+V → Image ${b.index + 1}<small>Scenes ${b.start + 1}–${b.start + b.count}${S.grids[b.index] ? ' · will replace the current image' : ''}</small>`;
+}
+document.addEventListener('click', e => {
+  const card = e.target.closest('[data-card]'); if (!card) return;
+  if (e.target.closest('summary, pre, input, label')) return;
+  selectCard(+card.dataset.card);
+}, true);
+$('#pasteBadge').onclick = () => { const id = (curTab === 'grids' ? 'gcard-' : 'batch-') + pasteTarget; const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); };
 
 /* ============ grid detection & slicing ============ */
 function lumaProfile(img) {
@@ -764,7 +789,7 @@ function renderGridCards() {
   $('#gridCards').innerHTML = bs.map(b => {
     const g = S.grids[b.index], r = R.grids[b.index];
     let body;
-    if (!g) body = `<div class="body" style="grid-template-columns:1fr"><div class="drop" data-griddrop="${b.index}" tabindex="0" role="button"><strong>Drop image ${b.index + 1} here, or paste it with Ctrl+V</strong>Scenes ${b.start + 1}–${b.start + b.count} (${b.rows}×${b.cols} grid)</div></div>`;
+    if (!g) body = `<div class="body" style="grid-template-columns:1fr">${dropBox(b)}</div>`;
     else {
       const det = g.auto ? (r && r.found >= r.expected ? `<span class="chip ok">Lines found</span>` : `<span class="chip wait">Lines not fully found, split equally</span>`) : `<span class="chip">Equal split</span>`;
       const cells = Array.from({ length: b.count }, (_, k) => { const i = b.start + k, s = S.segments[i]; const ov = R.overrides[s.id];
@@ -775,9 +800,10 @@ function renderGridCards() {
         <div class="row"><button class="btn small" data-replace="${b.index}">Replace</button><button class="btn small danger" data-remove="${b.index}">Remove</button></div></div>
         <div class="cells" style="grid-template-columns:repeat(${b.cols},minmax(0,1fr))">${cells}</div></div>`;
     }
-    return `<div class="batch gridcard"><div class="batch-h"><h3>Image ${b.index + 1}</h3><span class="chip">Scenes ${b.start + 1}–${b.start + b.count}</span><span class="chip ${g ? 'ok' : 'wait'}">${g ? 'Ready' : 'Pending'}</span><button class="btn small" data-copy="${b.index}">Copy prompt</button></div>${body}</div>`;
+    return `<div class="batch gridcard${b.index === pasteTarget ? ' current' : ''}" id="gcard-${b.index}" data-card="${b.index}"><div class="batch-h"><h3>Image ${b.index + 1}</h3><span class="chip">Scenes ${b.start + 1}–${b.start + b.count}</span>${selChip(!!g)}<span class="chip unsel-only ${g ? 'ok' : 'wait'}">${g ? 'Ready' : 'Pending'}</span><button class="btn small" data-copy="${b.index}">Copy prompt</button></div>${body}</div>`;
   }).join('');
-  $$('#gridCards [data-griddrop]').forEach(el => { const gi = +el.dataset.griddrop; setupDrop(el, f => placeGrid(gi, f[0]), $('#oneFile'), false); });
+  $$('#gridCards [data-griddrop]').forEach(el => { const gi = +el.dataset.griddrop; setupDrop(el, f => placeGrid(gi, f[0]), $('#oneFile'), false, false); });
+  updateTargetUI();
   bs.forEach(b => { drawSrc(b.index); });
   drawCellThumbs();
 }
@@ -996,7 +1022,8 @@ document.addEventListener('click', async e => {
   else if (d.merge != null) { const i = +d.merge; const A = S.segments[i], B = S.segments[i + 1]; A.text = A.text.trim() + ' ' + B.text.trim(); A.visual = [A.visual, B.visual].filter(Boolean).join('; '); S.segments.splice(i + 1, 1); S.starts.splice(i + 1, 1); segmentsChanged(true); }
   else if (d.del != null) { const i = +d.del; S.segments.splice(i, 1); S.starts.splice(i, 1); if (S.starts.length) S.starts[0] = 0; segmentsChanged(true); }
   else if (d.replace != null) { const [f] = await pickFile($('#oneFile')); if (f) placeGrid(+d.replace, f); }
-  else if (d.remove != null) { const gi = +d.remove; S.grids[gi] = null; R.grids[gi] = null; pasteTarget = gi; segmentsChanged(true); toast(`Image ${gi + 1} removed. Press Ctrl+V to paste the right image here.`); }
+  else if (d.remove != null) { const gi = +d.remove; S.grids[gi] = null; R.grids[gi] = null; pasteTarget = gi; segmentsChanged(true); toast(`Image ${gi + 1} removed. It is selected, so Ctrl+V now pastes here.`); }
+  else if (d.pick != null) { const gi = +d.pick; const [f] = await pickFile($('#oneFile')); if (f) placeGrid(gi, f); }
   else if (d.one != null) { const i = +d.one; const [f] = await pickFile($('#oneFile')); if (f) { await setOverride(S.segments[i].id, f); segmentsChanged(true); } }
   else if (d.oneclear != null) { const id = S.segments[+d.oneclear].id; delete S.overrides[id]; delete R.overrides[id]; segmentsChanged(true); }
 });
@@ -1090,6 +1117,7 @@ function showTab(name) {
   if (name === 'sync') { renderTimes(); requestAnimationFrame(drawTimeline); }
   if (name === 'video') drawPreview();
   if (name === 'grids') drawCellThumbs();
+  updateTargetUI();
 }
 $$('nav.tabs button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
 document.addEventListener('keydown', e => {
