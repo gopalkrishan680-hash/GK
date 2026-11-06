@@ -36,6 +36,7 @@ import re
 import tempfile
 import threading
 import time
+import unicodedata
 import uuid
 from typing import Dict, List, Optional
 
@@ -46,7 +47,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-SERVER_VERSION = "10"  # shown in the app, to see which server code is running
+SERVER_VERSION = "11"  # shown in the app, to see which server code is running
 SR = 24000  # Chatterbox output rate; Stickman Studio also sends its recordings at 24 kHz
 
 # exaggeration (emotion strength), cfg_weight (lower = freer, more expressive pacing), temperature
@@ -563,13 +564,13 @@ class Refiner:
             self.asr_error = f"{type(e).__name__}: {e}"
         return self.asr
 
-    def words(self, wav, lang):
+    def words(self, wav, lang, prompt="fillers"):
         asr = self.load_asr()
         if asr is None:
             return None
         x = np.interp(np.arange(0, wav.size, SR / 16000), np.arange(wav.size), wav).astype(np.float32)
         segs, _ = asr.transcribe(x, language=lang if lang in ("hi", "en") else None, word_timestamps=True,
-                                 initial_prompt=FILLER_PROMPT.get(lang, FILLER_PROMPT["en"]), beam_size=5,
+                                 initial_prompt=(FILLER_PROMPT.get(lang, FILLER_PROMPT["en"]) if prompt == "fillers" else None), beam_size=5,
                                  vad_filter=False, condition_on_previous_text=False)
         out = []
         for sg in segs:
@@ -649,6 +650,7 @@ class Job:
         self.unit_mood_in: List[str] = ["normal"] * self.total
         self.unit_seed: List[int] = [spec.seed + i for i in range(self.total)]
         self.timings: List[dict] = []
+        self.stats = {"lines": 0, "retries": 0}
         self.audio: Optional[bytes] = None
         self.duration = 0.0
         self.tmp = tempfile.mkdtemp(prefix="ssvoice_")
@@ -661,9 +663,87 @@ class Job:
         self.sounds = {k: trim(decode_b64_wav(v)) for k, v in spec.sounds.items() if k in SOUND_MOOD and v}
 
 
+def _norm_chars(t):
+    t = unicodedata.normalize("NFC", t.lower())
+    return re.sub(r"[^\w\u0900-\u097F]|[_\u0964\u0965]", "", t.replace("\u093c", ""))   # letters only; nukta and danda ignored
+
+
+def char_error_rate(ref, hyp):
+    """Levenshtein distance between the two texts (letters only) divided by the reference length."""
+    a, b = _norm_chars(ref), _norm_chars(hyp)
+    if not a:
+        return 0.0
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i] + [0] * len(b)
+        for j, cb in enumerate(b, 1):
+            cur[j] = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb))
+        prev = cur
+    return min(1.0, prev[-1] / len(a))
+
+
+def _frames(wav):
+    n = int(SR * 0.01)
+    k = wav.size // n
+    if k == 0:
+        return np.array([-90.0])
+    return 20 * np.log10(np.sqrt((wav[: k * n].reshape(k, n) ** 2).mean(axis=1)) + 1e-9)
+
+
+def cut_after(wav, t_end, min_gap=0.08):
+    """Cut a stray sound after `t_end` (end of the last real word): only if it is separated from the
+    speech by a silence of at least `min_gap`, so a word that simply runs on is never cut."""
+    db = _frames(wav)
+    thr = db.max() - 35
+    start = int(t_end * 100)
+    gap_frames = int(min_gap * 100)
+    i = start
+    while i < len(db):
+        if db[i] < thr:
+            j = i
+            while j + 1 < len(db) and db[j + 1] < thr:
+                j += 1
+            if j - i + 1 >= gap_frames and (db[j + 1:] >= thr).any():
+                return wav[: int((i + 5) * SR / 100)], True   # keep 50 ms of the silence
+            i = j + 1
+        else:
+            i += 1
+    return wav, False
+
+
+def cut_before(wav, t_start, min_gap=0.08):
+    rev, cut = cut_after(wav[::-1].copy(), wav.size / SR - t_start, min_gap)
+    return rev[::-1].copy(), cut
+
+
+def tail_blip_cut(wav):
+    """Without a speech recogniser: drop a final blip (< 0.25 s, clearly quieter than the speech)
+    that follows a short silence; that is how Chatterbox's stray end sounds look."""
+    db = _frames(wav)
+    thr = db.max() - 35
+    act = db >= thr
+    if not act.any():
+        return wav, False
+    end = len(act) - 1
+    while end > 0 and not act[end]:
+        end -= 1
+    s0 = end
+    while s0 > 0 and act[s0 - 1]:
+        s0 -= 1
+    g = s0 - 1
+    while g > 0 and not act[g]:
+        g -= 1
+    blip_len, gap_len = (end - s0 + 1) / 100, (s0 - 1 - g) / 100
+    speech_level = np.median(db[act])
+    if blip_len < 0.25 and gap_len >= 0.1 and db[s0:end + 1].max() < speech_level + 3 and g > 30:
+        return wav[: int((g + 6) * SR / 100)], True
+    return wav, False
+
+
 class VoiceServer:
-    def __init__(self, engine):
+    def __init__(self, engine, refiner=None):
         self.engine = engine
+        self.refiner = refiner
         self.jobs: Dict[str, Job] = {}
         self.queue: List[tuple] = []
         self.cv = threading.Condition()
@@ -680,12 +760,41 @@ class VoiceServer:
         if not re.search(r"[\w\u0900-\u097F]", text):
             return silence(0.05)
         expected = 1.0 + 0.11 * len(re.sub(r"\s", "", text))
-        wav = None
-        for attempt in range(3):  # retry when the model rambles far past the text length
+        best = None
+        for attempt in range(3):
             wav = trim(self.engine.synth(text, lang, ref, ex, cfg, p["temp"], seed + 1000 * attempt))
-            if 0 < wav.size / SR <= expected * 2.5 + 2:
+            if not 0 < wav.size / SR <= expected * 2.5 + 2:   # rambled far past the text
+                score = 2.0
+            else:
+                wav, score = self._check(wav, text, lang)
+            job.stats["lines"] += 1
+            if best is None or score < best[1]:
+                best = (wav, score)
+            if score <= 0.3:   # close enough to the script
                 break
-        return fade_edges(wav)
+            job.stats["retries"] += 1
+        return fade_edges(best[0])
+
+    def _check(self, wav, text, lang):
+        """Listen to a generated line: cut stray sounds before the first / after the last real word,
+        and score how far the words are from the script (0 = same, 1 = unrelated)."""
+        asr = self.refiner.load_asr() if self.refiner is not None else None
+        if asr is None:
+            wav, cut = tail_blip_cut(wav)
+            self._last_cut = cut
+            return wav, 0.0
+        try:
+            words = self.refiner.words(wav, lang, prompt=None)
+        except Exception:
+            return wav, 0.0
+        if not words:
+            return wav, 1.0
+        # 0.12 s: longer than the closure before a stop consonant (त, क...), so word endings stay
+        wav, c1 = cut_after(wav, words[-1][1] + 0.05, min_gap=0.12)
+        wav, c2 = cut_before(wav, max(0.0, words[0][0] - 0.05), min_gap=0.12)
+        if c1 or c2:
+            self._trims = getattr(self, "_trims", 0) + 1
+        return trim(wav), char_error_rate(text, " ".join(w for _, _, w in words))
 
     def _render_unit(self, job, i):
         ops, mood_out = parse_line(job.spec.units[i], job.unit_mood_in[i])
@@ -775,8 +884,8 @@ class VoiceServer:
 
 
 def create_app(engine, refiner=None):
-    server = VoiceServer(engine)
     refiner = refiner or Refiner()
+    server = VoiceServer(engine, refiner)
     app = FastAPI(title="Stickman Studio voice server")
     # The app runs from file://, from the Android app and from GitHub Pages, so allow any origin.
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -822,6 +931,7 @@ def create_app(engine, refiner=None):
         if job.status == "done":
             res["timings"] = job.timings
             res["duration"] = job.duration
+            res["stats"] = job.stats
         return res
 
     @app.get("/jobs/{job_id}/audio")
