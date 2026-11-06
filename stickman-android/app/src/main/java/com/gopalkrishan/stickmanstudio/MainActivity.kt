@@ -6,6 +6,7 @@ import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ContentValues
+import android.content.ClipDescription
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -46,6 +47,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var web: WebView
     private var fileCallback: ValueCallback<Array<Uri>>? = null
     private val pendingShares = ArrayList<Uri>()
+    private var pendingLink: String? = null
+    private var lastClipStamp = -1L
     private var pageReady = false
 
     private var saveStream: OutputStream? = null
@@ -113,6 +116,7 @@ class MainActivity : ComponentActivity() {
             override fun onPageFinished(view: WebView, url: String) {
                 pageReady = true
                 flushShares()
+                flushLink()
             }
         }
 
@@ -196,6 +200,12 @@ class MainActivity : ComponentActivity() {
 
     private fun handleIntent(i: Intent?) {
         if (i == null) return
+        // stickmanstudio://connect?url=https://….trycloudflare.com from the voice notebook's button
+        if (i.action == Intent.ACTION_VIEW && i.data?.scheme == "stickmanstudio") {
+            pendingLink = i.data?.getQueryParameter("url") ?: return
+            flushLink()
+            return
+        }
         val uris = when (i.action) {
             Intent.ACTION_SEND -> listOfNotNull(streamOf(i)).ifEmpty { clipUris(i) }
             Intent.ACTION_SEND_MULTIPLE -> multiStreams(i).ifEmpty { clipUris(i) }
@@ -203,6 +213,14 @@ class MainActivity : ComponentActivity() {
         }
         pendingShares.addAll(uris)
         flushShares()
+    }
+
+    /** The page checks the link and asks the user before connecting. */
+    private fun flushLink() {
+        val u = pendingLink ?: return
+        if (!pageReady) return
+        pendingLink = null
+        js("window.ssConnectLink && window.ssConnectLink(" + org.json.JSONObject.quote(u) + ")")
     }
 
     @Suppress("DEPRECATION")
@@ -358,6 +376,19 @@ class MainActivity : ComponentActivity() {
                 return mime + ";" + Base64.encodeToString(bytes, Base64.NO_WRAP)
             }
             return ""
+        }
+
+        /** A voice server link that was newly copied (each copy is read once), or "". */
+        @JavascriptInterface
+        fun clipboardText(): String {
+            val cm = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+            val desc = cm.primaryClipDescription ?: return ""
+            if (!desc.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) && !desc.hasMimeType(ClipDescription.MIMETYPE_TEXT_HTML)) return ""
+            val stamp = if (Build.VERSION.SDK_INT >= 26) desc.timestamp else 0L
+            if (Build.VERSION.SDK_INT >= 26 && stamp == lastClipStamp) return ""
+            lastClipStamp = stamp
+            val text = try { cm.primaryClip?.getItemAt(0)?.coerceToText(this@MainActivity)?.toString() } catch (_: Exception) { null } ?: return ""
+            return Regex("https://[a-z0-9-]+\\.trycloudflare\\.com").find(text)?.value ?: ""
         }
 
         @JavascriptInterface

@@ -101,4 +101,5 @@ jobs:
           name: emulator-result
           path: |
             screen.png
+            screen-link.png
             logcat.txt

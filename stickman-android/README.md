@@ -11,6 +11,9 @@ cannot do on its own:
 - Exported videos are saved to the gallery in **Movies/Stickman Studio**; a **Share video** button
   appears after export. Project files, prompts and SRT files go to **Download/Stickman Studio**.
 - The screen stays on while a video is exporting.
+- **Open in Stickman Studio** (button in the Colab / Kaggle voice notebook) opens the app with the voice
+  server link (`stickmanstudio://connect?url=…`); the app asks before connecting. A copied server link is
+  noticed when you switch back to the app.
 
 ## Install
 Every push that changes the app builds a new APK on GitHub Actions and publishes it as the

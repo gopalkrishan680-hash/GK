@@ -11,10 +11,21 @@ voiceover plus the exact start/end of every sentence, so scenes line up with the
    https://colab.research.google.com/github/gopalkrishan680-hash/GK/blob/claude/stickman-video-voiceover-sync-ivss4s/stickman-voice/StickmanVoice.ipynb
 2. **Runtime → Change runtime type → T4 GPU**.
 3. Run cell 1 (install, restarts the runtime once), then cell 2.
-4. Copy the `https://….trycloudflare.com` link into Stickman Studio → **Script + Voice → AI voice → Connect**.
+4. On a phone with the Android app: tap **Open in Stickman Studio** under cell 2, then **Connect** in the app.
+   Otherwise copy the `https://….trycloudflare.com` link (the Android app notices a copied link when you
+   switch back to it) or paste it into Stickman Studio → **Script + Voice → AI voice → Connect**.
 
 The link changes on every start. Colab's free GPU stops after a few hours or a long idle time;
-run cell 2 again and paste the new link.
+run cell 2 again and use the new link.
+
+### When Colab's free GPU is used up: Kaggle
+`StickmanVoiceKaggle.ipynb` runs the same server on Kaggle's free GPU (about 30 hours a week), also from a
+phone browser:
+https://www.kaggle.com/kernels/welcome?src=https://github.com/gopalkrishan680-hash/GK/blob/claude/stickman-video-voiceover-sync-ivss4s/stickman-voice/StickmanVoiceKaggle.ipynb
+1. Once: verify your phone number on Kaggle (needed for GPU and Internet).
+2. Session options: **Accelerator → GPU T4 x2**, **Internet → On**.
+3. Run cell 1 (install, no restart), then cell 2 and leave it running. Tap **Open in Stickman Studio**.
+4. Stop the session when done so the weekly GPU hours last. An optional `HF_TOKEN` goes in Add-ons → Secrets.
 
 ## Voice model
 Cell 2 has a **MODEL** setting:
