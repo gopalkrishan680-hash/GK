@@ -131,6 +131,7 @@ pre.prompt { margin: 0; padding: 14px; font: 13px/1.55 var(--font-mono); white-s
 .batches { display: grid; gap: 14px; }
 .slots { display: grid; gap: 8px; }
 #aiVoice[data-engine="gemini"] .colab-only, #aiVoice[data-engine="colab"] .gem-only { display: none !important; }
+#aiVoice[data-engine="gemini"][data-vc="1"] .colab-only.vc-show { display: flex !important; }
 .gembox { display: grid; gap: 10px; }
 .slot { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
 .slot .nm { font-weight: 600; }
@@ -303,7 +304,8 @@ details summary { cursor: pointer; font-weight: 600; }
       </div>
       <label class="f" id="gemCustomWrap" hidden>My style (how it should be performed) <textarea id="gemCustom" rows="2" placeholder="e.g. A warm young narrator telling an emotional family story, soft and intimate"></textarea></label>
       <div class="row">
-        <label class="f">Voice <select id="gemVoice"><option value="mine">My cloned voice</option><option value="Kore">Kore</option><option value="Puck">Puck</option><option value="Charon">Charon</option><option value="Fenrir">Fenrir</option><option value="Aoede">Aoede</option><option value="Enceladus">Enceladus</option><option value="Zephyr">Zephyr</option><option value="Leda">Leda</option><option value="Orus">Orus</option><option value="Callirrhoe">Callirrhoe</option><option value="Autonoe">Autonoe</option><option value="Iapetus">Iapetus</option><option value="Umbriel">Umbriel</option><option value="Algieba">Algieba</option><option value="Despina">Despina</option><option value="Erinome">Erinome</option><option value="Algenib">Algenib</option><option value="Rasalgethi">Rasalgethi</option><option value="Laomedeia">Laomedeia</option><option value="Achernar">Achernar</option><option value="Alnilam">Alnilam</option><option value="Schedar">Schedar</option><option value="Gacrux">Gacrux</option><option value="Pulcherrima">Pulcherrima</option><option value="Achird">Achird</option><option value="Zubenelgenubi">Zubenelgenubi</option><option value="Vindemiatrix">Vindemiatrix</option><option value="Sadachbia">Sadachbia</option><option value="Sadaltager">Sadaltager</option><option value="Sulafat">Sulafat</option></select></label>
+        <label class="f">Voice <select id="gemVoice"><option value="mine_free">My voice – free (Gemini performance + conversion on Colab)</option><option value="mine">My voice – Google cloning (needs a paid Google tier)</option><option value="Kore">Kore</option><option value="Puck">Puck</option><option value="Charon">Charon</option><option value="Fenrir">Fenrir</option><option value="Aoede">Aoede</option><option value="Enceladus">Enceladus</option><option value="Zephyr">Zephyr</option><option value="Leda">Leda</option><option value="Orus">Orus</option><option value="Callirrhoe">Callirrhoe</option><option value="Autonoe">Autonoe</option><option value="Iapetus">Iapetus</option><option value="Umbriel">Umbriel</option><option value="Algieba">Algieba</option><option value="Despina">Despina</option><option value="Erinome">Erinome</option><option value="Algenib">Algenib</option><option value="Rasalgethi">Rasalgethi</option><option value="Laomedeia">Laomedeia</option><option value="Achernar">Achernar</option><option value="Alnilam">Alnilam</option><option value="Schedar">Schedar</option><option value="Gacrux">Gacrux</option><option value="Pulcherrima">Pulcherrima</option><option value="Achird">Achird</option><option value="Zubenelgenubi">Zubenelgenubi</option><option value="Vindemiatrix">Vindemiatrix</option><option value="Sadachbia">Sadachbia</option><option value="Sadaltager">Sadaltager</option><option value="Sulafat">Sulafat</option></select></label>
+        <label class="f" id="gemBaseWrap" hidden>Base voice (choose one close to yours) <select id="gemBase"><option value="Kore">Kore</option><option value="Puck">Puck</option><option value="Charon">Charon</option><option value="Fenrir">Fenrir</option><option value="Aoede">Aoede</option><option value="Enceladus">Enceladus</option><option value="Zephyr">Zephyr</option><option value="Leda">Leda</option><option value="Orus">Orus</option><option value="Callirrhoe">Callirrhoe</option><option value="Autonoe">Autonoe</option><option value="Iapetus">Iapetus</option><option value="Umbriel">Umbriel</option><option value="Algieba">Algieba</option><option value="Despina">Despina</option><option value="Erinome">Erinome</option><option value="Algenib">Algenib</option><option value="Rasalgethi">Rasalgethi</option><option value="Laomedeia">Laomedeia</option><option value="Achernar">Achernar</option><option value="Alnilam">Alnilam</option><option value="Schedar">Schedar</option><option value="Gacrux">Gacrux</option><option value="Pulcherrima">Pulcherrima</option><option value="Achird">Achird</option><option value="Zubenelgenubi">Zubenelgenubi</option><option value="Vindemiatrix">Vindemiatrix</option><option value="Sadachbia">Sadachbia</option><option value="Sadaltager">Sadaltager</option><option value="Sulafat">Sulafat</option></select></label>
         <label class="f">Model <select id="gemModel"><option value="gemini-3.8-flash-tts">Gemini 3.8 Flash TTS (best)</option><option value="gemini-3.8-flash-lite-tts">Gemini 3.8 Flash Lite TTS (faster)</option></select></label>
       </div>
       <div class="slot" id="gemCloneBox" hidden>
@@ -314,7 +316,8 @@ details summary { cursor: pointer; font-weight: 600; }
       </div>
     </div>
     <p class="hint colab-only" style="margin:0">Turn the script into a voiceover in a ready-made voice or <b>your own cloned voice</b>, with pauses, laughs and moods. The voice model runs free on Google Colab: <a href="https://colab.research.google.com/github/gopalkrishan680-hash/GK/blob/claude/stickman-video-voiceover-sync-ivss4s/stickman-voice/StickmanVoice.ipynb" target="_blank" rel="noopener">open the Colab notebook</a>, run cells 1 and 2, then paste the link it shows here.</p>
-    <div class="row colab-only"><input type="text" id="ttsUrl" placeholder="https://…trycloudflare.com" aria-label="Voice server link" style="flex:1 1 260px"><button class="btn" id="ttsConnect">Connect</button></div>
+    <p class="hint colab-only vc-show" id="vcHint" style="margin:0;display:none">For "My voice – free": Gemini speaks in the base voice, then the free model on Google Colab turns it into your voice. <a href="https://colab.research.google.com/github/gopalkrishan680-hash/GK/blob/claude/stickman-video-voiceover-sync-ivss4s/stickman-voice/StickmanVoice.ipynb" target="_blank" rel="noopener">Open the Colab notebook</a>, run cells 1 and 2, then paste the link here and press Connect.</p>
+    <div class="row colab-only vc-show"><input type="text" id="ttsUrl" placeholder="https://…trycloudflare.com" aria-label="Voice server link" style="flex:1 1 260px"><button class="btn" id="ttsConnect">Connect</button></div>
     <div class="row colab-only">
       <label class="f">Language <select id="ttsLang"><option value="hi">Hindi / Hinglish</option><option value="en">English</option></select></label>
       <label class="f">Voice <select id="ttsVoice"><option value="default">Ready-made voice</option><option value="mine">My cloned voice</option></select></label>
@@ -1660,15 +1663,16 @@ const VOICE_SLOTS = [
 ];
 const TAGS = ['[pause]', '[pause 1.5]', '[laugh]', '[chuckle]', '[sigh]', '[gasp]', '[hmm]', '[happy]', '[excited]', '[sad]', '[angry]', '[whisper]', '[calm]', '[normal]'];
 const VP = { url: '', lang: 'hi', voice: 'default', expr: 1, sentPause: 0.6, commaPause: 0.25, pace: 'normal', pv: 2, consent: false, clean: true, enhance: true, slots: {},
-  engine: 'gemini', gemKey: '', gemStyle: 'narrative', gemPace: 'natural', gemAccent: 'neutral', gemCustom: '', gemVoice: 'mine', gemModel: 'gemini-3.8-flash-tts', gemVoiceKey: '', gemVoiceSig: '' };
+  engine: 'gemini', gemKey: '', gemStyle: 'narrative', gemPace: 'natural', gemAccent: 'neutral', gemCustom: '', gemVoice: 'mine_free', gemBase: 'Charon', gemModel: 'gemini-3.8-flash-tts', gemVoiceKey: '', gemVoiceSig: '' };
 let ttsOnline = false;
 let ttsPoll = null, recNow = null;
 const ttsBase = () => (VP.url || '').trim().replace(/\/+$/, '');
 function saveVP() { DB.put('voiceProfile', VP).catch(() => {}); }
 async function loadVP() { try { const v = await DB.get('voiceProfile'); if (v) Object.assign(VP, v); } catch (_) {}
   if ((VP.pv || 1) < 3) { VP.engine = 'gemini'; }
+  if ((VP.pv || 1) < 4 && VP.gemVoice === 'mine') VP.gemVoice = 'mine_free';
   if ((VP.pv || 1) < 2) { if (VP.sentPause === 0.45) VP.sentPause = 0.6; if (VP.commaPause === 0.15) VP.commaPause = 0.25; VP.pace = VP.pace || 'normal'; }
-  VP.pv = 3; for (const v of Object.values(VP.slots || {})) if (v) v.cleaning = false; }
+  VP.pv = 4; for (const v of Object.values(VP.slots || {})) if (v) v.cleaning = false; }
 // Natural-sounding defaults: relaxed pace, real pauses, a little more expression.
 const TTS_RECOMMENDED = { pace: 'relaxed', sentPause: 0.6, commaPause: 0.25, expr: 1.1 };
 function showTtsValues() {
@@ -1680,9 +1684,9 @@ function showTtsValues() {
   $('#ttsPaceHint').style.color = flat ? 'var(--warn)' : '';
 }
 $('#ttsRecommended').onclick = () => { Object.assign(VP, TTS_RECOMMENDED); saveVP(); vpToUI(); toast('Recommended settings applied: relaxed pace, 0.6 s / 0.25 s pauses'); };
-function vpToUI() { $('#ttsUrl').value = VP.url; $('#ttsLang').value = VP.lang; $('#ttsVoice').value = VP.voice; $('#ttsExpr').value = VP.expr; $('#ttsSentPause').value = VP.sentPause; $('#ttsCommaPause').value = VP.commaPause; $('#ttsPace').value = VP.pace || 'normal'; showTtsValues(); $('#ttsEngine').value = VP.engine || 'gemini'; $('#gemKey').value = VP.gemKey || ''; $('#gemStyle').value = VP.gemStyle; $('#gemPace').value = VP.gemPace; $('#gemAccent').value = VP.gemAccent; $('#gemCustom').value = VP.gemCustom || ''; $('#gemVoice').value = VP.gemVoice; $('#gemModel').value = VP.gemModel; showEngine();
+function vpToUI() { $('#ttsUrl').value = VP.url; $('#ttsLang').value = VP.lang; $('#ttsVoice').value = VP.voice; $('#ttsExpr').value = VP.expr; $('#ttsSentPause').value = VP.sentPause; $('#ttsCommaPause').value = VP.commaPause; $('#ttsPace').value = VP.pace || 'normal'; showTtsValues(); $('#ttsEngine').value = VP.engine || 'gemini'; $('#gemKey').value = VP.gemKey || ''; $('#gemStyle').value = VP.gemStyle; $('#gemPace').value = VP.gemPace; $('#gemAccent').value = VP.gemAccent; $('#gemCustom').value = VP.gemCustom || ''; $('#gemVoice').value = VP.gemVoice; $('#gemBase').value = VP.gemBase || 'Charon'; $('#gemModel').value = VP.gemModel; showEngine();
   $('#ttsConsent').checked = VP.consent; $('#ttsClean').checked = VP.clean !== false; $('#ttsEnhance').checked = VP.enhance !== false; $('#ttsEnhance').disabled = VP.clean === false; renderSlots(); }
-[['ttsUrl', 'url'], ['ttsLang', 'lang'], ['ttsVoice', 'voice'], ['ttsExpr', 'expr', 1], ['ttsSentPause', 'sentPause', 1], ['ttsCommaPause', 'commaPause', 1], ['ttsPace', 'pace'], ['ttsEngine', 'engine'], ['gemKey', 'gemKey'], ['gemStyle', 'gemStyle'], ['gemPace', 'gemPace'], ['gemAccent', 'gemAccent'], ['gemCustom', 'gemCustom'], ['gemVoice', 'gemVoice'], ['gemModel', 'gemModel']].forEach(([id, key, num]) => {
+[['ttsUrl', 'url'], ['ttsLang', 'lang'], ['ttsVoice', 'voice'], ['ttsExpr', 'expr', 1], ['ttsSentPause', 'sentPause', 1], ['ttsCommaPause', 'commaPause', 1], ['ttsPace', 'pace'], ['ttsEngine', 'engine'], ['gemKey', 'gemKey'], ['gemStyle', 'gemStyle'], ['gemPace', 'gemPace'], ['gemAccent', 'gemAccent'], ['gemCustom', 'gemCustom'], ['gemVoice', 'gemVoice'], ['gemBase', 'gemBase'], ['gemModel', 'gemModel']].forEach(([id, key, num]) => {
   const el = $('#' + id); el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => { VP[key] = num ? +el.value : el.value; saveVP(); showTtsValues(); if (/^(engine|gem)/.test(key)) showEngine(); });
 });
 $('#sampleUp').onclick = async () => {
@@ -1735,7 +1739,7 @@ async function cleanPending(quiet) {
   if (VP.clean === false || !ttsBase()) return;
   for (const sl of VOICE_SLOTS) { const v = VP.slots[sl.k]; if (v && !v.cleaned && sl.kind !== 'consent') await refineSlot(sl.k, quiet); }
 }
-const voiceMine = () => (VP.engine === 'gemini' ? VP.gemVoice === 'mine' : VP.voice === 'mine');
+const voiceMine = () => (VP.engine === 'gemini' ? (VP.gemVoice === 'mine' || VP.gemVoice === 'mine_free') : VP.voice === 'mine');
 function renderSample() {
   const box = $('#sampleBox'); box.hidden = !voiceMine();
   const has = VP.slots.normal; box.classList.toggle('has', !!has);
@@ -1932,14 +1936,15 @@ function showEngine() {
   $('#aiVoice').dataset.engine = VP.engine || 'gemini';
   if ($('#gemCloneBox').previousElementSibling !== $('#sampleBox')) $('#sampleBox').after($('#gemCloneBox'));   // sample first, then consent
   $('#gemCustomWrap').hidden = VP.gemStyle !== 'custom';
-  const mine = VP.engine === 'gemini' && VP.gemVoice === 'mine';
-  $('#gemCloneBox').hidden = !mine;
+  const mine = VP.engine === 'gemini' && VP.gemVoice === 'mine', vc = VP.engine === 'gemini' && VP.gemVoice === 'mine_free';
+  $('#gemCloneBox').hidden = !mine; $('#gemBaseWrap').hidden = !vc; $('#aiVoice').dataset.vc = vc ? '1' : '';
+  $('#vcHint').style.display = vc ? '' : 'none';
   const c = VP.slots.consent;
   $('#gemConsentPlay').hidden = !c;
   $('#gemConsentRec').textContent = recNow && recNow.slot === 'consent' ? 'Stop' : (c ? 'Record again' : 'Record consent');
   const sig = gemSig();
   $('#gemCloneInfo').textContent = !VP.slots.normal ? 'First add your voice sample above.' : !c ? 'Consent not recorded yet.' : (VP.gemVoiceKey && VP.gemVoiceSig === sig) ? 'Your Gemini voice is ready.' : 'Consent recorded. Press Create my Gemini voice (or just Generate: it is created automatically).';
-  if (VP.engine === 'gemini') { const chip = $('#ttsChip'); chip.textContent = VP.gemKey ? 'Gemini · ' + (VP.gemModel || '').replace('gemini-', '') : 'Gemini · add your API key'; chip.className = 'chip ' + (VP.gemKey ? 'ok' : 'wait'); }
+  if (VP.engine === 'gemini' && !(vc && ttsOnline)) { const chip = $('#ttsChip'); chip.textContent = VP.gemKey ? 'Gemini · ' + (VP.gemModel || '').replace('gemini-', '') : 'Gemini · add your API key'; chip.className = 'chip ' + (VP.gemKey ? 'ok' : 'wait'); }
   renderSample();
 }
 const gemSig = () => { const a = VP.slots.normal, b = VP.slots.consent; return a && b ? `${(a.rawDur || a.dur).toFixed(2)}|${(b.rawDur || b.dur).toFixed(2)}|${VP.gemModel}` : ''; };
@@ -1964,7 +1969,7 @@ async function gemFetch(path, body, timeoutSec = 180) {
       for (let w = Math.ceil(wait); w > 0; w--) { if (gemStop) throw new Error('Stopped'); gemStatus.wait = `Google's free per-minute limit: continuing in ${w} s`; if (gemTick) gemShow(); else $('#ttsInfo').textContent = gemStatus.wait; await sleep(1000); }
       gemStatus.wait = ''; continue;
     }
-    if (!r.ok) throw new Error('Google: ' + ((j.error && j.error.message) || ('error ' + r.status)));
+    if (!r.ok) { const m = (j.error && j.error.message) || ('error ' + r.status); throw new Error('Google: ' + m + (/Paid Quota Tier|paid tier|billing/i.test(m) ? ' → Free option: choose Voice "My voice – free".' : '')); }
     return j;
   }
   throw new Error('Google kept refusing because of rate limits. Try again in a few minutes.');
@@ -2045,6 +2050,23 @@ function gemChunks(units) {
   });
   return chunks;
 }
+// "My voice – free": turn Gemini's performance into the user's voice on the Colab server.
+async function gemConvert(pcm) {
+  const r = await (await ttsFetch('/convert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ audio: await blobB64(encodeWav(pcm, 24000)), ref: await blobB64(VP.slots.normal.dur >= 5 ? slotUse(VP.slots.normal) : slotRaw(VP.slots.normal)) }) })).json();
+  const { pcm: out, sr } = wavToFloat(Uint8Array.from(atob(r.audio), c => c.charCodeAt(0)).buffer);
+  return trimPcm(await to24k(out, sr));
+}
+async function gemPart(text, mood, voice, label) {
+  let pcm = await gemSpeak(text, mood, voice);
+  if (VP.gemVoice === 'mine_free') { gemStatus.label = label + ' · changing it into your voice'; gemShow(); pcm = await gemConvert(pcm); gemStatus.label = label; }
+  return pcm;
+}
+async function gemCheckVc() {
+  if (VP.gemVoice !== 'mine_free') return;
+  if (!VP.slots.normal) throw new Error('Add your voice sample first');
+  if (!ttsBase()) throw new Error('For "My voice – free", start the Colab notebook and paste its link (box above), then press Connect');
+  if (!ttsOnline && !(await ttsConnect())) throw new Error('Could not reach the Colab voice server. Is the notebook running? The link changes on every restart.');
+}
 async function gemSpeak(text, mood, voice) {
   const j = await gemFetch('/interactions', { model: VP.gemModel, input: [{ type: 'text', text, annotations: [{ type: 'speech_metadata', style: gemStyleText(mood) }] }],
     response_format: { type: 'audio' }, generation_config: { speech_config: [{ voice }] } });
@@ -2055,6 +2077,7 @@ async function gemSpeak(text, mood, voice) {
   return trimPcm(await to24k(pcm, sr));
 }
 async function gemVoiceName() {
+  if (VP.gemVoice === 'mine_free') return VP.gemBase || 'Charon';
   if (VP.gemVoice !== 'mine') return VP.gemVoice;
   if (VP.gemVoiceKey && VP.gemVoiceSig === gemSig()) return VP.gemVoiceKey;
   return gemMakeVoice(true);
@@ -2092,17 +2115,18 @@ async function gemFinish(out, chunks, units, msg) {
 async function gemGenerate() {
   S.script = $('#script').value;
   if (!S.segments.length) return toast('Press Create scenes first');
-  if (VP.gemVoice === 'mine' && (!VP.consent || !VP.slots.normal)) { renderSample(); return toast('For your own voice: tick the permission box and add your voice sample'); }
+  if ((VP.gemVoice === 'mine' || VP.gemVoice === 'mine_free') && (!VP.consent || !VP.slots.normal)) { renderSample(); $('#myVoice').open = true; return toast('For your own voice: tick the permission box and add your voice sample'); }
   const units = sentenceGroups().map(g => g.map(i => S.segments[i].text.trim()).join(' ')), chunks = gemChunks(units);
   gemStop = false; ttsBusy(true);
   try {
     gemStart('Preparing your voice');
+    await gemCheckVc();
     const voice = await gemVoiceName(), parts = [];
     gemStart(`Gemini is speaking: part 1 of ${chunks.length}`, chunks.length);
     for (let i = 0; i < chunks.length; i++) {
       if (gemStop) throw new Error('Stopped');
       gemStatus.label = `Gemini is speaking: part ${i + 1} of ${chunks.length}`; gemShow();
-      parts.push(await gemSpeak(chunks[i].text, chunks[i].mood, voice));
+      parts.push(await gemPart(chunks[i].text, chunks[i].mood, voice, gemStatus.label));
       gemStatus.done = i + 1; gemShow();
     }
     gemStatus.label = 'Putting the voiceover together'; gemShow();
@@ -2119,8 +2143,9 @@ async function gemRedo(k) {
   if (!S.audioBlob || S.audioName !== 'AI voiceover.wav') return toast('The current voiceover is not the AI one any more. Generate it again.');
   gemStop = false; ttsBusy(true); gemStart(`Redoing part ${ci + 1} (it holds line ${k + 1})`);
   try {
+    await gemCheckVc();
     const voice = await gemVoiceName(), ch = t.chunks[ci];
-    let fresh = await gemSpeak(ch.text, ch.mood, voice); gemEnd();
+    let fresh = await gemPart(ch.text, ch.mood, voice, gemStatus.label); gemEnd();
     const { pcm } = wavToFloat(await S.audioBlob.arrayBuffer()), SR = 24000, a = Math.round(ch.start * SR), b = Math.round(ch.end * SR);
     const rms = x => { let s2 = 0, n = 0; for (const v of x) if (Math.abs(v) > 0.01) { s2 += v * v; n++; } return n ? Math.sqrt(s2 / n) : 0; };
     const r0 = rms(pcm.subarray(a, b)), r1 = rms(fresh); if (r0 && r1) { const g = Math.min(2, Math.max(0.5, r0 / r1)); fresh = fresh.map(v => Math.max(-0.98, Math.min(0.98, v * g))); }

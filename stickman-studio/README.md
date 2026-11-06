@@ -42,7 +42,12 @@ speech model in Google AI Studio) straight from the app; no Colab needed.
 1. Get a free API key at https://aistudio.google.com/apikey and paste it (it stays on this device).
 2. Pick **Style** (Narrative, Promo – High, Dramatic storyteller, Documentary, Conversational, Calm or
    your own words), **Pace** (Natural / Slow / Fast) and **Accent** (Neutral / Neutral Indian / Native Hindi).
-3. **Voice**: one of Google's 30 voices, or **My cloned voice**. For your own voice add your voice sample
+3. **Voice**: one of Google's 30 voices, or your own voice in one of two ways:
+   - **My voice – free**: Gemini speaks in a base voice close to yours (Charon, Puck, Kore…), then the free
+     voice model on the Colab notebook (server v13+) turns each part into your voice. Needs your voice sample
+     and the Colab link connected (box below the voice options).
+   - **My voice – Google cloning**: needs a paid Google tier (Paid Quota Tier 1, i.e. billing turned on for
+     the API key's project). Add your voice sample
    (10–20 s, clean) and record Google's consent sentence in the same room:
    *"I am the owner of this voice and I consent to Google using this voice to create a synthetic voice model."*
    The app creates a private voice key (Google does not store the voice: `store=false`).

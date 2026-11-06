@@ -47,7 +47,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-SERVER_VERSION = "12"  # shown in the app, to see which server code is running
+SERVER_VERSION = "13"  # shown in the app, to see which server code is running
 SR = 24000  # Chatterbox output rate; Stickman Studio also sends its recordings at 24 kHz
 
 # exaggeration (emotion strength), cfg_weight (lower = freer, more expressive pacing), temperature
@@ -78,6 +78,9 @@ class FakeEngine:
     """Beeps whose length follows the text, for testing without a GPU."""
     name = "fake"
     device = "cpu"
+
+    def convert(self, src, ref):
+        return (src * 0.9).astype(np.float32)   # stand-in for voice conversion
 
     def synth(self, text, lang, ref_path, ex, cfg, temp, seed):
         n = max(1, len(re.sub(r"\W", "", text)))
@@ -229,6 +232,32 @@ class ChatterboxEngine:
             self.cond_cache[ref_path] = self.model.conds
         return self.cond_cache[ref_path]
 
+    def convert(self, src, ref):
+        """Voice conversion (as ChatterboxVC): keep what is said and how, speak it in the voice of `ref`.
+        Long audio is converted in pieces of up to 20 s, cut at pauses."""
+        import hashlib
+        import librosa
+        torch = self.torch
+        key = hashlib.md5(ref[: SR * 10].tobytes()).hexdigest()
+        if not hasattr(self, "vc_refs"):
+            self.vc_refs = {}
+        if key not in self.vc_refs:
+            with torch.inference_mode():
+                self.vc_refs[key] = self.model.s3gen.embed_ref(ref[: SR * 10], SR, device=self.device)
+        ref_dict = self.vc_refs[key]
+        out = []
+        for piece in split_at_pauses(src, 20.0):
+            with torch.inference_mode():
+                a16 = librosa.resample(piece, orig_sr=SR, target_sr=16000)
+                tokens, _ = self.model.s3gen.tokenizer(torch.from_numpy(a16).float().to(self.device)[None, ])
+                wav, _ = self.model.s3gen.inference(speech_tokens=tokens, ref_dict=ref_dict)
+            wav = wav.squeeze(0).detach().cpu().numpy().astype(np.float32)
+            wm = getattr(self.model, "watermarker", None)
+            if wm is not None:
+                wav = wm.apply_watermark(wav, sample_rate=SR).astype(np.float32)
+            out.append(fade_edges(wav, 0.01, 0.01))
+        return np.concatenate(out) if out else src[:0]
+
     def synth(self, text, lang, ref_path, ex, cfg, temp, seed):
         torch = self.torch
         torch.manual_seed(seed)
@@ -308,6 +337,30 @@ def speakable(text, lang="hi"):
     t = re.sub(r"([,.!?])(?=[^\s,.!?])", r"\1 ", t)
     t = re.sub(r"^[\s,.!?]+", "", t)
     return " ".join(t.replace("\u2024", ".").split())
+
+
+def split_at_pauses(wav, max_sec=20.0):
+    """Pieces of at most `max_sec`, cut in the middle of the longest pause in the last 8 s of each piece."""
+    n_max = int(SR * max_sec)
+    pieces, pos = [], 0
+    while wav.size - pos > n_max:
+        seg = wav[pos: pos + n_max]
+        db = _frames(seg)
+        quiet = db < db.max() - 35
+        lo = max(0, len(db) - 800)  # last 8 s (10 ms frames)
+        best, run_start, best_len = None, None, 0
+        for i in range(lo, len(db)):
+            if quiet[i]:
+                run_start = i if run_start is None else run_start
+                if i - run_start + 1 > best_len:
+                    best_len, best = i - run_start + 1, (run_start + i) // 2
+            else:
+                run_start = None
+        cut = pos + (best * SR // 100 if best is not None and best_len >= 5 else n_max)
+        pieces.append(wav[pos:cut])
+        pos = cut
+    pieces.append(wav[pos:])
+    return [p for p in pieces if p.size]
 
 
 def fade_edges(wav, fin=0.008, fout=0.025):
@@ -631,6 +684,11 @@ class JobIn(BaseModel):
     comma_pause: float = 0.25
     pace: str = "normal"            # relaxed / normal / fast
     seed: int = 7
+
+
+class ConvertIn(BaseModel):
+    audio: str   # base64 WAV to re-voice
+    ref: str     # base64 WAV of the target voice (the user's sample)
 
 
 class RedoIn(BaseModel):
@@ -981,6 +1039,19 @@ def create_app(engine, refiner=None):
         if job.audio is None:
             raise HTTPException(409, "Not ready yet")
         return Response(job.audio, media_type="audio/wav")
+
+    @app.post("/convert")
+    def convert(body: ConvertIn):
+        if not hasattr(engine, "convert"):
+            raise HTTPException(400, "This server cannot convert voices")
+        try:
+            src, ref = decode_b64_wav(body.audio), decode_b64_wav(body.ref)
+        except Exception:
+            raise HTTPException(400, "Could not read the audio")
+        if src.size < SR * 0.2 or ref.size < SR * 1:
+            raise HTTPException(400, "The audio or the voice sample is too short")
+        out = engine.convert(src, trim(ref))
+        return {"audio": base64.b64encode(wav_bytes(out)).decode(), "seconds": round(out.size / SR, 2)}
 
     @app.post("/redo_line")
     def redo_line(body: RedoLineIn):
