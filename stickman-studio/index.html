@@ -1802,14 +1802,19 @@ async function applyTtsResult(id, st, msg) {
   S.tts = { url: ttsBase(), job: id, timings: st.timings }; save(); renderTtsLines();
   $('#ttsInfo').textContent = msg + ` · ${fmt(st.duration, 0)} long. Scenes are synced to it.`;
 }
+// The request body for the voice server: lines, settings and (for "My cloned voice") the cleaned samples.
+async function ttsBody(units) {
+  const body = { units, language: VP.lang, expressiveness: VP.expr, sentence_pause: VP.sentPause, comma_pause: VP.commaPause, pace: VP.pace || 'normal', seed: 7, voice: {}, sounds: {} };
+  if (VP.voice === 'mine' && VP.clean !== false && VOICE_SLOTS.some(sl => VP.slots[sl.k] && !VP.slots[sl.k].cleaned)) { $('#ttsInfo').textContent = 'Cleaning your samples first…'; await cleanPending(true); }
+  if (VP.voice === 'mine') for (const sl of VOICE_SLOTS) { const v = VP.slots[sl.k]; if (v) (sl.kind === 'voice' ? body.voice : body.sounds)[sl.k] = await blobB64(slotUse(v)); }
+  return body;
+}
 async function ttsGenerate() {
   S.script = $('#script').value;
   if (!S.segments.length) return toast('Press Create scenes first');
   if (VP.voice === 'mine' && (!VP.consent || !VP.slots.normal)) { renderSample(); return toast('For your own voice: tick the permission box, then upload or record a voice sample'); }
   const groups = sentenceGroups(), units = groups.map(g => g.map(i => S.segments[i].text.trim()).join(' '));
-  const body = { units, language: VP.lang, expressiveness: VP.expr, sentence_pause: VP.sentPause, comma_pause: VP.commaPause, pace: VP.pace || 'normal', seed: 7, voice: {}, sounds: {} };
-  if (VP.voice === 'mine' && VP.clean !== false && VOICE_SLOTS.some(sl => VP.slots[sl.k] && !VP.slots[sl.k].cleaned)) { $('#ttsInfo').textContent = 'Cleaning your samples first…'; await cleanPending(true); }
-  if (VP.voice === 'mine') for (const sl of VOICE_SLOTS) { const v = VP.slots[sl.k]; if (v) (sl.kind === 'voice' ? body.voice : body.sounds)[sl.k] = await blobB64(slotUse(v)); }
+  const body = await ttsBody(units);
   ttsBusy(true); $('#ttsInfo').textContent = 'Sending the script…';
   try {
     const j = await (await ttsFetch('/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();
@@ -1827,14 +1832,26 @@ function renderTtsLines() {
 }
 let linePlayT;
 function playLine(k) { const x = S.tts.timings[k]; vo.currentTime = Math.max(0, x.start - 0.05); vo.play(); clearTimeout(linePlayT); linePlayT = setTimeout(() => vo.pause(), (x.end - x.start + 0.25) * 1000); }
+// Redo one line. If the server still remembers this voiceover it is quick; otherwise (e.g. after a
+// Colab restart) the app sends the voiceover it has, and only that line is replaced in it.
 async function redoLine(k) {
-  const t = S.tts; if (!t) return;
-  if (ttsBase() !== t.url) return toast('This voiceover was made by an earlier server session. Generate it again.');
+  const t = S.tts; if (!t || !t.timings) return;
+  if (!S.audioBlob || S.audioName !== 'AI voiceover.wav') return toast('The current voiceover is not the AI one any more. Generate it again.');
   ttsBusy(true); $('#ttsInfo').textContent = `Redoing line ${k + 1}…`;
   try {
-    await ttsFetch(`/jobs/${t.job}/redo`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ unit: k }) });
-    const st = await waitJob(t.job, 'Redoing');
-    await applyTtsResult(t.job, st, `Line ${k + 1} redone`); playLine(k);
+    let jobId = null;
+    if (ttsBase() === t.url && t.job) {
+      try { await ttsFetch(`/jobs/${t.job}/redo`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ unit: k }) }); jobId = t.job; }
+      catch (e) { if (!/Unknown job|404/i.test(e.message)) throw e; }
+    }
+    if (!jobId) {
+      $('#ttsInfo').textContent = `Sending the voiceover so only line ${k + 1} is redone…`;
+      const body = await ttsBody(t.timings.map(x => x.text));
+      Object.assign(body, { audio: await blobB64(S.audioBlob), timings: t.timings.map(x => ({ start: x.start, end: x.end })), unit: k });
+      jobId = (await (await ttsFetch('/redo_line', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json()).job_id;
+    }
+    const st = await waitJob(jobId, 'Redoing');
+    await applyTtsResult(jobId, st, `Line ${k + 1} redone`); playLine(k);
   } catch (e) { $('#ttsInfo').textContent = e.message; toast(e.message); }
   ttsBusy(false);
 }

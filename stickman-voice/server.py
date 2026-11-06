@@ -47,7 +47,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-SERVER_VERSION = "11"  # shown in the app, to see which server code is running
+SERVER_VERSION = "12"  # shown in the app, to see which server code is running
 SR = 24000  # Chatterbox output rate; Stickman Studio also sends its recordings at 24 kHz
 
 # exaggeration (emotion strength), cfg_weight (lower = freer, more expressive pacing), temperature
@@ -638,6 +638,15 @@ class RedoIn(BaseModel):
     seed: Optional[int] = None
 
 
+class RedoLineIn(JobIn):
+    """Redo one line of a voiceover the server no longer remembers (e.g. after a Colab restart):
+    the app sends the finished voiceover and its line timings, and gets it back with that line replaced."""
+    audio: str                 # base64 WAV of the current voiceover
+    timings: List[dict]        # [{"start": s, "end": s}] per line, as returned by the job
+    unit: int
+    redo_seed: Optional[int] = None
+
+
 class Job:
     def __init__(self, spec: JobIn):
         self.id = uuid.uuid4().hex[:12]
@@ -856,10 +865,42 @@ class VoiceServer:
         job.status = "done"
 
     def _redo(self, job, unit, seed):
+        """Regenerate one line and splice it into the finished voiceover: every other line and pause
+        stays exactly as it was, later lines just move by the length difference."""
         job.status = "running"
         job.unit_seed[unit] = seed
+        mood = "normal"
+        for i in range(unit):
+            _, mood = parse_line(job.spec.units[i], mood)
+        job.unit_mood_in[unit] = mood
         self._render_unit(job, unit)
-        self._assemble(job)
+        new = job.unit_audio[unit]
+        data, _ = sf.read(io.BytesIO(job.audio), dtype="float32", always_2d=True)
+        data = data.mean(axis=1)
+        t = job.timings[unit]
+        a, b = int(t["start"] * SR), int(t["end"] * SR)
+        # match the loudness of the other lines (the finished file was normalised as a whole)
+        others = np.concatenate([data[: a], data[b:]]) if data.size > b - a else data
+        def speech_rms(x):
+            if x.size == 0:
+                return 0.0
+            db = _frames(x)
+            loud = db >= db.max() - 30
+            n = int(SR * 0.01)
+            fr = x[: len(db) * n].reshape(len(db), n)[loud]
+            return float(np.sqrt((fr ** 2).mean())) if fr.size else 0.0
+        r_new, r_old = speech_rms(new), speech_rms(others)
+        if r_new > 0 and r_old > 0:
+            new = new * float(np.clip(r_old / r_new, 0.5, 2.0))
+        new = np.clip(new, -0.98, 0.98).astype(np.float32)
+        out = np.concatenate([data[:a], new, data[b:]])
+        delta = new.size / SR - (t["end"] - t["start"])
+        t["end"] = round(t["start"] + new.size / SR, 3)
+        for later in job.timings[unit + 1:]:
+            later["start"] = round(later["start"] + delta, 3)
+            later["end"] = round(later["end"] + delta, 3)
+        job.audio = wav_bytes(out)
+        job.duration = round(out.size / SR, 3)
         job.status = "done"
 
     def _worker(self):
@@ -940,6 +981,26 @@ def create_app(engine, refiner=None):
         if job.audio is None:
             raise HTTPException(409, "Not ready yet")
         return Response(job.audio, media_type="audio/wav")
+
+    @app.post("/redo_line")
+    def redo_line(body: RedoLineIn):
+        if not 0 <= body.unit < len(body.units) or len(body.timings) != len(body.units):
+            raise HTTPException(400, "The lines and their timings do not match")
+        spec = JobIn(**{k: getattr(body, k) for k in JobIn.model_fields})
+        job = Job(spec)
+        try:
+            job.audio = base64.b64decode(body.audio)
+            sf.info(io.BytesIO(job.audio))
+        except Exception:
+            raise HTTPException(400, "Could not read the voiceover audio")
+        job.timings = [{"unit": i, "start": float(t["start"]), "end": float(t["end"]), "text": spec.units[i]}
+                       for i, t in enumerate(body.timings)]
+        job.done = job.total
+        job.status = "queued"
+        server.jobs[job.id] = job
+        seed = body.redo_seed if body.redo_seed is not None else random.randint(1, 10 ** 6)
+        server.submit("redo", job, (body.unit, seed))
+        return {"job_id": job.id, "seed": seed}
 
     @app.post("/jobs/{job_id}/redo")
     def redo(job_id: str, body: RedoIn):
