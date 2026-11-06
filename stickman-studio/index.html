@@ -661,7 +661,7 @@ function renderPrompts() {
   $('#batches').innerHTML = bs.map(b => {
     const ok = !!S.grids[b.index], cur = b.index === pasteTarget;
     const side = ok
-      ? `<canvas data-psrc="${b.index}"></canvas><div class="row"><span class="chip ok">Cut into ${b.count} scenes</span><button class="btn small" data-replace="${b.index}">Replace</button><button class="btn small" data-goto="grids">Check cuts</button></div>`
+      ? `<canvas data-psrc="${b.index}"></canvas><div class="row"><span class="chip ok">Cut into ${b.count} scenes</span><button class="btn small" data-replace="${b.index}">Replace</button><button class="btn small danger" data-remove="${b.index}">Remove</button><button class="btn small" data-goto="grids">Check cuts</button></div>`
       : `<div class="drop" data-griddrop="${b.index}" tabindex="0" role="button"><strong>${cur ? 'Press Ctrl+V to paste the image' : 'Drop or click to add image ' + (b.index + 1)}</strong>${cur ? 'or drop / click to choose the file' : 'or copy its prompt and paste the image with Ctrl+V'}</div>`;
     return `<div class="batch${cur ? ' current' : ''}" id="batch-${b.index}"><div class="batch-h"><h3>Image ${b.index + 1} <span class="hint">of ${bs.length}</span></h3><span class="chip">Scenes ${b.start + 1}–${b.start + b.count} · ${b.rows}×${b.cols}</span><span class="chip ${ok ? 'ok' : cur ? '' : 'wait'}">${ok ? 'Done' : cur ? 'Waiting for image' : 'Pending'}</span><button class="btn small ${ok ? '' : 'primary'}" data-copy="${b.index}">Copy prompt</button></div>
       <div class="pbody${ok ? ' done' : ''}"><details class="ptext"${ok ? '' : ' open'}><summary>Prompt text</summary><pre class="prompt">${esc(buildPrompt(b))}</pre></details><div class="pside">${side}</div></div></div>`;
@@ -996,7 +996,7 @@ document.addEventListener('click', async e => {
   else if (d.merge != null) { const i = +d.merge; const A = S.segments[i], B = S.segments[i + 1]; A.text = A.text.trim() + ' ' + B.text.trim(); A.visual = [A.visual, B.visual].filter(Boolean).join('; '); S.segments.splice(i + 1, 1); S.starts.splice(i + 1, 1); segmentsChanged(true); }
   else if (d.del != null) { const i = +d.del; S.segments.splice(i, 1); S.starts.splice(i, 1); if (S.starts.length) S.starts[0] = 0; segmentsChanged(true); }
   else if (d.replace != null) { const [f] = await pickFile($('#oneFile')); if (f) placeGrid(+d.replace, f); }
-  else if (d.remove != null) { S.grids[+d.remove] = null; R.grids[+d.remove] = null; segmentsChanged(true); }
+  else if (d.remove != null) { const gi = +d.remove; S.grids[gi] = null; R.grids[gi] = null; pasteTarget = gi; segmentsChanged(true); toast(`Image ${gi + 1} removed. Press Ctrl+V to paste the right image here.`); }
   else if (d.one != null) { const i = +d.one; const [f] = await pickFile($('#oneFile')); if (f) { await setOverride(S.segments[i].id, f); segmentsChanged(true); } }
   else if (d.oneclear != null) { const id = S.segments[+d.oneclear].id; delete S.overrides[id]; delete R.overrides[id]; segmentsChanged(true); }
 });

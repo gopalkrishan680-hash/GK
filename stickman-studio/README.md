@@ -15,6 +15,7 @@ Open it in **Chrome or Edge** (double-click the file). Everything runs locally o
    - Press **Copy next prompt** and paste it into ChatGPT or Gemini.
    - Copy the generated image (right-click → Copy image) and press `Ctrl+V` anywhere in the app.
      It goes into the right card and is cut into its 9 scenes. Repeat until the progress bar is full.
+   - Wrong image pasted? Press **Remove** on that card, then `Ctrl+V` the right image. It goes back into the same card.
    - You can also drop the downloaded file on its card.
    - *AI Scene Director:* give ChatGPT one prompt covering the whole script and it writes a visual for every scene.
      Paste the reply back and press **Apply** to get better prompts.
