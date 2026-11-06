@@ -46,12 +46,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-SERVER_VERSION = "7"  # shown in the app, to see which server code is running
+SERVER_VERSION = "8"  # shown in the app, to see which server code is running
 SR = 24000  # Chatterbox output rate; Stickman Studio also sends its recordings at 24 kHz
 
 # exaggeration (emotion strength), cfg_weight (lower = freer, more expressive pacing), temperature
 MOODS = {
-    "normal": dict(ex=0.5, cfg=0.35, temp=0.8),
+    "normal": dict(ex=0.5, cfg=0.35, temp=0.85),
     "happy": dict(ex=0.7, cfg=0.3, temp=0.85),
     "excited": dict(ex=0.9, cfg=0.25, temp=0.9),
     "sad": dict(ex=0.4, cfg=0.4, temp=0.75),
@@ -255,6 +255,42 @@ def wav_bytes(wav):
     buf = io.BytesIO()
     sf.write(buf, wav, SR, format="WAV", subtype="PCM_16")
     return buf.getvalue()
+
+
+def speakable(text, lang="hi"):
+    """Make text safe for the model. Chatterbox does not know the Hindi danda (।) and adds an extra
+    full stop after it, and it tries to voice quote marks; both produce odd sounds. Quotes, symbols
+    and emoji are removed, the danda becomes a full stop, ellipses and dashes become commas, and runs
+    of punctuation are collapsed to one mark."""
+    words = {"hi": (" प्रतिशत", " और "), "en": (" percent", " and ")}.get(lang, (" percent", " and "))
+    t = re.sub(r"\s*%", words[0], text).replace("&", words[1])
+    t = re.sub(r"(\d)\.(\d)", "\\1\u2024\\2", t)                        # keep decimals like 3.5 together
+    t = t.replace("।", ".").replace("॥", ".")
+    t = t.replace("…", ",").replace("...", ",")
+    t = re.sub(r"[—–]", ",", t)
+    t = re.sub(r"[“”„‟\"«»‹›]", " ", t)
+    t = re.sub(r"(^|\s)['‘’`´]+|['‘’`´]+(?=\s|$|[,.!?])", " ", t)   # quote marks, not apostrophes in words
+    t = re.sub(r"[‘’`´]", "'", t)
+    t = re.sub(r"[^\w\s\u0900-\u097F\u2024,.!?'-]", " ", t)         # symbols, brackets, emoji
+    t = re.sub(r"\s*-\s*(?=\s|$)", " ", t)                           # stray dashes
+    def one_mark(m):
+        g = m.group(0)
+        return "?" if "?" in g else "!" if "!" in g else "." if "." in g else ","
+    t = re.sub(r"\s*[,.!?](?:\s*[,.!?])+", one_mark, t)
+    t = re.sub(r"\s+([,.!?])", r"\1", t)
+    t = re.sub(r"([,.!?])(?=[^\s,.!?])", r"\1 ", t)
+    t = re.sub(r"^[\s,.!?]+", "", t)
+    return " ".join(t.replace("\u2024", ".").split())
+
+
+def fade_edges(wav, fin=0.008, fout=0.025):
+    """Short fades so joins between generated pieces never click."""
+    a, b = int(SR * fin), int(SR * fout)
+    if wav.size > a + b:
+        wav = wav.copy()
+        wav[:a] *= np.linspace(0, 1, a)
+        wav[-b:] *= np.linspace(1, 0, b)
+    return wav
 
 
 def split_long(text, limit=220):
@@ -614,13 +650,16 @@ class VoiceServer:
         ex = max(0.25, min(2.0, p["ex"] * job.spec.expressiveness))
         cfg = max(0.0, min(1.0, p["cfg"] * PACE.get(job.spec.pace, 1.0)))
         lang = job.spec.language
+        text = speakable(text, lang)
+        if not re.search(r"[\w\u0900-\u097F]", text):
+            return silence(0.05)
         expected = 1.0 + 0.11 * len(re.sub(r"\s", "", text))
         wav = None
         for attempt in range(3):  # retry when the model rambles far past the text length
             wav = trim(self.engine.synth(text, lang, ref, ex, cfg, p["temp"], seed + 1000 * attempt))
             if 0 < wav.size / SR <= expected * 2.5 + 2:
                 break
-        return wav
+        return fade_edges(wav)
 
     def _render_unit(self, job, i):
         ops, mood_out = parse_line(job.spec.units[i], job.unit_mood_in[i])
@@ -656,7 +695,10 @@ class VoiceServer:
             t += wav.size / SR
             job.timings.append({"unit": i, "start": round(start, 3), "end": round(t, 3), "text": job.spec.units[i]})
             if i < len(job.unit_audio) - 1:
-                base = job.spec.sentence_pause if STRONG_END.search(job.spec.units[i]) else job.spec.comma_pause * 2
+                unit_text = TAG_RE.sub("", job.spec.units[i]).strip()
+                base = job.spec.sentence_pause if STRONG_END.search(unit_text) else job.spec.comma_pause * 2
+                if re.search(r"[?!][\"'”’)»]*$", unit_text):
+                    base *= 1.25  # a question or exclamation lands, then a slightly longer breath
                 gap = max(0.05, base * rnd.uniform(0.85, 1.15))  # small natural variation
                 out.append(silence(gap))
                 t += gap
