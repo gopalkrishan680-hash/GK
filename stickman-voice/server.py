@@ -46,7 +46,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-SERVER_VERSION = "8"  # shown in the app, to see which server code is running
+SERVER_VERSION = "9"  # shown in the app, to see which server code is running
 SR = 24000  # Chatterbox output rate; Stickman Studio also sends its recordings at 24 kHz
 
 # exaggeration (emotion strength), cfg_weight (lower = freer, more expressive pacing), temperature
@@ -114,10 +114,17 @@ def _build_multilingual(files, device):
     ve = VoiceEncoder()
     ve.load_state_dict(state(files["ve"]))
     ve.to(device).eval()
-    t3 = T3(T3Config.multilingual())
     t3_state = load_file(str(files["t3"]))
     if "model" in t3_state.keys():
         t3_state = t3_state["model"][0]
+    # A language pack may come with its own text vocabulary: size the model from its weights,
+    # and keep the multilingual behaviour (language tag, alignment checks) on.
+    vocab = int(t3_state["text_emb.weight"].shape[0]) if "text_emb.weight" in t3_state else 2454
+
+    class PackConfig(T3Config):
+        is_multilingual = property(lambda self: True)
+
+    t3 = T3(T3Config.multilingual() if vocab == 2454 else PackConfig(text_tokens_dict_size=vocab))
     t3.load_state_dict(t3_state)
     t3.to(device).eval()
     s3gen = S3Gen()
@@ -149,24 +156,37 @@ def load_multilingual(device, want="hindi"):
                 pack = Path(snapshot_download(repo_id=HINDI_PACK, repo_type="model", token=token))
                 listing = sorted(str(x.relative_to(pack)) for x in pack.rglob("*") if x.is_file())
                 print("Hindi pack files:", ", ".join(listing))
+                notes.append("hindi pack files: " + ", ".join(listing[:12]))
                 tensors = sorted(pack.rglob("*.safetensors"))
                 t3s = [x for x in tensors if "t3" in x.name.lower()] or tensors
                 if not t3s:
                     raise FileNotFoundError("no .safetensors file in the Hindi pack")
                 files["t3"] = t3s[0]
+                import json as _json
                 for x in pack.rglob("*"):
                     nm = x.name.lower()
+                    if nm.endswith(".json") and "tok" not in files.get("_pack_tok", ""):
+                        try:  # a tokenizer file whatever its name: {"model": {"vocab": ...}}
+                            d = _json.loads(x.read_text(encoding="utf-8"))
+                            if isinstance(d, dict) and isinstance(d.get("model"), dict) and "vocab" in d["model"]:
+                                files["tok"] = x
+                                files["_pack_tok"] = "tok"
+                        except Exception:
+                            pass
                     if nm in ("ve.pt", "ve.safetensors"):
                         files["ve"] = x
                     elif nm.startswith("s3gen") and nm.endswith((".pt", ".safetensors")):
                         files["s3gen"] = x
-                    elif nm.endswith(".json") and ("grapheme" in nm or nm.startswith("tokenizer")):
+                    elif nm.endswith(".json") and ("grapheme" in nm or nm.startswith("tokenizer")) and "_pack_tok" not in files:
                         files["tok"] = x
                     elif nm == "conds.pt":
                         files["conds"] = x
             if not Path(files["t3"]).exists():
                 raise FileNotFoundError(Path(files["t3"]).name + " is not available")
+            files.pop("_pack_tok", None)
             model = _build_multilingual(files, device)
+            if opt == "hindi":
+                notes = []  # loaded: nothing to report
             return model, opt, notes
         except Exception as e:
             msg = f"{opt}: {type(e).__name__}: {str(e)[:200]}"
@@ -757,7 +777,8 @@ def create_app(engine, refiner=None):
 
     @app.get("/health")
     def health():
-        return {"ok": True, "version": SERVER_VERSION, "engine": engine.name, "model": getattr(engine, "variant", ""), "device": getattr(engine, "device", "?"), "refine": True,
+        return {"ok": True, "version": SERVER_VERSION, "engine": engine.name, "model": getattr(engine, "variant", ""),
+                "notes": [n[:300] for n in getattr(engine, "notes", [])][:4], "device": getattr(engine, "device", "?"), "refine": True,
                 "languages": getattr(engine, "languages", ["hi", "en"]), "busy": len(server.queue)}
 
     @app.post("/refine")

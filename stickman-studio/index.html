@@ -1772,7 +1772,9 @@ async function ttsFetch(path, opt = {}) {
 }
 async function ttsConnect() {
   const chip = $('#ttsChip'); chip.textContent = 'Connecting…'; chip.className = 'chip';
-  try { const h = await (await ttsFetch('/health')).json(); chip.textContent = `Connected · ${h.engine === 'fake' ? 'test engine' : 'GPU ready'}${h.model ? ' · ' + ({ hindi: 'Hindi model', v3: 'V3 model', v2: 'V2 model' }[h.model] || h.model) : ''}${h.version ? ' · server v' + h.version : ''}`; chip.className = 'chip ok'; ttsOnline = true; cleanPending(); return true; }
+  try { const h = await (await ttsFetch('/health')).json(); chip.textContent = `Connected · ${h.engine === 'fake' ? 'test engine' : 'GPU ready'}${h.model ? ' · ' + ({ hindi: 'Hindi model', v3: 'V3 model', v2: 'V2 model' }[h.model] || h.model) : ''}${h.version ? ' · server v' + h.version : ''}`; chip.className = 'chip ok'; ttsOnline = true;
+    $('#ttsInfo').textContent = (h.model && h.model !== 'hindi' && h.notes && h.notes.length) ? `Hindi model not used (running ${h.model.toUpperCase()}): ${h.notes.join(' | ')}` : '';
+    cleanPending(); return true; }
   catch (e) { chip.textContent = 'Not connected'; chip.className = 'chip wait'; ttsOnline = false; toast(e.message); return false; }
 }
 $('#ttsConnect').onclick = ttsConnect;
