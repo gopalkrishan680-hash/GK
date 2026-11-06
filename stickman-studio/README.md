@@ -35,7 +35,25 @@ Open it in **Chrome or Edge** (double-click the file). Everything runs locally o
    player. It is usually faster than the video length.
    Older browsers fall back to live recording, which needs the tab to stay open and in front.
 
-## AI voice (optional)
+## AI voice with Google Gemini (most natural)
+In **Script + Voice → AI voice**, choose **Voice engine: Google Gemini**. It uses Gemini 3.8 TTS (the
+speech model in Google AI Studio) straight from the app; no Colab needed.
+
+1. Get a free API key at https://aistudio.google.com/apikey and paste it (it stays on this device).
+2. Pick **Style** (Narrative, Promo – High, Dramatic storyteller, Documentary, Conversational, Calm or
+   your own words), **Pace** (Natural / Slow / Fast) and **Accent** (Neutral / Neutral Indian / Native Hindi).
+3. **Voice**: one of Google's 30 voices, or **My cloned voice**. For your own voice add your voice sample
+   (10–20 s, clean) and record Google's consent sentence in the same room:
+   *"I am the owner of this voice and I consent to Google using this voice to create a synthetic voice model."*
+   The app creates a private voice key (Google does not store the voice: `store=false`).
+4. **Generate voiceover**. Consecutive sentences are spoken together (about a paragraph at a time) so the
+   delivery flows naturally; `[laugh]`, `[sigh]`, `[pause]` become Gemini's `<laugh>`, `<sigh>`,
+   `<short pause>`, and `[happy]`/`[sad]`… change the mood of the following part. Scenes are synced from the
+   pauses inside each part. **Redo** speaks the part holding that line again and puts it in place.
+
+Free keys have per-minute limits; the app waits and continues by itself.
+
+## AI voice on Colab (optional)
 No voiceover yet? In **Script + Voice → AI voice** the app turns the script into one, in a ready-made
 voice or **your own cloned voice**, with `[pause]`, `[laugh]`, `[sigh]`, `[happy]`, `[sad]`… tags.
 The voice model runs free on Google Colab; see `../stickman-voice/README.md` for the 3-step start.
