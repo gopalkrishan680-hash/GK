@@ -115,6 +115,22 @@ audio { width: 100%; }
 .batch-h h3 { margin-right: auto; }
 pre.prompt { margin: 0; padding: 14px; font: 13px/1.55 var(--font-mono); white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow: auto; }
 .batches { display: grid; gap: 14px; }
+.callout { border: 2px solid var(--accent); border-radius: var(--r); background: var(--surface); padding: 14px 16px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.callout .big { font-family: var(--font-display); font-weight: 800; font-size: 22px; line-height: 1.2; }
+.callout .grow { flex: 1 1 260px; min-width: 0; }
+.flow { display: grid; gap: 10px; }
+.flow ol { margin: 0; padding-left: 20px; display: grid; gap: 2px; }
+.bar { height: 10px; border-radius: 99px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--good); width: 0; transition: width .3s; }
+.batch.current { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.batch .pbody { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 0; }
+.batch .pbody > * { min-width: 0; }
+.batch .pbody.done { grid-template-columns: minmax(0, 1fr) minmax(0, 300px); align-items: start; }
+.batch .pside { border-left: 1px solid var(--line); padding: 12px; display: grid; gap: 8px; align-content: start; }
+.batch .pside canvas { width: 100%; height: auto; border-radius: 6px; display: block; }
+.batch .pside .drop { padding: 22px 12px; }
+@media (max-width: 760px) { .batch .pbody { grid-template-columns: 1fr; } .batch .pside { border-left: 0; border-top: 1px solid var(--line); } }
+details.ptext summary { padding: 10px 14px; font-size: 13px; color: var(--muted); }
 
 /* grids */
 .gridcard .body { padding: 14px; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 14px; }
@@ -232,6 +248,10 @@ details summary { cursor: pointer; font-weight: 600; }
       <p class="hint">Next: check the scenes, then open the <b>Image Prompts</b> tab.</p>
     </div>
   </div>
+  <div class="callout" id="gridCallout" hidden>
+    <div class="grow"><div class="big" id="calloutBig"></div><div class="hint" id="calloutSub"></div></div>
+    <button class="btn primary" data-goto="prompts">Open Image Prompts →</button>
+  </div>
   <div class="panel">
     <div class="row"><h3 style="margin-right:auto">Scenes <span class="chip" id="sceneCount">0</span></h3>
       <span class="hint">Edit the text, <b>Merge</b> joins two scenes, <b>Split</b> breaks a scene at the cursor.</span></div>
@@ -279,10 +299,20 @@ details summary { cursor: pointer; font-weight: 600; }
       <div class="row"><button class="btn primary" id="applyDirector">Apply</button><span class="hint" id="dirInfo"></span></div>
     </div>
   </div>
-  <div class="row">
-    <button class="btn primary" id="copyAll">Copy all prompts</button>
-    <button class="btn" id="dlPrompts">Prompts .txt download</button>
-    <span class="hint" id="promptInfo"></span>
+  <div class="panel flow">
+    <div class="row"><h3 style="margin-right:auto" id="flowTitle">Grid images</h3><span class="chip" id="flowCount">0 / 0 done</span></div>
+    <div class="bar"><i id="flowBar"></i></div>
+    <ol class="hint">
+      <li>Press <b>Copy next prompt</b> and paste it into ChatGPT or Gemini.</li>
+      <li>When the image is ready, copy it (right-click → Copy image) and press <kbd>Ctrl</kbd>+<kbd>V</kbd> anywhere on this page. Or drop the downloaded file on its card.</li>
+      <li>The app puts it in the right card and cuts it into its 9 scenes. Repeat until all are done.</li>
+    </ol>
+    <div class="row">
+      <button class="btn primary" id="copyNext">Copy next prompt</button>
+      <button class="btn" id="copyAll">Copy all prompts</button>
+      <button class="btn" id="dlPrompts">Prompts .txt download</button>
+      <span class="hint" id="promptInfo"></span>
+    </div>
   </div>
   <div class="batches" id="batches"></div>
 </section>
@@ -616,14 +646,49 @@ Reply ONLY in this exact format, one line per scene, nothing else:
 SCENES:
 ${scenes}`;
 }
+let pasteTarget = null;   // batch index whose prompt was copied last
+function nextPending() { const b = batches().find(b => !S.grids[b.index]); return b ? b.index : null; }
 function renderPrompts() {
-  const bs = batches();
-  $('#promptInfo').textContent = bs.length ? `${S.segments.length} scenes → ${bs.length} image${bs.length > 1 ? 's' : ''} to generate` : 'Create scenes in Step 1 first';
+  const bs = batches(), per = (+S.settings.grid) ** 2;
+  const done = bs.filter(b => S.grids[b.index]).length;
+  $('#promptInfo').textContent = bs.length ? `${S.segments.length} scenes → ${bs.length} image${bs.length > 1 ? 's' : ''} (up to ${per} scenes each)` : 'Create scenes in Step 1 first';
+  $('#flowCount').textContent = `${done} / ${bs.length} done`; $('#flowCount').className = 'chip ' + (bs.length && done === bs.length ? 'ok' : 'wait');
+  $('#flowBar').style.width = bs.length ? (done / bs.length * 100) + '%' : '0';
+  const nx = nextPending();
+  $('#copyNext').textContent = nx == null ? (bs.length ? 'All images done' : 'Copy next prompt') : `Copy next prompt (Image ${nx + 1} of ${bs.length})`;
+  $('#copyNext').disabled = nx == null;
+  if (pasteTarget != null && (pasteTarget >= bs.length || S.grids[pasteTarget])) pasteTarget = null;
   $('#batches').innerHTML = bs.map(b => {
-    const done = !!S.grids[b.index];
-    return `<div class="batch"><div class="batch-h"><h3>Image ${b.index + 1}</h3><span class="chip">Scenes ${b.start + 1}–${b.start + b.count} · ${b.rows}×${b.cols}</span><span class="chip ${done ? 'ok' : 'wait'}">${done ? 'Uploaded' : 'Pending'}</span><button class="btn small primary" data-copy="${b.index}">Copy prompt</button></div><pre class="prompt">${esc(buildPrompt(b))}</pre></div>`;
+    const ok = !!S.grids[b.index], cur = b.index === pasteTarget;
+    const side = ok
+      ? `<canvas data-psrc="${b.index}"></canvas><div class="row"><span class="chip ok">Cut into ${b.count} scenes</span><button class="btn small" data-replace="${b.index}">Replace</button><button class="btn small" data-goto="grids">Check cuts</button></div>`
+      : `<div class="drop" data-griddrop="${b.index}" tabindex="0" role="button"><strong>${cur ? 'Press Ctrl+V to paste the image' : 'Drop or click to add image ' + (b.index + 1)}</strong>${cur ? 'or drop / click to choose the file' : 'or copy its prompt and paste the image with Ctrl+V'}</div>`;
+    return `<div class="batch${cur ? ' current' : ''}" id="batch-${b.index}"><div class="batch-h"><h3>Image ${b.index + 1} <span class="hint">of ${bs.length}</span></h3><span class="chip">Scenes ${b.start + 1}–${b.start + b.count} · ${b.rows}×${b.cols}</span><span class="chip ${ok ? 'ok' : cur ? '' : 'wait'}">${ok ? 'Done' : cur ? 'Waiting for image' : 'Pending'}</span><button class="btn small ${ok ? '' : 'primary'}" data-copy="${b.index}">Copy prompt</button></div>
+      <div class="pbody${ok ? ' done' : ''}"><details class="ptext"${ok ? '' : ' open'}><summary>Prompt text</summary><pre class="prompt">${esc(buildPrompt(b))}</pre></details><div class="pside">${side}</div></div></div>`;
   }).join('');
+  $$('#batches [data-griddrop]').forEach(el => { const gi = +el.dataset.griddrop; setupDrop(el, f => placeGrid(gi, f[0]), $('#oneFile'), false); });
+  $$('[data-psrc]').forEach(cv => { const r = R.grids[+cv.dataset.psrc]; if (!r || !r.img) return; const sc = Math.min(1, 480 / r.img.width); cv.width = Math.round(r.img.width * sc); cv.height = Math.round(r.img.height * sc); const x = cv.getContext('2d'); x.drawImage(r.img, 0, 0, cv.width, cv.height); x.strokeStyle = '#f5c518'; x.lineWidth = 2; (r.cells || []).forEach(c => x.strokeRect(c.x * sc, c.y * sc, c.w * sc, c.h * sc)); });
 }
+async function placeGrid(gi, blob) {
+  await setGrid(gi, blob); if (!S.grids[gi]) return;
+  const b = batches()[gi]; if (pasteTarget === gi) pasteTarget = null;
+  segmentsChanged(true);
+  const nx = nextPending();
+  toast(`Image ${gi + 1} added → scenes ${b.start + 1}–${b.start + b.count} cut.` + (nx == null ? ' All images done!' : ` Next: image ${nx + 1}`));
+}
+function copyBatch(gi) {
+  const b = batches()[gi]; if (!b) return;
+  copyText(buildPrompt(b)); if (!S.grids[gi]) { pasteTarget = gi; renderPrompts(); }
+}
+document.addEventListener('paste', e => {
+  const items = [...(e.clipboardData?.items || [])]; const it = items.find(i => i.kind === 'file' && i.type.startsWith('image/'));
+  if (!it) return; const f = it.getAsFile(); if (!f) return;
+  e.preventDefault();
+  if (!S.segments.length) return toast('Create scenes first');
+  const gi = pasteTarget != null && !S.grids[pasteTarget] ? pasteTarget : nextPending();
+  if (gi == null) return toast('All grid images are already added. Use Replace on a card to change one.');
+  placeGrid(gi, f);
+});
 
 /* ============ grid detection & slicing ============ */
 function lumaProfile(img) {
@@ -699,11 +764,11 @@ function renderGridCards() {
   $('#gridCards').innerHTML = bs.map(b => {
     const g = S.grids[b.index], r = R.grids[b.index];
     let body;
-    if (!g) body = `<div class="body" style="grid-template-columns:1fr"><div class="drop" data-griddrop="${b.index}" tabindex="0" role="button"><strong>Drop image ${b.index + 1} here</strong>Scenes ${b.start + 1}–${b.start + b.count} (${b.rows}×${b.cols} grid)</div></div>`;
+    if (!g) body = `<div class="body" style="grid-template-columns:1fr"><div class="drop" data-griddrop="${b.index}" tabindex="0" role="button"><strong>Drop image ${b.index + 1} here, or paste it with Ctrl+V</strong>Scenes ${b.start + 1}–${b.start + b.count} (${b.rows}×${b.cols} grid)</div></div>`;
     else {
       const det = g.auto ? (r && r.found >= r.expected ? `<span class="chip ok">Lines found</span>` : `<span class="chip wait">Lines not fully found, split equally</span>`) : `<span class="chip">Equal split</span>`;
       const cells = Array.from({ length: b.count }, (_, k) => { const i = b.start + k, s = S.segments[i]; const ov = R.overrides[s.id];
-        return `<div class="cell"><canvas data-cellcv="${i}" width="160" height="90" style="aspect-ratio:${asp}"></canvas><span class="tag ${ov ? 'ov' : ''}">${i + 1}${ov ? ' · single' : ''}</span><div class="acts"><button class="btn" data-one="${i}">Single image</button>${ov ? `<button class="btn danger" data-oneclear="${i}">Remove</button>` : `<button class="btn" data-onecopy="${i}">Prompt</button>`}</div></div>`; }).join('');
+        return `<div class="cell"><canvas data-cellcv="${i}" width="160" height="90" style="aspect-ratio:${asp}"></canvas><span class="tag ${ov ? 'ov' : ''}">${i + 1}${ov ? ' · single' : ''}</span><div class="acts"><button class="btn" data-one="${i}">Single image</button>${ov ? `<button class="btn danger" data-oneclear="${i}">Remove</button>` : `<button class="btn" data-onecopy="${i}" title="Prompt for just this one scene, to fix a bad panel">Fix prompt</button>`}</div></div>`; }).join('');
       body = `<div class="body"><div style="display:grid;gap:10px;min-width:0"><canvas class="src" data-srccv="${b.index}"></canvas>
         <div class="row">${det}<label class="row" style="gap:6px"><input type="checkbox" data-auto="${b.index}" ${g.auto ? 'checked' : ''}> Auto-detect lines</label></div>
         <label class="f">Trim edges: <span data-trimv="${b.index}">${g.trim}%</span><input type="range" min="0" max="8" step="0.5" value="${g.trim}" data-trim="${b.index}"></label>
@@ -712,7 +777,7 @@ function renderGridCards() {
     }
     return `<div class="batch gridcard"><div class="batch-h"><h3>Image ${b.index + 1}</h3><span class="chip">Scenes ${b.start + 1}–${b.start + b.count}</span><span class="chip ${g ? 'ok' : 'wait'}">${g ? 'Ready' : 'Pending'}</span><button class="btn small" data-copy="${b.index}">Copy prompt</button></div>${body}</div>`;
   }).join('');
-  $$('[data-griddrop]').forEach(el => { const gi = +el.dataset.griddrop; setupDrop(el, async f => { await setGrid(gi, f[0]); segmentsChanged(true); }, $('#oneFile'), false); });
+  $$('#gridCards [data-griddrop]').forEach(el => { const gi = +el.dataset.griddrop; setupDrop(el, f => placeGrid(gi, f[0]), $('#oneFile'), false); });
   bs.forEach(b => { drawSrc(b.index); });
   drawCellThumbs();
 }
@@ -908,7 +973,7 @@ function renderScenes() {
     <textarea rows="1" data-text="${i}" aria-label="Scene ${i + 1} text">${esc(s.text)}</textarea>
     <input type="text" data-vis="${i}" value="${esc(s.visual || '')}" placeholder="Visual (optional): what the image should show, e.g. 'Rohan sad, sitting alone on stairs, close-up'">
     <div class="meta"><span class="t">${fmt(S.starts[i] || 0, 2)} → ${fmt(segEnd(i), 2)} · ${(segEnd(i) - (S.starts[i] || 0)).toFixed(1)}s</span>
-    <button class="btn small" data-split="${i}">Split</button>${i < S.segments.length - 1 ? `<button class="btn small" data-merge="${i}">Merge ↓</button>` : ''}<button class="btn small" data-onecopy="${i}">Prompt</button><button class="btn small danger" data-del="${i}">Delete</button></div></div></div>`).join('') || '<p class="hint">Write a script and press <b>Create scenes</b>.</p>';
+    <button class="btn small" data-split="${i}">Split</button>${i < S.segments.length - 1 ? `<button class="btn small" data-merge="${i}">Merge ↓</button>` : ''}<button class="btn small danger" data-del="${i}">Delete</button></div></div></div>`).join('') || '<p class="hint">Write a script and press <b>Create scenes</b>.</p>';
   $$('[data-thumb]').forEach(cv => { const i = +cv.dataset.thumb; const [W, H] = dims(208); cv.width = W; cv.height = H; const x = cv.getContext('2d'); if (sceneCache[i]) drawCover(x, sceneCache[i], W, H, 1, .5, .5); else { x.fillStyle = cssVar('--surface-2'); x.fillRect(0, 0, W, H); x.fillStyle = cssVar('--muted'); x.font = '600 22px "JetBrains Mono", monospace'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('—', W / 2, H / 2); } });
 }
 $('#scenes').addEventListener('input', e => {
@@ -917,7 +982,8 @@ $('#scenes').addEventListener('input', e => {
 $('#scenes').addEventListener('change', () => { renderPrompts(); renderStatus(); });
 document.addEventListener('click', async e => {
   const b = e.target.closest('button'); if (!b) return; const d = b.dataset;
-  if (d.copy != null) { const bt = batches()[+d.copy]; if (bt) copyText(buildPrompt(bt)); }
+  if (d.goto) showTab(d.goto);
+  else if (d.copy != null) copyBatch(+d.copy);
   else if (d.onecopy != null) copyText(singlePrompt(+d.onecopy));
   else if (d.split != null) {
     const i = +d.split, ta = document.querySelector(`[data-text="${i}"]`), s = S.segments[i].text;
@@ -929,7 +995,7 @@ document.addEventListener('click', async e => {
   }
   else if (d.merge != null) { const i = +d.merge; const A = S.segments[i], B = S.segments[i + 1]; A.text = A.text.trim() + ' ' + B.text.trim(); A.visual = [A.visual, B.visual].filter(Boolean).join('; '); S.segments.splice(i + 1, 1); S.starts.splice(i + 1, 1); segmentsChanged(true); }
   else if (d.del != null) { const i = +d.del; S.segments.splice(i, 1); S.starts.splice(i, 1); if (S.starts.length) S.starts[0] = 0; segmentsChanged(true); }
-  else if (d.replace != null) { const [f] = await pickFile($('#oneFile')); if (f) { await setGrid(+d.replace, f); segmentsChanged(true); } }
+  else if (d.replace != null) { const [f] = await pickFile($('#oneFile')); if (f) placeGrid(+d.replace, f); }
   else if (d.remove != null) { S.grids[+d.remove] = null; R.grids[+d.remove] = null; segmentsChanged(true); }
   else if (d.one != null) { const i = +d.one; const [f] = await pickFile($('#oneFile')); if (f) { await setOverride(S.segments[i].id, f); segmentsChanged(true); } }
   else if (d.oneclear != null) { const id = S.segments[+d.oneclear].id; delete S.overrides[id]; delete R.overrides[id]; segmentsChanged(true); }
@@ -950,12 +1016,14 @@ $('#splitBtn').onclick = () => {
   if (!texts.length) return toast('The script is empty');
   setSegmentsFromTexts(texts);
   const avg = duration() / texts.length;
-  $('#splitInfo').textContent = `${texts.length} scenes created${S.audioBlob ? ` · ~${avg.toFixed(1)}s per scene` : ''} · ${batches().length} grid images`;
+  $('#splitInfo').textContent = `${texts.length} scenes created${S.audioBlob ? ` · ~${avg.toFixed(1)}s per scene` : ''} → only ${batches().length} grid images to generate`;
 };
 
 /* ============ status ============ */
 function renderStatus() {
   const n = S.segments.length, bs = batches(), up = bs.filter(b => S.grids[b.index]).length;
+  $('#gridCallout').hidden = !n;
+  if (n) { const per = (+S.settings.grid) ** 2; $('#calloutBig').textContent = `${n} scenes → only ${bs.length} image${bs.length > 1 ? 's' : ''} to generate`; $('#calloutSub').textContent = `Each image is a ${S.settings.grid}×${S.settings.grid} grid that covers ${per} scenes. You copy ${bs.length} prompt${bs.length > 1 ? 's' : ''}, not ${n}, and the app cuts every image into its scenes.`; }
   const missing = sceneCache.filter(c => !c).length;
   $('#status').innerHTML = `<span class="chip ${n ? 'ok' : 'wait'}">${n} scenes</span><span class="chip ${S.audioBlob ? 'ok' : 'wait'}">${S.audioBlob ? 'Voice ' + fmt(duration(), 0) : 'No voice yet'}</span><span class="chip ${bs.length && up === bs.length ? 'ok' : 'wait'}">Grids ${up}/${bs.length}</span>${missing && n ? `<span class="chip wait">${missing} images missing</span>` : ''}`;
 }
@@ -994,6 +1062,7 @@ $('#applyDirector').onclick = () => {
   $('#dirInfo').textContent = c ? `Filled visuals for ${c} scenes` : 'No lines in "1: ..." format found';
   if (c) { renderScenes(); renderPrompts(); save(); }
 };
+$('#copyNext').onclick = () => { const nx = nextPending(); if (nx == null) return toast('All grid images are done'); copyBatch(nx); const el = document.getElementById('batch-' + nx); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); };
 $('#copyAll').onclick = () => { const bs = batches(); if (!bs.length) return toast('Create scenes first'); copyText(bs.map(b => `===== IMAGE ${b.index + 1} (Scenes ${b.start + 1}-${b.start + b.count}) =====\n${buildPrompt(b)}`).join('\n\n')); };
 $('#dlPrompts').onclick = () => { const bs = batches(); if (!bs.length) return; download(new Blob([bs.map(b => `===== IMAGE ${b.index + 1} (Scenes ${b.start + 1}-${b.start + b.count}) =====\n${buildPrompt(b)}`).join('\n\n')], { type: 'text/plain' }), safeName() + '-prompts.txt'); };
 $('#loadChars').onclick = () => { const ta = $('#characters'); ta.value = (ta.value.trim() ? ta.value.trim() + '\n' : '') + CHANNEL_CHARS; S.settings.characters = ta.value; renderPrompts(); save(); };

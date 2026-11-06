@@ -10,8 +10,12 @@ Open it in **Chrome or Edge** (double-click the file). Everything runs locally o
    - Very short pieces (like "and said,") are joined with the next scene (*Min words per scene*).
    - Very long pieces are split into equal parts (*Max words per scene*).
    - To highlight a word in yellow in the captions, wrap it in stars: `*58 percent*`.
-2. **Image Prompts:** Pick a style and characters. Each prompt asks for **one image with a 3×3 grid = 9 scenes**.
-   Copy a prompt into ChatGPT or Gemini and download the image.
+2. **Image Prompts:** Pick a style and characters. Each prompt asks for **one image with a 3×3 grid = 9 scenes**,
+   so 120 scenes need only 14 prompts.
+   - Press **Copy next prompt** and paste it into ChatGPT or Gemini.
+   - Copy the generated image (right-click → Copy image) and press `Ctrl+V` anywhere in the app.
+     It goes into the right card and is cut into its 9 scenes. Repeat until the progress bar is full.
+   - You can also drop the downloaded file on its card.
    - *AI Scene Director:* give ChatGPT one prompt covering the whole script and it writes a visual for every scene.
      Paste the reply back and press **Apply** to get better prompts.
 3. **Grid Upload:** Drop all grid images at once. The app finds the lines between panels and cuts each
