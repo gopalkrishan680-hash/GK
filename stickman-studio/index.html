@@ -1825,7 +1825,7 @@ async function waitJob(id, label) {
     ttsPoll = setTimeout(tick, 600);
   });
 }
-$('#ttsStop').onclick = () => { gemStop = true; clearTimeout(ttsPoll); ttsBusy(false); $('#ttsInfo').textContent = 'Stopped waiting. The server may still finish in the background.'; };
+$('#ttsStop').onclick = () => { gemStop = true; if (gemAbort) gemAbort.abort(); gemEnd(); clearTimeout(ttsPoll); ttsBusy(false); $('#ttsInfo').textContent = 'Stopped waiting. The server may still finish in the background.'; };
 async function applyTtsResult(id, st, msg) {
   const blob = await (await ttsFetch(`/jobs/${id}/audio`)).blob();
   await setVoice(new Blob([blob], { type: 'audio/wav' }), 'AI voiceover.wav');
@@ -1908,7 +1908,26 @@ const GEM_PACE = { natural: 'Pace: natural, like a real person speaking, with na
 const GEM_ACCENT = { neutral: 'Accent: neutral.', indian: 'Accent: neutral Indian accent.', hindi: 'Accent: natural native Hindi speaker; English words are said the way Indians say them.' };
 const GEM_MOOD = { happy: 'happy and cheerful', excited: 'excited and energetic', sad: 'sad and emotional', angry: 'angry and intense', calm: 'calm and gentle', whisper: 'whispering softly', serious: 'serious' };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-let gemStop = false;
+let gemStop = false, gemAbort = null, gemTick = null;
+const gemStatus = { label: '', t0: 0, done: 0, total: 0, partStart: 0, wait: '' };
+function gemShow() {
+  const el = (performance.now() - gemStatus.t0) / 1000, mmss = s2 => `${Math.floor(s2 / 60)}:${String(Math.floor(s2 % 60)).padStart(2, '0')}`;
+  let txt = gemStatus.label + ' · ' + mmss(el);
+  if (gemStatus.total) {
+    const pct = Math.round(100 * gemStatus.done / gemStatus.total);
+    txt = `${gemStatus.label} · ${pct}% · ${mmss(el)}`;
+    if (gemStatus.done > 0) { const left = el / gemStatus.done * (gemStatus.total - gemStatus.done); txt += left > 60 ? ` · about ${Math.ceil(left / 60)} min left` : ` · about ${Math.ceil(left / 5) * 5} s left`; }
+    $('#ttsProg').value = gemStatus.done / gemStatus.total;
+  }
+  if (gemStatus.wait) txt += ' · ' + gemStatus.wait;
+  $('#ttsInfo').textContent = txt;
+}
+function gemStart(label, total) {
+  Object.assign(gemStatus, { label, t0: performance.now(), done: 0, total: total || 0, wait: '' });
+  if (total) $('#ttsProg').value = 0; else $('#ttsProg').removeAttribute('value');   // no total: moving bar
+  clearInterval(gemTick); gemTick = setInterval(gemShow, 1000); gemShow();
+}
+function gemEnd() { clearInterval(gemTick); gemTick = null; $('#ttsProg').value = 0; }
 function showEngine() {
   $('#aiVoice').dataset.engine = VP.engine || 'gemini';
   if ($('#gemCloneBox').previousElementSibling !== $('#sampleBox')) $('#sampleBox').after($('#gemCloneBox'));   // sample first, then consent
@@ -1924,18 +1943,26 @@ function showEngine() {
   renderSample();
 }
 const gemSig = () => { const a = VP.slots.normal, b = VP.slots.consent; return a && b ? `${(a.rawDur || a.dur).toFixed(2)}|${(b.rawDur || b.dur).toFixed(2)}|${VP.gemModel}` : ''; };
-async function gemFetch(path, body) {
+async function gemFetch(path, body, timeoutSec = 180) {
   if (!(VP.gemKey || '').trim()) throw new Error('Paste your Gemini API key first (aistudio.google.com/apikey)');
   for (let attempt = 0; attempt < 10; attempt++) {
-    let r;
-    try { r = await fetch(GEM_BASE + path, { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': VP.gemKey.trim() }, body: body ? JSON.stringify(body) : undefined }); }
-    catch (e) { throw new Error('Could not reach Google. Check the internet connection.'); }
-    const j = await r.json().catch(() => ({}));
+    if (gemStop) throw new Error('Stopped');
+    let r, j;
+    const ctl = new AbortController(); gemAbort = ctl;
+    const timer = setTimeout(() => ctl.abort(), timeoutSec * 1000);
+    try {
+      r = await fetch(GEM_BASE + path, { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': VP.gemKey.trim() }, body: body ? JSON.stringify(body) : undefined, signal: ctl.signal });
+      j = await r.json().catch(() => ({}));
+    } catch (e) {
+      if (gemStop) throw new Error('Stopped');
+      if (ctl.signal.aborted) throw new Error(`Google did not answer within ${Math.round(timeoutSec / 60) || 1} min. Check the internet connection and try again.`);
+      throw new Error('Could not reach Google. Check the internet connection.');
+    } finally { clearTimeout(timer); gemAbort = null; }
     if (r.status === 429 || r.status === 503) {
       let wait = 20; const d = ((j.error && j.error.details) || []).find(x => x.retryDelay); if (d) wait = parseFloat(d.retryDelay) || wait;
-      if (gemStop) throw new Error('Stopped');
-      $('#ttsInfo').textContent = `Google's free limit reached: waiting ${Math.ceil(wait)} s, then continuing…`;
-      await sleep(Math.min(90, wait) * 1000 + 500); continue;
+      wait = Math.min(90, wait);
+      for (let w = Math.ceil(wait); w > 0; w--) { if (gemStop) throw new Error('Stopped'); gemStatus.wait = `Google's free per-minute limit: continuing in ${w} s`; if (gemTick) gemShow(); else $('#ttsInfo').textContent = gemStatus.wait; await sleep(1000); }
+      gemStatus.wait = ''; continue;
     }
     if (!r.ok) throw new Error('Google: ' + ((j.error && j.error.message) || ('error ' + r.status)));
     return j;
@@ -1979,9 +2006,12 @@ async function gemMakeVoice(quiet) {
   if (!VP.consent) { $('#myVoice').open = true; throw new Error('Tick the box: this is my own voice (or I have permission)'); }
   if (!VP.slots.normal) throw new Error('Add your voice sample first');
   if (!VP.slots.consent) throw new Error('Record the consent sentence first (see the box above)');
-  $('#ttsInfo').textContent = 'Creating your Gemini voice…';
-  const j = await gemFetch('/voices', { store: false, voice: { model: VP.gemModel, type: 'replicated', display_name: 'Stickman Studio voice',
-    replicated: { source_audio: { data: await blobSlice(slotRaw(VP.slots.normal), 20), mime_type: 'audio/wav' }, consent_audio: { data: await blobB64(slotRaw(VP.slots.consent)), mime_type: 'audio/wav' } } } });
+  const ownTicker = !gemTick; if (ownTicker) { ttsBusy(true); gemStart('Creating your Gemini voice (one time only, usually under a minute)'); }
+  else Object.assign(gemStatus, { label: 'Creating your Gemini voice (one time only, usually under a minute)', total: 0 }), $('#ttsProg').removeAttribute('value');
+  let j;
+  try { j = await gemFetch('/voices', { store: false, voice: { model: VP.gemModel, type: 'replicated', display_name: 'Stickman Studio voice',
+    replicated: { source_audio: { data: await blobSlice(slotRaw(VP.slots.normal), 20), mime_type: 'audio/wav' }, consent_audio: { data: await blobB64(slotRaw(VP.slots.consent)), mime_type: 'audio/wav' } } } }, 120); }
+  finally { if (ownTicker) { gemEnd(); ttsBusy(false); } }
   const key = j.key || (j.voice && j.voice.key) || j.id;
   if (!key) throw new Error('Google did not return a voice');
   VP.gemVoiceKey = key; VP.gemVoiceSig = gemSig(); saveVP(); showEngine();
@@ -1990,7 +2020,7 @@ async function gemMakeVoice(quiet) {
   if (!quiet && sample && sample.data) new Audio('data:audio/wav;base64,' + sample.data).play().catch(() => {});
   return key;
 }
-$('#gemMake').onclick = async () => { try { await gemMakeVoice(); } catch (e) { toast(e.message); $('#gemCloneInfo').textContent = e.message; } };
+$('#gemMake').onclick = async () => { gemStop = false; try { await gemMakeVoice(); $('#ttsInfo').textContent = 'Your Gemini voice is ready.'; } catch (e) { toast(e.message); $('#gemCloneInfo').textContent = e.message; $('#ttsInfo').textContent = e.message; } };
 // script tags -> Gemini inline tags; moods start a new part with their own style
 function gemText(t) {
   return t.replace(/\*/g, '').replace(/\[\s*pause\s+([\d.]+)\s*\]/gi, (m, n) => (+n >= 1 ? ' <long pause> ' : ' <short pause> '))
@@ -2066,27 +2096,31 @@ async function gemGenerate() {
   const units = sentenceGroups().map(g => g.map(i => S.segments[i].text.trim()).join(' ')), chunks = gemChunks(units);
   gemStop = false; ttsBusy(true);
   try {
+    gemStart('Preparing your voice');
     const voice = await gemVoiceName(), parts = [];
+    gemStart(`Gemini is speaking: part 1 of ${chunks.length}`, chunks.length);
     for (let i = 0; i < chunks.length; i++) {
       if (gemStop) throw new Error('Stopped');
-      $('#ttsProg').value = i / chunks.length; $('#ttsInfo').textContent = `Gemini is speaking: part ${i + 1} of ${chunks.length}…`;
+      gemStatus.label = `Gemini is speaking: part ${i + 1} of ${chunks.length}`; gemShow();
       parts.push(await gemSpeak(chunks[i].text, chunks[i].mood, voice));
+      gemStatus.done = i + 1; gemShow();
     }
+    gemStatus.label = 'Putting the voiceover together'; gemShow();
     const { out, spans } = gemAssemble(parts);
     chunks.forEach((c, i) => { c.start = spans[i][0]; c.end = spans[i][1]; });
-    await gemFinish(out, chunks, units, 'Voiceover ready');
+    gemEnd(); await gemFinish(out, chunks, units, 'Voiceover ready');
     toast('Voiceover ready and synced');
-  } catch (e) { $('#ttsInfo').textContent = e.message; toast(e.message); }
+  } catch (e) { gemEnd(); $('#ttsInfo').textContent = e.message; toast(e.message); }
   ttsBusy(false);
 }
 // Redo: speak again the part that holds this sentence and put it in place of the old one.
 async function gemRedo(k) {
   const t = S.tts; const ci = (t.chunks || []).findIndex(c => c.groups.includes(k)); if (ci < 0) return toast('Generate the voiceover again');
   if (!S.audioBlob || S.audioName !== 'AI voiceover.wav') return toast('The current voiceover is not the AI one any more. Generate it again.');
-  gemStop = false; ttsBusy(true); $('#ttsInfo').textContent = `Redoing part ${ci + 1} (it holds line ${k + 1})…`;
+  gemStop = false; ttsBusy(true); gemStart(`Redoing part ${ci + 1} (it holds line ${k + 1})`);
   try {
     const voice = await gemVoiceName(), ch = t.chunks[ci];
-    let fresh = await gemSpeak(ch.text, ch.mood, voice);
+    let fresh = await gemSpeak(ch.text, ch.mood, voice); gemEnd();
     const { pcm } = wavToFloat(await S.audioBlob.arrayBuffer()), SR = 24000, a = Math.round(ch.start * SR), b = Math.round(ch.end * SR);
     const rms = x => { let s2 = 0, n = 0; for (const v of x) if (Math.abs(v) > 0.01) { s2 += v * v; n++; } return n ? Math.sqrt(s2 / n) : 0; };
     const r0 = rms(pcm.subarray(a, b)), r1 = rms(fresh); if (r0 && r1) { const g = Math.min(2, Math.max(0.5, r0 / r1)); fresh = fresh.map(v => Math.max(-0.98, Math.min(0.98, v * g))); }
@@ -2094,7 +2128,7 @@ async function gemRedo(k) {
     const delta = fresh.length / SR - (ch.end - ch.start); ch.end = ch.start + fresh.length / SR;
     t.chunks.slice(ci + 1).forEach(c => { c.start += delta; c.end += delta; });
     await gemFinish(out, t.chunks, t.timings.map(x => x.text), `Part ${ci + 1} redone`); playLine(k);
-  } catch (e) { $('#ttsInfo').textContent = e.message; toast(e.message); }
+  } catch (e) { gemEnd(); $('#ttsInfo').textContent = e.message; toast(e.message); }
   ttsBusy(false);
 }
 
