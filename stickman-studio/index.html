@@ -61,6 +61,9 @@ header.top { background: var(--surface); }
   .top-row > .row { order: 5; }
 }
 .touch-only { display: none; }
+.app-only { display: none !important; }
+.in-app .app-only { display: revert !important; }
+.in-app .web-only { display: none !important; }
 @media (pointer: coarse) { .touch-only { display: revert; } .kb-only { display: none !important; } }
 .top-row { display: flex; align-items: center; gap: 12px; padding-block: 10px; flex-wrap: wrap; }
 .brand { font-family: var(--font-display); font-weight: 800; font-size: 22px; letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px; }
@@ -326,13 +329,16 @@ details summary { cursor: pointer; font-weight: 600; }
     <div class="bar"><i id="flowBar"></i></div>
     <ol class="hint">
       <li>Press <b>Copy next prompt</b> and paste it into ChatGPT or Gemini.</li>
-      <li class="touch-only">When the image is ready, copy it (long-press the image → Copy). <b>Tap the card</b> it belongs to (it turns yellow), then tap <b>Paste image</b>. If your phone cannot copy the image, save it and use <b>Choose file…</b>.</li>
+      <li class="app-only">When the image is ready, open it in ChatGPT/Gemini and tap <b>Share → Stickman Studio</b>. It goes straight into the selected (yellow) card. You can also copy it and tap <b>Paste image</b>.</li>
+      <li class="touch-only web-only">When the image is ready, copy it (long-press the image → Copy). <b>Tap the card</b> it belongs to (it turns yellow), then tap <b>Paste image</b>. If your phone cannot copy the image, save it and use <b>Choose file…</b>.</li>
       <li class="kb-only">When the image is ready, copy it (right-click → Copy image). <b>Click the card</b> it belongs to (it turns yellow), then press <kbd>Ctrl</kbd>+<kbd>V</kbd>. The yellow box at the bottom right always shows where the paste will go.</li>
       <li>The app cuts it into its 9 scenes and selects the next empty card for you. Repeat until all are done.</li>
     </ol>
     <p class="hint"><b>Quality tip:</b> each scene gets only a ninth of the image. Gemini can make 4K images (about 1280×720 per scene, which is sharp). ChatGPT makes at most 1536×1024 (about 500 px per scene), so the app sharpens and upscales those panels for you.</p>
     <div class="row">
       <button class="btn primary" id="copyNext">Copy next prompt</button>
+      <button class="btn app-only" data-openapp="chatgpt">Open ChatGPT</button>
+      <button class="btn app-only" data-openapp="gemini">Open Gemini</button>
       <button class="btn" id="copyAll">Copy all prompts</button>
       <button class="btn" id="dlPrompts">Prompts .txt download</button>
       <span class="hint" id="promptInfo"></span>
@@ -466,11 +472,26 @@ function fmt(t, dec = 1) { t = Math.max(0, t || 0); const m = Math.floor(t / 60)
 function fmtSrt(t) { t = Math.max(0, t); const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = Math.floor(t % 60), ms = Math.round((t % 1) * 1000) % 1000; const p = (n, l = 2) => String(n).padStart(l, '0'); return `${p(h)}:${p(m)}:${p(s)},${p(ms, 3)}`; }
 let toastT;
 function toast(msg) { const el = $('#toast'); el.textContent = msg; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, 2600); }
+const APP = !!window.AndroidBridge;
+if (APP) document.documentElement.classList.add('in-app');
 async function copyText(txt) {
+  if (APP) { try { AndroidBridge.copyText(txt); toast('Copied'); return; } catch (_) {} }
   try { await navigator.clipboard.writeText(txt); toast('Copied'); }
   catch (e) { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (_) {} ta.remove(); toast(ok ? 'Copied' : 'Copy failed, select the text and copy it manually'); }
 }
-function download(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60000); }
+async function saveInApp(blob, name) {
+  if (!AndroidBridge.saveStart(name, blob.type || 'application/octet-stream')) throw new Error('could not create the file');
+  const CH = 768 * 1024;
+  for (let o = 0; o < blob.size; o += CH) {
+    const b = new Uint8Array(await blob.slice(o, o + CH).arrayBuffer()); let str = '';
+    for (let i = 0; i < b.length; i += 0x8000) str += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+    if (!AndroidBridge.saveChunk(btoa(str))) throw new Error('write failed');
+  }
+  const where = AndroidBridge.saveEnd(); console.log('SSAPP-SAVED ' + where + ' ' + blob.size); toast('Saved to ' + where); return where;
+}
+function download(blob, name) {
+  if (APP) { saveInApp(blob, name).catch(e => { console.log('SSAPP-SAVE-FAIL ' + e.message); toast('Could not save: ' + e.message); }); return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60000); }
 function safeName() { return (S.settings.title || 'stickman-video').replace(/[^\p{L}\p{N}_-]+/gu, '-').replace(/^-+|-+$/g, '') || 'stickman-video'; }
 function pickFile(input) { return new Promise(res => { input.value = ''; input.onchange = () => res([...input.files]); input.click(); }); }
 function setupDrop(el, onFiles, input, multiple, pickOnClick = true) {
@@ -1238,11 +1259,15 @@ document.addEventListener('click', async e => {
   else if (d.replace != null) { const [f] = await pickFile($('#oneFile')); if (f) placeGrid(+d.replace, f); }
   else if (d.remove != null) { const gi = +d.remove; S.grids[gi] = null; R.grids[gi] = null; pasteTarget = gi; segmentsChanged(true); toast(`Image ${gi + 1} removed. It is selected, so ${PK} now pastes here.`); }
   else if (d.paste != null) { const gi = +d.paste; selectCard(gi); try {
+      let blob = null;
+      if (APP) { const r = AndroidBridge.clipboardImage(); if (r) { const k = r.indexOf(';'); blob = new Blob([Uint8Array.from(atob(r.slice(k + 1)), c => c.charCodeAt(0))], { type: r.slice(0, k) }); } if (!blob) return toast('No image copied. In ChatGPT/Gemini use Share → Stickman Studio, or Choose file…'); return placeGrid(gi, blob); }
       if (!navigator.clipboard || !navigator.clipboard.read) throw new Error('no clipboard');
-      let blob = null; for (const it of await navigator.clipboard.read()) { const t = it.types.find(x => x.startsWith('image/')); if (t) { blob = await it.getType(t); break; } }
+      for (const it of await navigator.clipboard.read()) { const t = it.types.find(x => x.startsWith('image/')); if (t) { blob = await it.getType(t); break; } }
       if (!blob) return toast('No image on the clipboard. Copy the image first, or use Choose file…');
       placeGrid(gi, blob);
     } catch (err) { toast(TOUCH ? 'This browser did not share the copied image. Save the image and use Choose file…' : 'Could not read the clipboard. Press Ctrl+V instead, or use Choose file…'); } }
+  else if (d.openapp) { if (APP) AndroidBridge.openApp(d.openapp); }
+  else if (d.sharelast != null) { if (APP && !AndroidBridge.shareLast()) toast('Still saving, try again in a moment'); }
   else if (d.pick != null) { const gi = +d.pick; const [f] = await pickFile($('#oneFile')); if (f) placeGrid(gi, f); }
   else if (d.one != null) { const i = +d.one; const [f] = await pickFile($('#oneFile')); if (f) { await setOverride(S.segments[i].id, f); segmentsChanged(true); } }
   else if (d.oneclear != null) { const id = S.segments[+d.oneclear].id; delete S.overrides[id]; delete R.overrides[id]; segmentsChanged(true); }
@@ -1382,6 +1407,7 @@ async function exportOffline() {
   exporting = { cancelled: false }; ui.btn.disabled = true; ui.cancel.hidden = false; ui.prog.hidden = false; ui.prog.value = 0;
   ui.cancel.onclick = () => { exporting.cancelled = true; };
   let wake = null; try { wake = await navigator.wakeLock?.request('screen'); } catch (_) {}
+  if (APP) try { AndroidBridge.keepAwake(true); } catch (_) {}
   const t0 = performance.now(); let result = null, errMsg = '';
   try {
     ui.info.textContent = 'Mixing the audio…';
@@ -1416,11 +1442,12 @@ async function exportOffline() {
     try { venc.close(); } catch (_) {}
   } catch (e) { errMsg = e && e.message ? e.message : String(e); }
   try { wake && wake.release(); } catch (_) {}
+  if (APP) try { AndroidBridge.keepAwake(false); } catch (_) {}
   const cancelled = exporting.cancelled; exporting = null; ui.btn.disabled = false; ui.cancel.hidden = true; ui.prog.hidden = true; drawPreview();
   if (cancelled) { ui.info.textContent = 'Export cancelled.'; return true; }
   if (!result) { ui.info.textContent = 'Export failed: ' + errMsg + '. Trying live recording instead…'; return false; }
   download(result, `${safeName()}.mp4`);
-  ui.info.innerHTML = `Video ready: <b>${safeName()}.mp4</b> (${(result.size / 1048576).toFixed(1)} MB, ${W}×${H}) downloaded in ${Math.round((performance.now() - t0) / 1000)}s.`;
+  ui.info.innerHTML = `Video ready: <b>${safeName()}.mp4</b> (${(result.size / 1048576).toFixed(1)} MB, ${W}×${H}) ${APP ? 'saved to your gallery (Movies/Stickman Studio)' : 'downloaded'} in ${Math.round((performance.now() - t0) / 1000)}s.${APP ? ' <button class="btn small" data-sharelast>Share video</button>' : ''}`;
   return true;
 }
 function pickMime() {
@@ -1512,6 +1539,42 @@ async function restore(p) {
 }
 
 /* ============ boot ============ */
+let bootDone; const booted = new Promise(r => bootDone = r);
+const incoming = {};
+window.receiveSharedChunk = (id, b64) => { (incoming[id] = incoming[id] || []).push(b64); };
+window.receiveSharedEnd = async (id, name, mime) => {
+  await booted;
+  const parts = (incoming[id] || []).map(b64 => Uint8Array.from(atob(b64), c => c.charCodeAt(0))); delete incoming[id];
+  const blob = new Blob(parts, { type: mime });
+  if (mime.startsWith('image/')) {
+    if (!S.segments.length) return toast('Create scenes first, then share the image again');
+    const gi = pasteTarget != null && pasteTarget < batches().length ? pasteTarget : nextPending();
+    if (gi == null) return toast('All grid images are added. Tap a card first to replace its image.');
+    if (curTab !== 'grids') showTab('prompts');
+    await placeGrid(gi, blob); const el = document.getElementById('batch-' + gi); if (el && curTab === 'prompts') el.scrollIntoView({ block: 'center' });
+  } else if (mime.startsWith('audio/')) {
+    await setVoice(blob, name); if (S.segments.length) smartTiming(); segmentsChanged(true); showTab('script'); toast('Voiceover added');
+  } else toast('Share an image or an audio file');
+};
+async function ssSelfTest() {   // run inside the app by the CI emulator check
+  try {
+    const sr = 22050, Dd = 4, oc = new OfflineAudioContext(1, sr * Dd, sr), o = oc.createOscillator(), g = oc.createGain(); o.connect(g).connect(oc.destination);
+    g.gain.setValueAtTime(0, 0); for (let t = 0.2; t < Dd - 0.5; t += 1) { g.gain.setValueAtTime(0.4, t); g.gain.setValueAtTime(0, t + 0.6); } o.start(); const buf = await oc.startRendering();
+    audioBuf = buf; analysis = analyzeAudio(buf); S.audioBlob = new Blob(['x']);
+    S.script = 'One, two. Three, four.'; $('#script').value = S.script; setSegmentsFromTexts(splitScript(S.script, 'all', 1, 14));
+    const c = document.createElement('canvas'); c.width = 1536; c.height = 1024; const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, 1536, 1024);
+    ['#e55', '#5ae', '#5c7', '#ec4'].forEach((col, k) => { x.fillStyle = col; x.fillRect((k % 2) * 774, Math.floor(k / 2) * 518, 762, 506); });
+    const gb = await new Promise(r => c.toBlob(r, 'image/png')); await placeGrid(0, gb);
+    S.settings.res = 720; smartTiming();
+    const caps = { videoEncoder: !!window.VideoEncoder, audioEncoder: !!window.AudioEncoder };
+    if (caps.videoEncoder) { const v = await pickVideoCodec(1280, 720, 30, 3.5e6); caps.video = v && v.cfg.codec; }
+    if (caps.audioEncoder) { const a = await pickAudioCodec(48000); caps.audio = a && a.cfg.codec; }
+    console.log('SSAPP-SELFTEST-CAPS ' + JSON.stringify(caps));
+    const ok = await exportOffline();
+    console.log('SSAPP-SELFTEST-EXPORT ' + (ok ? 'ok' : 'fell back') + ' | ' + $('#exportInfo').textContent);
+  } catch (e) { console.log('SSAPP-SELFTEST-FAIL ' + (e && e.message)); }
+}
+window.addEventListener('error', e => console.log('SSAPP-ERR ' + e.message + ' @' + e.lineno));
 (async function boot() {
   sizePreview();
   try { await DB.open(); } catch (_) {}
@@ -1525,6 +1588,8 @@ async function restore(p) {
   let tab = 'script'; try { tab = localStorage.getItem('ss-tab') || 'script'; } catch (_) {}
   showTab(tab);
   document.fonts && document.fonts.ready.then(() => { drawPreview(); });
+  bootDone();
+  if (APP) { console.log('SSAPP-READY scenes=' + S.segments.length + ' idb=' + !!DB.db); if (location.hash === '#selftest') ssSelfTest(); }
 })();
 </script>
 </body>
