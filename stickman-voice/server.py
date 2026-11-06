@@ -46,20 +46,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-SERVER_VERSION = "6"  # shown in the app, to see which server code is running
+SERVER_VERSION = "7"  # shown in the app, to see which server code is running
 SR = 24000  # Chatterbox output rate; Stickman Studio also sends its recordings at 24 kHz
 
 # exaggeration (emotion strength), cfg_weight (lower = freer, more expressive pacing), temperature
 MOODS = {
-    "normal": dict(ex=0.5, cfg=0.5, temp=0.8),
-    "happy": dict(ex=0.75, cfg=0.4, temp=0.85),
-    "excited": dict(ex=0.95, cfg=0.3, temp=0.9),
-    "sad": dict(ex=0.35, cfg=0.5, temp=0.7),
-    "angry": dict(ex=0.9, cfg=0.3, temp=0.85),
-    "calm": dict(ex=0.3, cfg=0.55, temp=0.7),
-    "whisper": dict(ex=0.3, cfg=0.5, temp=0.7),
-    "serious": dict(ex=0.4, cfg=0.55, temp=0.7),
+    "normal": dict(ex=0.5, cfg=0.35, temp=0.8),
+    "happy": dict(ex=0.7, cfg=0.3, temp=0.85),
+    "excited": dict(ex=0.9, cfg=0.25, temp=0.9),
+    "sad": dict(ex=0.4, cfg=0.4, temp=0.75),
+    "angry": dict(ex=0.85, cfg=0.25, temp=0.85),
+    "calm": dict(ex=0.35, cfg=0.4, temp=0.75),
+    "whisper": dict(ex=0.35, cfg=0.4, temp=0.75),
+    "serious": dict(ex=0.45, cfg=0.4, temp=0.75),
 }
+# Lower cfg_weight = slower, more deliberate, more human pacing (Chatterbox docs)
+PACE = {"relaxed": 0.7, "normal": 1.0, "fast": 1.35}
 SOUND_FALLBACK = {  # spoken stand-ins when the user has not recorded the sound
     "hi": {"laugh": "हा हा हा!", "chuckle": "हे हे।", "sigh": "हाय...", "gasp": "अरे!", "hmm": "हम्म...", "cry": "उफ़..."},
     "en": {"laugh": "Ha ha ha!", "chuckle": "Heh heh.", "sigh": "Haah...", "gasp": "Oh!", "hmm": "Hmm...", "cry": "Oh no..."},
@@ -86,15 +88,105 @@ class FakeEngine:
         return np.concatenate([pad, wav, pad]).astype(np.float32)
 
 
+HINDI_PACK = "ResembleAI/Chatterbox-Multilingual-hi"
+BASE_FILES = ["ve.pt", "s3gen.pt", "grapheme_mtl_merged_expanded_v1.json", "conds.pt", "Cangjie5_TC.json",
+              "t3_mtl23ls_v2.safetensors", "t3_mtl23ls_v3.safetensors"]
+
+
+def _build_multilingual(files, device):
+    """Same steps as ChatterboxMultilingualTTS.from_local, but with any T3 checkpoint
+    (V2, V3 or a single-language pack). The model code is identical across them."""
+    import torch
+    from pathlib import Path
+    from safetensors.torch import load_file
+    from chatterbox.mtl_tts import ChatterboxMultilingualTTS, Conditionals
+    from chatterbox.models.t3 import T3
+    from chatterbox.models.t3.modules.t3_config import T3Config
+    from chatterbox.models.s3gen import S3Gen
+    from chatterbox.models.tokenizers import MTLTokenizer
+    from chatterbox.models.voice_encoder import VoiceEncoder
+    loc = None if device == "cuda" else torch.device("cpu")
+
+    def state(path):
+        path = str(path)
+        return load_file(path) if path.endswith(".safetensors") else torch.load(path, map_location=loc, weights_only=True)
+
+    ve = VoiceEncoder()
+    ve.load_state_dict(state(files["ve"]))
+    ve.to(device).eval()
+    t3 = T3(T3Config.multilingual())
+    t3_state = load_file(str(files["t3"]))
+    if "model" in t3_state.keys():
+        t3_state = t3_state["model"][0]
+    t3.load_state_dict(t3_state)
+    t3.to(device).eval()
+    s3gen = S3Gen()
+    s3gen.load_state_dict(state(files["s3gen"]))
+    s3gen.to(device).eval()
+    tokenizer = MTLTokenizer(str(files["tok"]))
+    conds = None
+    if files.get("conds") and Path(files["conds"]).exists():
+        conds = Conditionals.load(files["conds"], map_location=loc).to(device)
+    return ChatterboxMultilingualTTS(t3, s3gen, ve, tokenizer, device, conds=conds)
+
+
+def load_multilingual(device, want="hindi"):
+    """Try the dedicated Hindi pack, then Multilingual V3, then V2. Returns (model, variant, notes)."""
+    from pathlib import Path
+    from huggingface_hub import snapshot_download
+    from chatterbox.mtl_tts import REPO_ID
+    token = os.getenv("HF_TOKEN") or None
+    base = Path(snapshot_download(repo_id=REPO_ID, repo_type="model", allow_patterns=BASE_FILES, token=token))
+    order = {"hindi": ["hindi", "v3", "v2"], "v3": ["v3", "v2"], "v2": ["v2"]}.get(want, ["hindi", "v3", "v2"])
+    notes = []
+    for opt in order:
+        try:
+            files = {"ve": base / "ve.pt", "s3gen": base / "s3gen.pt", "conds": base / "conds.pt",
+                     "tok": base / "grapheme_mtl_merged_expanded_v1.json"}
+            if opt in ("v2", "v3"):
+                files["t3"] = base / f"t3_mtl23ls_{opt}.safetensors"
+            else:
+                pack = Path(snapshot_download(repo_id=HINDI_PACK, repo_type="model", token=token))
+                listing = sorted(str(x.relative_to(pack)) for x in pack.rglob("*") if x.is_file())
+                print("Hindi pack files:", ", ".join(listing))
+                tensors = sorted(pack.rglob("*.safetensors"))
+                t3s = [x for x in tensors if "t3" in x.name.lower()] or tensors
+                if not t3s:
+                    raise FileNotFoundError("no .safetensors file in the Hindi pack")
+                files["t3"] = t3s[0]
+                for x in pack.rglob("*"):
+                    nm = x.name.lower()
+                    if nm in ("ve.pt", "ve.safetensors"):
+                        files["ve"] = x
+                    elif nm.startswith("s3gen") and nm.endswith((".pt", ".safetensors")):
+                        files["s3gen"] = x
+                    elif nm.endswith(".json") and ("grapheme" in nm or nm.startswith("tokenizer")):
+                        files["tok"] = x
+                    elif nm == "conds.pt":
+                        files["conds"] = x
+            if not Path(files["t3"]).exists():
+                raise FileNotFoundError(Path(files["t3"]).name + " is not available")
+            model = _build_multilingual(files, device)
+            return model, opt, notes
+        except Exception as e:
+            msg = f"{opt}: {type(e).__name__}: {str(e)[:200]}"
+            notes.append(msg)
+            print("Could not load", msg)
+    raise RuntimeError("No voice model could be loaded. " + " | ".join(notes))
+
+
 class ChatterboxEngine:
     name = "chatterbox-multilingual"
 
-    def __init__(self):
+    def __init__(self, want=None):
         import torch
-        from chatterbox.mtl_tts import ChatterboxMultilingualTTS, SUPPORTED_LANGUAGES
+        from chatterbox.mtl_tts import SUPPORTED_LANGUAGES
         self.torch = torch
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.model = ChatterboxMultilingualTTS.from_pretrained(device=self.device)
+        want = want or os.environ.get("STICKMAN_MODEL", "hindi")
+        self.model, self.variant, self.notes = load_multilingual(self.device, want)
+        self.name = f"chatterbox-{self.variant}"
+        print(f"Voice model: {self.variant}" + (f"  (skipped: {' | '.join(self.notes)})" if self.notes else ""))
         self.languages = sorted(SUPPORTED_LANGUAGES.keys())
         # Voice conditionals are kept by reference: they hold tensors that cannot be deep-copied, and
         # Chatterbox never changes them in place (a new exaggeration replaces conds.t3 with a new object).
@@ -261,11 +353,17 @@ def noise_floor_db(wav):
 
 
 def denoise(wav):
+    """Soft noise reduction, and only when the recording is actually noisy: strong spectral gating
+    leaves watery artefacts that the voice clone would copy."""
     try:
         import noisereduce as nr
     except ImportError:
         return wav, False
-    out = nr.reduce_noise(y=wav, sr=SR, stationary=False, prop_decrease=0.9)
+    db = frame_db(wav)
+    snr = float(np.percentile(db, 90) - np.percentile(db, 10))
+    if snr > 38:  # already clean
+        return wav, False
+    out = nr.reduce_noise(y=wav, sr=SR, stationary=True, prop_decrease=0.75)
     return out.astype(np.float32), True
 
 
@@ -316,9 +414,48 @@ def enhance(wav):
     return x.astype(np.float32), True
 
 
+def cut_fillers(wav, words, long_gap=0.8, keep_gap=0.5):
+    """Cut only the fillers (uh, um, hmm...) and shorten silences longer than `long_gap`.
+    Breaths and natural pauses stay, so the clone keeps a human rhythm.
+    words = [(start, end, text)] in seconds. Returns (audio, removed filler words)."""
+    dur = wav.size / SR
+    cuts = []
+    for a, b, t in words:
+        if is_filler(t):
+            cuts.append((max(0.0, a - 0.02), min(dur, b + 0.03)))
+    real = [(a, b) for a, b, t in words if not is_filler(t)]
+    for (a1, b1), (a2, b2) in zip(real, real[1:]):
+        gap = a2 - b1
+        if gap > long_gap:
+            mid = (b1 + a2) / 2
+            cuts.append((mid - (gap - keep_gap) / 2, mid + (gap - keep_gap) / 2))
+    if not cuts:
+        return wav, []
+    cuts.sort()
+    merged = [list(cuts[0])]
+    for a, b in cuts[1:]:
+        if a <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], b)
+        else:
+            merged.append([a, b])
+    out, pos, fade = [], 0.0, int(SR * 0.01)
+    for a, b in merged:
+        seg = wav[int(pos * SR): int(a * SR)].copy()
+        if seg.size > 2 * fade:
+            seg[-fade:] *= np.linspace(1, 0, fade)
+            if out:
+                seg[:fade] *= np.linspace(0, 1, fade)
+        out.append(seg)
+        pos = b
+    tail = wav[int(pos * SR):].copy()
+    if tail.size > fade:
+        tail[:fade] *= np.linspace(0, 1, fade)
+    out.append(tail)
+    return np.concatenate(out), [t for a, b, t in words if is_filler(t)]
+
+
 def keep_words(wav, words, max_gap=0.3, pad_in=0.04, pad_out=0.07):
-    """Keep only real words: drop fillers and whatever lies outside words (coughs, breaths, clicks),
-    and shorten long silences. words = [(start, end, text)] in seconds."""
+    """(Older, stricter cleaning, no longer used.) Keep only real words and shorten silences."""
     spans = []
     real = [(a, b, t) for a, b, t in words if not is_filler(t)]
     fillers = [(a, b) for a, b, t in words if is_filler(t)]
@@ -393,7 +530,7 @@ class Refiner:
             else:
                 rep["asr"] = True
                 rep["transcript"] = " ".join(t for _, _, t in words)
-                cut, removed = keep_words(clean, words)
+                cut, removed = cut_fillers(clean, words)
                 if cut.size / SR >= min(3.0, before * 0.5):
                     clean = cut
                     rep["fillers"] = len(removed)
@@ -427,8 +564,9 @@ class JobIn(BaseModel):
     voice: Dict[str, str] = {}      # mood -> base64 WAV of the user's voice in that mood
     sounds: Dict[str, str] = {}     # laugh/sigh/... -> base64 WAV
     expressiveness: float = 1.0     # multiplies every mood's exaggeration
-    sentence_pause: float = 0.45
-    comma_pause: float = 0.15
+    sentence_pause: float = 0.6
+    comma_pause: float = 0.25
+    pace: str = "normal"            # relaxed / normal / fast
     seed: int = 7
 
 
@@ -474,11 +612,12 @@ class VoiceServer:
         p = MOODS.get(mood, MOODS["normal"])
         ref = job.refs.get(mood) or job.refs.get("normal")
         ex = max(0.25, min(2.0, p["ex"] * job.spec.expressiveness))
+        cfg = max(0.0, min(1.0, p["cfg"] * PACE.get(job.spec.pace, 1.0)))
         lang = job.spec.language
         expected = 1.0 + 0.11 * len(re.sub(r"\s", "", text))
         wav = None
         for attempt in range(3):  # retry when the model rambles far past the text length
-            wav = trim(self.engine.synth(text, lang, ref, ex, p["cfg"], p["temp"], seed + 1000 * attempt))
+            wav = trim(self.engine.synth(text, lang, ref, ex, cfg, p["temp"], seed + 1000 * attempt))
             if 0 < wav.size / SR <= expected * 2.5 + 2:
                 break
         return wav
@@ -576,7 +715,7 @@ def create_app(engine, refiner=None):
 
     @app.get("/health")
     def health():
-        return {"ok": True, "version": SERVER_VERSION, "engine": engine.name, "device": getattr(engine, "device", "?"), "refine": True,
+        return {"ok": True, "version": SERVER_VERSION, "engine": engine.name, "model": getattr(engine, "variant", ""), "device": getattr(engine, "device", "?"), "refine": True,
                 "languages": getattr(engine, "languages", ["hi", "en"]), "busy": len(server.queue)}
 
     @app.post("/refine")
