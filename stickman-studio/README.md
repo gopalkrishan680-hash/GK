@@ -30,15 +30,23 @@ Open it in **Chrome or Edge** (double-click the file). Everything runs locally o
    - Drag the lines on the timeline, or edit the numbers, to fine-tune.
    - **SRT import/export:** take timing from an SRT file, or export an SRT for YouTube.
 5. **Preview + Export:** set captions, transition, camera zoom/pan and background music, then press
-   **Export video**. Export runs in real time, so keep the tab open.
-   Chrome produces MP4. If a browser gives WebM instead:
-   `ffmpeg -i video.webm -c:v libx264 -c:a aac video.mp4`
+   **Export video**. In Chrome/Edge the app draws every frame at its exact time and writes a normal MP4
+   (H.264), so picture and voice stay in sync for the whole video and the file can be scrubbed in any
+   player. It is usually faster than the video length.
+   Older browsers fall back to live recording, which needs the tab to stay open and in front.
 
 ## Extra features
 - 16:9, 9:16 (Shorts) and 1:1. 3×3 or 2×2 grid (2×2 = higher quality per scene).
 - If the last batch has fewer scenes, it gets a 2×2 or single-image prompt.
 - A gentle Ken Burns zoom/pan on every scene so the video never looks frozen (no-freeze rule).
-- Big captions (Baloo 2, white with black outline, pop animation) at the top, center or bottom, or off.
+- Big captions (Baloo 2, white with black outline, pop animation). By default they sit in a dark bar
+  below the picture, so they never cover the drawing. They can also go on the picture (top, center, bottom) or be turned off.
+- **Picture fit:** if a grid panel has a different shape than the video (ChatGPT often makes 3:2 images),
+  the whole panel is shown with blurred sides instead of cutting its edges off.
+- Grid cutting looks for black or white lines between panels, and for straight edges where panels touch
+  without any line.
+- **Smart Sync** matches every scene change to a pause in the voiceover for the whole script at once,
+  so the timing does not drift later in the video.
 - Transitions: quick fade, hard cut, white flash, slide, zoom punch.
 - Autosaves in the browser. **Project save** stores the whole project (images + audio) in one file.
 - The "Add channel characters" button adds the looks of Rohan, Maa, Papa and Aman to the prompt.
