@@ -1758,7 +1758,7 @@ async function ttsFetch(path, opt = {}) {
 }
 async function ttsConnect() {
   const chip = $('#ttsChip'); chip.textContent = 'Connecting…'; chip.className = 'chip';
-  try { const h = await (await ttsFetch('/health')).json(); chip.textContent = `Connected · ${h.engine === 'fake' ? 'test engine' : 'GPU ready'}`; chip.className = 'chip ok'; ttsOnline = true; cleanPending(); return true; }
+  try { const h = await (await ttsFetch('/health')).json(); chip.textContent = `Connected · ${h.engine === 'fake' ? 'test engine' : 'GPU ready'}${h.version ? ' · server v' + h.version : ''}`; chip.className = 'chip ok'; ttsOnline = true; cleanPending(); return true; }
   catch (e) { chip.textContent = 'Not connected'; chip.className = 'chip wait'; ttsOnline = false; toast(e.message); return false; }
 }
 $('#ttsConnect').onclick = ttsConnect;

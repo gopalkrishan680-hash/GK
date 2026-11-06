@@ -46,6 +46,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
 
+SERVER_VERSION = "6"  # shown in the app, to see which server code is running
 SR = 24000  # Chatterbox output rate; Stickman Studio also sends its recordings at 24 kHz
 
 # exaggeration (emotion strength), cfg_weight (lower = freer, more expressive pacing), temperature
@@ -575,7 +576,7 @@ def create_app(engine, refiner=None):
 
     @app.get("/health")
     def health():
-        return {"ok": True, "engine": engine.name, "device": getattr(engine, "device", "?"), "refine": True,
+        return {"ok": True, "version": SERVER_VERSION, "engine": engine.name, "device": getattr(engine, "device", "?"), "refine": True,
                 "languages": getattr(engine, "languages", ["hi", "en"]), "busy": len(server.queue)}
 
     @app.post("/refine")
