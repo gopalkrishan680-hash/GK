@@ -45,8 +45,12 @@ Open it in **Chrome or Edge** (double-click the file). Everything runs locally o
   the whole panel is shown with blurred sides instead of cutting its edges off.
 - Grid cutting looks for black or white lines between panels, and for straight edges where panels touch
   without any line.
-- **Smart Sync** matches every scene change to a pause in the voiceover for the whole script at once,
-  so the timing does not drift later in the video.
+- **Smart Sync** first pins every sentence (ending in `.` `।` `?` `!`) to the longer pauses of the voiceover,
+  for the whole script at once, then spreads the comma pieces inside each sentence by their length and snaps
+  them to small gaps. Pauses are judged against the voice level around them, so background music does not
+  confuse it, and missing pauses at commas do not make it fall apart. Mistakes stay inside one sentence
+  instead of adding up over the video.
+- Projects saved with an older version get their scene timing redone once when they are opened.
 - Transitions: quick fade, hard cut, white flash, slide, zoom punch.
 - Autosaves in the browser. **Project save** stores the whole project (images + audio) in one file.
 - The "Add channel characters" button adds the looks of Rohan, Maa, Papa and Aman to the prompt.

@@ -499,7 +499,7 @@ const DB = {
   del(k) { return this.db ? this.tx('readwrite', s => s.delete(k)) : Promise.resolve(); }
 };
 function snapshot() {
-  return { v: 1, settings: S.settings, script: S.script, segments: S.segments, starts: S.starts, uid,
+  return { v: 1, settings: S.settings, script: S.script, segments: S.segments, starts: S.starts, syncVer: S.syncVer || 3, uid,
     grids: S.grids.map(g => g ? { blob: g.blob, auto: g.auto, trim: g.trim } : null),
     overrides: S.overrides, audioBlob: S.audioBlob, audioName: S.audioName, musicBlob: S.musicBlob, musicName: S.musicName };
 }
@@ -562,49 +562,87 @@ function ratioTiming(fromIdx = 0) {
   S.starts = st.map(v => clamp(v, 0, D));
 }
 const speechWeight = s => Math.max(2, (plain(s).match(/[\p{L}\p{N}\p{M}]/gu) || []).length);
-// Smart sync: choose one pause per scene boundary for the whole script at once (dynamic programming),
-// so a wrong guess early on cannot push every later scene out of sync.
-function smartTiming() {
-  if (!analysis) { ratioTiming(); return false; }
-  const n = S.segments.length; if (n < 2) { S.starts = [0]; return true; }
-  const [s0, s1] = speechBounds();
-  const C = analysis.pauses.filter(p => p.start > s0 + 0.05 && p.end < s1 - 0.05);
-  if (C.length < n - 1) return greedyTiming();
-  const w = S.segments.map(s => speechWeight(s.text)), strong = S.segments.map(s => strongEnd(s.text));
-  const W = w.reduce((a, b) => a + b, 0), P = C.length;
-  let rate = Math.max(0.01, (s1 - s0 - C.reduce((a, p) => a + p.dur, 0) * 0.5) / W);
+// Smart sync, two levels:
+//  1. sentences (ending in . ! ? ।) are pinned to the clear, longer pauses of the voiceover, chosen for the whole
+//     script at once, so an early mistake cannot shift everything after it;
+//  2. inside each sentence, the comma pieces are spread by their length and snapped to small gaps when there are any.
+// Every boundary may also fall where no pause was found (with a penalty), so it never gives up on missing pauses.
+function sceneCut(g) { return g.virtual ? g.start - 0.03 : Math.max(g.start + 0.02, g.end - 0.12); }
+function alignUnits(w, C, s0, s1, rate) {
+  const n = w.length; if (n < 2) return [];
+  const P = C.length; if (P < n - 1) return null;
+  const wMean = w.reduce((a, b) => a + b, 0) / n;
   let pick = null;
   for (let iter = 0; iter < 3; iter++) {
-    const res = alignPauses(C, w, strong, s0, s1, rate); if (!res) break; pick = res;
-    let speech = res.length ? C[res[0]].start - s0 : 0;
-    for (let i = 1; i < res.length; i++) speech += C[res[i]].start - C[res[i - 1]].end;
-    speech += s1 - C[res[res.length - 1]].end; rate = Math.max(0.01, speech / W);
+    const res = alignOnce(w, C, s0, s1, rate, wMean); if (!res) break; pick = res;
+    let sp = C[res[0]].start - s0; for (let k = 1; k < res.length; k++) sp += C[res[k]].start - C[res[k - 1]].end; sp += s1 - C[res[res.length - 1]].end;
+    rate = Math.max(0.005, sp / w.reduce((a, b) => a + b, 0));
   }
-  if (!pick) return greedyTiming();
-  S.starts = [0, ...pick.map(j => Math.max(C[j].start + 0.02, C[j].end - 0.12))];
-  return true;
+  return pick;
 }
-function alignPauses(C, w, strong, s0, s1, rate) {
+function alignOnce(w, C, s0, s1, rate, wMean) {
   const n = w.length, P = C.length, INF = 1e18;
-  const cost = (seg, d) => d <= 0.05 ? 1e6 : Math.log(d / (w[seg] * rate)) ** 2;
-  const bonus = (j, seg) => Math.min(C[j].dur, 0.8) * (strong[seg] ? 1.2 : 0.6);
-  const maxD = seg => w[seg] * rate * 6 + 3;
+  const cost = (u, d) => d <= 0.04 ? 1e6 : Math.log(d / (w[u] * rate)) ** 2 * Math.sqrt(w[u] / wMean);
+  const maxD = u => w[u] * rate * 4 + 2;
   let prev = new Float64Array(P).fill(INF); const back = [];
-  for (let j = 0; j < P; j++) { const d = C[j].start - s0; if (d <= maxD(0) && P - 1 - j >= n - 2) prev[j] = cost(0, d) - bonus(j, 0); }
-  for (let i = 2; i < n; i++) {           // boundary i sits between segment i-1 and i
-    const cur = new Float64Array(P).fill(INF), bk = new Int32Array(P).fill(-1), seg = i - 1, md = maxD(seg);
+  for (let j = 0; j < P && j <= P - (n - 1); j++) { const d = C[j].start - s0; if (d > maxD(0)) break; prev[j] = cost(0, d) - C[j].bonus; }
+  for (let i = 2; i < n; i++) {
+    const cur = new Float64Array(P).fill(INF), bk = new Int32Array(P).fill(-1), u = i - 1, md = maxD(u);
     for (let j = i - 1; j <= P - 1 - (n - 1 - i); j++) {
       let best = INF, bi = -1;
-      for (let k = j - 1; k >= 0; k--) { const d = C[j].start - C[k].end; if (d > md) break; if (prev[k] >= INF) continue; const v = prev[k] + cost(seg, d); if (v < best) { best = v; bi = k; } }
-      if (bi >= 0) { cur[j] = best - bonus(j, seg); bk[j] = bi; }
+      for (let k = j - 1; k >= 0; k--) { const d = C[j].start - C[k].end; if (d > md) break; if (prev[k] >= INF) continue; const v = prev[k] + cost(u, d); if (v < best) { best = v; bi = k; } }
+      if (bi >= 0) { cur[j] = best - C[j].bonus; bk[j] = bi; }
     }
     back.push(bk); prev = cur;
   }
   let best = INF, bj = -1;
   for (let j = 0; j < P; j++) { if (prev[j] >= INF) continue; const v = prev[j] + cost(n - 1, s1 - C[j].end); if (v < best) { best = v; bj = j; } }
   if (bj < 0) return null;
-  const out = [bj]; for (let i = back.length - 1; i >= 0; i--) out.push(back[i][out[out.length - 1]]);
+  const out = [bj]; for (let k = back.length - 1; k >= 0; k--) out.push(back[k][out[out.length - 1]]);
   out.reverse(); return out.some(x => x < 0) ? null : out;
+}
+function withGrid(gaps, a, b, step, pen) {
+  const C = gaps.slice(); let gi = 0; const sorted = gaps.slice().sort((x, y) => x.start - y.start);
+  for (let t = a + step; t < b - step / 2; t += step) {
+    while (gi < sorted.length && sorted[gi].end < t) gi++;
+    if (gi < sorted.length && sorted[gi].start <= t + 0.03 && sorted[gi].end >= t - 0.03) continue;
+    C.push({ start: t, end: t, dur: 0, bonus: -pen, virtual: true });
+  }
+  return C.sort((x, y) => x.start - y.start);
+}
+function smartTiming() {
+  if (!analysis) { ratioTiming(); return false; }
+  const n = S.segments.length; if (n < 2) { S.starts = [0]; return true; }
+  const [s0, s1] = speechBounds(); const gaps = (analysis.gaps || analysis.pauses).filter(g => g.start > s0 + 0.03 && g.end < s1 - 0.03);
+  const w = S.segments.map(s => speechWeight(s.text));
+  // group scenes into sentences
+  const groups = []; let cur = [];
+  S.segments.forEach((sg, i) => { cur.push(i); if (strongEnd(sg.text) || i === n - 1) { groups.push(cur); cur = []; } });
+  const gw = groups.map(g => g.reduce((a, i) => a + w[i], 0));
+  const W = gw.reduce((a, b) => a + b, 0);
+  const longGaps = gaps.filter(g => g.dur >= 0.1).reduce((a, g) => a + g.dur, 0);
+  const rate0 = Math.max(0.005, (s1 - s0 - longGaps) / W);
+  // level 1: sentence ends -> longer pauses
+  const C1 = withGrid(gaps.map(g => ({ ...g, bonus: g.dur >= 0.12 ? 1.2 * Math.min(g.dur, 0.7) + 0.4 * g.depth : 0.15 * g.depth })), s0, s1, 0.25, 0.9);
+  const pick1 = alignUnits(gw, C1, s0, s1, rate0);
+  if (!pick1) { ratioTiming(); return false; }
+  const starts = new Array(n).fill(0);
+  const spans = groups.map((g, k) => [k === 0 ? s0 : C1[pick1[k - 1]].end, k === groups.length - 1 ? s1 : C1[pick1[k]].start]);
+  groups.forEach((g, k) => { if (k > 0) starts[g[0]] = sceneCut(C1[pick1[k - 1]]); });
+  // level 2: comma pieces inside each sentence
+  groups.forEach((g, k) => {
+    if (g.length < 2) return;
+    const [a, b] = spans[k]; const ww = g.map(i => w[i]);
+    const inner = gaps.filter(x => x.start > a + 0.05 && x.end < b - 0.05).map(x => ({ ...x, bonus: 0.9 * Math.min(x.dur, 0.5) + 0.35 * x.depth + (x.dur >= 0.08 ? 0.2 : 0) }));
+    const C2 = withGrid(inner, a, b, 0.05, 0.3);
+    const r2 = Math.max(0.005, (b - a - inner.filter(x => x.dur >= 0.1).reduce((s2, x) => s2 + x.dur, 0)) / ww.reduce((x, y) => x + y, 0));
+    const pick2 = alignUnits(ww, C2, a, b, r2);
+    if (pick2) pick2.forEach((j, m) => { starts[g[m + 1]] = sceneCut(C2[j]); });
+    else { let acc = a; const tot = ww.reduce((x, y) => x + y, 0); for (let m = 1; m < g.length; m++) { acc += (b - a) * ww[m - 1] / tot; starts[g[m]] = acc; } }
+  });
+  starts[0] = 0;
+  for (let i = 1; i < n; i++) if (starts[i] <= starts[i - 1] + 0.05) starts[i] = starts[i - 1] + 0.05;
+  S.starts = starts; S.syncVer = 3; return true;
 }
 function greedyTiming() {
   const n = S.segments.length, D = duration(); const w = S.segments.map(s => weight(s.text));
@@ -649,7 +687,16 @@ function analyzeAudio(buf) {
   let a = 0; while (a < nf && silent(a)) a++;
   let b = nf - 1; while (b > 0 && silent(b)) b--;
   let mx = 0; for (let f = 0; f < nf; f++) if (peak[f] > mx) mx = peak[f];
-  return { peak, rate: 100, max: mx || 1, pauses, speechStart: a * 0.01, speechEnd: (b + 1) * 0.01 };
+  // Local gaps: compare each moment with the voice level around it (±1 s), so steady background music or hiss
+  // does not hide pauses and quiet words are not mistaken for pauses.
+  const BL = 5, nb = Math.ceil(nf / BL), blk = new Float32Array(nb);
+  for (let k = 0; k < nb; k++) { let s2 = 0, c = 0; for (let f = k * BL; f < Math.min(nf, k * BL + BL); f++) { s2 += sm[f]; c++; } blk[k] = s2 / c; }
+  const lo = new Float32Array(nb), hi = new Float32Array(nb), R = 20;
+  for (let k = 0; k < nb; k++) { const win = Array.from(blk.subarray(Math.max(0, k - R), Math.min(nb, k + R + 1))).sort((x, y) => x - y); lo[k] = win[Math.floor(win.length * 0.1)]; hi[k] = win[Math.floor((win.length - 1) * 0.9)]; }
+  const gthr = f => { const k = Math.floor(f / BL); return Math.max(thr * 0.6, lo[k] + 0.22 * (hi[k] - lo[k])); };
+  const gaps = []; let f = 0;
+  while (f < nf) { if (sm[f] < gthr(f)) { let g = f, mn = sm[f]; while (g + 1 < nf && sm[g + 1] < gthr(g + 1)) { g++; if (sm[g] < mn) mn = sm[g]; } const dur = (g - f + 1) * 0.01; if (dur >= 0.04) { const k = Math.floor(f / BL); gaps.push({ start: f * 0.01, end: (g + 1) * 0.01, mid: (f + g + 1) * 0.005, dur, depth: clamp(1 - mn / (hi[k] || 1), 0, 1) }); } f = g + 1; } else f++; }
+  return { peak, rate: 100, max: mx || 1, pauses, gaps, speechStart: a * 0.01, speechEnd: (b + 1) * 0.01 };
 }
 
 /* ============ segments ============ */
@@ -1366,7 +1413,12 @@ async function restore(p) {
   if (p.audioBlob) await setVoice(p.audioBlob, p.audioName);
   await setMusic(p.musicBlob || null, p.musicName || '');
   if (S.starts.length !== S.segments.length) ratioTiming();
+  // projects saved before the improved Smart Sync: redo their timing once
+  const resync = (p.syncVer || 0) < 3 && analysis && S.segments.length > 1;
+  if (resync) smartTiming();
+  S.syncVer = 3;
   segmentsChanged(true);
+  if (resync) { save(); toast('Scene timing was redone with the improved Smart Sync'); }
 }
 
 /* ============ boot ============ */
