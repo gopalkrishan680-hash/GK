@@ -29,7 +29,6 @@ and long silences between words are cut out.
 Set STICKMAN_FAKE_TTS=1 to run without a GPU/model (beeps instead of speech) for testing.
 """
 import base64
-import copy
 import io
 import os
 import random
@@ -96,16 +95,19 @@ class ChatterboxEngine:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = ChatterboxMultilingualTTS.from_pretrained(device=self.device)
         self.languages = sorted(SUPPORTED_LANGUAGES.keys())
-        self.default_conds = copy.deepcopy(self.model.conds)  # the built-in voice
+        # Voice conditionals are kept by reference: they hold tensors that cannot be deep-copied, and
+        # Chatterbox never changes them in place (a new exaggeration replaces conds.t3 with a new object).
+        self.default_conds = self.model.conds  # the built-in voice
         self.cond_cache: Dict[str, object] = {}
 
     def _conds_for(self, ref_path):
         if not ref_path:
-            return copy.deepcopy(self.default_conds)
+            return self.default_conds
         if ref_path not in self.cond_cache:
-            self.model.prepare_conditionals(ref_path, exaggeration=0.5)
-            self.cond_cache[ref_path] = copy.deepcopy(self.model.conds)
-        return copy.deepcopy(self.cond_cache[ref_path])
+            with self.torch.no_grad():
+                self.model.prepare_conditionals(ref_path, exaggeration=0.5)
+            self.cond_cache[ref_path] = self.model.conds
+        return self.cond_cache[ref_path]
 
     def synth(self, text, lang, ref_path, ex, cfg, temp, seed):
         torch = self.torch
