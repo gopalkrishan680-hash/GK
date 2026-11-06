@@ -635,9 +635,37 @@ def create_app(engine, refiner=None):
     return app
 
 
+def fix_torchvision():
+    """Colab ships a torchvision built for a newer PyTorch than the 2.6 Chatterbox needs, which makes
+    `transformers` fail with "operator torchvision::nms does not exist". Install the matching build
+    (or remove it: nothing here needs it). Returns True when the Python process must restart."""
+    import importlib.util
+    import subprocess
+    import sys
+    if importlib.util.find_spec("torchvision") is None:
+        return False
+    check = [sys.executable, "-c", "import torch, torchvision; torch.ops.torchvision.nms"]
+    if subprocess.run(check, capture_output=True).returncode == 0:
+        return False
+    print("Fixing a library conflict: torchvision does not match PyTorch…")
+    import torch
+    match = {"2.6": "0.21.0", "2.7": "0.22.0", "2.8": "0.23.0"}.get(".".join(torch.__version__.split(".")[:2]))
+    ok = False
+    if match:
+        ok = subprocess.run([sys.executable, "-m", "pip", "install", "-q", f"torchvision=={match}", "--no-deps"]).returncode == 0
+        ok = ok and subprocess.run(check, capture_output=True).returncode == 0
+    if not ok:
+        subprocess.run([sys.executable, "-m", "pip", "uninstall", "-y", "-q", "torchvision"])
+    # modules imported before the fix stay broken in this process
+    return "torchvision" in sys.modules or "transformers" in sys.modules
+
+
 def load_engine():
     if os.environ.get("STICKMAN_FAKE_TTS") == "1":
         return FakeEngine()
+    if fix_torchvision():
+        print("Fixed. The runtime restarts now; then run cell 2 again.")
+        os.kill(os.getpid(), 9)
     return ChatterboxEngine()
 
 
