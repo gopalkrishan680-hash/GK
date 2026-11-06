@@ -46,7 +46,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-SERVER_VERSION = "9"  # shown in the app, to see which server code is running
+SERVER_VERSION = "10"  # shown in the app, to see which server code is running
 SR = 24000  # Chatterbox output rate; Stickman Studio also sends its recordings at 24 kHz
 
 # exaggeration (emotion strength), cfg_weight (lower = freer, more expressive pacing), temperature
@@ -128,7 +128,13 @@ def _build_multilingual(files, device):
     t3.load_state_dict(t3_state)
     t3.to(device).eval()
     s3gen = S3Gen()
-    s3gen.load_state_dict(state(files["s3gen"]))
+    # Newer S3Gen files (e.g. s3gen_v3 in language packs) leave out two buffers that S3Gen computes
+    # itself; Chatterbox loads those files with strict=False too. Anything else missing is an error.
+    res = s3gen.load_state_dict(state(files["s3gen"]), strict=False)
+    computed = {"tokenizer._mel_filters", "tokenizer.window"}
+    bad = [k for k in res.missing_keys if k not in computed]
+    if bad or res.unexpected_keys:
+        raise RuntimeError(f"S3Gen weights do not match: missing {bad[:5]}, unexpected {list(res.unexpected_keys)[:5]}")
     s3gen.to(device).eval()
     tokenizer = MTLTokenizer(str(files["tok"]))
     conds = None
