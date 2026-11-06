@@ -55,8 +55,16 @@ Open it in **Chrome or Edge** (double-click the file). Everything runs locally o
 - Autosaves in the browser. **Project save** stores the whole project (images + audio) in one file.
 - The "Add channel characters" button adds the looks of Rohan, Maa, Papa and Aman to the prompt.
 
+- **Picture quality:** small panels are upscaled to the size they are shown at, JPEG blocks are smoothed,
+  edges are sharpened and near-black lines / near-white backgrounds are cleaned up. It runs on any computer
+  (no GPU or download needed) and can be turned off under *Picture quality*.
+- Each grid card shows how many pixels wide one scene is.
+
 ## Tips
-- ChatGPT images are often 1536×1024, so in a 3×3 grid each scene is about 512px wide.
-  For sharper scenes use the 2×2 grid, or have Gemini generate a larger image.
+- Each scene gets a ninth of the image. Gemini can generate 4K images (about 1280×720 per scene, already sharp).
+  ChatGPT makes at most 1536×1024 (about 500px per scene); the app sharpens those panels. The prompts ask for
+  the highest resolution available.
+- A browser AI upscaler (ESRGAN-slim) was tried too. On stickman line art it looked about the same as the
+  built-in sharpening, but needs a GPU and a 3 MB model, so it is not included.
 - White-background styles ask for **black lines** between panels and dark styles ask for **white lines**,
   so the app can find the lines easily.

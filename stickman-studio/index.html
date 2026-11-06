@@ -314,6 +314,7 @@ details summary { cursor: pointer; font-weight: 600; }
       <li>When the image is ready, copy it (right-click → Copy image). <b>Click the card</b> it belongs to (it turns yellow), then press <kbd>Ctrl</kbd>+<kbd>V</kbd>. The yellow box at the bottom right always shows where the paste will go.</li>
       <li>The app cuts it into its 9 scenes and selects the next empty card for you. Repeat until all are done.</li>
     </ol>
+    <p class="hint"><b>Quality tip:</b> each scene gets only a ninth of the image. Gemini can make 4K images (about 1280×720 per scene, which is sharp). ChatGPT makes at most 1536×1024 (about 500 px per scene), so the app sharpens and upscales those panels for you.</p>
     <div class="row">
       <button class="btn primary" id="copyNext">Copy next prompt</button>
       <button class="btn" id="copyAll">Copy all prompts</button>
@@ -407,6 +408,9 @@ details summary { cursor: pointer; font-weight: 600; }
         </label>
         <label class="f">Camera motion (zoom/pan) <input type="range" id="motion" min="0" max="20" step="1"></label>
       </div>
+      <label class="f">Picture quality
+        <select id="enhance"><option value="on">Sharpen + upscale small panels (recommended)</option><option value="off">Original pixels</option></select>
+      </label>
       <h3>Background music</h3>
       <div class="row"><button class="btn small" id="musicBtn">Choose music file</button><button class="btn small danger" id="musicDel">Remove</button><span class="hint" id="musicInfo">No music</span></div>
       <input type="file" id="musicFile" accept="audio/*" hidden>
@@ -480,7 +484,7 @@ He looked at Papa. Papa smiled, and said, "I am proud of you."`;
 
 /* ============ state ============ */
 const DEFAULTS = { title: '', aspect: '16:9', grid: 3, style: 'stickman', styleText: STYLES.stickman.text, characters: '', gutter: 'auto',
-  splitLevel: 'all', minWords: 2, maxWords: 14, captions: 'bar', fit: 'auto', v: 2, capSize: 1, motion: 6, transition: 'fade', transDur: 0.15, res: 1080, fps: 30, musicVol: 0.12 };
+  splitLevel: 'all', minWords: 2, maxWords: 14, captions: 'bar', fit: 'auto', enhance: 'on', v: 2, capSize: 1, motion: 6, transition: 'fade', transDur: 0.15, res: 1080, fps: 30, musicVol: 0.12 };
 const S = { settings: { ...DEFAULTS }, script: '', segments: [], starts: [], grids: [], overrides: {}, audioBlob: null, audioName: '', musicBlob: null, musicName: '' };
 let uid = 1;
 let audioBuf = null, analysis = null;
@@ -726,13 +730,17 @@ function buildPrompt(b) {
   const segs = S.segments.slice(b.start, b.start + b.count);
   const total = b.rows * b.cols, gc = gutterColor() === 'black' ? 'solid black' : 'pure white';
   const style = (S.settings.styleText || '').trim();
-  if (total === 1) return `Create ONE single illustration, ${aspectWords()}.\n\nSTYLE: ${style}\n${charBlock()}\nSCENE: ${sceneLine(segs[0])}\n\nRULES: no text, no letters, no captions, no speech bubbles, no watermark. Keep the main subject near the centre (edges may be cropped slightly).`;
+  if (total === 1) return `Create ONE single illustration, ${aspectWords()}.\n\nSTYLE: ${style}\n${charBlock()}\nSCENE: ${sceneLine(segs[0])}\n\nQUALITY: highest resolution available, crisp clean lines, no blur or compression artifacts.
+
+RULES: no text, no letters, no captions, no speech bubbles, no watermark. Keep the main subject near the centre (edges may be cropped slightly).`;
   let lines = segs.map((s, i) => `${i + 1}. ${sceneLine(s)}`);
   for (let i = segs.length; i < total; i++) lines.push(`${i + 1}. Leave this panel completely empty and plain.`);
   return `Create ONE image that is a ${b.rows}×${b.cols} storyboard grid: exactly ${total} equal-sized panels in ${b.rows} rows and ${b.cols} columns, separated by thin straight ${gc} gutter lines of equal width. The whole image is ${aspectWords()}, and every panel has that same shape and is filled edge to edge with its scene.
 
 STYLE (same in all panels): ${style}
 ${charBlock()}
+QUALITY: render at the highest resolution you can (4K, 3840×2160, if available), with crisp clean lines and no blur, noise or compression artifacts.
+
 RULES: no text, no letters, no numbers, no captions, no speech bubbles, no panel numbers, no watermark, no extra borders or frames. Each panel is its own complete scene with a clear composition and the main subject near the centre (panel edges may be cropped slightly). Keep characters, clothes and colours consistent across all panels. Vary the camera: wide shots, medium shots and close-ups.
 
 PANELS (left to right, top to bottom):
@@ -825,13 +833,13 @@ function lumaProfile(img) {
   for (let i = 0; i < w * h; i++) L[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
   // per column / row: share of near-black and near-white pixels, and how sharply it differs from the next one
   const stat = (n, m, get) => { const dark = new Float32Array(n), light = new Float32Array(n), edge = new Float32Array(n);
-    for (let i = 0; i < n; i++) { let dk = 0, lt = 0, ed = 0; for (let j = 0; j < m; j++) { const v = get(i, j); if (v < 75) dk++; else if (v > 200) lt++; if (i + 1 < n) ed += Math.abs(get(i + 1, j) - v); } dark[i] = dk / m; light[i] = lt / m; edge[i] = ed / m; }
+    for (let i = 0; i < n; i++) { let dk = 0, lt = 0, ed = 0; for (let j = 0; j < m; j++) { const v = get(i, j); if (v < 45) dk++; else if (v > 232) lt++; if (i + 1 < n) ed += Math.abs(get(i + 1, j) - v); } dark[i] = dk / m; light[i] = lt / m; edge[i] = ed / m; }
     return { dark, light, edge }; };
   return { w, h, sc, col: stat(w, h, (i, j) => L[j * w + i]), row: stat(h, w, (i, j) => L[i * w + j]) };
 }
 function findCuts(prof, len, parts, gutter) {
   const frac = gutter === 'black' ? prof.dark : prof.light;
-  const isG = i => i >= 0 && i < len && frac[i] >= 0.9;
+  const isG = i => i >= 0 && i < len && frac[i] >= 0.95;
   let a = 0; while (a < len * 0.12 && isG(a)) a++;
   let b = len - 1; while (b > len * 0.88 && isG(b)) b--;
   const sorted = Array.from(prof.edge).sort((x, y) => x - y), med = sorted[Math.floor(sorted.length / 2)] || 0;
@@ -840,10 +848,14 @@ function findCuts(prof, len, parts, gutter) {
     const exp = a + (b - a) * k / parts, win = (b - a) * 0.08; let best = null;
     for (let i = Math.max(0, Math.floor(exp - win)); i <= Math.min(len - 1, exp + win); i++) {
       if (!isG(i)) continue; let s = i, e = i; while (isG(s - 1)) s--; while (isG(e + 1)) e++;
-      if (e - s + 1 <= len * 0.08) { const dd = Math.abs((s + e) / 2 - exp); if (!best || dd < best.d) best = { s, e, d: dd }; }
+      const run = e - s + 1;
+      if (run <= len * 0.035) { const dd = Math.abs((s + e) / 2 - exp); if (!best || dd < best.d) best = { s, e: e + 1, d: dd }; }
+      else if (run <= len * 0.3) {   // a gutter merged with the plain margin of a panel: cut inside the blank area
+        const c = clamp(Math.round(exp), s + 1, e); const dd = Math.abs(c - exp) + len * 0.02; if (!best || dd < best.d) best = { s: c, e: c, d: dd };
+      }
       i = e;
     }
-    if (best) { cuts.push([best.s, best.e + 1]); runs++; continue; }
+    if (best) { cuts.push([best.s, best.e]); runs++; continue; }
     // no gutter line: look for a hard straight edge where two panels touch
     let bi = -1, bv = 0;
     for (let i = Math.max(0, Math.floor(exp - win)); i <= Math.min(len - 2, exp + win); i++) if (prof.edge[i] > bv) { bv = prof.edge[i]; bi = i; }
@@ -881,6 +893,7 @@ function cropCell(img, c) {
   const x = cv.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(img, c.x, c.y, c.w, c.h, 0, 0, cv.width, cv.height); return cv;
 }
 function rebuildCache() {
+  enh.clear();
   const bs = batches(); sceneCache = new Array(S.segments.length).fill(null);
   bs.forEach(b => {
     const r = R.grids[b.index]; if (!r || !r.img) return;
@@ -908,7 +921,9 @@ function renderGridCards() {
     let body;
     if (!g) body = `<div class="body" style="grid-template-columns:1fr">${dropBox(b)}</div>`;
     else {
-      const det = g.auto ? (r && r.found >= r.expected ? `<span class="chip ok">Lines found</span>` : `<span class="chip wait">Lines not fully found, split equally</span>`) : `<span class="chip">Equal split</span>`;
+      const cw0 = r && r.cells && r.cells[0] ? Math.round(r.cells[0].w) : 0;
+      const resChip = cw0 ? `<span class="chip ${cw0 < 900 ? 'wait' : 'ok'}" title="Width of one scene in this image">${cw0}px per scene${cw0 < 900 && S.settings.enhance !== 'off' ? ' · app sharpens it' : ''}</span>` : '';
+      const det = resChip + (g.auto ? (r && r.found >= r.expected ? `<span class="chip ok">Lines found</span>` : `<span class="chip wait">Lines not fully found, split equally</span>`) : `<span class="chip">Equal split</span>`);
       const cells = Array.from({ length: b.count }, (_, k) => { const i = b.start + k, s = S.segments[i]; const ov = R.overrides[s.id];
         return `<div class="cell"><canvas data-cellcv="${i}" width="160" height="90" style="aspect-ratio:${asp}"></canvas><span class="tag ${ov ? 'ov' : ''}">${i + 1}${ov ? ' · single' : ''}</span><div class="acts"><button class="btn" data-one="${i}">Single image</button>${ov ? `<button class="btn danger" data-oneclear="${i}">Remove</button>` : `<button class="btn" data-onecopy="${i}" title="Prompt for just this one scene, to fix a bad panel">Fix prompt</button>`}</div></div>`; }).join('');
       body = `<div class="body"><div style="display:grid;gap:10px;min-width:0"><canvas class="src" data-srccv="${b.index}"></canvas>
@@ -941,6 +956,49 @@ function drawCover(ctx, src, W, H, z, px, py, dx = 0, dy = 0) {
   const iw = src.width, ih = src.height; const s = Math.max(W / iw, H / ih) * z; const dw = iw * s, dh = ih * s;
   ctx.drawImage(src, (W - dw) * px + dx, (H - dh) * py + dy, dw, dh);
 }
+/* ---- picture enhancement: smooth upscale + unsharp mask + clean blacks/whites, made for flat line art ---- */
+const enh = new Map();   // LRU of enhanced scene canvases, key = scene@width
+function boxBlur(src, dst, w, h, r) {   // one separable box blur pass on RGBA, alpha untouched
+  const tmp = new Uint8ClampedArray(src.length), d = 2 * r + 1;
+  for (let y = 0; y < h; y++) { for (let c = 0; c < 3; c++) { let acc = 0; const row = y * w;
+    for (let x = -r; x <= r; x++) acc += src[(row + clamp(x, 0, w - 1)) * 4 + c];
+    for (let x = 0; x < w; x++) { tmp[(row + x) * 4 + c] = acc / d; acc += src[(row + Math.min(w - 1, x + r + 1)) * 4 + c] - src[(row + Math.max(0, x - r)) * 4 + c]; } } }
+  for (let x = 0; x < w; x++) { for (let c = 0; c < 3; c++) { let acc = 0;
+    for (let y = -r; y <= r; y++) acc += tmp[(clamp(y, 0, h - 1) * w + x) * 4 + c];
+    for (let y = 0; y < h; y++) { dst[(y * w + x) * 4 + c] = acc / d; acc += tmp[(Math.min(h - 1, y + r + 1) * w + x) * 4 + c] - tmp[(Math.max(0, y - r) * w + x) * 4 + c]; } } }
+}
+function enhanceCanvas(src, tw, th) {
+  const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+  // 1. first step up to at most 2x, then soften JPEG blocks and jaggies a little
+  const w1 = Math.min(tw, src.width * 2), h1 = Math.max(1, Math.round(w1 * src.height / src.width));
+  const c1 = mk(w1, h1), x1 = c1.getContext('2d', { willReadFrequently: true }); x1.imageSmoothingQuality = 'high'; x1.drawImage(src, 0, 0, w1, h1);
+  if (w1 > src.width * 1.3) { const im = x1.getImageData(0, 0, w1, h1), bl = new Uint8ClampedArray(im.data.length); boxBlur(im.data, bl, w1, h1, 1); for (let i = 0; i < bl.length; i += 4) for (let c = 0; c < 3; c++) im.data[i + c] = (im.data[i + c] + bl[i + c]) >> 1; x1.putImageData(im, 0, 0); }
+  // 2. up to the size it is shown at
+  const c2 = mk(tw, th), x2 = c2.getContext('2d', { willReadFrequently: true }); x2.imageSmoothingQuality = 'high'; x2.drawImage(c1, 0, 0, tw, th);
+  // 3. unsharp mask, then push near-black to black and near-white to white (smooth ramps, colours kept)
+  const im = x2.getImageData(0, 0, tw, th), D = im.data, bl = new Uint8ClampedArray(D.length), r = clamp(Math.round(tw / src.width), 1, 4);
+  boxBlur(D, bl, tw, th, r); boxBlur(bl, bl, tw, th, r);
+  for (let i = 0; i < D.length; i += 4) {
+    let R0 = D[i], G0 = D[i + 1], B0 = D[i + 2];
+    const dr = R0 - bl[i], dg = G0 - bl[i + 1], db = B0 - bl[i + 2];
+    if (Math.abs(dr) + Math.abs(dg) + Math.abs(db) > 9) { R0 += 1.4 * dr; G0 += 1.4 * dg; B0 += 1.4 * db; }
+    const l = 0.299 * R0 + 0.587 * G0 + 0.114 * B0;
+    const dk = clamp((70 - l) / 50, 0, 1) * 0.6, lt = clamp((l - 212) / 30, 0, 1) * 0.85;
+    D[i] = (R0 * (1 - dk)) + (255 - R0 * (1 - dk)) * lt; D[i + 1] = (G0 * (1 - dk)) + (255 - G0 * (1 - dk)) * lt; D[i + 2] = (B0 * (1 - dk)) + (255 - B0 * (1 - dk)) * lt;
+  }
+  x2.putImageData(im, 0, 0); return c2;
+}
+function hiSrc(i, src, rw, rh) {
+  if (S.settings.enhance === 'off' || !src) return src;
+  const iw = src.width, ih = src.height, cover = Math.max(rw / iw, rh / ih), contain = Math.min(rw / iw, rh / ih);
+  const sc = ((S.settings.fit === 'fill' || cover / contain < 1.06) ? cover : contain) * (1 + S.settings.motion / 100);
+  if (sc <= 1.15) return src;
+  const k = Math.min(sc, 4), tw = Math.round(iw * k), th = Math.round(ih * k), key = i + '@' + tw;
+  let c = enh.get(key); if (c) { enh.delete(key); enh.set(key, c); return c; }
+  c = enhanceCanvas(src, tw, th); enh.set(key, c);
+  while (enh.size > 12) enh.delete(enh.keys().next().value);
+  return c;
+}
 function frameLayout(W, H) {
   const band = S.settings.captions === 'bar' ? Math.round(H * (S.settings.aspect === '9:16' ? 0.16 : 0.2) * clamp(S.settings.capSize, 0.75, 1.4)) : 0;
   return { pw: W, ph: H - band, band };
@@ -963,7 +1021,7 @@ function drawScene(ctx, i, t, W, H, o = {}) {
   const m = S.settings.motion / 100, mode = i % 4; let z, px = 0.5, py = 0.5;
   if (mode === 0) z = 1 + m * p; else if (mode === 1) z = 1 + m * (1 - p); else { z = 1 + m; px = mode === 2 ? 0.2 + 0.6 * p : 0.8 - 0.6 * p; py = 0.5 - 0.15 * (p - 0.5); }
   z *= o.scale || 1;
-  drawPic(ctx, i, src, W, H, z, px, py, o.dx || 0); ctx.restore();
+  drawPic(ctx, i, hiSrc(i, src, W, H), W, H, z, px, py, o.dx || 0); ctx.restore();
 }
 function captionTokens(text) {
   const clean = text.trim().replace(/[,;:।|.—]+["'”’]*$/, m => m.replace(/[,;:।|.—]+/g, ''));
@@ -1226,13 +1284,14 @@ $('#dlPrompts').onclick = () => { const bs = batches(); if (!bs.length) return; 
 $('#loadChars').onclick = () => { const ta = $('#characters'); ta.value = (ta.value.trim() ? ta.value.trim() + '\n' : '') + CHANNEL_CHARS; S.settings.characters = ta.value; renderPrompts(); save(); };
 
 /* ============ settings binding ============ */
-const BIND = ['aspect', 'grid', 'style', 'styleText', 'characters', 'gutter', 'splitLevel', 'minWords', 'maxWords', 'captions', 'fit', 'capSize', 'motion', 'transition', 'transDur', 'res', 'fps', 'musicVol'];
+const BIND = ['aspect', 'grid', 'style', 'styleText', 'characters', 'gutter', 'splitLevel', 'minWords', 'maxWords', 'captions', 'fit', 'enhance', 'capSize', 'motion', 'transition', 'transDur', 'res', 'fps', 'musicVol'];
 const NUM = new Set(['grid', 'minWords', 'maxWords', 'capSize', 'motion', 'transDur', 'res', 'fps', 'musicVol']);
 function applySettingsToUI() { BIND.forEach(k => { const el = $('#' + k); if (el) el.value = S.settings[k]; }); $('#projTitle').value = S.settings.title || ''; }
 BIND.forEach(k => { const el = $('#' + k); if (!el) return; el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => {
   S.settings[k] = NUM.has(k) ? +el.value : el.value;
   if (k === 'style') { if (S.settings.style !== 'custom') { S.settings.styleText = STYLES[S.settings.style].text; $('#styleText').value = S.settings.styleText; } }
   if (k === 'musicVol') music.volume = S.settings.musicVol;
+  if (['enhance', 'fit', 'motion', 'captions', 'capSize', 'aspect'].includes(k)) enh.clear();
   if (k === 'aspect') { sizePreview(); }
   if (['aspect', 'grid', 'gutter', 'style'].includes(k)) { R.grids.forEach((r, gi) => { if (r) { r.cells = null; } }); rebuildCache(); renderGridCards(); renderScenes(); renderStatus(); }
   if (['style', 'styleText', 'characters', 'gutter', 'aspect', 'grid'].includes(k)) renderPrompts();
