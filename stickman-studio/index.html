@@ -129,6 +129,19 @@ audio { width: 100%; }
 .batch-h h3 { margin-right: auto; }
 pre.prompt { margin: 0; padding: 14px; font: 13px/1.55 var(--font-mono); white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow: auto; }
 .batches { display: grid; gap: 14px; }
+.slots { display: grid; gap: 8px; }
+.slot { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
+.slot .nm { font-weight: 600; }
+.slot .ds { font-size: 12.5px; color: var(--muted); }
+.slot .acts { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.slot.has { border-color: var(--good); }
+.slot.rec { border-color: var(--bad); box-shadow: 0 0 0 2px var(--bad); }
+@media (max-width: 560px) { .slot { grid-template-columns: 1fr; } .slot .acts { justify-content: flex-start; } }
+.tagbtns { display: flex; gap: 4px; flex-wrap: wrap; }
+.tagbtns .btn { font-family: var(--font-mono); font-size: 12px; padding: 3px 8px; }
+.linelist { display: grid; gap: 4px; max-height: 320px; overflow: auto; }
+.linelist .ln { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 13.5px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.linelist .ln span.tx { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .callout { border: 2px solid var(--accent); border-radius: var(--r); background: var(--surface); padding: 14px 16px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
 .callout .big { font-family: var(--font-display); font-weight: 800; font-size: 22px; line-height: 1.2; }
 .callout .grow { flex: 1 1 260px; min-width: 0; }
@@ -253,8 +266,10 @@ details summary { cursor: pointer; font-weight: 600; }
       <h3>Voiceover</h3>
       <div class="drop" id="voDrop" tabindex="0" role="button"><strong>Drop the voiceover file here</strong>or click to choose (mp3, wav, m4a)</div>
       <input type="file" id="voFile" accept="audio/*" hidden>
+      <input type="file" id="oneAudio" accept="audio/*,video/*,.opus,.ogg,.m4a,.aac" hidden>
       <div id="voInfo" class="hint"></div>
       <audio id="vo" controls preload="auto"></audio>
+      <div class="row"><button class="btn small" data-dlvoice>Download voiceover</button><span class="hint">Make one below with <b>AI voice</b>, or drop your own recording.</span></div>
       <div class="row">
         <label class="f">Video shape
           <select id="aspect">
@@ -272,6 +287,37 @@ details summary { cursor: pointer; font-weight: 600; }
       </div>
       <p class="hint">Next: check the scenes, then open the <b>Image Prompts</b> tab.</p>
     </div>
+  </div>
+  <div class="panel" id="aiVoice">
+    <div class="row"><h3 style="margin-right:auto">AI voice</h3><span class="chip wait" id="ttsChip">Not connected</span></div>
+    <p class="hint" style="margin:0">Turn the script into a voiceover in a ready-made voice or <b>your own cloned voice</b>, with pauses, laughs and moods. The voice model runs free on Google Colab: <a href="https://colab.research.google.com/github/gopalkrishan680-hash/GK/blob/claude/stickman-video-voiceover-sync-ivss4s/stickman-voice/StickmanVoice.ipynb" target="_blank" rel="noopener">open the Colab notebook</a>, run cells 1 and 2, then paste the link it shows here.</p>
+    <div class="row"><input type="text" id="ttsUrl" placeholder="https://…trycloudflare.com" aria-label="Voice server link" style="flex:1 1 260px"><button class="btn" id="ttsConnect">Connect</button></div>
+    <div class="row">
+      <label class="f">Language <select id="ttsLang"><option value="hi">Hindi / Hinglish</option><option value="en">English</option></select></label>
+      <label class="f">Voice <select id="ttsVoice"><option value="default">Ready-made voice</option><option value="mine">My cloned voice</option></select></label>
+      <label class="f">Expression strength <input type="range" id="ttsExpr" min="0.6" max="1.6" step="0.05"></label>
+    </div>
+    <div class="slot" id="sampleBox" hidden>
+      <div><div class="nm">Your voice sample</div><div class="ds" id="sampleInfo">Upload a clear recording of your own voice (10–30 s is best; mp3, wav, m4a, a WhatsApp voice note or even a video). The app uses it to clone your voice for this script.</div></div>
+      <div class="acts"><button class="btn small primary" id="sampleUp">Upload my voice sample</button><button class="btn small" data-rec="normal" id="sampleRec">Record now</button><button class="btn small" data-slotplay="normal" id="samplePlay" hidden>Play</button></div>
+    </div>
+    <div class="row">
+      <label class="f">Pause after a sentence <input type="range" id="ttsSentPause" min="0.15" max="1.2" step="0.05"></label>
+      <label class="f">Pause at a comma <input type="range" id="ttsCommaPause" min="0" max="0.5" step="0.05"></label>
+    </div>
+    <div class="f" style="font-size:13px;font-weight:600;color:var(--muted)">Add to the script at the cursor (tags are spoken, never shown in captions):</div>
+    <div class="tagbtns" id="tagBtns"></div>
+    <details id="myVoice">
+      <summary>My voice and my sounds (for cloning)</summary>
+      <div style="display:grid;gap:10px;margin-top:10px">
+        <label style="display:flex;gap:8px;align-items:flex-start;flex-wrap:nowrap"><input type="checkbox" id="ttsConsent" style="margin-top:4px;flex:none"> <span>This is <b>my own voice</b>, or the speaker has given me permission to clone it.</span></label>
+        <p class="hint" style="margin:0">Record in a quiet room, phone close to your mouth. <b>Main voice</b> is needed for cloning; the others are optional. A mood recording makes <code>[happy]</code>, <code>[sad]</code>… sound like you in that mood. A sound recording is used wherever its tag appears, e.g. your real laugh for <code>[laugh]</code>. Recordings stay on this device and are not put into project files.</p>
+        <div class="slots" id="slots"></div>
+      </div>
+    </details>
+    <div class="row"><button class="btn primary" id="ttsGo">Generate voiceover</button><button class="btn" id="ttsStop" hidden>Stop waiting</button><button class="btn" data-dlvoice>Download voiceover</button><span class="hint" id="ttsInfo"></span></div>
+    <progress id="ttsProg" value="0" max="1" hidden></progress>
+    <details id="ttsLines" hidden><summary>Lines of the last voiceover (play one, or redo it)</summary><div class="linelist" id="ttsLineList"></div></details>
   </div>
   <div class="callout" id="gridCallout" hidden>
     <div class="grow"><div class="big" id="calloutBig"></div><div class="hint" id="calloutSub"></div></div>
@@ -541,7 +587,7 @@ const DB = {
   del(k) { return this.db ? this.tx('readwrite', s => s.delete(k)) : Promise.resolve(); }
 };
 function snapshot() {
-  return { v: 1, settings: S.settings, script: S.script, segments: S.segments, starts: S.starts, syncVer: S.syncVer || 3, uid,
+  return { v: 1, settings: S.settings, script: S.script, segments: S.segments, starts: S.starts, syncVer: S.syncVer || 3, uid, tts: S.tts || null,
     grids: S.grids.map(g => g ? { blob: g.blob, auto: g.auto, trim: g.trim } : null),
     overrides: S.overrides, audioBlob: S.audioBlob, audioName: S.audioName, musicBlob: S.musicBlob, musicName: S.musicName };
 }
@@ -549,7 +595,7 @@ let saveT;
 function save() { clearTimeout(saveT); saveT = setTimeout(() => { DB.put('project', snapshot()).catch(() => {}); }, 600); }
 
 /* ============ script splitting ============ */
-const wordCount = s => s.replace(/\*/g, '').split(/\s+/).filter(w => /[\p{L}\p{N}]/u.test(w)).length;
+const wordCount = s => plain(s).split(/\s+/).filter(w => /[\p{L}\p{N}]/u.test(w)).length;
 function splitScript(text, level, minW, maxW) {
   const P = level === 'all' ? ',.!?।|;:…—' : '.!?।|…';
   const CLOSE = '"\'”’)»';
@@ -578,14 +624,15 @@ function splitScript(text, level, minW, maxW) {
   return out.map(s => s.replace(/․/g, '.').replace(/‚/g, ','));
 }
 function weight(s) {
-  const clean = s.replace(/\*/g, '').trim();
+  const clean = plain(s);
   let w = (clean.match(/[\p{L}\p{N}\p{M}]/gu) || []).length;
   const end = clean.replace(/["'”’)»]+$/, '').slice(-1);
   if (/[.!?।|…]/.test(end)) w += 6; else if (/[,;:—]/.test(end)) w += 3;
   return Math.max(w, 3);
 }
-const strongEnd = s => /[.!?।|…]["'”’)»]*$/.test(s.trim());
-const plain = s => s.replace(/\*/g, '');
+const strongEnd = s => /[.!?।|…]["'”’)»]*$/.test(plain(s));
+const TAG_RX = /\[\s*[a-zA-Z]+(?:\s+[\w.]+)?\s*\]/g;   // voice tags like [laugh] or [pause 1.5]
+const plain = s => s.replace(/\*/g, '').replace(TAG_RX, ' ').replace(/\s{2,}/g, ' ').trim();
 
 /* ============ timing ============ */
 function duration() { if (audioBuf) return audioBuf.duration; if (vo.duration && isFinite(vo.duration)) return vo.duration; return Math.max(1, S.segments.length * 2.5); }
@@ -657,9 +704,7 @@ function smartTiming() {
   const n = S.segments.length; if (n < 2) { S.starts = [0]; return true; }
   const [s0, s1] = speechBounds(); const gaps = (analysis.gaps || analysis.pauses).filter(g => g.start > s0 + 0.03 && g.end < s1 - 0.03);
   const w = S.segments.map(s => speechWeight(s.text));
-  // group scenes into sentences
-  const groups = []; let cur = [];
-  S.segments.forEach((sg, i) => { cur.push(i); if (strongEnd(sg.text) || i === n - 1) { groups.push(cur); cur = []; } });
+  const groups = sentenceGroups();
   const gw = groups.map(g => g.reduce((a, i) => a + w[i], 0));
   const W = gw.reduce((a, b) => a + b, 0);
   const longGaps = gaps.filter(g => g.dur >= 0.1).reduce((a, g) => a + g.dur, 0);
@@ -671,7 +716,18 @@ function smartTiming() {
   const starts = new Array(n).fill(0);
   const spans = groups.map((g, k) => [k === 0 ? s0 : C1[pick1[k - 1]].end, k === groups.length - 1 ? s1 : C1[pick1[k]].start]);
   groups.forEach((g, k) => { if (k > 0) starts[g[0]] = sceneCut(C1[pick1[k - 1]]); });
-  // level 2: comma pieces inside each sentence
+  fillInside(groups, spans, starts, w, gaps);
+  starts[0] = 0;
+  for (let i = 1; i < n; i++) if (starts[i] <= starts[i - 1] + 0.05) starts[i] = starts[i - 1] + 0.05;
+  S.starts = starts; S.syncVer = 3; return true;
+}
+function sentenceGroups() {   // scene indexes grouped into sentences
+  const groups = []; let cur = []; const n = S.segments.length;
+  S.segments.forEach((sg, i) => { cur.push(i); if (strongEnd(sg.text) || i === n - 1) { groups.push(cur); cur = []; } });
+  return groups;
+}
+// level 2: comma pieces inside each sentence, given each sentence's [start, end]
+function fillInside(groups, spans, starts, w, gaps) {
   groups.forEach((g, k) => {
     if (g.length < 2) return;
     const [a, b] = spans[k]; const ww = g.map(i => w[i]);
@@ -682,6 +738,16 @@ function smartTiming() {
     if (pick2) pick2.forEach((j, m) => { starts[g[m + 1]] = sceneCut(C2[j]); });
     else { let acc = a; const tot = ww.reduce((x, y) => x + y, 0); for (let m = 1; m < g.length; m++) { acc += (b - a) * ww[m - 1] / tot; starts[g[m]] = acc; } }
   });
+}
+// Timing from an AI voiceover: the server reports exactly when each sentence starts and ends.
+function ttsTiming(timings) {
+  const groups = sentenceGroups(), n = S.segments.length;
+  if (!analysis || timings.length !== groups.length) return smartTiming();
+  const w = S.segments.map(s => speechWeight(s.text)), starts = new Array(n).fill(0);
+  const gaps = (analysis.gaps || analysis.pauses);
+  const spans = timings.map(t => [t.start, t.end]);
+  groups.forEach((g, k) => { if (k > 0) starts[g[0]] = Math.max(timings[k - 1].end + 0.02, timings[k].start - 0.1); });
+  fillInside(groups, spans, starts, w, gaps);
   starts[0] = 0;
   for (let i = 1; i < n; i++) if (starts[i] <= starts[i - 1] + 0.05) starts[i] = starts[i - 1] + 0.05;
   S.starts = starts; S.syncVer = 3; return true;
@@ -1063,7 +1129,7 @@ function drawScene(ctx, i, t, W, H, o = {}) {
   drawPic(ctx, i, hiSrc(i, src, W, H), W, H, z, px, py, o.dx || 0); ctx.restore();
 }
 function captionTokens(text) {
-  const clean = text.trim().replace(/[,;:।|.—]+["'”’]*$/, m => m.replace(/[,;:।|.—]+/g, ''));
+  const clean = text.replace(TAG_RX, ' ').replace(/\s{2,}/g, ' ').trim().replace(/[,;:।|.—]+["'”’]*$/, m => m.replace(/[,;:।|.—]+/g, ''));
   const toks = []; clean.split(/(\*[^*]+\*)/).forEach(part => { if (!part) return; const hl = /^\*[^*]+\*$/.test(part); part.replace(/\*/g, '').split(/\s+/).filter(Boolean).forEach(w => toks.push({ w, hl })); });
   return toks;
 }
@@ -1266,6 +1332,14 @@ document.addEventListener('click', async e => {
       if (!blob) return toast('No image on the clipboard. Copy the image first, or use Choose file…');
       placeGrid(gi, blob);
     } catch (err) { toast(TOUCH ? 'This browser did not share the copied image. Save the image and use Choose file…' : 'Could not read the clipboard. Press Ctrl+V instead, or use Choose file…'); } }
+  else if (d.tag) insertTag(d.tag);
+  else if (d.rec) toggleRec(d.rec);
+  else if (d.slotup) { const [f] = await pickFile($('#oneAudio')); if (f) setSlot(d.slotup, f); }
+  else if (d.slotplay) { const a = new Audio(URL.createObjectURL(VP.slots[d.slotplay].blob)); a.play(); }
+  else if (d.slotdel) { delete VP.slots[d.slotdel]; saveVP(); renderSlots(); }
+  else if (d.lineplay != null) playLine(+d.lineplay);
+  else if (d.lineredo != null) redoLine(+d.lineredo);
+  else if (d.dlvoice != null) downloadVoice();
   else if (d.openapp) { if (APP) AndroidBridge.openApp(d.openapp); }
   else if (d.sharelast != null) { if (APP && !AndroidBridge.shareLast()) toast('Still saving, try again in a moment'); }
   else if (d.pick != null) { const gi = +d.pick; const [f] = await pickFile($('#oneFile')); if (f) placeGrid(gi, f); }
@@ -1520,7 +1594,7 @@ $('#newProj').onclick = async () => {
 async function restore(p) {
   S.settings = { ...DEFAULTS, ...(p.settings || {}) };
   if ((S.settings.v || 1) < 2) { S.settings.captions = S.settings.captions === 'off' ? 'off' : 'bar'; S.settings.fit = 'auto'; S.settings.motion = Math.min(S.settings.motion, 6); S.settings.v = 2; }
-  S.script = p.script || ''; S.segments = p.segments || []; S.starts = p.starts || [];
+  S.script = p.script || ''; S.segments = p.segments || []; S.starts = p.starts || []; S.tts = p.tts || null;
   uid = Math.max(p.uid || 1, ...S.segments.map(s => s.id + 1), 1);
   S.grids = []; R.grids = []; S.overrides = {}; R.overrides = {}; audioBuf = null; analysis = null; S.audioBlob = null;
   if (vo.src) { URL.revokeObjectURL(vo.src); vo.removeAttribute('src'); vo.load(); }
@@ -1536,9 +1610,180 @@ async function restore(p) {
   S.syncVer = 3;
   segmentsChanged(true);
   if (resync) { save(); toast('Scene timing was redone with the improved Smart Sync'); }
+  renderTtsLines();
 }
 
 /* ============ boot ============ */
+/* ============ AI voice (talks to the Colab voice server) ============ */
+const VOICE_SLOTS = [
+  { k: 'normal', kind: 'voice', nm: 'Main voice', ds: 'Read 2–3 sentences in your normal voice (10–20 s).', max: 25 },
+  { k: 'happy', kind: 'voice', nm: 'Happy', ds: 'A happy line, smiling (5–15 s).', max: 20 },
+  { k: 'excited', kind: 'voice', nm: 'Excited', ds: 'Energetic and fast (5–15 s).', max: 20 },
+  { k: 'sad', kind: 'voice', nm: 'Sad', ds: 'Slow and low (5–15 s).', max: 20 },
+  { k: 'angry', kind: 'voice', nm: 'Angry', ds: 'Firm and loud (5–15 s).', max: 20 },
+  { k: 'whisper', kind: 'voice', nm: 'Whisper', ds: 'Whispering (5–15 s).', max: 20 },
+  { k: 'laugh', kind: 'sound', nm: 'Laugh', ds: 'Your real laugh (1–4 s).', max: 5 },
+  { k: 'chuckle', kind: 'sound', nm: 'Chuckle', ds: 'A small laugh (1–3 s).', max: 4 },
+  { k: 'sigh', kind: 'sound', nm: 'Sigh', ds: 'A sigh (1–3 s).', max: 4 },
+  { k: 'gasp', kind: 'sound', nm: 'Gasp', ds: 'A surprised breath (1–2 s).', max: 3 },
+  { k: 'hmm', kind: 'sound', nm: 'Hmm', ds: 'Thinking "hmm" (1–3 s).', max: 4 },
+  { k: 'cry', kind: 'sound', nm: 'Cry', ds: 'A sob (1–4 s).', max: 5 },
+];
+const TAGS = ['[pause]', '[pause 1.5]', '[laugh]', '[chuckle]', '[sigh]', '[gasp]', '[hmm]', '[happy]', '[excited]', '[sad]', '[angry]', '[whisper]', '[calm]', '[normal]'];
+const VP = { url: '', lang: 'hi', voice: 'default', expr: 1, sentPause: 0.45, commaPause: 0.15, consent: false, slots: {} };
+let ttsPoll = null, recNow = null;
+const ttsBase = () => (VP.url || '').trim().replace(/\/+$/, '');
+function saveVP() { DB.put('voiceProfile', VP).catch(() => {}); }
+async function loadVP() { try { const v = await DB.get('voiceProfile'); if (v) Object.assign(VP, v); } catch (_) {} }
+function vpToUI() { $('#ttsUrl').value = VP.url; $('#ttsLang').value = VP.lang; $('#ttsVoice').value = VP.voice; $('#ttsExpr').value = VP.expr; $('#ttsSentPause').value = VP.sentPause; $('#ttsCommaPause').value = VP.commaPause; $('#ttsConsent').checked = VP.consent; renderSlots(); }
+[['ttsUrl', 'url'], ['ttsLang', 'lang'], ['ttsVoice', 'voice'], ['ttsExpr', 'expr', 1], ['ttsSentPause', 'sentPause', 1], ['ttsCommaPause', 'commaPause', 1]].forEach(([id, key, num]) => {
+  const el = $('#' + id); el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => { VP[key] = num ? +el.value : el.value; saveVP(); });
+});
+$('#sampleUp').onclick = async () => {
+  if (!VP.consent) { $('#myVoice').open = true; $('#ttsConsent').focus(); return toast('First tick the box: this is my own voice (or I have permission)'); }
+  const [f] = await pickFile($('#oneAudio')); if (f) setSlot('normal', f);
+};
+$('#ttsConsent').addEventListener('change', e => { VP.consent = e.target.checked; saveVP(); renderSlots(); });
+$('#ttsVoice').addEventListener('change', () => { renderSample(); if (VP.voice === 'mine' && !VP.slots.normal) toast('Upload or record a sample of your voice'); });
+$('#tagBtns').innerHTML = TAGS.map(t => `<button class="btn" data-tag="${t}">${t}</button>`).join('');
+function insertTag(tag) {
+  const ta = $('#script'), a = ta.selectionStart ?? ta.value.length, b = ta.selectionEnd ?? a;
+  const pre = ta.value.slice(0, a), post = ta.value.slice(b);
+  const ins = (pre && !/\s$/.test(pre) ? ' ' : '') + tag + (post && !/^\s/.test(post) ? ' ' : '');
+  ta.value = pre + ins + post; ta.focus(); ta.selectionStart = ta.selectionEnd = a + ins.length; S.script = ta.value; save();
+  toast(`${tag} added. Press Create scenes when you are done editing.`);
+}
+function renderSample() {
+  const box = $('#sampleBox'); box.hidden = VP.voice !== 'mine';
+  const has = VP.slots.normal; box.classList.toggle('has', !!has);
+  $('#sampleInfo').textContent = has ? `Voice sample ready · ${has.dur.toFixed(1)} s. Generate the voiceover and it will speak in this voice. You can replace it any time.` : 'Upload a clear recording of your own voice (10–30 s is best; mp3, wav, m4a, a WhatsApp voice note or even a video). The app uses it to clone your voice for this script.';
+  $('#sampleUp').textContent = has ? 'Replace sample' : 'Upload my voice sample';
+  $('#samplePlay').hidden = !has;
+  const recording = recNow && recNow.slot === 'normal'; $('#sampleRec').textContent = recording ? 'Stop' : 'Record now'; box.classList.toggle('rec', !!recording);
+}
+function renderSlots() {
+  renderSample();
+  const dis = !VP.consent;
+  $('#slots').innerHTML = VOICE_SLOTS.map(sl => {
+    const b = VP.slots[sl.k], recording = recNow && recNow.slot === sl.k;
+    return `<div class="slot${b ? ' has' : ''}${recording ? ' rec' : ''}"><div><div class="nm">${sl.nm}${sl.kind === 'sound' ? ` <code>[${sl.k}]</code>` : sl.k !== 'normal' ? ` <code>[${sl.k}]</code>` : ''}</div><div class="ds">${b ? `Recorded · ${b.dur.toFixed(1)} s` : sl.ds}</div></div>
+      <div class="acts"><button class="btn small ${recording ? 'danger' : ''}" data-rec="${sl.k}" ${dis ? 'disabled' : ''}>${recording ? 'Stop' : 'Record'}</button><button class="btn small" data-slotup="${sl.k}" ${dis ? 'disabled' : ''}>Upload</button>${b ? `<button class="btn small" data-slotplay="${sl.k}">Play</button><button class="btn small danger" data-slotdel="${sl.k}">Remove</button>` : ''}</div></div>`;
+  }).join('');
+}
+function encodeWav(f32, sr) {
+  const buf = new ArrayBuffer(44 + f32.length * 2), v = new DataView(buf), str = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+  str(0, 'RIFF'); v.setUint32(4, 36 + f32.length * 2, true); str(8, 'WAVE'); str(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); str(36, 'data'); v.setUint32(40, f32.length * 2, true);
+  for (let i = 0; i < f32.length; i++) v.setInt16(44 + i * 2, Math.max(-1, Math.min(1, f32[i])) * 32767, true);
+  return new Blob([buf], { type: 'audio/wav' });
+}
+// any recording/upload -> trimmed 24 kHz mono WAV (what the voice model works with)
+async function toVoiceWav(blob, maxSec) {
+  actxDecode = actxDecode || new (window.AudioContext || window.webkitAudioContext)();
+  const dec = await actxDecode.decodeAudioData(await blob.arrayBuffer());
+  const sr = 24000, oc = new OfflineAudioContext(1, Math.max(1, Math.ceil(dec.duration * sr)), sr), src = oc.createBufferSource();
+  src.buffer = dec; src.connect(oc.destination); src.start(); const out = (await oc.startRendering()).getChannelData(0);
+  let pk = 0; for (const x of out) pk = Math.max(pk, Math.abs(x)); const thr = Math.max(0.01, pk * 0.06);
+  let a = 0, b = out.length - 1; while (a < b && Math.abs(out[a]) < thr) a++; while (b > a && Math.abs(out[b]) < thr) b--;
+  a = Math.max(0, a - sr * 0.08); b = Math.min(out.length, b + sr * 0.12, a + sr * maxSec);
+  const cut = out.slice(a, b); if (cut.length < sr * 0.3) throw new Error('The recording is silent or too short');
+  const g = pk > 0 ? Math.min(4, 0.9 / pk) : 1; for (let i = 0; i < cut.length; i++) cut[i] *= g;
+  return { blob: encodeWav(cut, sr), dur: cut.length / sr };
+}
+async function setSlot(k, blob) {
+  const sl = VOICE_SLOTS.find(x => x.k === k);
+  try { const r = await toVoiceWav(blob, sl.max); VP.slots[k] = r; saveVP(); renderSlots(); toast(`${sl.nm} saved (${r.dur.toFixed(1)} s)`); }
+  catch (e) { toast('Could not use this recording: ' + e.message); }
+}
+async function toggleRec(k) {
+  if (recNow) { const was = recNow.slot; recNow.mr.stop(); if (was === k) return; }
+  if (!VP.consent) { $('#myVoice').open = true; return toast('First tick the box: this is my own voice (or I have permission)'); }
+  let stream; try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
+  catch (e) { return toast('Microphone not available: ' + (e.message || e.name) + '. You can upload a recording instead.'); }
+  const mr = new MediaRecorder(stream), chunks = [], sl = VOICE_SLOTS.find(x => x.k === k);
+  mr.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+  mr.onstop = async () => { stream.getTracks().forEach(t => t.stop()); clearTimeout(recNow && recNow.timer); recNow = null; renderSlots(); await setSlot(k, new Blob(chunks, { type: mr.mimeType || 'audio/webm' })); };
+  recNow = { slot: k, mr, timer: setTimeout(() => { if (recNow && recNow.mr === mr) mr.stop(); }, sl.max * 1000) };
+  mr.start(); renderSlots(); toast(`Recording ${sl.nm}… press Stop when done`);
+}
+const blobB64 = b => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(',')[1]); fr.onerror = rej; fr.readAsDataURL(b); });
+async function ttsFetch(path, opt = {}) {
+  if (!ttsBase()) throw new Error('Paste the voice server link first');
+  let r; try { r = await fetch(ttsBase() + path, opt); } catch (e) { throw new Error('Could not reach the voice server. Is the Colab notebook still running? The link changes on every restart.'); }
+  if (!r.ok) { let m = r.status + ''; try { m = (await r.json()).detail || m; } catch (_) {} throw new Error(m); }
+  return r;
+}
+async function ttsConnect() {
+  const chip = $('#ttsChip'); chip.textContent = 'Connecting…'; chip.className = 'chip';
+  try { const h = await (await ttsFetch('/health')).json(); chip.textContent = `Connected · ${h.engine === 'fake' ? 'test engine' : 'GPU ready'}`; chip.className = 'chip ok'; return true; }
+  catch (e) { chip.textContent = 'Not connected'; chip.className = 'chip wait'; toast(e.message); return false; }
+}
+$('#ttsConnect').onclick = ttsConnect;
+function ttsBusy(on) { $('#ttsGo').disabled = on; $('#ttsStop').hidden = !on; $('#ttsProg').hidden = !on; }
+async function waitJob(id, label) {
+  return new Promise((res, rej) => {
+    const tick = async () => {
+      try {
+        const s = await (await ttsFetch('/jobs/' + id)).json();
+        if (s.status === 'done') return res(s);
+        if (s.status === 'error') return rej(new Error(s.message || 'The voice server failed'));
+        $('#ttsProg').value = s.total ? s.done / s.total : 0;
+        $('#ttsInfo').textContent = s.status === 'queued' ? 'Waiting for the GPU…' : `${label}: line ${Math.min(s.done + 1, s.total)} of ${s.total}…`;
+        ttsPoll = setTimeout(tick, 1500);
+      } catch (e) { rej(e); }
+    };
+    ttsPoll = setTimeout(tick, 600);
+  });
+}
+$('#ttsStop').onclick = () => { clearTimeout(ttsPoll); ttsBusy(false); $('#ttsInfo').textContent = 'Stopped waiting. The server may still finish in the background.'; };
+async function applyTtsResult(id, st, msg) {
+  const blob = await (await ttsFetch(`/jobs/${id}/audio`)).blob();
+  await setVoice(new Blob([blob], { type: 'audio/wav' }), 'AI voiceover.wav');
+  ttsTiming(st.timings); segmentsChanged(true);
+  S.tts = { url: ttsBase(), job: id, timings: st.timings }; save(); renderTtsLines();
+  $('#ttsInfo').textContent = msg + ` · ${fmt(st.duration, 0)} long. Scenes are synced to it.`;
+}
+async function ttsGenerate() {
+  S.script = $('#script').value;
+  if (!S.segments.length) return toast('Press Create scenes first');
+  if (VP.voice === 'mine' && (!VP.consent || !VP.slots.normal)) { renderSample(); return toast('For your own voice: tick the permission box, then upload or record a voice sample'); }
+  const groups = sentenceGroups(), units = groups.map(g => g.map(i => S.segments[i].text.trim()).join(' '));
+  const body = { units, language: VP.lang, expressiveness: VP.expr, sentence_pause: VP.sentPause, comma_pause: VP.commaPause, seed: 7, voice: {}, sounds: {} };
+  if (VP.voice === 'mine') for (const sl of VOICE_SLOTS) { const v = VP.slots[sl.k]; if (v) (sl.kind === 'voice' ? body.voice : body.sounds)[sl.k] = await blobB64(v.blob); }
+  ttsBusy(true); $('#ttsInfo').textContent = 'Sending the script…';
+  try {
+    const j = await (await ttsFetch('/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();
+    const st = await waitJob(j.job_id, 'Speaking');
+    await applyTtsResult(j.job_id, st, 'Voiceover ready');
+    toast('Voiceover ready and synced');
+  } catch (e) { $('#ttsInfo').textContent = e.message; toast(e.message); }
+  ttsBusy(false);
+}
+$('#ttsGo').onclick = ttsGenerate;
+function renderTtsLines() {
+  const t = S.tts; $('#ttsLines').hidden = !(t && t.timings && t.timings.length);
+  if (!t || !t.timings) return;
+  $('#ttsLineList').innerHTML = t.timings.map((x, k) => `<div class="ln"><b class="tc">${k + 1}</b><span class="tx" title="${esc(x.text)}">${esc(x.text)}</span><span class="row" style="gap:4px"><button class="btn small" data-lineplay="${k}">Play</button><button class="btn small" data-lineredo="${k}">Redo</button></span></div>`).join('');
+}
+let linePlayT;
+function playLine(k) { const x = S.tts.timings[k]; vo.currentTime = Math.max(0, x.start - 0.05); vo.play(); clearTimeout(linePlayT); linePlayT = setTimeout(() => vo.pause(), (x.end - x.start + 0.25) * 1000); }
+async function redoLine(k) {
+  const t = S.tts; if (!t) return;
+  if (ttsBase() !== t.url) return toast('This voiceover was made by an earlier server session. Generate it again.');
+  ttsBusy(true); $('#ttsInfo').textContent = `Redoing line ${k + 1}…`;
+  try {
+    await ttsFetch(`/jobs/${t.job}/redo`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ unit: k }) });
+    const st = await waitJob(t.job, 'Redoing');
+    await applyTtsResult(t.job, st, `Line ${k + 1} redone`); playLine(k);
+  } catch (e) { $('#ttsInfo').textContent = e.message; toast(e.message); }
+  ttsBusy(false);
+}
+function downloadVoice() {
+  if (!S.audioBlob) return toast('No voiceover yet');
+  const ext = (S.audioBlob.type.includes('wav') ? 'wav' : (S.audioName.split('.').pop() || 'audio')).toLowerCase();
+  download(S.audioBlob, `${safeName()}-voiceover.${ext}`);
+}
+
 let bootDone; const booted = new Promise(r => bootDone = r);
 const incoming = {};
 window.receiveSharedChunk = (id, b64) => { (incoming[id] = incoming[id] || []).push(b64); };
@@ -1578,6 +1823,7 @@ window.addEventListener('error', e => console.log('SSAPP-ERR ' + e.message + ' @
 (async function boot() {
   sizePreview();
   try { await DB.open(); } catch (_) {}
+  await loadVP(); vpToUI();
   let p = null; try { p = await DB.get('project'); } catch (_) {}
   if (p && (p.script || (p.segments && p.segments.length))) await restore(p);
   else {

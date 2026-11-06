@@ -1,11 +1,13 @@
 package com.gopalkrishan.stickmanstudio
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ContentValues
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -17,6 +19,7 @@ import android.util.Log
 import android.view.WindowManager
 import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
+import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -51,6 +54,14 @@ class MainActivity : ComponentActivity() {
     private var saveMime = ""
     @Volatile private var lastSaved: Uri? = null
     @Volatile private var lastSavedMime = ""
+
+    // The page asks for the microphone (voice recordings); ask Android, then answer the page.
+    private var pendingMic: PermissionRequest? = null
+    private val micPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        val req = pendingMic ?: return@registerForActivityResult
+        pendingMic = null
+        if (granted) req.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) else req.deny()
+    }
 
     private val pickFiles = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->
         val cb = fileCallback ?: return@registerForActivityResult
@@ -129,6 +140,20 @@ class MainActivity : ComponentActivity() {
                 } catch (e: ActivityNotFoundException) {
                     fileCallback = null
                     false
+                }
+            }
+
+            override fun onPermissionRequest(request: PermissionRequest) {
+                runOnUiThread {
+                    if (!request.resources.contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) {
+                        request.deny()
+                    } else if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                        request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
+                    } else {
+                        pendingMic?.deny()
+                        pendingMic = request
+                        micPermission.launch(Manifest.permission.RECORD_AUDIO)
+                    }
                 }
             }
 

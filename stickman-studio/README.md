@@ -35,6 +35,13 @@ Open it in **Chrome or Edge** (double-click the file). Everything runs locally o
    player. It is usually faster than the video length.
    Older browsers fall back to live recording, which needs the tab to stay open and in front.
 
+## AI voice (optional)
+No voiceover yet? In **Script + Voice → AI voice** the app turns the script into one, in a ready-made
+voice or **your own cloned voice**, with `[pause]`, `[laugh]`, `[sigh]`, `[happy]`, `[sad]`… tags.
+The voice model runs free on Google Colab; see `../stickman-voice/README.md` for the 3-step start.
+The voiceover is set as the video's audio and every scene is timed from the voice itself.
+**Download voiceover** saves it as a WAV file. Each line can be played or redone on its own.
+
 ## Extra features
 - 16:9, 9:16 (Shorts) and 1:1. 3×3 or 2×2 grid (2×2 = higher quality per scene).
 - If the last batch has fewer scenes, it gets a 2×2 or single-image prompt.

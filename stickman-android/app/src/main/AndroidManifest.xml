@@ -3,6 +3,9 @@
 
     <!-- fonts from Google Fonts; everything else runs offline -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- record your own voice / laugh for voice cloning -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
     <!-- so "Open ChatGPT / Open Gemini" can find the installed apps -->
     <queries>
