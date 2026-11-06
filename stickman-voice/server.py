@@ -21,6 +21,11 @@ Script tags understood inside each line:
                                                mood for the following text (stays until changed);
                                                uses that mood's own reference recording if one was given
 
+Voice samples are cleaned before cloning (POST /refine): background noise is reduced
+(noisereduce, spectral gating), and for speech samples a speech recogniser (faster-whisper) finds
+every word so that fillers such as "uh", "um", "hmm", "अं", "उम्म" as well as coughs, breaths
+and long silences between words are cut out.
+
 Set STICKMAN_FAKE_TTS=1 to run without a GPU/model (beeps instead of speech) for testing.
 """
 import base64
@@ -213,6 +218,204 @@ def parse_line(text, mood):
     return ops, mood
 
 
+# ---------------------------------------------------------------- sample cleaning
+
+FILLERS = {
+    "uh", "uhh", "uhm", "um", "umm", "ummm", "er", "erm", "ah", "ahh", "eh", "hmm", "hm", "hmmm", "mm", "mmm", "huh",
+    "अ", "अं", "आं", "अम", "अम्म", "उम", "उम्", "उम्म", "उं", "हम", "हम्म", "हम्मम", "हं", "हूं", "एं", "अह", "आह",
+}
+# Whisper usually leaves fillers out of its text; a prompt full of fillers makes it write them down.
+FILLER_PROMPT = {
+    "hi": "उम्म, अं... हम्म, तो मैं, उम्म, ये कह रहा था कि, अं, ठीक है। Umm, uh, okay.",
+    "en": "Umm, uh, let me think, like, hmm... Okay, uh, here's what I was, um, saying.",
+}
+
+
+def norm_word(w):
+    return re.sub(r"[^\w\u0900-\u097F]|[\u0964\u0965]", "", w.lower())   # also drop the danda । ॥
+
+
+def is_filler(w):
+    n = norm_word(w)
+    if not n:
+        return True
+    if n in FILLERS:
+        return True
+    # stretched forms: "ummmm", "hmmmm", "उम्म्म"
+    return bool(re.fullmatch(r"u+h+|u+m+|h+m+|m+|a+h+|e+r+m*|उ+म्*म*्*|ह+म्*म*्*|अ+ं*", n))
+
+
+def frame_db(wav, frame=0.02):
+    n = int(SR * frame)
+    if wav.size < n:
+        return np.array([-90.0])
+    f = wav[: wav.size // n * n].reshape(-1, n)
+    return 20 * np.log10(np.sqrt((f ** 2).mean(axis=1)) + 1e-9)
+
+
+def noise_floor_db(wav):
+    return float(np.percentile(frame_db(wav), 10))
+
+
+def denoise(wav):
+    try:
+        import noisereduce as nr
+    except ImportError:
+        return wav, False
+    out = nr.reduce_noise(y=wav, sr=SR, stationary=False, prop_decrease=0.9)
+    return out.astype(np.float32), True
+
+
+def _biquad(kind, f0, gain_db, q):
+    """RBJ audio-EQ-cookbook biquad as a second-order section."""
+    a_ = 10 ** (gain_db / 40)
+    w0 = 2 * np.pi * f0 / SR
+    alpha = np.sin(w0) / (2 * q)
+    c = np.cos(w0)
+    if kind == "peak":
+        b = [1 + alpha * a_, -2 * c, 1 - alpha * a_]
+        a = [1 + alpha / a_, -2 * c, 1 - alpha / a_]
+    else:  # high shelf
+        sq = 2 * np.sqrt(a_) * alpha
+        b = [a_ * ((a_ + 1) + (a_ - 1) * c + sq), -2 * a_ * ((a_ - 1) + (a_ + 1) * c), a_ * ((a_ + 1) + (a_ - 1) * c - sq)]
+        a = [(a_ + 1) - (a_ - 1) * c + sq, 2 * ((a_ - 1) - (a_ + 1) * c), (a_ + 1) - (a_ - 1) * c - sq]
+    return np.array([b[0] / a[0], b[1] / a[0], b[2] / a[0], 1.0, a[1] / a[0], a[2] / a[0]])
+
+
+def enhance(wav):
+    """Gentle studio chain that keeps the speaker's real voice: remove rumble, a little less
+    "mud", a little more presence and air, soft compression, even level. Every EQ move is
+    within ±2.5 dB, so the voice is clearer but not changed."""
+    try:
+        from scipy.signal import butter, sosfilt, sosfiltfilt
+    except ImportError:
+        return wav, False
+    if wav.size < SR * 0.2:
+        return wav, False
+    x = sosfiltfilt(butter(2, 70, "highpass", fs=SR, output="sos"), wav)
+    eq = np.vstack([_biquad("peak", 300, -2.0, 1.0), _biquad("peak", 4000, 2.5, 0.9), _biquad("shelf", 9000, 1.0, 0.7)])
+    x = sosfilt(eq, x)   # single pass: filtfilt would double every EQ gain
+    # soft compression: 2.5:1 above -24 dBFS, using a 20 ms RMS envelope
+    win = int(SR * 0.02)
+    env = np.sqrt(np.convolve(x ** 2, np.ones(win) / win, mode="same") + 1e-12)
+    lvl = 20 * np.log10(env)
+    over = np.maximum(0.0, lvl - (-24.0))
+    gain_db = -over * (1 - 1 / 2.5)
+    gain = 10 ** (np.convolve(gain_db, np.ones(win) / win, mode="same") / 20)
+    x = x * gain
+    # even level: speech RMS to about -20 dBFS, peaks kept under -1 dBFS
+    speech = env > np.percentile(env, 60)
+    rms = np.sqrt(np.mean((x[speech] if speech.any() else x) ** 2)) + 1e-9
+    x = x * (10 ** (-20 / 20) / rms)
+    pk = np.max(np.abs(x))
+    if pk > 0.89:
+        x = x * (0.89 / pk)
+    return x.astype(np.float32), True
+
+
+def keep_words(wav, words, max_gap=0.3, pad_in=0.04, pad_out=0.07):
+    """Keep only real words: drop fillers and whatever lies outside words (coughs, breaths, clicks),
+    and shorten long silences. words = [(start, end, text)] in seconds."""
+    spans = []
+    real = [(a, b, t) for a, b, t in words if not is_filler(t)]
+    fillers = [(a, b) for a, b, t in words if is_filler(t)]
+    for a, b, t in real:
+        a, b = max(0.0, a - pad_in), min(wav.size / SR, b + pad_out)
+        for fa, fb in fillers:  # never reach into a removed filler
+            if fb <= a + pad_in and fb > a:
+                a = fb
+            if fa >= b - pad_out and fa < b:
+                b = fa
+        if spans and a - spans[-1][1] < 0.25:
+            spans[-1][1] = max(spans[-1][1], b)
+        else:
+            spans.append([a, b])
+    out, fade = [], int(SR * 0.008)
+    for k, (a, b) in enumerate(spans):
+        seg = wav[int(a * SR): int(b * SR)].copy()
+        if seg.size > 2 * fade:
+            seg[:fade] *= np.linspace(0, 1, fade)
+            seg[-fade:] *= np.linspace(1, 0, fade)
+        if k:
+            out.append(silence(min(max_gap, a - spans[k - 1][1])))
+        out.append(seg)
+    return (np.concatenate(out) if out else wav[:0]), [t for a, b, t in words if is_filler(t)]
+
+
+class Refiner:
+    def __init__(self):
+        self.asr = None
+        self.asr_error = ""
+
+    def load_asr(self):
+        if self.asr is not None or self.asr_error:
+            return self.asr
+        try:
+            from faster_whisper import WhisperModel
+            import torch
+            if torch.cuda.is_available():
+                self.asr = WhisperModel("medium", device="cuda", compute_type="float16")
+            else:
+                self.asr = WhisperModel("small", device="cpu", compute_type="int8")
+        except Exception as e:  # cleaning still reduces noise without it
+            self.asr_error = f"{type(e).__name__}: {e}"
+        return self.asr
+
+    def words(self, wav, lang):
+        asr = self.load_asr()
+        if asr is None:
+            return None
+        x = np.interp(np.arange(0, wav.size, SR / 16000), np.arange(wav.size), wav).astype(np.float32)
+        segs, _ = asr.transcribe(x, language=lang if lang in ("hi", "en") else None, word_timestamps=True,
+                                 initial_prompt=FILLER_PROMPT.get(lang, FILLER_PROMPT["en"]), beam_size=5,
+                                 vad_filter=False, condition_on_previous_text=False)
+        out = []
+        for sg in segs:
+            for w in (sg.words or []):
+                out.append((float(w.start), float(w.end), w.word.strip()))
+        return out
+
+    def refine(self, wav, lang="hi", kind="voice", enhance_voice=True):
+        before = wav.size / SR
+        rep = {"before": round(before, 2), "fillers": 0, "filler_words": [], "transcript": "", "asr": False}
+        nf0 = noise_floor_db(wav)
+        clean, did = denoise(wav)
+        rep["noise_reduced_db"] = round(nf0 - noise_floor_db(clean), 1) if did else 0.0
+        if kind == "voice":
+            words = self.words(clean, lang)
+            if words is None:
+                rep["note"] = "Filler removal unavailable: " + (self.asr_error or "no speech recogniser")
+            elif not words:
+                rep["note"] = "No words recognised, so nothing was cut"
+            else:
+                rep["asr"] = True
+                rep["transcript"] = " ".join(t for _, _, t in words)
+                cut, removed = keep_words(clean, words)
+                if cut.size / SR >= min(3.0, before * 0.5):
+                    clean = cut
+                    rep["fillers"] = len(removed)
+                    rep["filler_words"] = removed[:20]
+                else:
+                    rep["note"] = "Too little speech left after cutting, kept the whole sample"
+        clean = trim(clean)
+        rep["enhanced"] = False
+        if enhance_voice:
+            clean, rep["enhanced"] = enhance(clean)
+        peak = float(np.max(np.abs(clean))) if clean.size else 0.0
+        if peak > 0 and not rep["enhanced"]:
+            clean = clean * (0.9 / peak)
+        rep["after"] = round(clean.size / SR, 2)
+        rep["removed_sec"] = round(max(0.0, before - rep["after"]), 2)
+        return clean.astype(np.float32), rep
+
+
+class RefineIn(BaseModel):
+    audio: str              # base64 WAV
+    language: str = "hi"
+    kind: str = "voice"     # "voice" (speech sample) or "sound" (laugh, sigh...: noise reduction only)
+    enhance: bool = True    # gentle clarity chain (EQ, compression, level) that keeps the real voice
+
+
 # ---------------------------------------------------------------- jobs
 
 class JobIn(BaseModel):
@@ -361,16 +564,28 @@ class VoiceServer:
             self.cv.notify()
 
 
-def create_app(engine):
+def create_app(engine, refiner=None):
     server = VoiceServer(engine)
+    refiner = refiner or Refiner()
     app = FastAPI(title="Stickman Studio voice server")
     # The app runs from file://, from the Android app and from GitHub Pages, so allow any origin.
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
     @app.get("/health")
     def health():
-        return {"ok": True, "engine": engine.name, "device": getattr(engine, "device", "?"),
+        return {"ok": True, "engine": engine.name, "device": getattr(engine, "device", "?"), "refine": True,
                 "languages": getattr(engine, "languages", ["hi", "en"]), "busy": len(server.queue)}
+
+    @app.post("/refine")
+    def refine(body: RefineIn):
+        try:
+            wav = decode_b64_wav(body.audio)
+        except Exception:
+            raise HTTPException(400, "Could not read the audio")
+        if wav.size < SR * 0.3:
+            raise HTTPException(400, "The recording is too short")
+        clean, report = refiner.refine(wav, body.language, "sound" if body.kind == "sound" else "voice", body.enhance)
+        return {"audio": base64.b64encode(wav_bytes(clean)).decode(), "report": report}
 
     @app.post("/jobs")
     def create_job(spec: JobIn):
@@ -430,7 +645,13 @@ def start(port=8000):
     """Load the model and serve in a background thread (used by the Colab notebook)."""
     import uvicorn
     engine = load_engine()
-    app = create_app(engine)
+    refiner = Refiner()
+    if os.environ.get("STICKMAN_FAKE_TTS") != "1":
+        print("Loading the speech recogniser used to clean voice samples…")
+        refiner.load_asr()
+        if refiner.asr_error:
+            print("Sample cleaning will only reduce noise:", refiner.asr_error)
+    app = create_app(engine, refiner)
     cfg = uvicorn.Config(app, host="0.0.0.0", port=port, log_level="warning")
     srv = uvicorn.Server(cfg)
     threading.Thread(target=srv.run, daemon=True).start()

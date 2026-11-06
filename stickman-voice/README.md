@@ -29,6 +29,22 @@ Tags (spoken, never shown in captions or image prompts):
 Sentences get a natural pause after them (slightly varied), commas a shorter one; both are set in the app.
 If one line comes out wrong (skipped or extra words), press **Redo** next to it in the app.
 
+## Sample cleaning (automatic)
+Every sample you upload or record is cleaned before it is used for cloning (`POST /refine`):
+
+1. **Background noise** is reduced with spectral gating (`noisereduce`).
+2. For speech samples, a speech recogniser (faster-whisper, `medium` on the GPU) finds every word;
+   fillers such as *uh, um, hmm, अं, उम्म, हम्म*, plus coughs, breaths and clicks between words, are cut,
+   and long silences are shortened. Real words like *हाँ* or *okay* stay. If too little speech would be
+   left, the whole sample is kept.
+3. **Crystal clear** (optional, on by default): a gentle studio chain, not an AI re-synthesis, so the
+   voice stays yours: high-pass at 70 Hz, −2 dB at 300 Hz, +2.5 dB at 4 kHz, +1 dB above 9 kHz,
+   2.5:1 compression above −24 dBFS and an even speech level.
+
+Sounds (laugh, sigh…) only get the noise reduction and the polish; nothing is cut from them.
+The app shows what was done (e.g. "background noise −19 dB · 4 fillers removed · clarity polished")
+and keeps the original so you can compare. Both steps can be switched off in the app.
+
 ## Your voice
 In Stickman Studio open **My voice and my sounds**, confirm that it is your voice (or that you have
 the speaker's permission), and record the **Main voice** (10–20 s of normal speech). Optional: the same
@@ -40,4 +56,6 @@ inaudible watermark to its audio.
 `GET /health` · `POST /jobs` `{units, language, voice{mood: wav-base64}, sounds{name: wav-base64}, expressiveness, sentence_pause, comma_pause, seed}` ·
 `GET /jobs/{id}` (status, progress, timings) · `GET /jobs/{id}/audio` (24 kHz WAV) · `POST /jobs/{id}/redo` `{unit, seed?}`.
 
-Test without a GPU: `STICKMAN_FAKE_TTS=1 python server.py` (beeps instead of speech).
+`POST /refine` `{audio, language, kind: voice|sound, enhance}` → `{audio, report}`.
+
+Test without a GPU: `STICKMAN_FAKE_TTS=1 python server.py` (beeps instead of speech; cleaning then only reduces noise).

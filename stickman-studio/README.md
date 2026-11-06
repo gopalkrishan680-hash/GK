@@ -41,6 +41,8 @@ voice or **your own cloned voice**, with `[pause]`, `[laugh]`, `[sigh]`, `[happy
 The voice model runs free on Google Colab; see `../stickman-voice/README.md` for the 3-step start.
 The voiceover is set as the video's audio and every scene is timed from the voice itself.
 **Download voiceover** saves it as a WAV file. Each line can be played or redone on its own.
+Your voice samples are cleaned first (background noise, uh/um, coughs, long gaps removed, gentle
+"crystal clear" polish that keeps your real voice); the original is kept for comparison.
 
 ## Extra features
 - 16:9, 9:16 (Shorts) and 1:1. 3×3 or 2×2 grid (2×2 = higher quality per scene).

@@ -299,7 +299,7 @@ details summary { cursor: pointer; font-weight: 600; }
     </div>
     <div class="slot" id="sampleBox" hidden>
       <div><div class="nm">Your voice sample</div><div class="ds" id="sampleInfo">Upload a clear recording of your own voice (10–30 s is best; mp3, wav, m4a, a WhatsApp voice note or even a video). The app uses it to clone your voice for this script.</div></div>
-      <div class="acts"><button class="btn small primary" id="sampleUp">Upload my voice sample</button><button class="btn small" data-rec="normal" id="sampleRec">Record now</button><button class="btn small" data-slotplay="normal" id="samplePlay" hidden>Play</button></div>
+      <div class="acts"><button class="btn small primary" id="sampleUp">Upload my voice sample</button><button class="btn small" data-rec="normal" id="sampleRec">Record now</button><button class="btn small" data-slotplay="normal" id="samplePlay" hidden>Play</button><button class="btn small" data-slotorig="normal" id="sampleOrig" hidden>Original</button></div>
     </div>
     <div class="row">
       <label class="f">Pause after a sentence <input type="range" id="ttsSentPause" min="0.15" max="1.2" step="0.05"></label>
@@ -311,6 +311,8 @@ details summary { cursor: pointer; font-weight: 600; }
       <summary>My voice and my sounds (for cloning)</summary>
       <div style="display:grid;gap:10px;margin-top:10px">
         <label style="display:flex;gap:8px;align-items:flex-start;flex-wrap:nowrap"><input type="checkbox" id="ttsConsent" style="margin-top:4px;flex:none"> <span>This is <b>my own voice</b>, or the speaker has given me permission to clone it.</span></label>
+        <label style="display:flex;gap:8px;align-items:flex-start;flex-wrap:nowrap"><input type="checkbox" id="ttsClean" style="margin-top:4px;flex:none"> <span><b>Clean my samples first</b> (recommended): remove background noise, and "uh", "um", "hmm", coughs and long gaps from voice samples, then clone from the cleaned sample. Sounds like a laugh only get the noise removed.</span></label>
+        <label style="display:flex;gap:8px;align-items:flex-start;flex-wrap:nowrap"><input type="checkbox" id="ttsEnhance" style="margin-top:4px;flex:none"> <span><b>Make it crystal clear</b>: a gentle studio polish (removes rumble, a little less boominess, a little more clarity, even loudness). It does not regenerate your voice, so it still sounds like you.</span></label>
         <p class="hint" style="margin:0">Record in a quiet room, phone close to your mouth. <b>Main voice</b> is needed for cloning; the others are optional. A mood recording makes <code>[happy]</code>, <code>[sad]</code>… sound like you in that mood. A sound recording is used wherever its tag appears, e.g. your real laugh for <code>[laugh]</code>. Recordings stay on this device and are not put into project files.</p>
         <div class="slots" id="slots"></div>
       </div>
@@ -1335,7 +1337,8 @@ document.addEventListener('click', async e => {
   else if (d.tag) insertTag(d.tag);
   else if (d.rec) toggleRec(d.rec);
   else if (d.slotup) { const [f] = await pickFile($('#oneAudio')); if (f) setSlot(d.slotup, f); }
-  else if (d.slotplay) { const a = new Audio(URL.createObjectURL(VP.slots[d.slotplay].blob)); a.play(); }
+  else if (d.slotplay) { const a = new Audio(URL.createObjectURL(slotUse(VP.slots[d.slotplay]))); a.play(); }
+  else if (d.slotorig) { const a = new Audio(URL.createObjectURL(slotRaw(VP.slots[d.slotorig]))); a.play(); }
   else if (d.slotdel) { delete VP.slots[d.slotdel]; saveVP(); renderSlots(); }
   else if (d.lineplay != null) playLine(+d.lineplay);
   else if (d.lineredo != null) redoLine(+d.lineredo);
@@ -1630,12 +1633,13 @@ const VOICE_SLOTS = [
   { k: 'cry', kind: 'sound', nm: 'Cry', ds: 'A sob (1–4 s).', max: 5 },
 ];
 const TAGS = ['[pause]', '[pause 1.5]', '[laugh]', '[chuckle]', '[sigh]', '[gasp]', '[hmm]', '[happy]', '[excited]', '[sad]', '[angry]', '[whisper]', '[calm]', '[normal]'];
-const VP = { url: '', lang: 'hi', voice: 'default', expr: 1, sentPause: 0.45, commaPause: 0.15, consent: false, slots: {} };
+const VP = { url: '', lang: 'hi', voice: 'default', expr: 1, sentPause: 0.45, commaPause: 0.15, consent: false, clean: true, enhance: true, slots: {} };
+let ttsOnline = false;
 let ttsPoll = null, recNow = null;
 const ttsBase = () => (VP.url || '').trim().replace(/\/+$/, '');
 function saveVP() { DB.put('voiceProfile', VP).catch(() => {}); }
-async function loadVP() { try { const v = await DB.get('voiceProfile'); if (v) Object.assign(VP, v); } catch (_) {} }
-function vpToUI() { $('#ttsUrl').value = VP.url; $('#ttsLang').value = VP.lang; $('#ttsVoice').value = VP.voice; $('#ttsExpr').value = VP.expr; $('#ttsSentPause').value = VP.sentPause; $('#ttsCommaPause').value = VP.commaPause; $('#ttsConsent').checked = VP.consent; renderSlots(); }
+async function loadVP() { try { const v = await DB.get('voiceProfile'); if (v) Object.assign(VP, v); } catch (_) {} for (const v of Object.values(VP.slots || {})) if (v) v.cleaning = false; }
+function vpToUI() { $('#ttsUrl').value = VP.url; $('#ttsLang').value = VP.lang; $('#ttsVoice').value = VP.voice; $('#ttsExpr').value = VP.expr; $('#ttsSentPause').value = VP.sentPause; $('#ttsCommaPause').value = VP.commaPause; $('#ttsConsent').checked = VP.consent; $('#ttsClean').checked = VP.clean !== false; $('#ttsEnhance').checked = VP.enhance !== false; $('#ttsEnhance').disabled = VP.clean === false; renderSlots(); }
 [['ttsUrl', 'url'], ['ttsLang', 'lang'], ['ttsVoice', 'voice'], ['ttsExpr', 'expr', 1], ['ttsSentPause', 'sentPause', 1], ['ttsCommaPause', 'commaPause', 1]].forEach(([id, key, num]) => {
   const el = $('#' + id); el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => { VP[key] = num ? +el.value : el.value; saveVP(); });
 });
@@ -1644,6 +1648,12 @@ $('#sampleUp').onclick = async () => {
   const [f] = await pickFile($('#oneAudio')); if (f) setSlot('normal', f);
 };
 $('#ttsConsent').addEventListener('change', e => { VP.consent = e.target.checked; saveVP(); renderSlots(); });
+$('#ttsClean').addEventListener('change', e => { VP.clean = e.target.checked; $('#ttsEnhance').disabled = !VP.clean; saveVP(); renderSlots(); if (VP.clean) cleanPending(); });
+$('#ttsEnhance').addEventListener('change', e => {   // redo the cleaning with or without the polish
+  VP.enhance = e.target.checked;
+  for (const v of Object.values(VP.slots)) if (v && v.cleaned) { v.blob = slotRaw(v); v.dur = v.rawDur || v.dur; v.cleaned = false; v.report = null; }
+  saveVP(); renderSlots(); if (ttsOnline) cleanPending(); else toast('Your samples will be cleaned again when the voice server is connected');
+});
 $('#ttsVoice').addEventListener('change', () => { renderSample(); if (VP.voice === 'mine' && !VP.slots.normal) toast('Upload or record a sample of your voice'); });
 $('#tagBtns').innerHTML = TAGS.map(t => `<button class="btn" data-tag="${t}">${t}</button>`).join('');
 function insertTag(tag) {
@@ -1653,12 +1663,42 @@ function insertTag(tag) {
   ta.value = pre + ins + post; ta.focus(); ta.selectionStart = ta.selectionEnd = a + ins.length; S.script = ta.value; save();
   toast(`${tag} added. Press Create scenes when you are done editing.`);
 }
+const slotRaw = v => v && (v.raw || v.blob);
+const slotUse = v => v && (VP.clean !== false && v.cleaned ? v.blob : slotRaw(v));
+function cleanSummary(v) {
+  if (!v) return '';
+  if (VP.clean === false) return `Original · ${(v.rawDur || v.dur).toFixed(1)} s (cleaning is off)`;
+  if (!v.cleaned) return `Recorded · ${(v.rawDur || v.dur).toFixed(1)} s · ${v.cleanError ? 'could not clean: ' + v.cleanError : 'will be cleaned when the voice server is connected'}`;
+  const r = v.report || {}, parts = [];
+  if (r.noise_reduced_db > 0.5) parts.push(`background noise −${Math.round(r.noise_reduced_db)} dB`);
+  if (r.asr) parts.push(r.fillers ? `${r.fillers} filler${r.fillers > 1 ? 's' : ''} removed (${(r.filler_words || []).slice(0, 4).join(', ')})` : 'no uh/um found');
+  if (r.enhanced) parts.push('clarity polished');
+  if (r.removed_sec > 0.2) parts.push(`${r.before} s → ${r.after} s`);
+  if (r.note) parts.push(r.note);
+  return `Cleaned · ${v.dur.toFixed(1)} s · ${parts.join(' · ') || 'already clean'}`;
+}
+async function refineSlot(k, quiet) {
+  const v = VP.slots[k]; if (!v || v.cleaning) return;
+  const sl = VOICE_SLOTS.find(x => x.k === k); v.cleaning = true; v.cleanError = ''; renderSlots();
+  try {
+    const r = await (await ttsFetch('/refine', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ audio: await blobB64(slotRaw(v)), language: VP.lang, kind: sl.kind, enhance: VP.enhance !== false }) })).json();
+    v.raw = slotRaw(v); v.rawDur = v.rawDur || v.dur;
+    v.blob = new Blob([Uint8Array.from(atob(r.audio), c => c.charCodeAt(0))], { type: 'audio/wav' });
+    v.dur = r.report.after; v.report = r.report; v.cleaned = true;
+    if (!quiet) toast(`${sl.nm} cleaned: ${cleanSummary(v).split(' · ').slice(2).join(', ') || 'already clean'}`);
+  } catch (e) { v.cleanError = e.message; if (!quiet) toast('Could not clean the sample: ' + e.message); }
+  v.cleaning = false; saveVP(); renderSlots();
+}
+async function cleanPending(quiet) {
+  if (VP.clean === false || !ttsBase()) return;
+  for (const sl of VOICE_SLOTS) { const v = VP.slots[sl.k]; if (v && !v.cleaned) await refineSlot(sl.k, quiet); }
+}
 function renderSample() {
   const box = $('#sampleBox'); box.hidden = VP.voice !== 'mine';
   const has = VP.slots.normal; box.classList.toggle('has', !!has);
-  $('#sampleInfo').textContent = has ? `Voice sample ready · ${has.dur.toFixed(1)} s. Generate the voiceover and it will speak in this voice. You can replace it any time.` : 'Upload a clear recording of your own voice (10–30 s is best; mp3, wav, m4a, a WhatsApp voice note or even a video). The app uses it to clone your voice for this script.';
+  $('#sampleInfo').textContent = has ? (has.cleaning ? 'Cleaning the sample: removing background noise and uh/um, polishing the voice…' : cleanSummary(has) + '. Generate the voiceover and it will speak in this voice.') : 'Upload a clear recording of your own voice (10–30 s is best; mp3, wav, m4a, a WhatsApp voice note or even a video). The app uses it to clone your voice for this script.';
   $('#sampleUp').textContent = has ? 'Replace sample' : 'Upload my voice sample';
-  $('#samplePlay').hidden = !has;
+  $('#samplePlay').hidden = !has; $('#sampleOrig').hidden = !(has && has.cleaned && VP.clean !== false);
   const recording = recNow && recNow.slot === 'normal'; $('#sampleRec').textContent = recording ? 'Stop' : 'Record now'; box.classList.toggle('rec', !!recording);
 }
 function renderSlots() {
@@ -1666,8 +1706,8 @@ function renderSlots() {
   const dis = !VP.consent;
   $('#slots').innerHTML = VOICE_SLOTS.map(sl => {
     const b = VP.slots[sl.k], recording = recNow && recNow.slot === sl.k;
-    return `<div class="slot${b ? ' has' : ''}${recording ? ' rec' : ''}"><div><div class="nm">${sl.nm}${sl.kind === 'sound' ? ` <code>[${sl.k}]</code>` : sl.k !== 'normal' ? ` <code>[${sl.k}]</code>` : ''}</div><div class="ds">${b ? `Recorded · ${b.dur.toFixed(1)} s` : sl.ds}</div></div>
-      <div class="acts"><button class="btn small ${recording ? 'danger' : ''}" data-rec="${sl.k}" ${dis ? 'disabled' : ''}>${recording ? 'Stop' : 'Record'}</button><button class="btn small" data-slotup="${sl.k}" ${dis ? 'disabled' : ''}>Upload</button>${b ? `<button class="btn small" data-slotplay="${sl.k}">Play</button><button class="btn small danger" data-slotdel="${sl.k}">Remove</button>` : ''}</div></div>`;
+    return `<div class="slot${b ? ' has' : ''}${recording ? ' rec' : ''}"><div><div class="nm">${sl.nm}${sl.kind === 'sound' ? ` <code>[${sl.k}]</code>` : sl.k !== 'normal' ? ` <code>[${sl.k}]</code>` : ''}</div><div class="ds">${b ? (b.cleaning ? 'Cleaning…' : cleanSummary(b)) : sl.ds}</div></div>
+      <div class="acts"><button class="btn small ${recording ? 'danger' : ''}" data-rec="${sl.k}" ${dis ? 'disabled' : ''}>${recording ? 'Stop' : 'Record'}</button><button class="btn small" data-slotup="${sl.k}" ${dis ? 'disabled' : ''}>Upload</button>${b ? `<button class="btn small" data-slotplay="${sl.k}">Play</button>${b.cleaned && VP.clean !== false ? `<button class="btn small" data-slotorig="${sl.k}">Original</button>` : ''}<button class="btn small danger" data-slotdel="${sl.k}">Remove</button>` : ''}</div></div>`;
   }).join('');
 }
 function encodeWav(f32, sr) {
@@ -1692,7 +1732,10 @@ async function toVoiceWav(blob, maxSec) {
 }
 async function setSlot(k, blob) {
   const sl = VOICE_SLOTS.find(x => x.k === k);
-  try { const r = await toVoiceWav(blob, sl.max); VP.slots[k] = r; saveVP(); renderSlots(); toast(`${sl.nm} saved (${r.dur.toFixed(1)} s)`); }
+  try {
+    const r = await toVoiceWav(blob, sl.max); VP.slots[k] = { blob: r.blob, raw: r.blob, dur: r.dur, rawDur: r.dur, cleaned: false }; saveVP(); renderSlots();
+    if (VP.clean !== false && ttsOnline) await refineSlot(k); else toast(`${sl.nm} saved (${r.dur.toFixed(1)} s)` + (VP.clean !== false ? '. It will be cleaned when the voice server is connected.' : ''));
+  }
   catch (e) { toast('Could not use this recording: ' + e.message); }
 }
 async function toggleRec(k) {
@@ -1715,8 +1758,8 @@ async function ttsFetch(path, opt = {}) {
 }
 async function ttsConnect() {
   const chip = $('#ttsChip'); chip.textContent = 'Connecting…'; chip.className = 'chip';
-  try { const h = await (await ttsFetch('/health')).json(); chip.textContent = `Connected · ${h.engine === 'fake' ? 'test engine' : 'GPU ready'}`; chip.className = 'chip ok'; return true; }
-  catch (e) { chip.textContent = 'Not connected'; chip.className = 'chip wait'; toast(e.message); return false; }
+  try { const h = await (await ttsFetch('/health')).json(); chip.textContent = `Connected · ${h.engine === 'fake' ? 'test engine' : 'GPU ready'}`; chip.className = 'chip ok'; ttsOnline = true; cleanPending(); return true; }
+  catch (e) { chip.textContent = 'Not connected'; chip.className = 'chip wait'; ttsOnline = false; toast(e.message); return false; }
 }
 $('#ttsConnect').onclick = ttsConnect;
 function ttsBusy(on) { $('#ttsGo').disabled = on; $('#ttsStop').hidden = !on; $('#ttsProg').hidden = !on; }
@@ -1749,7 +1792,8 @@ async function ttsGenerate() {
   if (VP.voice === 'mine' && (!VP.consent || !VP.slots.normal)) { renderSample(); return toast('For your own voice: tick the permission box, then upload or record a voice sample'); }
   const groups = sentenceGroups(), units = groups.map(g => g.map(i => S.segments[i].text.trim()).join(' '));
   const body = { units, language: VP.lang, expressiveness: VP.expr, sentence_pause: VP.sentPause, comma_pause: VP.commaPause, seed: 7, voice: {}, sounds: {} };
-  if (VP.voice === 'mine') for (const sl of VOICE_SLOTS) { const v = VP.slots[sl.k]; if (v) (sl.kind === 'voice' ? body.voice : body.sounds)[sl.k] = await blobB64(v.blob); }
+  if (VP.voice === 'mine' && VP.clean !== false && VOICE_SLOTS.some(sl => VP.slots[sl.k] && !VP.slots[sl.k].cleaned)) { $('#ttsInfo').textContent = 'Cleaning your samples first…'; await cleanPending(true); }
+  if (VP.voice === 'mine') for (const sl of VOICE_SLOTS) { const v = VP.slots[sl.k]; if (v) (sl.kind === 'voice' ? body.voice : body.sounds)[sl.k] = await blobB64(slotUse(v)); }
   ttsBusy(true); $('#ttsInfo').textContent = 'Sending the script…';
   try {
     const j = await (await ttsFetch('/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();
