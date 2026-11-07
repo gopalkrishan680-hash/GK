@@ -1668,7 +1668,7 @@ const VOICE_SLOTS = [
 ];
 const TAGS = ['[pause]', '[pause 1.5]', '[laugh]', '[chuckle]', '[sigh]', '[gasp]', '[hmm]', '[happy]', '[excited]', '[sad]', '[angry]', '[whisper]', '[calm]', '[normal]'];
 const VP = { url: '', lang: 'hi', voice: 'default', expr: 1, sentPause: 0.6, commaPause: 0.25, pace: 'normal', pv: 2, consent: false, clean: true, enhance: true, slots: {},
-  engine: 'gemini', gemKey: '', gemStyle: 'narrative', gemPace: 'natural', gemAccent: 'neutral', gemCustom: '', gemVoice: 'mine_free', gemBase: 'Charon', gemModel: 'gemini-3.8-flash-tts', gemVoiceKey: '', gemVoiceSig: '' };
+  engine: 'gemini', gemKey: '', gemStyle: 'narrative', gemPace: 'natural', gemAccent: 'neutral', gemCustom: '', gemVoice: 'Charon', gemBase: 'Charon', gemModel: 'gemini-3.8-flash-tts', gemVoiceKey: '', gemVoiceSig: '' };
 let ttsOnline = false;
 let ttsPoll = null, recNow = null;
 const ttsBase = () => (VP.url || '').trim().replace(/\/+$/, '');
@@ -1676,8 +1676,10 @@ function saveVP() { DB.put('voiceProfile', VP).catch(() => {}); }
 async function loadVP() { try { const v = await DB.get('voiceProfile'); if (v) Object.assign(VP, v); } catch (_) {}
   if ((VP.pv || 1) < 3) { VP.engine = 'gemini'; }
   if ((VP.pv || 1) < 4 && VP.gemVoice === 'mine') VP.gemVoice = 'mine_free';
+  // v5: Gemini's ready voice by default: works with just the API key, no Colab or Kaggle
+  if ((VP.pv || 1) < 5) { VP.engine = 'gemini'; if (VP.gemVoice === 'mine' || VP.gemVoice === 'mine_free') VP.gemVoice = VP.gemBase || 'Charon'; }
   if ((VP.pv || 1) < 2) { if (VP.sentPause === 0.45) VP.sentPause = 0.6; if (VP.commaPause === 0.15) VP.commaPause = 0.25; VP.pace = VP.pace || 'normal'; }
-  VP.pv = 4; for (const v of Object.values(VP.slots || {})) if (v) v.cleaning = false; }
+  VP.pv = 5; for (const v of Object.values(VP.slots || {})) if (v) v.cleaning = false; }
 // Natural-sounding defaults: relaxed pace, real pauses, a little more expression.
 const TTS_RECOMMENDED = { pace: 'relaxed', sentPause: 0.6, commaPause: 0.25, expr: 1.1 };
 function showTtsValues() {
