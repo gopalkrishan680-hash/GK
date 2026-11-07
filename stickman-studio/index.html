@@ -518,6 +518,9 @@ details summary { cursor: pointer; font-weight: 600; }
       <label class="f">Pictures for the scenes
         <select id="pics"><option value="auto">My images; a drawn stickman scene where there is none</option><option value="draw">Always drawn stickmen (no images needed)</option><option value="images">Only my images</option></select>
       </label>
+      <label class="f">Drawing style
+        <select id="skStyle"><option value="classic">Classic: clean thin lines</option><option value="sketch">Pen sketch: hand-drawn, big head, expressive</option><option value="bold">Bold cartoon: outlined tube limbs</option><option value="flat">Flat colour explainer</option><option value="doodle">Expressive doodle: curved limbs, big eyes, hands and shoes</option><option value="marker">Thick marker with a colour accent</option></select>
+      </label>
       <p class="hint" style="margin:0 0 6px">Drawn scenes are made in the app, offline, from each line: who is in it, the pose, the face, things like a laptop, phone, chai, money, clock, chart, rain cloud or idea bulb, and speech or thought bubbles. The arms and legs really move. Change any of it with <b>✏️ Drawing</b> under the scene (step 1).</p>
       <h3>Smart animation</h3>
       <p class="hint" style="margin:0 0 6px">Reads every line (tags like <code>[laugh]</code>, words like <i>achanak, hans, udaas, gussa, darr, pyaar, bhaag</i>, and <b>!</b> / <b>?</b>) and picks the camera move, the stickman's movement and a small effect by itself: laugh → bounce + sparkles, achanak / ! → zoom punch + "!", sad → slow zoom out + tears, scared → sweat drop, angry → shake + 💢, love → hearts, ? → push-in + "?", running → speed lines. To change one scene, use its <b>Animation</b> menu in the scene list (step 1).</p>
@@ -621,7 +624,7 @@ He looked at Papa. Papa smiled, and said, "I am proud of you."`;
 
 /* ============ state ============ */
 const DEFAULTS = { title: '', aspect: '16:9', grid: 3, style: 'stickman', styleText: STYLES.stickman.text, characters: '', gutter: 'auto',
-  splitLevel: 'all', minWords: 2, maxWords: 14, captions: 'bar', fit: 'auto', enhance: 'on', v: 2, capSize: 1, motion: 6, transition: 'fade', transDur: 0.15, res: 1080, fps: 30, musicVol: 0.12, anim: 'on', animAmt: 1, capWords: 'on', pics: 'auto' };
+  splitLevel: 'all', minWords: 2, maxWords: 14, captions: 'bar', fit: 'auto', enhance: 'on', v: 2, capSize: 1, motion: 6, transition: 'fade', transDur: 0.15, res: 1080, fps: 30, musicVol: 0.12, anim: 'on', animAmt: 1, capWords: 'on', pics: 'auto', skStyle: 'classic' };
 try { if (matchMedia('(pointer: coarse)').matches) DEFAULTS.res = 720; } catch (_) {}   // phones: smaller, faster export
 const S = { settings: { ...DEFAULTS }, script: '', segments: [], starts: [], grids: [], overrides: {}, audioBlob: null, audioName: '', musicBlob: null, musicName: '' };
 let uid = 1;
@@ -1442,6 +1445,18 @@ function animScene(ctx, i, src0, lt, d, p, W, H, o) {
 const SK = (() => {
   const LEN = { th: 62, sh: 60, torso: 108, ua: 50, fa: 48, head: 40, neck: 5 };
   const D2R = Math.PI / 180, V = a => [Math.sin(a * D2R), Math.cos(a * D2R)];
+  // Drawing styles: the same skeleton, poses and scenes, drawn differently.
+  const STYLES = {
+    classic: { label: 'Classic: clean thin lines', lw: 4.4, head: 1, wobble: 0.06 },
+    sketch: { label: 'Pen sketch: hand-drawn, big head, expressive', lw: 3, head: 1.2, wobble: 0.11, double: 1, ends: 1, brows: 1, shadow: 'hatch' },
+    bold: { label: 'Bold cartoon: outlined tube limbs', lw: 4, head: 1.25, wobble: 0, tube: 14, ends: 1, brows: 1, shadow: 'soft', blush: 1 },
+    flat: { label: 'Flat colour explainer: clothes and skin colour', lw: 3.2, head: 1.12, wobble: 0.02, flat: 1, ends: 1, brows: 1, wall: 1, blush: 1, shadow: 'soft' },
+    doodle: { label: 'Expressive doodle: curved limbs, big eyes, hands and shoes', lw: 3.4, head: 1.45, wobble: 0.07, curvy: 1, bigEyes: 1, nose: 1, ends: 2, brows: 1, shadow: 'hatch' },
+    marker: { label: 'Thick marker with a colour accent', lw: 7, head: 1.2, wobble: 0.03, ends: 1, brows: 1, shadow: 'soft', accent: 1, blush: 1 },
+  };
+  let ST = STYLES.classic;
+  const SHIRTS = ['#e4572e', '#2e86ab', '#3f9e5a', '#f2a541', '#8e5bd6', '#e8446b', '#2a9d8f'], SKIN = '#f3cfae', PANTS = '#36435f';
+  const HR = () => LEN.head * ST.head;
   // Poses face right. Angles are absolute: 0 = straight down, 90 = right (forward), 180 = up, -90 = left (back).
   // la / ra = [upper arm, forearm] of the back / front arm; ll / rl = [thigh, shin]; lean and head tilt forward in degrees.
   const POSES = {
@@ -1519,7 +1534,7 @@ const SK = (() => {
     const hip = [q.dx || 0, -drop - (q.lift || 0)];
     const kL = add(hip, q.ll[0], LEN.th), fL = add(kL, q.ll[1], LEN.sh), kR = add(hip, q.rl[0], LEN.th), fR = add(kR, q.rl[1], LEN.sh);
     const neck = add(hip, 180 - q.lean, LEN.torso), sh = [neck[0] + (hip[0] - neck[0]) * 0.1, neck[1] + (hip[1] - neck[1]) * 0.1];
-    const head = add(neck, 180 - q.lean - q.head, LEN.head + LEN.neck);
+    const head = add(neck, 180 - q.lean - q.head, HR() + LEN.neck);
     const eL = add(sh, q.la[0], LEN.ua), hL = add(eL, q.la[1], LEN.fa), eR = add(sh, q.ra[0], LEN.ua), hR = add(eR, q.ra[1], LEN.fa);
     return { hip, kL, fL, kR, fR, neck, sh, head, eL, hL, eR, hR };
   }
@@ -1527,10 +1542,13 @@ const SK = (() => {
   // ---------- hand-drawn strokes ----------
   const nz = (a, b) => { const v = Math.sin(a * 91.17 + b * 47.53) * 43758.5453; return v - Math.floor(v); };
   function seg(c, x1, y1, x2, y2, s = 1) {
-    const dx = x2 - x1, dy = y2 - y1, l = Math.hypot(dx, dy) || 1, o = (nz(s, l) - 0.5) * l * 0.06;
+    const dx = x2 - x1, dy = y2 - y1, l = Math.hypot(dx, dy) || 1, o = (nz(s, l) - 0.5) * l * ST.wobble;
     c.moveTo(x1, y1); c.quadraticCurveTo((x1 + x2) / 2 - dy / l * o, (y1 + y2) / 2 + dx / l * o, x2, y2);
   }
-  function line(c, pts, s = 1) { c.beginPath(); for (let k = 0; k < pts.length - 1; k++) seg(c, pts[k][0], pts[k][1], pts[k + 1][0], pts[k + 1][1], s + k); c.stroke(); }
+  function line(c, pts, s = 1) {
+    c.beginPath(); for (let k = 0; k < pts.length - 1; k++) seg(c, pts[k][0], pts[k][1], pts[k + 1][0], pts[k + 1][1], s + k); c.stroke();
+    if (ST.double) { c.save(); c.lineWidth *= 0.5; c.globalAlpha *= 0.55; c.translate(0.9, -0.7); c.beginPath(); for (let k = 0; k < pts.length - 1; k++) seg(c, pts[k][0], pts[k][1], pts[k + 1][0], pts[k + 1][1], s + k + 37); c.stroke(); c.restore(); }
+  }
   function circ(c, x, y, r, s = 1, fill) {
     c.beginPath(); for (let k = 0; k <= 26; k++) { const a = k / 26 * Math.PI * 2 + 0.3, rr = r * (1 + (nz(s, k % 26) - 0.5) * 0.05); c[k ? 'lineTo' : 'moveTo'](x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
     c.closePath(); if (fill) { c.fillStyle = fill; c.fill(); } c.stroke();
@@ -1539,7 +1557,7 @@ const SK = (() => {
   function text(c, str, x, y, size, col = '#1a1a1a', align = 'center', bold = 700) {
     c.save(); c.font = `${bold} ${size}px "Comic Sans MS", "Baloo 2", "Hind", "Chalkboard SE", sans-serif`; c.fillStyle = col; c.textAlign = align; c.textBaseline = 'middle'; c.fillText(str, x, y); c.restore();
   }
-  const INK = '#1a1a1a', PAPER = '#fbfaf6';
+  let INK = '#1a1a1a', PAPER = '#fbfaf6';
 
   // ---------- faces, hair, extras (figure space, facing +x) ----------
   function face(c, hx, hy, r, kind, t, seed) {
@@ -1547,6 +1565,8 @@ const SK = (() => {
     const ox = r * 0.22, ex1 = hx + ox - r * 0.2, ex2 = hx + ox + r * 0.2, ey = hy - r * 0.1;
     const blink = !['laugh', 'sleep', 'cry', 'tired'].includes(kind) && ((t + seed * 1.37) % 3.7) < 0.12;
     const eye = (x, big) => {
+      if (ST.bigEyes && !blink) { const rx = r * (big ? 0.17 : 0.14), ry = r * (big ? 0.22 : 0.18); c.save(); c.lineWidth = 2; c.fillStyle = '#fff'; c.beginPath(); c.ellipse(x, ey - r * 0.02, rx, ry, 0, 0, 7); c.fill(); c.stroke();
+        c.fillStyle = INK; c.beginPath(); c.arc(x + r * (kind === 'think' ? 0.02 : 0.05), ey + (kind === 'think' ? -r * 0.09 : r * 0.03), r * (big ? 0.06 : 0.075), 0, 7); c.fill(); c.restore(); return; }
       if (blink) { c.beginPath(); c.moveTo(x - r * 0.08, ey); c.lineTo(x + r * 0.08, ey); c.stroke(); return; }
       if (big) { c.beginPath(); c.ellipse(x, ey, r * 0.12, r * 0.15, 0, 0, 7); c.stroke(); c.beginPath(); c.arc(x + r * 0.02, ey + r * 0.02, r * 0.05, 0, 7); c.fill(); }
       else { c.beginPath(); c.ellipse(x + (kind === 'think' ? r * 0.03 : 0), ey - (kind === 'think' ? r * 0.06 : 0), r * 0.065, r * 0.1, 0, 0, 7); c.fill(); }
@@ -1579,6 +1599,12 @@ const SK = (() => {
         c.beginPath(); c.ellipse(mx, my + r * 0.02, r * 0.06, r * 0.08, 0, 0, 7); c.stroke(); break;
       default: eye(ex1); eye(ex2); mouth([[mx - r * 0.18, my + r * 0.02], [mx + r * 0.05, my + r * 0.06], [mx + r * 0.22, my]]);
     }
+    if (ST.nose && kind !== 'sleep') { c.save(); c.lineWidth = 2; c.beginPath(); c.moveTo(hx + ox + r * 0.3, hy + r * 0.04); c.quadraticCurveTo(hx + ox + r * 0.45, hy + r * 0.16, hx + ox + r * 0.3, hy + r * 0.22); c.stroke(); c.restore(); }
+    if (ST.brows && ['neutral', 'happy', 'smirk', 'think', 'surprised', 'scared'].includes(kind)) {
+      const up = kind === 'surprised' || kind === 'scared' ? 0.36 : 0.26; c.lineWidth = 2.2; c.beginPath();
+      for (const x of [ex1, ex2]) { c.moveTo(x - r * 0.1, ey - r * (up - 0.03)); c.quadraticCurveTo(x, ey - r * (up + 0.06), x + r * 0.1, ey - r * (up - 0.03)); } c.stroke();
+    }
+    if (ST.blush && ['happy', 'laugh', 'smirk'].includes(kind)) { c.fillStyle = 'rgba(255,110,130,0.4)'; for (const x of [ex1 - r * 0.14, ex2 + r * 0.12]) { c.beginPath(); c.ellipse(x, ey + r * 0.27, r * 0.12, r * 0.07, 0, 0, 7); c.fill(); } }
     c.restore();
   }
   function hair(c, hx, hy, r, look) {
@@ -1629,7 +1655,9 @@ const SK = (() => {
     (ANIM[an] || ANIM.breathe)(q, t + f.phase);
     const J = fk(q);
     c.save(); c.translate(f.x + (f.walk || 0), f.y); c.scale(f.s * f.facing, f.s);
-    c.lineWidth = 4.4; c.strokeStyle = INK; c.lineCap = 'round'; c.lineJoin = 'round';
+    c.lineWidth = ST.lw; c.strokeStyle = INK; c.lineCap = 'round'; c.lineJoin = 'round';
+    const R = HR(), shirt = SHIRTS[f.seed % SHIRTS.length];
+    if (ST.shadow && !q.lie && !q.seat) { c.save(); if (ST.shadow === 'soft') { c.fillStyle = 'rgba(0,0,0,0.13)'; c.beginPath(); c.ellipse(0, 2, 62, 9, 0, 0, 7); c.fill(); } else { c.lineWidth = 1.6; c.globalAlpha *= 0.6; c.beginPath(); for (let x = -44; x <= 44; x += 9) { c.moveTo(x, 3); c.lineTo(x - 9, 11); } c.stroke(); } c.restore(); }
     c.save();
     if (q.lie) {   // lying down: the standing skeleton turned on its side, head forward, face up
       if (q.seat === 'bed') { rect(c, -205, -62, 410, 26, 31, '#fff'); line(c, [[-205, -36], [-205, 0]], 32); line(c, [[205, -36], [205, 0]], 33); line(c, [[205, -62], [205, -110]], 34); c.translate(-150, -66); }
@@ -1637,17 +1665,29 @@ const SK = (() => {
       c.rotate(Math.PI / 2); c.scale(-1, 1);
     }
     if (q.seat && !q.lie) seatBack(c, q.seat);
-    const l = (a, b, s) => line(c, [a, b], s);
-    l(J.hip, J.kL, 1); l(J.kL, J.fL, 2); l(J.hip, J.kR, 3); l(J.kR, J.fR, 4);
-    l(J.hip, J.neck, 5);
-    if (f.look.female && !q.lie) { c.save(); c.lineWidth = 3; const w = J.hip, s0 = [J.neck[0] + (w[0] - J.neck[0]) * 0.5, J.neck[1] + (w[1] - J.neck[1]) * 0.5]; line(c, [s0, [w[0] - 26, w[1] + 18], [w[0] + 26, w[1] + 18], s0], 40); c.restore(); }
+    const straight = (a, b, w, col) => { c.save(); c.lineWidth = w; c.strokeStyle = col; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); c.restore(); };
+    const l = (a, b, s, part) => {
+      if (ST.flat) return straight(a, b, part === 'torso' ? 30 : part === 'leg' ? 12 : 10, part === 'leg' ? PANTS : shirt);
+      if (ST.tube) { const w = part === 'torso' ? ST.tube + 6 : ST.tube; straight(a, b, w, INK); return straight(a, b, w - 7, PAPER); }
+      if (ST.accent && part === 'torso') straight(a, b, 17, shirt);
+      line(c, [a, b], s);
+    };
+    const curve = (a, k, b, part) => { if (!ST.curvy) { l(a, k, 1, part); return l(k, b, 2, part); } c.beginPath(); c.moveTo(a[0], a[1]); c.quadraticCurveTo(2 * k[0] - (a[0] + b[0]) / 2, 2 * k[1] - (a[1] + b[1]) / 2, b[0], b[1]); c.stroke(); };
+    const foot = (k, f) => { if (!ST.ends) return; if (ST.ends === 2) { c.save(); c.lineWidth = 2.4; c.fillStyle = INK; c.beginPath(); c.ellipse(f[0] + 9, f[1] - 5, 15, 7, -0.08, 0, 7); c.fill(); c.restore(); return; } c.save(); c.fillStyle = ST.flat ? '#2a2a2a' : INK; c.beginPath(); c.ellipse(f[0] + 7, f[1] - 3, 11, 5, 0, 0, 7); c.fill(); c.restore(); };
+    const hand = (h, e) => { if (!ST.ends) return; if (ST.ends === 2) { const a = Math.atan2(h[1] - e[1], h[0] - e[0]); c.save(); c.translate(h[0], h[1]); c.rotate(a); c.lineWidth = 2.2; c.fillStyle = PAPER;
+        c.beginPath(); c.ellipse(5, 0, 8, 6.5, 0, 0, 7); c.fill(); c.stroke(); c.beginPath(); c.ellipse(3, -6, 4.5, 2.6, -0.6, 0, 7); c.fill(); c.stroke(); c.restore(); return; } c.save(); c.lineWidth = Math.min(ST.lw, 3); c.fillStyle = ST.flat ? SKIN : PAPER; c.beginPath(); c.arc(h[0], h[1], ST.flat ? 6.5 : 5.5, 0, 7); c.fill(); c.stroke(); c.restore(); };
+    curve(J.hip, J.kL, J.fL, 'leg'); curve(J.hip, J.kR, J.fR, 'leg'); foot(0, J.fL); foot(1, J.fR);
+    const neckLow = [J.neck[0] + (J.hip[0] - J.neck[0]) * (ST.flat ? 0.1 : 0), J.neck[1] + (J.hip[1] - J.neck[1]) * (ST.flat ? 0.1 : 0)];
+    l(J.hip, neckLow, 5, 'torso');
+    if (f.look.female && !q.lie) { c.save(); c.lineWidth = ST.flat ? 2 : Math.min(ST.lw, 3.4); const w = J.hip, s0 = [J.neck[0] + (w[0] - J.neck[0]) * 0.45, J.neck[1] + (w[1] - J.neck[1]) * 0.45];
+      c.beginPath(); c.moveTo(s0[0], s0[1]); c.lineTo(w[0] - 30, w[1] + 22); c.lineTo(w[0] + 30, w[1] + 22); c.closePath(); c.fillStyle = ST.flat || ST.accent ? shirt : PAPER; if (ST.flat || ST.accent || ST.tube) c.fill(); c.stroke(); c.restore(); }
     if (f.look.tie && !q.lie) { c.save(); c.fillStyle = INK; c.beginPath(); c.moveTo(J.neck[0], J.neck[1] + 6); c.lineTo(J.neck[0] - 6, J.neck[1] + 40); c.lineTo(J.neck[0], J.neck[1] + 50); c.lineTo(J.neck[0] + 6, J.neck[1] + 40); c.closePath(); c.fill(); c.restore(); }
-    l(J.sh, J.eL, 6); l(J.eL, J.hL, 7);
-    circ(c, J.head[0], J.head[1], LEN.head, f.seed, PAPER);
-    hair(c, J.head[0], J.head[1], LEN.head, f.look);
-    face(c, J.head[0], J.head[1], LEN.head, f.face, t, f.seed);
-    extras(c, J.head[0], J.head[1], LEN.head, f.look);
-    l(J.sh, J.eR, 8); l(J.eR, J.hR, 9);
+    curve(J.sh, J.eL, J.hL, 'arm'); hand(J.hL, J.eL);
+    c.save(); if (ST.tube) c.lineWidth = 5; if (ST.flat) c.lineWidth = 2.6; circ(c, J.head[0], J.head[1], R, f.seed, ST.flat ? SKIN : PAPER); c.restore();
+    hair(c, J.head[0], J.head[1], R, f.look);
+    face(c, J.head[0], J.head[1], R, f.face, t, f.seed);
+    extras(c, J.head[0], J.head[1], R, f.look);
+    curve(J.sh, J.eR, J.hR, 'arm'); hand(J.hR, J.eR);
     if (q.hold && !q.lie) held(c, q.hold, J, t, f.sign, f.facing);
     if (q.seat && !q.lie && (POSES[f.pose] || {}).front) seatFront(c, POSES[f.pose].front, t);
     c.restore();
@@ -1655,7 +1695,7 @@ const SK = (() => {
     // Zzz for sleepers
     if (an === 'snore') { c.save(); c.scale(f.facing, 1); for (let k = 0; k < 3; k++) { const ph = (t * 0.5 + k / 3) % 1; c.globalAlpha = Math.sin(Math.PI * ph); text(c, 'z', 150 + ph * 40 + k * 4, -110 - ph * 70, 18 + k * 6); } c.restore(); }
     c.restore();
-    const top = f.y - (q.lie ? 120 : (LEN.th + LEN.sh + LEN.torso + 2 * LEN.head + LEN.neck)) * f.s;
+    const top = f.y - (q.lie ? 120 : (LEN.th + LEN.sh + LEN.torso + 2 * R + LEN.neck)) * f.s;
     return { x0: f.x - 70 * f.s, x1: f.x + 70 * f.s, y0: top, y1: f.y, head: [f.x + f.facing * J.head[0] * f.s, f.y + J.head[1] * f.s] };
   }
 
@@ -1855,9 +1895,11 @@ const SK = (() => {
   // Main figure's box as fractions of the scene (for the camera and the effects).
   function box(i, LW, LH) { const { figs } = scene(i, LW, LH), f = figs[0], h = 320 * f.s; return { x0: (f.x - 110 * f.s) / LW, x1: (f.x + 110 * f.s) / LW, y0: (f.y - h) / LH, y1: f.y / LH }; }
 
-  function draw(c, i, lt, d, LW, LH) {
+  function draw(c, i, lt, d, LW, LH, style) {
+    ST = STYLES[style || S.settings.skStyle] || STYLES.classic;
     const { P, L, figs } = scene(i, LW, LH);
     c.save(); c.fillStyle = PAPER; c.fillRect(0, 0, LW, LH);
+    if (ST.wall) { c.fillStyle = '#e8f0f6'; c.fillRect(0, 0, LW, L.G); c.fillStyle = '#d5e0e8'; c.fillRect(0, L.G, LW, LH - L.G); }
     c.lineWidth = 3; c.strokeStyle = INK; c.lineCap = 'round';
     line(c, [[LW * 0.04, L.G + 2], [LW * 0.5, L.G + 4], [LW * 0.96, L.G + 1]], 200 + i);
     const f0 = figs[0], mb = { x: f0.x, facing: f0.facing, y0: f0.y - 320 * f0.s, head: [f0.x, f0.y - 280 * f0.s] };
@@ -1870,7 +1912,7 @@ const SK = (() => {
     c.restore();
     return boxes[0];
   }
-  return { POSES, FACES, PROPS, plan, draw, box, scene, castOf };
+  return { POSES, FACES, PROPS, STYLES, plan, draw, box, scene, castOf };
 })();
 function sceneUsesDraw(i) { const m = S.settings.pics || 'auto', sg = S.segments[i]; if (sg && sg.pic === 'draw') return true; if (sg && sg.pic === 'image' && sceneCache[i]) return false; return m === 'draw' || (m !== 'images' && !sceneCache[i]); }
 function drawnThumb(x, i, W, H) { const LW = Math.round(900 * W / H), LH = 900; x.save(); x.scale(W / LW, H / LH); SK.draw(x, i, 0.8, 3, LW, LH); x.restore(); }
@@ -2185,7 +2227,7 @@ $('#dlPrompts').onclick = () => { const bs = batches(); if (!bs.length) return; 
 $('#loadChars').onclick = () => { const ta = $('#characters'); ta.value = (ta.value.trim() ? ta.value.trim() + '\n' : '') + CHANNEL_CHARS; S.settings.characters = ta.value; renderPrompts(); save(); };
 
 /* ============ settings binding ============ */
-const BIND = ['aspect', 'grid', 'style', 'styleText', 'characters', 'gutter', 'splitLevel', 'minWords', 'maxWords', 'captions', 'fit', 'enhance', 'capSize', 'motion', 'transition', 'transDur', 'res', 'fps', 'musicVol', 'anim', 'animAmt', 'capWords', 'pics'];
+const BIND = ['aspect', 'grid', 'style', 'styleText', 'characters', 'gutter', 'splitLevel', 'minWords', 'maxWords', 'captions', 'fit', 'enhance', 'capSize', 'motion', 'transition', 'transDur', 'res', 'fps', 'musicVol', 'anim', 'animAmt', 'capWords', 'pics', 'skStyle'];
 const NUM = new Set(['grid', 'minWords', 'maxWords', 'capSize', 'motion', 'transDur', 'res', 'fps', 'musicVol', 'animAmt']);
 function applySettingsToUI() { BIND.forEach(k => { const el = $('#' + k); if (el) el.value = S.settings[k]; }); $('#projTitle').value = S.settings.title || ''; }
 BIND.forEach(k => { const el = $('#' + k); if (!el) return; el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => {
@@ -2193,7 +2235,7 @@ BIND.forEach(k => { const el = $('#' + k); if (!el) return; el.addEventListener(
   if (k === 'style') { if (S.settings.style !== 'custom') { S.settings.styleText = STYLES[S.settings.style].text; $('#styleText').value = S.settings.styleText; } }
   if (k === 'musicVol') music.volume = S.settings.musicVol;
   if (['enhance', 'fit', 'motion', 'captions', 'capSize', 'aspect'].includes(k)) enh.clear();
-  if (k === 'anim' || k === 'pics') { renderScenes(); renderStatus(); }
+  if (k === 'anim' || k === 'pics' || k === 'skStyle') { renderScenes(); renderStatus(); }
   if (k === 'aspect') { sizePreview(); }
   if (['aspect', 'grid', 'gutter', 'style'].includes(k)) { R.grids.forEach((r, gi) => { if (r) { r.cells = null; } }); rebuildCache(); renderGridCards(); renderScenes(); renderStatus(); }
   if (['style', 'styleText', 'characters', 'gutter', 'aspect', 'grid'].includes(k)) renderPrompts();
