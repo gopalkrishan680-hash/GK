@@ -275,7 +275,7 @@ details summary { cursor: pointer; font-weight: 600; }
       <input type="file" id="oneAudio" accept="audio/*,video/*,.opus,.ogg,.m4a,.aac" hidden>
       <div id="voInfo" class="hint"></div>
       <audio id="vo" controls preload="auto"></audio>
-      <div class="row"><button class="btn small" data-dlvoice>Download voiceover</button><span class="hint">Make one below with <b>AI voice</b>, or drop your own recording.</span></div>
+      <div class="row" hidden><button class="btn small" data-dlvoice>Download voiceover</button></div>
       <div class="row">
         <label class="f">Video shape
           <select id="aspect">
@@ -294,7 +294,7 @@ details summary { cursor: pointer; font-weight: 600; }
       <p class="hint">Next: check the scenes, then open the <b>Image Prompts</b> tab.</p>
     </div>
   </div>
-  <div class="panel" id="aiVoice">
+  <div class="panel" id="aiVoice" hidden>
     <div class="row"><h3 style="margin-right:auto">AI voice</h3><span class="chip wait" id="ttsChip">Not connected</span></div>
     <div class="row"><label class="f">Voice engine <select id="ttsEngine"><option value="gemini">Google Gemini: most natural, like AI Studio (free API key, no Colab)</option><option value="colab">Free open model on Google Colab (Chatterbox)</option></select></label></div>
     <div class="gembox gem-only">
@@ -358,7 +358,7 @@ details summary { cursor: pointer; font-weight: 600; }
     <details id="ttsLines" hidden><summary>Lines of the last voiceover (play one, or redo it)</summary><div class="linelist" id="ttsLineList"></div></details>
   </div>
   <div class="callout" id="gridCallout" hidden>
-    <div class="grow"><div class="big" id="calloutBig"></div><div class="hint" id="calloutSub"></div><div class="hint" style="margin-top:4px">No time for images? Skip them: every scene without an image gets a stickman drawing made by the app from its line (change it under the scene with <b>✏️ Drawing</b>).</div></div>
+    <div class="grow"><div class="big" id="calloutBig"></div><div class="hint" id="calloutSub"></div></div>
     <button class="btn primary" data-goto="prompts">Open Image Prompts →</button>
   </div>
   <div class="panel">
@@ -514,6 +514,7 @@ details summary { cursor: pointer; font-weight: 600; }
         </label>
         <label class="f">Camera motion (zoom/pan) <input type="range" id="motion" min="0" max="20" step="1"></label>
       </div>
+      <div hidden>
       <h3>Pictures</h3>
       <label class="f">Pictures for the scenes
         <select id="pics"><option value="auto">My images; a drawn stickman scene where there is none</option><option value="draw">Always drawn stickmen (no images needed)</option><option value="images">Only my images</option></select>
@@ -522,6 +523,7 @@ details summary { cursor: pointer; font-weight: 600; }
         <select id="skStyle"><option value="chibi">Chibi: very big head, cute (recommended)</option><option value="classic">Classic: clean thin lines</option><option value="sketch">Pen sketch: hand-drawn, big head, expressive</option><option value="bold">Bold cartoon: outlined tube limbs</option><option value="flat">Flat colour explainer</option><option value="doodle">Expressive doodle: curved limbs, big eyes, hands and shoes</option><option value="marker">Thick marker with a colour accent</option><option value="chalk">Chalkboard</option><option value="notebook">Notebook: blue pen on ruled paper</option><option value="silhouette">Silhouette</option><option value="bean">Bean body: round coloured bodies</option><option value="neon">Neon glow</option><option value="comic">Comic: bold outlines, bright colours</option></select>
       </label>
       <p class="hint" style="margin:0 0 6px">Drawn scenes are made in the app, offline, from each line: who is in it, the pose, the face, things like a laptop, phone, chai, money, clock, chart, rain cloud or idea bulb, and speech or thought bubbles. The arms and legs really move. Change any of it with <b>✏️ Drawing</b> under the scene (step 1).</p>
+      </div>
       <h3>Smart animation</h3>
       <p class="hint" style="margin:0 0 6px">Reads every line (tags like <code>[laugh]</code>, words like <i>achanak, hans, udaas, gussa, darr, pyaar, bhaag</i>, and <b>!</b> / <b>?</b>) and picks the camera move, the stickman's movement and a small effect by itself: laugh → bounce + sparkles, achanak / ! → zoom punch + "!", sad → slow zoom out + tears, scared → sweat drop, angry → shake + 💢, love → hearts, ? → push-in + "?", running → speed lines. To change one scene, use its <b>Animation</b> menu in the scene list (step 1).</p>
       <div class="row">
@@ -624,7 +626,7 @@ He looked at Papa. Papa smiled, and said, "I am proud of you."`;
 
 /* ============ state ============ */
 const DEFAULTS = { title: '', aspect: '16:9', grid: 3, style: 'stickman', styleText: STYLES.stickman.text, characters: '', gutter: 'auto',
-  splitLevel: 'all', minWords: 2, maxWords: 14, captions: 'bar', fit: 'auto', enhance: 'on', v: 3, capSize: 1, motion: 6, transition: 'fade', transDur: 0.15, res: 1080, fps: 30, musicVol: 0.12, anim: 'on', animAmt: 1, capWords: 'on', pics: 'auto', skStyle: 'chibi' };
+  splitLevel: 'all', minWords: 2, maxWords: 14, captions: 'bar', fit: 'auto', enhance: 'on', v: 3, capSize: 1, motion: 6, transition: 'fade', transDur: 0.15, res: 1080, fps: 30, musicVol: 0.12, anim: 'on', animAmt: 1, capWords: 'on', pics: 'images', skStyle: 'chibi' };
 try { if (matchMedia('(pointer: coarse)').matches) DEFAULTS.res = 720; } catch (_) {}   // phones: smaller, faster export
 const S = { settings: { ...DEFAULTS }, script: '', segments: [], starts: [], grids: [], overrides: {}, audioBlob: null, audioName: '', musicBlob: null, musicName: '' };
 let uid = 1;
@@ -2077,7 +2079,8 @@ const SK = (() => {
   }
   return { POSES, FACES, PROPS, STYLES, plan, draw, box, scene, castOf };
 })();
-function sceneUsesDraw(i) { const m = S.settings.pics || 'auto', sg = S.segments[i]; if (sg && sg.pic === 'draw') return true; if (sg && sg.pic === 'image' && sceneCache[i]) return false; return m === 'draw' || (m !== 'images' && !sceneCache[i]); }
+function sceneUsesDraw(i) { return false;   // only uploaded images are used
+  const m = S.settings.pics || 'auto', sg = S.segments[i]; if (sg && sg.pic === 'draw') return true; if (sg && sg.pic === 'image' && sceneCache[i]) return false; return m === 'draw' || (m !== 'images' && !sceneCache[i]); }
 function drawnThumb(x, i, W, H) { const LW = Math.round(900 * W / H), LH = 900; x.save(); x.scale(W / LW, H / LH); SK.draw(x, i, 0.8, 3, LW, LH); x.restore(); }
 function captionTokens(text) {
   const clean = text.replace(TAG_RX, ' ').replace(/\s{2,}/g, ' ').trim().replace(/[,;:।|.—]+["'”’]*$/, m => m.replace(/[,;:।|.—]+/g, ''));
@@ -2252,6 +2255,7 @@ $('#ratioSync').onclick = () => { ratioTiming(); $('#syncInfo').textContent = 'E
 
 /* ============ scenes list ============ */
 function drawMenu(i) {
+  return '';   // drawn stickmen are not used
   const sg = S.segments[i], pic = sceneCache[i] ? `<select class="anim-sel" data-pic="${i}" aria-label="Picture of scene ${i + 1}"><option value="auto"${!sg.pic ? ' selected' : ''}>Picture: ${S.settings.pics === 'draw' ? 'drawn' : 'my image'} (auto)</option><option value="image"${sg.pic === 'image' ? ' selected' : ''}>Picture: my image</option><option value="draw"${sg.pic === 'draw' ? ' selected' : ''}>Picture: drawn stickman</option></select>` : '';
   if (!sceneUsesDraw(i)) return pic;
   const P = SK.plan(i), ov = sg.draw || {}, opt = (key, list, autoLabel) => `<select class="anim-sel" data-draw="${key}" data-i="${i}" aria-label="${key}"><option value="">${esc(autoLabel)}</option>${Object.entries(list).map(([k, v]) => `<option value="${k}"${ov[key] === k ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select>`;
@@ -2775,7 +2779,7 @@ function askServerLink(u) {
   showTab('script'); setTimeout(() => $('#linkAsk').scrollIntoView({ block: 'center', behavior: 'smooth' }), 50);
   return true;
 }
-window.ssConnectLink = askServerLink;
+window.ssConnectLink = () => false;   // the AI voice panel is not shown, so voice server links are ignored
 $('#linkAskYes').onclick = async () => {
   $('#linkAsk').hidden = true; $('#ttsUrl').value = linkAsked; $('#ttsUrl').dispatchEvent(new Event('input'));
   if (await ttsConnect()) toast('Connected to the voice server');
@@ -2783,6 +2787,7 @@ $('#linkAskYes').onclick = async () => {
 $('#linkAskNo').onclick = () => { $('#linkAsk').hidden = true; linkSkip = linkAsked; };
 // In the Android app: notice a link copied from the notebook when you come back to the app.
 function checkCopiedLink() {
+  return;   // AI voice is not shown
   if (!APP || !window.AndroidBridge.clipboardText || document.hidden) return;
   let t = ''; try { t = window.AndroidBridge.clipboardText(); } catch (_) {}
   const url = linkOk(t); if (url && url !== linkSkip && url !== linkAsked) askServerLink(url);

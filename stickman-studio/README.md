@@ -3,6 +3,10 @@
 An app for turning a script + voiceover into a stickman video. It is a single file (`index.html`) with nothing to install.
 Open it in **Chrome or Edge** (double-click the file). Everything runs locally on your computer.
 
+> **Simple mode (current):** the app takes your script, your voiceover and your images, and makes the video.
+> The AI voice panel and the drawn stickman scenes are switched off and not shown; the sections about them below
+> describe code that stays in the file, inactive.
+
 ## How to use
 
 1. **Script + Voice:** Paste the script, drop in the voiceover (mp3/wav/m4a) and press **Create scenes**.
