@@ -35,6 +35,25 @@ Open it in **Chrome or Edge** (double-click the file). Everything runs locally o
    player. It is usually faster than the video length.
    Older browsers fall back to live recording, which needs the tab to stay open and in front.
 
+## Smart animation (offline, automatic)
+In **Preview + Export**, *Smart animation* (on by default) reads every scene's line and animates it by
+itself, with no internet and no extra steps:
+- **Mood from the line:** a voice tag (`[laugh]`, `[sad]`, `[angry]`, `[gasp]`…) wins; otherwise words in Hindi,
+  Hinglish or English (achanak/अचानक, hans/हँस, udaas/उदास, gussa/गुस्सा, darr/डर, pyaar/प्यार, bhaag/भाग, soch/सोच…)
+  and `!` / `?` decide.
+- **Camera:** zoom punch + shake (shock), slow push-in (love, scared, question), slow zoom-out (sad), pan (running),
+  gentle zoom/pan otherwise.
+- **The stickman moves:** a drawing on plain paper is lifted off the paper, so only the drawing hops (happy),
+  bounces (laugh), jolts (shock), trembles (angry, scared), sinks (sad), sways (thinking) or breathes (calm).
+  Pictures with a full background move as a whole, more gently.
+- **Cartoon effects:** "!" (shock), "?" (question), sparkles, hearts, tears, sweat drop, 💢 and speed lines, plus a
+  faded look for sad and red / dark edges for angry / scared. An effect shows on the first scene of a run of the
+  same mood.
+- **Word-by-word captions:** each word appears as it is spoken (timed from the word lengths), the current word in yellow.
+
+Every scene in the scene list has an **Animation** menu: *auto* shows what was detected; pick another mood or
+*No motion* to change it. *Animation strength* makes all of it calmer or stronger.
+
 ## AI voice with Google Gemini (most natural)
 In **Script + Voice → AI voice**, choose **Voice engine: Google Gemini**. It uses Gemini 3.8 TTS (the
 speech model in Google AI Studio) straight from the app; no Colab needed.

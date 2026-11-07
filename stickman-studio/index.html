@@ -120,6 +120,7 @@ audio { width: 100%; }
 .scene .body { display: grid; gap: 6px; min-width: 0; }
 .scene textarea { min-height: 0; padding: 6px 8px; }
 .scene .meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.scene .meta select.anim-sel { font-size: 12px; padding: 4px 6px; width: auto; max-width: 210px; min-height: 0; }
 .scene .t { font-family: var(--font-mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; margin-right: auto; }
 @media (max-width: 520px) { .scene { grid-template-columns: 30px 1fr; } .scene .thumb { display: none; } }
 
@@ -480,7 +481,7 @@ details summary { cursor: pointer; font-weight: 600; }
 <section class="step" data-panel="video" hidden>
   <div>
     <h2>Preview and export video</h2>
-    <p class="lead">Every scene gets a gentle camera zoom/pan so the video never looks frozen. Export draws every frame at its exact time, so picture and voice stay in sync, and the MP4 can be scrubbed in any player.</p>
+    <p class="lead">With <b>Smart animation</b> every scene moves the way its line feels: the camera, the stickman and small cartoon effects are chosen from the script by themselves. Export draws every frame at its exact time, so picture and voice stay in sync, and the MP4 can be scrubbed in any player.</p>
   </div>
   <div class="cols">
     <div class="panel">
@@ -511,6 +512,17 @@ details summary { cursor: pointer; font-weight: 600; }
         </label>
         <label class="f">Camera motion (zoom/pan) <input type="range" id="motion" min="0" max="20" step="1"></label>
       </div>
+      <h3>Smart animation</h3>
+      <p class="hint" style="margin:0 0 6px">Reads every line (tags like <code>[laugh]</code>, words like <i>achanak, hans, udaas, gussa, darr, pyaar, bhaag</i>, and <b>!</b> / <b>?</b>) and picks the camera move, the stickman's movement and a small effect by itself: laugh → bounce + sparkles, achanak / ! → zoom punch + "!", sad → slow zoom out + tears, scared → sweat drop, angry → shake + 💢, love → hearts, ? → push-in + "?", running → speed lines. To change one scene, use its <b>Animation</b> menu in the scene list (step 1).</p>
+      <div class="row">
+        <label class="f">Smart animation
+          <select id="anim"><option value="on">On (from the script)</option><option value="off">Off (gentle zoom only)</option></select>
+        </label>
+        <label class="f">Animation strength <input type="range" id="animAmt" min="0.3" max="2" step="0.1"></label>
+      </div>
+      <label class="f">Caption style
+        <select id="capWords"><option value="on">Word by word, as they are spoken</option><option value="off">Whole line at once</option></select>
+      </label>
       <label class="f">Picture quality
         <select id="enhance"><option value="on">Sharpen + upscale small panels (recommended)</option><option value="off">Original pixels</option></select>
       </label>
@@ -602,7 +614,7 @@ He looked at Papa. Papa smiled, and said, "I am proud of you."`;
 
 /* ============ state ============ */
 const DEFAULTS = { title: '', aspect: '16:9', grid: 3, style: 'stickman', styleText: STYLES.stickman.text, characters: '', gutter: 'auto',
-  splitLevel: 'all', minWords: 2, maxWords: 14, captions: 'bar', fit: 'auto', enhance: 'on', v: 2, capSize: 1, motion: 6, transition: 'fade', transDur: 0.15, res: 1080, fps: 30, musicVol: 0.12 };
+  splitLevel: 'all', minWords: 2, maxWords: 14, captions: 'bar', fit: 'auto', enhance: 'on', v: 2, capSize: 1, motion: 6, transition: 'fade', transDur: 0.15, res: 1080, fps: 30, musicVol: 0.12, anim: 'on', animAmt: 1, capWords: 'on' };
 try { if (matchMedia('(pointer: coarse)').matches) DEFAULTS.res = 720; } catch (_) {}   // phones: smaller, faster export
 const S = { settings: { ...DEFAULTS }, script: '', segments: [], starts: [], grids: [], overrides: {}, audioBlob: null, audioName: '', musicBlob: null, musicName: '' };
 let uid = 1;
@@ -845,7 +857,7 @@ function analyzeAudio(buf) {
 /* ============ segments ============ */
 function setSegmentsFromTexts(texts) {
   const old = S.segments; const oldVis = new Map(old.map(s => [plain(s.text).trim(), s]));
-  S.segments = texts.map(t => { const o = oldVis.get(plain(t).trim()); return { id: o ? o.id : uid++, text: t, visual: o ? o.visual : '' }; });
+  S.segments = texts.map(t => { const o = oldVis.get(plain(t).trim()); return { id: o ? o.id : uid++, text: t, visual: o ? o.visual : '', anim: o ? o.anim : undefined }; });
   ratioTiming(); if (analysis) smartTiming();
   segmentsChanged();
 }
@@ -1143,12 +1155,19 @@ function frameLayout(W, H) {
   const band = S.settings.captions === 'bar' ? Math.round(H * (S.settings.aspect === '9:16' ? 0.16 : 0.2) * clamp(S.settings.capSize, 0.75, 1.4)) : 0;
   return { pw: W, ph: H - band, band };
 }
-function drawPic(ctx, i, src, rw, rh, z, px, py, dx) {
+function picRect(src, rw, rh, z, px, py, dx, dy = 0) {
   const iw = src.width, ih = src.height, cover = Math.max(rw / iw, rh / ih), contain = Math.min(rw / iw, rh / ih);
   const fill = S.settings.fit === 'fill' || cover / contain < 1.06;
+  const sc = (fill ? cover : contain) * z, w = iw * sc, h = ih * sc;
+  return { x: (rw - w) * (w > rw ? px : 0.5) + dx, y: (rh - h) * (h > rh ? py : 0.5) + dy, w, h, fill };
+}
+function drawSides(ctx, i, rw, rh, dx, fill) {
   if (!fill && blurCache[i]) { const bl = blurCache[i], s2 = Math.max(rw / bl.width, rh / bl.height) * 1.15; ctx.drawImage(bl, (rw - bl.width * s2) / 2 + dx, (rh - bl.height * s2) / 2, bl.width * s2, bl.height * s2); ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(dx, 0, rw, rh); }
-  const sc = (fill ? cover : contain) * z, dw = iw * sc, dh = ih * sc;
-  ctx.drawImage(src, (rw - dw) * (dw > rw ? px : 0.5) + dx, (rh - dh) * (dh > rh ? py : 0.5), dw, dh);
+}
+function drawPic(ctx, i, src, rw, rh, z, px, py, dx) {
+  const r = picRect(src, rw, rh, z, px, py, dx);
+  drawSides(ctx, i, rw, rh, dx, r.fill);
+  ctx.drawImage(src, r.x, r.y, r.w, r.h);
 }
 function drawScene(ctx, i, t, W, H, o = {}) {
   const src = sceneCache[i]; const d = Math.max(0.01, segEnd(i) - S.starts[i]); const p = clamp((t - S.starts[i]) / d, 0, 1);
@@ -1158,19 +1177,257 @@ function drawScene(ctx, i, t, W, H, o = {}) {
     ctx.font = `700 ${Math.round(H * 0.06)}px "Baloo 2", sans-serif`; ctx.fillText(`Scene ${i + 1} — image missing`, W / 2 + (o.dx || 0), H * 0.5);
     ctx.restore(); return;
   }
+  if (S.settings.anim !== 'off') { animScene(ctx, i, src, t - S.starts[i], d, p, W, H, o); ctx.restore(); return; }
   const m = S.settings.motion / 100, mode = i % 4; let z, px = 0.5, py = 0.5;
   if (mode === 0) z = 1 + m * p; else if (mode === 1) z = 1 + m * (1 - p); else { z = 1 + m; px = mode === 2 ? 0.2 + 0.6 * p : 0.8 - 0.6 * p; py = 0.5 - 0.15 * (p - 0.5); }
   z *= o.scale || 1;
   drawPic(ctx, i, hiSrc(i, src, W, H), W, H, z, px, py, o.dx || 0); ctx.restore();
+}
+/* ============ smart animation ============
+   Every scene gets a mood, read from its line: a voice tag ([laugh], [sad]…) first, else words
+   (Hindi, Hinglish, English) and ! / ?. The mood picks the camera move, the stickman's movement
+   and a small cartoon effect. A drawing on plain paper is lifted off its paper so only the
+   drawing moves; other pictures move as a whole. Everything is drawn from the time t alone,
+   so preview and export are identical and frame-exact. */
+const MOODS = {
+  calm: { label: 'Calm', desc: 'gentle camera, breathing', cam: 'gentle', fig: 'breathe', fx: '' },
+  happy: { label: 'Happy', desc: 'hop + sparkles', cam: 'gentle', fig: 'hop', fx: 'sparkle' },
+  laugh: { label: 'Laugh', desc: 'bounce + sparkles', cam: 'gentle', fig: 'bounce', fx: 'sparkle' },
+  love: { label: 'Love', desc: 'push-in + hearts', cam: 'pushin', fig: 'breathe', fx: 'hearts' },
+  excited: { label: 'Excited', desc: 'zoom punch + hop + sparkles', cam: 'punch', fig: 'hop', fx: 'sparkle' },
+  shock: { label: 'Shock / suddenly', desc: 'zoom punch + shake + "!"', cam: 'punch', shake: 1, fig: 'jolt', fx: 'bang' },
+  sad: { label: 'Sad', desc: 'slow zoom out + tears, faded colour', cam: 'pullout', fig: 'droop', fx: 'tears', grade: 'sad' },
+  angry: { label: 'Angry', desc: 'shake + 💢, red edges', cam: 'gentle', tremble: 1, fig: 'tremble', fx: 'anger', grade: 'angry' },
+  fear: { label: 'Scared / tense', desc: 'push-in + trembling + sweat', cam: 'pushin', fig: 'tremble', fx: 'sweat', grade: 'dark' },
+  question: { label: 'Question / thinking', desc: 'push-in + "?"', cam: 'pushin', fig: 'lean', fx: 'question' },
+  fast: { label: 'Fast / running', desc: 'pan + speed lines', cam: 'pan', fig: 'run', fx: 'speed' },
+  none: { label: 'No motion', desc: 'still picture', cam: 'still', fig: '', fx: '' },
+};
+// "=word" must be a whole word; other entries also match the start of a longer word (hans → hansne)
+const MOOD_WORDS = {
+  shock: ['achanak', 'suddenly', 'shock', 'chauk', 'chonk', 'dhamaka', 'boom', 'oh no', '=arey', '=arre', 'hairan', 'hairaan', 'stunned', 'jhatka', 'अचानक', 'चौंक', 'धमाका', 'हैरान', 'झटका', '=अरे'],
+  angry: ['gussa', 'gusse', 'angry', 'naraz', 'naraaz', 'chilla', 'shout', 'daant', 'furious', 'गुस्स', 'नाराज', 'नाराज़', 'चिल्ला', 'डांट', 'डाँट'],
+  fear: ['darr', 'dar gay', 'dar lag', 'darte', 'darta', 'darti', 'ghabra', 'tension', 'nervous', 'scared', 'afraid', '=fear', 'pasina', 'paseena', 'bhoot', 'deadline', 'डर', 'घबरा', 'टेंशन', 'पसीन', 'भूत'],
+  sad: ['dukh', 'udaas', 'udas', '=sad', 'rone', 'roya', 'royi', 'rote', 'aansu', 'ansu', '=cry', 'crying', 'tears', 'akela', 'akeli', 'alone', 'tanha', 'haar gay', 'dard', 'दुख', 'दुःख', 'उदास', 'रोने', 'रोया', 'रोई', 'रो पड़', 'आंसू', 'आँसू', 'अकेल', 'दर्द', 'हार गय'],
+  laugh: ['hans', 'hansi', 'haha', 'laugh', '=lol', 'thahaka', 'हँस', 'हंस', 'ठहाक'],
+  love: ['pyaar', 'pyar', '=love', 'mohabbat', 'gale lag', '=hug', 'dil se', 'प्यार', 'मोहब्बत', 'गले लग', '=दिल'],
+  excited: ['=wow', 'waah', 'excited', '=yay', 'hurray', 'amazing', 'kamaal', 'kamal', 'awesome', 'josh', 'वाह', 'कमाल', 'जोश'],
+  happy: ['khush', 'muskur', 'smile', 'happy', 'garv', 'proud', 'jeet', 'winner', 'mubarak', 'badhai', 'party', 'celebrat', 'mazaa', '=maza', 'खुश', 'मुस्कुर', 'मुस्कर', 'गर्व', 'जीत', 'बधाई', 'मज़ा', 'मजा'],
+  fast: ['bhaag', 'daud', '=run', 'running', 'jaldi', 'hurry', '=race', '=tez', 'rush', 'भाग', 'दौड़', 'दौड', 'जल्दी', 'तेज़', '=तेज'],
+  question: ['kyun', 'kyon', '=kyu', 'socho', 'soch', 'think', 'wonder', 'confused', 'samajh nahi', 'sawal', '=why', 'क्यों', 'क्यूं', 'सोच', 'सवाल', 'समझ नहीं'],
+};
+const MOOD_ORDER = ['shock', 'angry', 'fear', 'sad', 'laugh', 'love', 'excited', 'happy', 'fast', 'question'];
+const TAG_MOOD = { laugh: 'laugh', chuckle: 'laugh', giggle: 'laugh', happy: 'happy', excited: 'excited', sad: 'sad', cry: 'sad', sob: 'sad', sigh: 'sad', angry: 'angry', gasp: 'shock', shock: 'shock', surprised: 'shock', scared: 'fear', fear: 'fear', hmm: 'question', think: 'question', whisper: 'calm', calm: 'calm', normal: 'calm', serious: 'calm' };
+const MOOD_RX = Object.fromEntries(Object.entries(MOOD_WORDS).map(([k, ws]) => [k, ws.map(w => {
+  const whole = w[0] === '=', ww = (whole ? w.slice(1) : w).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp('(^|[^\\p{L}\\p{M}])' + ww + (whole ? '(?=$|[^\\p{L}\\p{M}])' : ''), 'u');
+})]));
+const moodMemo = new Map();
+function detectMood(text) {
+  text = String(text || ''); if (moodMemo.has(text)) return moodMemo.get(text);
+  let mood = 'calm';
+  const tags = [...text.matchAll(/\[\s*([a-zA-Z]+)/g)].map(m => TAG_MOOD[m[1].toLowerCase()]).filter(Boolean);
+  const strong = tags.find(t => t !== 'calm');
+  if (strong) mood = strong;
+  else if (!tags.length) {
+    const low = text.replace(TAG_RX, ' ').toLowerCase(), score = {};
+    for (const k of MOOD_ORDER) score[k] = MOOD_RX[k].reduce((n, rx) => n + (rx.test(low) ? 1 : 0), 0);
+    if (/\?/.test(low)) score.question += 1;
+    if (/!/.test(low)) { if (score.shock) score.shock += 1; else score.excited += 0.6; }
+    let best = 0; for (const k of MOOD_ORDER) if (score[k] > best) { best = score[k]; mood = k; }
+  }
+  if (moodMemo.size > 2000) moodMemo.clear();
+  moodMemo.set(text, mood); return mood;
+}
+function sceneMood(i) { const sg = S.segments[i]; if (!sg) return 'calm'; return sg.anim && MOODS[sg.anim] ? sg.anim : detectMood(sg.text); }
+function animOptions(i) {
+  const sg = S.segments[i], cur = sg.anim && MOODS[sg.anim] ? sg.anim : 'auto';
+  return `<option value="auto">Animation: auto · ${esc(MOODS[detectMood(sg.text)].label)}</option>` +
+    Object.entries(MOODS).map(([k, v]) => `<option value="${k}"${cur === k ? ' selected' : ''}>${esc(v.label)}: ${esc(v.desc)}</option>`).join('');
+}
+// A drawing on plain paper → the drawing alone (paper made transparent), the paper colour and where the ink is.
+const layerCache = new WeakMap();
+function figLayer(src) {
+  if (!src || !src.width) return null;
+  if (layerCache.has(src)) return layerCache.get(src);
+  let res = null;
+  try {
+    const w = src.width, h = src.height, c = document.createElement('canvas'); c.width = w; c.height = h;
+    const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(src, 0, 0);
+    const im = x.getImageData(0, 0, w, h), D = im.data, step = Math.max(1, Math.floor(Math.sqrt(w * h / 40000)));
+    const hist = new Map(); let n = 0;
+    for (let yy = 0; yy < h; yy += step) for (let xx = 0; xx < w; xx += step) {
+      const k = (yy * w + xx) * 4; n++; if (D[k] + D[k + 1] + D[k + 2] < 450) continue;
+      const key = (D[k] >> 4) << 8 | (D[k + 1] >> 4) << 4 | (D[k + 2] >> 4); hist.set(key, (hist.get(key) || 0) + 1);
+    }
+    let best = -1, bc = 0; hist.forEach((v, k) => { if (v > bc) { bc = v; best = k; } });
+    if (best >= 0) {
+      let pr = 0, pg = 0, pb = 0, pc = 0;
+      for (let yy = 0; yy < h; yy += step) for (let xx = 0; xx < w; xx += step) {
+        const k = (yy * w + xx) * 4; if (((D[k] >> 4) << 8 | (D[k + 1] >> 4) << 4 | (D[k + 2] >> 4)) !== best) continue;
+        pr += D[k]; pg += D[k + 1]; pb += D[k + 2]; pc++;
+      }
+      pr /= pc; pg /= pc; pb /= pc;
+      let near = 0, x0 = w, y0 = h, x1 = -1, y1 = -1;
+      for (let yy = 0; yy < h; yy += step) for (let xx = 0; xx < w; xx += step) {
+        const k = (yy * w + xx) * 4, dr = D[k] - pr, dg = D[k + 1] - pg, db = D[k + 2] - pb, d2 = dr * dr + dg * dg + db * db;
+        if (d2 < 1600) near++;
+        else if (d2 > 4900) { if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (yy < y0) y0 = yy; if (yy > y1) y1 = yy; }
+      }
+      if (near / n >= 0.55 && x1 > x0 && y1 > y0) {
+        for (let k = 0; k < D.length; k += 4) {
+          const dr = D[k] - pr, dg = D[k + 1] - pg, db = D[k + 2] - pb, dd = Math.sqrt(dr * dr + dg * dg + db * db);
+          D[k + 3] = dd <= 16 ? 0 : dd >= 56 ? 255 : Math.round((dd - 16) * 6.375);
+        }
+        x.putImageData(im, 0, 0);
+        const box = { x0: x0 / w, y0: y0 / h, x1: (x1 + step) / w, y1: (y1 + step) / h };
+        if (box.y1 - box.y0 < 0.25) { const cy = (box.y0 + box.y1) / 2; box.y0 = Math.max(0, cy - 0.125); box.y1 = Math.min(1, cy + 0.125); }
+        res = { canvas: c, paper: `rgb(${Math.round(pr)},${Math.round(pg)},${Math.round(pb)})`, box };
+      }
+    }
+  } catch (_) { res = null; }
+  layerCache.set(src, res); return res;
+}
+const ease = x => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
+const backOut = x => { x = clamp(x, 0, 1) - 1; return 1 + 2.7 * x * x * x + 1.7 * x * x; };
+function figMotion(kind, lt, i, A) {
+  const f = { dx: 0, dy: 0, sx: 1, sy: 1, rot: 0 }; if (!kind) return f;
+  const side = i % 2 ? 1 : -1, br = 0.012 * A * Math.sin(lt * 2 * Math.PI / 2.6);
+  f.sy = 1 + br; f.sx = 1 - br * 0.4;
+  if (kind === 'hop') {
+    const u = (lt - 0.08) / 0.5;
+    if (u > 0 && u < 1) { const h = Math.sin(Math.PI * u); f.dy -= 0.06 * A * h; f.sy += 0.03 * A * h; f.sx -= 0.015 * A * h; }
+    else if (u >= 1 && u < 1.3) { const q = Math.sin(Math.PI * (u - 1) / 0.3); f.sy -= 0.045 * A * q; f.sx += 0.025 * A * q; }
+  } else if (kind === 'bounce') {
+    const h = Math.abs(Math.sin(Math.PI * ((lt * 2.4) % 1))); f.dy -= 0.03 * A * h; f.sy += 0.025 * A * (h - 0.5); f.sx -= 0.012 * A * (h - 0.5);
+  } else if (kind === 'jolt') {
+    const k = Math.exp(-lt * 6); f.dy -= 0.05 * A * k; f.sy += 0.06 * A * k; f.sx -= 0.03 * A * k;
+  } else if (kind === 'tremble') {
+    f.dx += 0.003 * A * Math.sin(lt * 70);
+  } else if (kind === 'droop') {
+    const q = ease(lt / 1.5); f.sy -= 0.03 * A * q; f.dy += 0.01 * A * q;
+  } else if (kind === 'lean') {
+    f.dx += 0.006 * A * Math.sin(lt * 2.2) * side;
+  } else if (kind === 'run') {
+    f.dy -= 0.02 * A * Math.abs(Math.sin(lt * 11));
+  }
+  return f;
+}
+function drawGrade(ctx, g, lt, A, W, H) {
+  if (!g) return; const k = ease(lt / 0.6) * Math.min(1, A);
+  ctx.save();
+  if (g === 'sad') {
+    ctx.globalCompositeOperation = 'saturation'; ctx.fillStyle = `rgba(128,128,128,${0.55 * k})`; ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = `rgba(30,60,130,${0.10 * k})`; ctx.fillRect(0, 0, W, H);
+  } else {
+    const gr = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.hypot(W, H) * 0.55);
+    const col = g === 'angry' ? '200,20,20' : '0,0,0', a = (g === 'angry' ? 0.3 * (0.75 + 0.25 * Math.sin(lt * 6)) : 0.45) * k;
+    gr.addColorStop(0, `rgba(${col},0)`); gr.addColorStop(1, `rgba(${col},${a.toFixed(3)})`); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
+  }
+  ctx.restore();
+}
+function inkPath(ctx, fill, lw) { ctx.lineJoin = 'round'; ctx.lineWidth = lw; ctx.strokeStyle = '#111'; ctx.stroke(); ctx.fillStyle = fill; ctx.fill(); }
+function heartPath(ctx, x, y, s) {
+  ctx.beginPath(); ctx.moveTo(x, y + s * 0.3);
+  ctx.bezierCurveTo(x, y, x - s * 0.5, y, x - s * 0.5, y + s * 0.3); ctx.bezierCurveTo(x - s * 0.5, y + s * 0.6, x, y + s * 0.8, x, y + s);
+  ctx.bezierCurveTo(x, y + s * 0.8, x + s * 0.5, y + s * 0.6, x + s * 0.5, y + s * 0.3); ctx.bezierCurveTo(x + s * 0.5, y, x, y, x, y + s * 0.3); ctx.closePath();
+}
+function dropPath(ctx, x, y, s) {
+  ctx.beginPath(); ctx.moveTo(x, y - s);
+  ctx.bezierCurveTo(x + s * 0.7, y - s * 0.1, x + s * 0.6, y + s * 0.6, x, y + s * 0.6); ctx.bezierCurveTo(x - s * 0.6, y + s * 0.6, x - s * 0.7, y - s * 0.1, x, y - s); ctx.closePath();
+}
+function starPath(ctx, x, y, R) {
+  ctx.beginPath(); for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4 - Math.PI / 2, r = k % 2 ? R * 0.3 : R; ctx.lineTo(x + r * Math.cos(a), y + r * Math.sin(a)); } ctx.closePath();
+}
+const rnd = (i, k) => { const v = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return v - Math.floor(v); };
+function drawFx(ctx, fx, lt, A, i, b, U, W, H, onPaper) {
+  if (!fx) return;
+  const s = U * 0.12 * (0.75 + 0.25 * Math.min(A, 1.6)), lw = s * 0.09;
+  const mx = U * 0.08, ax = clamp(b.x + b.w * 0.85, mx, W - mx), ay = clamp(b.y - U * 0.01, mx * 1.3, H - mx);
+  const hx = clamp(b.x + b.w * 0.5, mx, W - mx), hy = clamp(b.y, mx, H - mx);
+  ctx.save(); ctx.globalAlpha *= ease(lt / 0.15);
+  if (fx === 'bang' || fx === 'question') {
+    const sc = backOut(lt / 0.3), bob = fx === 'question' ? Math.sin(lt * 3) * s * 0.08 : 0;
+    ctx.translate(ax, ay + bob); ctx.rotate(fx === 'bang' ? 0.12 : -0.1); ctx.scale(sc, sc);
+    ctx.font = `900 ${Math.round(s * 1.9)}px Arial, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const ch = fx === 'bang' ? '!' : '?';
+    ctx.lineJoin = 'round'; ctx.lineWidth = s * 0.22; ctx.strokeStyle = '#111'; ctx.strokeText(ch, 0, 0);
+    ctx.fillStyle = fx === 'bang' ? '#ffd21f' : '#59c3ff'; ctx.fillText(ch, 0, 0);
+    if (fx === 'bang') { ctx.strokeStyle = '#111'; ctx.lineWidth = lw * 1.2; ctx.lineCap = 'round'; for (const a of [-2.3, -1.6, -0.9]) { ctx.beginPath(); ctx.moveTo(Math.cos(a) * s * 0.95, Math.sin(a) * s * 0.95); ctx.lineTo(Math.cos(a) * s * 1.35, Math.sin(a) * s * 1.35); ctx.stroke(); } }
+  } else if (fx === 'sparkle') {
+    for (let k = 0; k < 5; k++) {
+      const tw = Math.sin(lt * 4 + k * 1.7); if (tw < 0.05) continue;
+      const x = clamp(b.x + b.w * (rnd(i, k) * 1.2 - 0.1), mx, W - mx), y = clamp(b.y + b.h * (rnd(i, k + 7) * 0.6 - 0.1), mx, H - mx);
+      starPath(ctx, x, y, s * 0.45 * tw); inkPath(ctx, '#ffd21f', lw * 0.7);
+    }
+  } else if (fx === 'hearts') {
+    for (let k = 0; k < 3; k++) {
+      const ph = (lt * 0.55 + k / 3) % 1, x = hx + (k - 1) * b.w * 0.3 + Math.sin(lt * 2 + k) * s * 0.3, y = hy - ph * b.h * 0.55;
+      ctx.save(); ctx.globalAlpha *= Math.sin(Math.PI * ph); heartPath(ctx, x, y, s * 0.7); inkPath(ctx, '#ff4d6d', lw * 0.8); ctx.restore();
+    }
+  } else if (fx === 'tears') {
+    for (let k = 0; k < 2; k++) {
+      const ph = (lt * 0.9 + k * 0.5) % 1, x = hx + (k ? 1 : -1) * b.w * 0.06, y = hy + b.h * 0.1 + ph * b.h * 0.18;
+      ctx.save(); ctx.globalAlpha *= 1 - ph; dropPath(ctx, x, y, s * 0.28); inkPath(ctx, '#6ec6ff', lw * 0.6); ctx.restore();
+    }
+  } else if (fx === 'sweat') {
+    const ph = (lt * 0.5) % 1, x = clamp(b.x + b.w * 0.72, mx, W - mx), y = hy + b.h * 0.04 + ph * b.h * 0.12;
+    ctx.globalAlpha *= ph > 0.85 ? (1 - ph) / 0.15 : 1; dropPath(ctx, x, y, s * 0.45); inkPath(ctx, '#6ec6ff', lw * 0.8);
+  } else if (fx === 'anger') {
+    const R = s * 0.6 * (1 + 0.12 * Math.sin(lt * 8)), g = R * 0.25; ctx.translate(ax, ay); ctx.lineCap = 'round';
+    for (const [col, wd] of [['#111', s * 0.26], ['#ff3b3b', s * 0.14]]) {
+      ctx.strokeStyle = col; ctx.lineWidth = wd;
+      for (let q = 0; q < 4; q++) { ctx.save(); ctx.rotate(q * Math.PI / 2); ctx.beginPath(); ctx.moveTo(g, -R); ctx.quadraticCurveTo(g, -g, R, -g); ctx.stroke(); ctx.restore(); }
+    }
+  } else if (fx === 'speed') {
+    ctx.lineCap = 'round'; ctx.lineWidth = U * 0.006; ctx.strokeStyle = onPaper ? 'rgba(30,30,30,0.35)' : 'rgba(255,255,255,0.5)';
+    for (let k = 0; k < 8; k++) {
+      const y = H * (0.12 + 0.76 * rnd(i, k)), len = W * (0.15 + 0.25 * rnd(i, k + 9)), x = W - ((lt * W * 1.6 + rnd(i, k + 3) * W * 2) % (W * 2));
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + len, y); ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+function animScene(ctx, i, src0, lt, d, p, W, H, o) {
+  const mood = sceneMood(i), M = MOODS[mood] || MOODS.calm, A = clamp(S.settings.animAmt ?? 1, 0.3, 2), m = S.settings.motion / 100;
+  const src = hiSrc(i, src0, W, H), L = figLayer(src), U = Math.min(W, H);
+  const box = L ? L.box : { x0: 0.3, y0: 0.18, x1: 0.7, y1: 0.86 }, cx = (box.x0 + box.x1) / 2, cy = (box.y0 + box.y1) / 2;
+  let z = 1, px = 0.5, py = 0.5, ox = 0, oy = 0;
+  if (M.cam === 'pushin') { z = 1 + (m + 0.07 * A) * ease(p); px = cx; py = cy; }
+  else if (M.cam === 'pullout') { z = 1 + (m + 0.07 * A) * (1 - ease(p)); px = cx; py = cy; }
+  else if (M.cam === 'punch') { z = 1 + m * p * 0.6 + 0.16 * A * Math.exp(-lt * 7); px = cx; py = cy; }
+  else if (M.cam === 'pan') { z = 1 + Math.max(m, 0.08); px = 0.15 + 0.7 * p; }
+  else if (M.cam === 'gentle') { const mode = i % 4; if (mode === 0) z = 1 + m * p; else if (mode === 1) z = 1 + m * (1 - p); else { z = 1 + m; px = mode === 2 ? 0.2 + 0.6 * p : 0.8 - 0.6 * p; py = 0.5 - 0.15 * (p - 0.5); } }
+  if (M.shake) { const k = 0.02 * A * U * Math.exp(-lt * 5); ox += k * Math.sin(lt * 71); oy += k * Math.cos(lt * 53); }
+  if (M.tremble) { const k = 0.004 * A * U; ox += k * Math.sin(lt * 63); oy += k * Math.sin(lt * 47 + 1); }
+  const fm = figMotion(M.fig, lt, i, A);
+  if (!L && M.fig) { z *= 1.03 + Math.max(0, fm.sy - 1) * 0.4; oy += fm.dy * H * 0.35; ox += fm.dx * U; }   // no plain paper: move the whole picture, gently
+  z *= o.scale || 1;
+  const dx = (o.dx || 0) + ox, r = picRect(src, W, H, z, px, py, dx, oy);
+  drawSides(ctx, i, W, H, o.dx || 0, r.fill);
+  const bh = (box.y1 - box.y0) * r.h, ax = r.x + cx * r.w, ay = r.y + box.y1 * r.h;
+  if (L) {
+    ctx.fillStyle = L.paper; ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.save(); ctx.translate(ax + fm.dx * U, ay + fm.dy * bh); ctx.rotate(fm.rot); ctx.scale(fm.sx, fm.sy); ctx.translate(-ax, -ay);
+    ctx.drawImage(L.canvas, r.x, r.y, r.w, r.h); ctx.restore();
+  } else ctx.drawImage(src, r.x, r.y, r.w, r.h);
+  drawGrade(ctx, M.grade, lt, A, W, H);
+  if (i === 0 || sceneMood(i - 1) !== mood) {   // the effect shows on the first scene of a run, not on every scene
+    const b = { x: r.x + box.x0 * r.w + fm.dx * U, y: r.y + box.y0 * r.h + fm.dy * bh, w: (box.x1 - box.x0) * r.w, h: bh };
+    drawFx(ctx, M.fx, lt, A, i, b, U, W, H, !!L);
+  }
 }
 function captionTokens(text) {
   const clean = text.replace(TAG_RX, ' ').replace(/\s{2,}/g, ' ').trim().replace(/[,;:।|.—]+["'”’]*$/, m => m.replace(/[,;:।|.—]+/g, ''));
   const toks = []; clean.split(/(\*[^*]+\*)/).forEach(part => { if (!part) return; const hl = /^\*[^*]+\*$/.test(part); part.replace(/\*/g, '').split(/\s+/).filter(Boolean).forEach(w => toks.push({ w, hl })); });
   return toks;
 }
-function drawCaption(ctx, W, H, text, lt, L) {
+function drawCaption(ctx, W, H, text, lt, L, dur) {
   const pos = S.settings.captions; if (pos === 'off' || !text) return;
   const toks = captionTokens(text); if (!toks.length) return;
+  // word by word: each word appears when it is (about to be) spoken, estimated from its length
+  const words = S.settings.capWords !== 'off' && dur > 0.3; let wt = null;
+  if (words) { const wgt = toks.map(t => t.w.length + 2), tot = wgt.reduce((a, b) => a + b, 0), span = Math.max(0.25, dur * 0.88 - 0.05); let acc = 0; wt = wgt.map(g => { const v = 0.05 + span * acc / tot; acc += g; return v; }); toks.forEach((t, k) => t.k = k); }
   const bar = pos === 'bar' && L && L.band > 0;
   let fs = Math.min(W, H) * (bar ? 0.064 : 0.075) * S.settings.capSize; const maxW = W * 0.9; let lines;
   for (let tries = 0; tries < 5; tries++) {
@@ -1182,17 +1439,21 @@ function drawCaption(ctx, W, H, text, lt, L) {
   }
   const lh = fs * 1.12, total = lh * lines.length;
   let y0 = bar ? L.ph + (L.band - total) / 2 + fs * 0.85 : pos === 'top' ? H * 0.08 + fs * 0.85 : pos === 'center' ? H / 2 - total / 2 + fs * 0.85 : H - H * 0.08 - total + fs * 0.85;
-  const pop = lt < 0.14 ? 0.82 + 0.18 * (lt / 0.14) : 1;
+  const pop = words ? 1 : lt < 0.14 ? 0.82 + 0.18 * (lt / 0.14) : 1;
   ctx.save(); ctx.translate(W / 2, y0 + total / 2 - fs * 0.85); ctx.scale(pop, pop); ctx.translate(-W / 2, -(y0 + total / 2 - fs * 0.85));
   ctx.lineJoin = 'round'; ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
   const sp = ctx.measureText(' ').width;
   lines.forEach((ln, li) => {
     let x = W / 2 - ln.w / 2; const y = y0 + li * lh;
     for (const t of ln.toks) {
+      if (words && lt < wt[t.k]) { x += t.width + sp; continue; }
+      const now = words && (t.k === toks.length - 1 ? lt < wt[t.k] + 0.5 : lt < wt[t.k + 1]);
+      const u = words ? (lt - wt[t.k]) / 0.16 : 1, sc = u < 1 ? 1 + 0.1 * Math.sin(Math.PI * u) : 1;
+      ctx.save(); if (sc !== 1) { ctx.translate(x + t.width / 2, y - fs * 0.35); ctx.scale(sc, sc); ctx.translate(-(x + t.width / 2), -(y - fs * 0.35)); }
       ctx.shadowColor = 'rgba(0,0,0,0.55)'; ctx.shadowBlur = fs * 0.18; ctx.shadowOffsetY = fs * 0.05;
       ctx.lineWidth = fs * 0.17; ctx.strokeStyle = '#000'; ctx.strokeText(t.w, x, y);
-      ctx.shadowColor = 'transparent'; ctx.fillStyle = t.hl ? '#ffd21f' : '#ffffff'; ctx.fillText(t.w, x, y);
-      x += t.width + sp;
+      ctx.shadowColor = 'transparent'; ctx.fillStyle = t.hl || now ? '#ffd21f' : '#ffffff'; ctx.fillText(t.w, x, y);
+      ctx.restore(); x += t.width + sp;
     }
   });
   ctx.restore();
@@ -1214,7 +1475,7 @@ function drawFrame(ctx, W, H, t) {
     else drawScene(ctx, i, t, W, PH);
   } else drawScene(ctx, i, t, W, PH);
   if (L.band) { ctx.fillStyle = '#0d0e11'; ctx.fillRect(0, PH, W, L.band); }
-  drawCaption(ctx, W, H, S.segments[i].text, lt, L);
+  drawCaption(ctx, W, H, S.segments[i].text, lt, L, d);
 }
 
 /* ============ preview ============ */
@@ -1335,11 +1596,12 @@ function renderScenes() {
     <textarea rows="1" data-text="${i}" aria-label="Scene ${i + 1} text">${esc(s.text)}</textarea>
     <input type="text" data-vis="${i}" value="${esc(s.visual || '')}" placeholder="Visual (optional): what the image should show, e.g. 'Rohan sad, sitting alone on stairs, close-up'">
     <div class="meta"><span class="t">${fmt(S.starts[i] || 0, 2)} → ${fmt(segEnd(i), 2)} · ${(segEnd(i) - (S.starts[i] || 0)).toFixed(1)}s</span>
-    <button class="btn small" data-split="${i}">Split</button>${i < S.segments.length - 1 ? `<button class="btn small" data-merge="${i}">Merge ↓</button>` : ''}<button class="btn small danger" data-del="${i}">Delete</button></div></div></div>`).join('') || '<p class="hint">Write a script and press <b>Create scenes</b>.</p>';
+    ${S.settings.anim !== 'off' ? `<select class="anim-sel" data-anim="${i}" aria-label="Animation of scene ${i + 1}" title="Animation">${animOptions(i)}</select>` : ''}<button class="btn small" data-split="${i}">Split</button>${i < S.segments.length - 1 ? `<button class="btn small" data-merge="${i}">Merge ↓</button>` : ''}<button class="btn small danger" data-del="${i}">Delete</button></div></div></div>`).join('') || '<p class="hint">Write a script and press <b>Create scenes</b>.</p>';
   $$('[data-thumb]').forEach(cv => { const i = +cv.dataset.thumb; const [W, H] = dims(208); cv.width = W; cv.height = H; const x = cv.getContext('2d'); if (sceneCache[i]) drawCover(x, sceneCache[i], W, H, 1, .5, .5); else { x.fillStyle = cssVar('--surface-2'); x.fillRect(0, 0, W, H); x.fillStyle = cssVar('--muted'); x.font = '600 22px "JetBrains Mono", monospace'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('—', W / 2, H / 2); } });
 }
 $('#scenes').addEventListener('input', e => {
-  const t = e.target; if (t.dataset.text != null) { S.segments[+t.dataset.text].text = t.value; save(); } if (t.dataset.vis != null) { S.segments[+t.dataset.vis].visual = t.value; save(); }
+  const t = e.target; if (t.dataset.text != null) { S.segments[+t.dataset.text].text = t.value; const sel = document.querySelector(`[data-anim="${t.dataset.text}"]`); if (sel) sel.options[0].text = 'Animation: auto · ' + MOODS[detectMood(t.value)].label; save(); }
+  if (t.dataset.anim != null) { S.segments[+t.dataset.anim].anim = t.value === 'auto' ? undefined : t.value; drawPreview(); save(); } if (t.dataset.vis != null) { S.segments[+t.dataset.vis].visual = t.value; save(); }
 });
 $('#scenes').addEventListener('change', () => { renderPrompts(); renderStatus(); });
 document.addEventListener('click', async e => {
@@ -1450,14 +1712,15 @@ $('#dlPrompts').onclick = () => { const bs = batches(); if (!bs.length) return; 
 $('#loadChars').onclick = () => { const ta = $('#characters'); ta.value = (ta.value.trim() ? ta.value.trim() + '\n' : '') + CHANNEL_CHARS; S.settings.characters = ta.value; renderPrompts(); save(); };
 
 /* ============ settings binding ============ */
-const BIND = ['aspect', 'grid', 'style', 'styleText', 'characters', 'gutter', 'splitLevel', 'minWords', 'maxWords', 'captions', 'fit', 'enhance', 'capSize', 'motion', 'transition', 'transDur', 'res', 'fps', 'musicVol'];
-const NUM = new Set(['grid', 'minWords', 'maxWords', 'capSize', 'motion', 'transDur', 'res', 'fps', 'musicVol']);
+const BIND = ['aspect', 'grid', 'style', 'styleText', 'characters', 'gutter', 'splitLevel', 'minWords', 'maxWords', 'captions', 'fit', 'enhance', 'capSize', 'motion', 'transition', 'transDur', 'res', 'fps', 'musicVol', 'anim', 'animAmt', 'capWords'];
+const NUM = new Set(['grid', 'minWords', 'maxWords', 'capSize', 'motion', 'transDur', 'res', 'fps', 'musicVol', 'animAmt']);
 function applySettingsToUI() { BIND.forEach(k => { const el = $('#' + k); if (el) el.value = S.settings[k]; }); $('#projTitle').value = S.settings.title || ''; }
 BIND.forEach(k => { const el = $('#' + k); if (!el) return; el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => {
   S.settings[k] = NUM.has(k) ? +el.value : el.value;
   if (k === 'style') { if (S.settings.style !== 'custom') { S.settings.styleText = STYLES[S.settings.style].text; $('#styleText').value = S.settings.styleText; } }
   if (k === 'musicVol') music.volume = S.settings.musicVol;
   if (['enhance', 'fit', 'motion', 'captions', 'capSize', 'aspect'].includes(k)) enh.clear();
+  if (k === 'anim') renderScenes();
   if (k === 'aspect') { sizePreview(); }
   if (['aspect', 'grid', 'gutter', 'style'].includes(k)) { R.grids.forEach((r, gi) => { if (r) { r.cells = null; } }); rebuildCache(); renderGridCards(); renderScenes(); renderStatus(); }
   if (['style', 'styleText', 'characters', 'gutter', 'aspect', 'grid'].includes(k)) renderPrompts();
