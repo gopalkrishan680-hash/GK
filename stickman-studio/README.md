@@ -39,15 +39,21 @@ Open it in **Chrome or Edge** (double-click the file). Everything runs locally o
 Every scene without an uploaded image gets a stickman drawing made by the app itself (setting
 **Preview + Export → Pictures**: *My images; drawn where there is none* (default), *Always drawn*, or *Only my
 images*). The figures are original, drawn in code with hand-drawn style lines; no image files, no internet.
+**Drawing style** (same place) picks how they look; the default is **Chibi**: big head, big shiny eyes, full
+hair (long hair or a bun for women, grey for grandparents), blush, round hands and shoes. Twelve other
+styles: classic, pen sketch, bold cartoon, flat colour, expressive doodle, marker, chalkboard, notebook,
+silhouette, bean body, neon and comic.
 - **From the line:** names in the script (Rohan, Neha… keep the same look in every scene; female verbs such as
   *gayi / rahi / thi* give long hair and a dress), roles (papa → moustache, maa / dadi → bun, teacher → glasses,
   boss → tie, bachcha → smaller), crowds (*sab log, team, family* → 3 people).
-- **Poses (34):** standing, hands on hips, talking, pointing, presenting, waving, walking, running, cheering,
+- **Poses (51):** on a phone call, eating, writing, watching TV, clapping, namaste, thumbs up, stop, fist up,
+  yawning, tired, headache, shouting, pushing, hugging, dancing, looking up, standing, hands on hips, talking, pointing, presenting, waving, walking, running, cheering,
   laughing, shocked, sad, crying, angry, scared, thinking, confused, shrugging, facepalm, phone, reading, chai,
   carrying, holding a sign, trophy, sitting, working at a laptop, sitting on the floor, kneeling, jumping,
   sleeping in bed, lying down.
 - **Faces (13)**, **things** (desk + laptop, phone, book, chai, money bag, falling money, clock, chart up / down,
-  rain cloud, idea bulb, door, house, tree, sun, blackboard, stairs, target, heart, trophy, bed) and
+  rain cloud, idea bulb, door, house, tree, sun, blackboard, stairs, target, heart, trophy, bed, TV and sofa,
+  food on a table, car, pile of books; *raat / night* adds a moon and stars) and
   **bubbles**: a "quote" in the line becomes a speech bubble; questions and *soch* get thought bubbles.
 - **Talking:** *X ne kaha / poocha* puts the listener (the previous scene's main character) in the scene; a line
   that is only a "quote" continues with the same people and mood.

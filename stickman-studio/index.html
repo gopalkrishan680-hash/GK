@@ -519,7 +519,7 @@ details summary { cursor: pointer; font-weight: 600; }
         <select id="pics"><option value="auto">My images; a drawn stickman scene where there is none</option><option value="draw">Always drawn stickmen (no images needed)</option><option value="images">Only my images</option></select>
       </label>
       <label class="f">Drawing style
-        <select id="skStyle"><option value="classic">Classic: clean thin lines</option><option value="sketch">Pen sketch: hand-drawn, big head, expressive</option><option value="bold">Bold cartoon: outlined tube limbs</option><option value="flat">Flat colour explainer</option><option value="doodle">Expressive doodle: curved limbs, big eyes, hands and shoes</option><option value="marker">Thick marker with a colour accent</option><option value="chalk">Chalkboard</option><option value="notebook">Notebook: blue pen on ruled paper</option><option value="silhouette">Silhouette</option><option value="bean">Bean body: round coloured bodies</option><option value="chibi">Chibi: very big head</option><option value="neon">Neon glow</option><option value="comic">Comic: bold outlines, bright colours</option></select>
+        <select id="skStyle"><option value="chibi">Chibi: very big head, cute (recommended)</option><option value="classic">Classic: clean thin lines</option><option value="sketch">Pen sketch: hand-drawn, big head, expressive</option><option value="bold">Bold cartoon: outlined tube limbs</option><option value="flat">Flat colour explainer</option><option value="doodle">Expressive doodle: curved limbs, big eyes, hands and shoes</option><option value="marker">Thick marker with a colour accent</option><option value="chalk">Chalkboard</option><option value="notebook">Notebook: blue pen on ruled paper</option><option value="silhouette">Silhouette</option><option value="bean">Bean body: round coloured bodies</option><option value="neon">Neon glow</option><option value="comic">Comic: bold outlines, bright colours</option></select>
       </label>
       <p class="hint" style="margin:0 0 6px">Drawn scenes are made in the app, offline, from each line: who is in it, the pose, the face, things like a laptop, phone, chai, money, clock, chart, rain cloud or idea bulb, and speech or thought bubbles. The arms and legs really move. Change any of it with <b>✏️ Drawing</b> under the scene (step 1).</p>
       <h3>Smart animation</h3>
@@ -624,7 +624,7 @@ He looked at Papa. Papa smiled, and said, "I am proud of you."`;
 
 /* ============ state ============ */
 const DEFAULTS = { title: '', aspect: '16:9', grid: 3, style: 'stickman', styleText: STYLES.stickman.text, characters: '', gutter: 'auto',
-  splitLevel: 'all', minWords: 2, maxWords: 14, captions: 'bar', fit: 'auto', enhance: 'on', v: 2, capSize: 1, motion: 6, transition: 'fade', transDur: 0.15, res: 1080, fps: 30, musicVol: 0.12, anim: 'on', animAmt: 1, capWords: 'on', pics: 'auto', skStyle: 'classic' };
+  splitLevel: 'all', minWords: 2, maxWords: 14, captions: 'bar', fit: 'auto', enhance: 'on', v: 3, capSize: 1, motion: 6, transition: 'fade', transDur: 0.15, res: 1080, fps: 30, musicVol: 0.12, anim: 'on', animAmt: 1, capWords: 'on', pics: 'auto', skStyle: 'chibi' };
 try { if (matchMedia('(pointer: coarse)').matches) DEFAULTS.res = 720; } catch (_) {}   // phones: smaller, faster export
 const S = { settings: { ...DEFAULTS }, script: '', segments: [], starts: [], grids: [], overrides: {}, audioBlob: null, audioName: '', musicBlob: null, musicName: '' };
 let uid = 1;
@@ -1457,13 +1457,14 @@ const SK = (() => {
     notebook: { label: 'Notebook: blue pen on ruled paper', lw: 3, head: 1.15, wobble: 0.09, double: 1, ink: '#1f3c88', paper: '#fdfdf8', bg: 'ruled', ends: 1, brows: 1 },
     silhouette: { label: 'Silhouette: solid black figures', lw: 4, head: 1.15, wobble: 0, sil: 1, ends: 1, paper: '#f4efe6', shadow: 'soft' },
     bean: { label: 'Bean body: round coloured bodies', lw: 3.6, head: 1.2, wobble: 0.03, bean: 1, ends: 2, brows: 1, blush: 1, shadow: 'soft' },
-    chibi: { label: 'Chibi: very big head, cute', lw: 4, head: 1.85, wobble: 0.03, bigEyes: 1, ends: 2, brows: 1, blush: 1, shadow: 'soft' },
+    chibi: { label: 'Chibi: very big head, cute', lw: 4, head: 1.85, body: 0.8, arm: 1.3, wobble: 0.03, bigEyes: 1, shine: 1, fullHair: 1, ends: 2, brows: 1, blush: 1, blushAll: 1, shadow: 'soft' },
     neon: { label: 'Neon: glowing lines on dark', lw: 4, head: 1.15, wobble: 0.02, ink: '#5ef2ff', paper: '#0e1020', fill: '#0e1020', glow: 1, ends: 1, brows: 1 },
     comic: { label: 'Comic: bold outlines, bright colours', lw: 4, head: 1.25, wobble: 0, tube: 15, comic: 1, ends: 2, brows: 1, blush: 1, bg: 'halftone', shadow: 'soft' },
   };
   let ST = STYLES.classic;
   const SHIRTS = ['#e4572e', '#2e86ab', '#3f9e5a', '#f2a541', '#8e5bd6', '#e8446b', '#2a9d8f'], SKIN = '#f3cfae', PANTS = '#36435f';
-  const HR = () => LEN.head * ST.head;
+  const HR = () => LEN.head * ST.head, BK = () => ST.body || 1;
+  const figH = () => (LEN.th + LEN.sh + LEN.torso) * BK() + 2 * HR() + LEN.neck;   // standing height of a figure
   // Poses face right. Angles are absolute: 0 = straight down, 90 = right (forward), 180 = up, -90 = left (back).
   // la / ra = [upper arm, forearm] of the back / front arm; ll / rl = [thigh, shin]; lean and head tilt forward in degrees.
   const POSES = {
@@ -1472,41 +1473,59 @@ const SK = (() => {
     talk: { label: 'Talking / explaining', la: [-12, -6], ra: [45, 120], ll: [-9, -9], rl: [9, 9], anim: 'talk' },
     point: { label: 'Pointing', la: [-14, -8], ra: [95, 92], ll: [-10, -10], rl: [10, 10], lean: -3 },
     present: { label: 'Presenting (points up)', la: [-14, -8], ra: [120, 125], ll: [-10, -10], rl: [10, 10], lean: -4 },
-    wave: { label: 'Waving', la: [-14, -8], ra: [150, 175], ll: [-9, -9], rl: [9, 9], anim: 'wave' },
+    wave: { label: 'Waving', la: [-14, -8], ra: [100, 165], ll: [-9, -9], rl: [9, 9], anim: 'wave' },
     walk: { label: 'Walking', la: [-14, -4], ra: [14, 24], ll: [-9, -9], rl: [9, 9], anim: 'walk' },
     run: { label: 'Running', la: [-30, 50], ra: [30, 110], ll: [-20, -40], rl: [30, 0], lean: 14, anim: 'run' },
     happy: { label: 'Happy, arms open', la: [-55, -130], ra: [55, 130], ll: [-10, -10], rl: [10, 10], anim: 'bob' },
-    cheer: { label: 'Cheering, arms up', la: [-140, -160], ra: [140, 160], ll: [-12, -12], rl: [12, 12], anim: 'hop' },
-    laugh: { label: 'Laughing', la: [-30, 60], ra: [30, -60], ll: [-10, -10], rl: [10, 10], lean: -8, head: -18, anim: 'laugh' },
-    shock: { label: 'Shocked, hands on head', la: [-100, 163], ra: [100, -163], ll: [-12, -12], rl: [12, 12], lean: -6, anim: 'jolt' },
+    cheer: { label: 'Cheering, arms up', la: [-100, -160], ra: [100, 160], ll: [-12, -12], rl: [12, 12], anim: 'hop' },
+    laugh: { label: 'Laughing', la: [0, 0], ra: [0, 0], lT: 'belly', rT: 'belly', ll: [-10, -10], rl: [10, 10], lean: -8, head: -18, anim: 'laugh' },
+    shock: { label: 'Shocked, hands on head', la: [0, 0], ra: [0, 0], lT: 'temple', rT: 'temple', ll: [-12, -12], rl: [12, 12], lean: -6, anim: 'jolt' },
     sad: { label: 'Sad, head down', la: [-6, -3], ra: [6, 3], ll: [-7, -7], rl: [7, 7], lean: 10, head: 24, anim: 'sigh' },
-    cry: { label: 'Crying', la: [80, -150], ra: [90, -159], ll: [-8, -8], rl: [8, 8], lean: 12, head: 22, anim: 'sob' },
+    cry: { label: 'Crying', la: [0, 0], ra: [0, 0], lT: 'eyes', rT: 'eyes', ll: [-8, -8], rl: [8, 8], lean: 10, head: 18, anim: 'sob' },
     angry: { label: 'Angry, pointing', la: [-35, 45], ra: [80, 88], ll: [-12, -12], rl: [12, 12], lean: 6, anim: 'shake' },
     fists: { label: 'Angry, fists', la: [-35, 30], ra: [35, -30], ll: [-14, -14], rl: [14, 14], anim: 'shake' },
     scared: { label: 'Scared', la: [-70, 160], ra: [60, 150], ll: [-16, 4], rl: [16, -4], lean: -8, anim: 'tremble' },
-    think: { label: 'Thinking (hand on chin)', la: [30, 95], ra: [95, -116], ll: [-9, -9], rl: [9, 9], head: -8, anim: 'think' },
-    scratch: { label: 'Confused (scratching head)', la: [-14, -8], ra: [160, -166], ll: [-9, -9], rl: [9, 9], head: 6, anim: 'scratch' },
+    think: { label: 'Thinking (hand on chin)', la: [30, 95], ra: [0, 0], rT: 'chin', ll: [-9, -9], rl: [9, 9], head: -8, anim: 'think' },
+    scratch: { label: 'Confused (scratching head)', la: [-14, -8], ra: [0, 0], rT: 'top', ll: [-9, -9], rl: [9, 9], head: 6, anim: 'scratch' },
     shrug: { label: 'Shrugging', la: [-50, -130], ra: [50, 130], ll: [-9, -9], rl: [9, 9], anim: 'shrug' },
-    facepalm: { label: 'Facepalm', la: [-14, -8], ra: [110, -147], ll: [-9, -9], rl: [9, 9], head: 16 },
-    phone: { label: 'Looking at phone', la: [-14, -8], ra: [20, 160], ll: [-9, -9], rl: [9, 9], head: 18, hold: 'phone' },
+    facepalm: { label: 'Facepalm', la: [-14, -8], ra: [0, 0], rT: 'forehead', ll: [-9, -9], rl: [9, 9], head: 16 },
+    phone: { label: 'Looking at phone', la: [-14, -8], ra: [0, 0], rT: 'phone', ll: [-9, -9], rl: [9, 9], head: 18, hold: 'phone' },
     read: { label: 'Reading a book', la: [30, 150], ra: [40, 160], ll: [-9, -9], rl: [9, 9], head: 20, hold: 'book' },
     cup: { label: 'Holding chai / coffee', la: [-14, -8], ra: [25, 130], ll: [-9, -9], rl: [9, 9], hold: 'cup', anim: 'sip' },
     carry: { label: 'Carrying a bag', la: [-14, -8], ra: [10, 10], ll: [-9, -9], rl: [9, 9], hold: 'bag', anim: 'walk' },
-    sign: { label: 'Holding a sign up', la: [-165, 175], ra: [165, -175], ll: [-9, -9], rl: [9, 9], hold: 'sign' },
-    trophy: { label: 'Winner with trophy', la: [-150, -170], ra: [160, 175], ll: [-12, -12], rl: [12, 12], hold: 'trophy', anim: 'hop' },
+    sign: { label: 'Holding a sign up', la: [-100, -172], ra: [100, 172], ll: [-9, -9], rl: [9, 9], hold: 'sign' },
+    trophy: { label: 'Winner with trophy', la: [-100, -160], ra: [105, 165], ll: [-12, -12], rl: [12, 12], hold: 'trophy', anim: 'hop' },
     sit: { label: 'Sitting on a chair', la: [30, 80], ra: [40, 85], ll: [88, 2], rl: [92, -2], seat: 'chair', anim: 'breathe' },
     desk: { label: 'Working at a laptop', la: [55, 95], ra: [62, 98], ll: [88, 2], rl: [92, -2], lean: 8, seat: 'chair', front: 'laptop', anim: 'type' },
     floor: { label: 'Sitting on the floor, sad', la: [60, 100], ra: [70, 100], ll: [120, 20], rl: [126, 26], lean: 12, head: 22, anim: 'sigh' },
     kneel: { label: 'Kneeling', la: [-6, -3], ra: [30, 60], ll: [88, 0], rl: [0, -90], lean: 6, head: 18 },
-    jump: { label: 'Jumping for joy', la: [-140, -160], ra: [140, 160], ll: [-25, 25], rl: [25, -25], anim: 'hop' },
+    jump: { label: 'Jumping for joy', la: [-100, -160], ra: [100, 160], ll: [-25, 25], rl: [25, -25], anim: 'hop' },
     sleep: { label: 'Sleeping in bed', la: [-8, -4], ra: [8, 4], ll: [-3, -3], rl: [3, 3], lie: true, seat: 'bed', anim: 'snore' },
+    call: { label: 'On a phone call', la: [-40, 40], ra: [0, 0], rT: 'ear', ll: [-9, -9], rl: [9, 9], hold: 'phone', anim: 'talk' },
+    eat: { label: 'Eating at a table', la: [40, 85], ra: [0, 0], rT: 'mouth', ll: [88, 2], rl: [92, -2], seat: 'chair', front: 'food', anim: 'eat' },
+    write: { label: 'Writing at a desk', la: [50, 95], ra: [58, 100], ll: [88, 2], rl: [92, -2], lean: 12, head: 22, seat: 'chair', front: 'paper', anim: 'write' },
+    watch: { label: 'Watching TV on a sofa', la: [30, 80], ra: [40, 85], ll: [88, 2], rl: [92, -2], lean: -6, seat: 'sofa', anim: 'breathe' },
+    clap: { label: 'Clapping', la: [0, 0], ra: [0, 0], lT: 'clap', rT: 'clap', ll: [-10, -10], rl: [10, 10], anim: 'clap' },
+    namaste: { label: 'Namaste', la: [0, 0], ra: [0, 0], lT: 'chest', rT: 'chest', ll: [-9, -9], rl: [9, 9], head: 10 },
+    thumbsup: { label: 'Thumbs up', la: [-14, -8], ra: [70, 165], ll: [-10, -10], rl: [10, 10], anim: 'bob' },
+    stop: { label: 'Stop! (palm out)', la: [-14, -8], ra: [92, 178], ll: [-12, -12], rl: [12, 12], lean: -5 },
+    fistpump: { label: 'Yes! (fist up)', la: [-30, 40], ra: [105, 170], ll: [-12, -12], rl: [12, 12], anim: 'hop' },
+    yawn: { label: 'Yawning / stretching', la: [-105, -165], ra: [105, 165], ll: [-9, -9], rl: [9, 9], head: -10, anim: 'stretch' },
+    tired: { label: 'Tired, dragging along', la: [8, 12], ra: [14, 18], ll: [-9, -9], rl: [9, 9], lean: 16, head: 22, anim: 'trudge' },
+    headache: { label: 'Headache (hands on temples)', la: [0, 0], ra: [0, 0], lT: 'temple', rT: 'temple', ll: [-9, -9], rl: [9, 9], head: 10, anim: 'tremble' },
+    shout: { label: 'Shouting / calling out', la: [0, 0], ra: [0, 0], lT: 'mouthside', rT: 'mouthside', ll: [-14, -14], rl: [14, 14], lean: -6, head: -10 },
+    push: { label: 'Pushing hard', la: [82, 96], ra: [88, 96], ll: [-38, -38], rl: [22, -2], lean: 24, anim: 'strain' },
+    hug: { label: 'Hugging (arms open)', la: [70, 125], ra: [82, 130], ll: [-9, -9], rl: [9, 9], lean: 6, anim: 'breathe' },
+    dance: { label: 'Dancing', la: [-95, -150], ra: [95, 150], ll: [-12, -12], rl: [12, 12], anim: 'dance' },
+    lookup: { label: 'Looking up, hoping', la: [-14, -8], ra: [0, 0], rT: 'forehead', ll: [-9, -9], rl: [9, 9], head: -24 },
     lie: { label: 'Lying on the floor', la: [-30, -40], ra: [30, 40], ll: [-6, -6], rl: [6, 6], lie: true },
   };
   const FACES = { neutral: 'Neutral', happy: 'Happy', laugh: 'Laughing', sad: 'Sad', cry: 'Crying', angry: 'Angry', surprised: 'Surprised', scared: 'Scared', confused: 'Confused', think: 'Thinking', tired: 'Tired', smirk: 'Proud / smirk', sleep: 'Asleep' };
-  const PROPS = { none: 'Nothing', laptop: 'Desk + laptop', phone: 'Phone', book: 'Book', cup: 'Chai / coffee', money: 'Money bag', clock: 'Clock', chartup: 'Chart going up', chartdown: 'Chart going down', rain: 'Rain cloud (problem)', bulb: 'Idea bulb', thought: 'Thought bubble ?', door: 'Door', house: 'House', board: 'Blackboard', trophy: 'Trophy', stairs: 'Stairs', target: 'Target / goal', heart: 'Big heart', sun: 'Sun', tree: 'Tree', bed: 'Bed', money2: 'Money falling' };
+  const PROPS = { tv: 'TV', car: 'Car', books: 'Pile of books', none: 'Nothing', laptop: 'Desk + laptop', phone: 'Phone', book: 'Book', cup: 'Chai / coffee', money: 'Money bag', clock: 'Clock', chartup: 'Chart going up', chartdown: 'Chart going down', rain: 'Rain cloud (problem)', bulb: 'Idea bulb', thought: 'Thought bubble ?', door: 'Door', house: 'House', board: 'Blackboard', trophy: 'Trophy', stairs: 'Stairs', target: 'Target / goal', heart: 'Big heart', sun: 'Sun', tree: 'Tree', bed: 'Bed', money2: 'Money falling' };
 
   // ---------- animation of the limbs ----------
   const clone = p => ({ ...p, la: [...p.la], ra: [...p.ra], ll: [...p.ll], rl: [...p.rl], lean: p.lean || 0, head: p.head || 0, lift: 0, dx: 0 });
+  const FACE_OF = { yawn: 'tired', tired: 'tired', headache: 'sad', shout: 'surprised', clap: 'happy', namaste: 'happy', thumbsup: 'happy', fistpump: 'happy', dance: 'laugh', hug: 'happy', push: 'angry', lookup: 'think', eat: 'happy', watch: 'happy', stop: 'neutral' };
   const ANIM = {
     breathe: (q, t) => { const b = Math.sin(t * 2.4); q.lean += b * 0.8; q.la[0] -= b * 2; q.ra[0] += b * 2; },
     talk: (q, t) => { q.head += 5 * Math.sin(t * 5) * Math.max(0, Math.sin(t * 1.3)); q.ra[1] += 18 * Math.sin(t * 3); q.ra[0] += 8 * Math.sin(t * 3); },
@@ -1531,18 +1550,53 @@ const SK = (() => {
     sip: (q, t) => { const k = Math.max(0, Math.sin(t * 1.2)); q.ra[1] += 25 * k; q.head -= 6 * k; },
     type: (q, t) => { q.la[1] += 4 * Math.sin(t * 15); q.ra[1] += 4 * Math.sin(t * 15 + 2); q.head += 2 * Math.sin(t * 1.3); },
     snore: () => {},
+    clap: (q, t) => { const k = Math.sin(t * 12); q.la[1] -= 10 * k; q.ra[1] += 10 * k; q.la[0] -= 4 * k; q.ra[0] += 4 * k; },
+    eat: (q, t) => { const k = Math.max(0, Math.sin(t * 2.6)); q.ra[0] -= 30 * (1 - k); q.ra[1] += 50 * (1 - k); },
+    write: (q, t) => { q.ra[1] += 5 * Math.sin(t * 9); q.ra[0] += 3 * Math.sin(t * 4.5); },
+    stretch: (q, t) => { const k = 0.5 + 0.5 * Math.sin(t * 1.6); q.la[0] += 20 * k; q.ra[0] -= 20 * k; q.lift = 4 * k; },
+    trudge: (q, t) => { const s = Math.sin(t * Math.PI * 2 * 0.9); q.ll = [12 * s, 12 * s - 10 * Math.max(0, -s)]; q.rl = [-12 * s, -12 * s - 10 * Math.max(0, s)]; q.la[0] -= 6 * s; q.ra[0] += 6 * s; },
+    strain: (q, t) => { q.dx = 1.2 * Math.sin(t * 50); q.lean += 2 * Math.sin(t * 3); },
+    dance: (q, t) => { const s = Math.sin(t * 6), c2 = Math.cos(t * 6); q.la = [-95 + 20 * s, -150 + 50 * c2]; q.ra = [95 + 20 * c2, 150 - 50 * s]; q.lean = 8 * s; q.lift = 8 * Math.abs(c2); q.ll[0] -= 10 * s; q.rl[0] -= 10 * s; },
   };
 
   // ---------- skeleton → joint positions (figure space: feet on y = 0, facing +x) ----------
   function fk(q) {
+    const k = BK(), TH = LEN.th * k, SH = LEN.sh * k, TO = LEN.torso * k, UA = LEN.ua * (ST.arm || 1), FA = LEN.fa * (ST.arm || 1), R = HR();
     const add = (p, a, l) => { const v = V(a); return [p[0] + v[0] * l, p[1] + v[1] * l]; };
-    const legY = l => LEN.th * Math.cos(l[0] * D2R) + LEN.sh * Math.cos(l[1] * D2R);
-    const drop = q.lie ? LEN.th + LEN.sh : Math.max(legY(q.ll), legY(q.rl), 0);
+    const legY = l => TH * Math.cos(l[0] * D2R) + SH * Math.cos(l[1] * D2R);
+    const drop = q.lie ? TH + SH : Math.max(legY(q.ll), legY(q.rl), 0);
     const hip = [q.dx || 0, -drop - (q.lift || 0)];
-    const kL = add(hip, q.ll[0], LEN.th), fL = add(kL, q.ll[1], LEN.sh), kR = add(hip, q.rl[0], LEN.th), fR = add(kR, q.rl[1], LEN.sh);
-    const neck = add(hip, 180 - q.lean, LEN.torso), sh = [neck[0] + (hip[0] - neck[0]) * 0.1, neck[1] + (hip[1] - neck[1]) * 0.1];
-    const head = add(neck, 180 - q.lean - q.head, HR() + LEN.neck);
-    const eL = add(sh, q.la[0], LEN.ua), hL = add(eL, q.la[1], LEN.fa), eR = add(sh, q.ra[0], LEN.ua), hR = add(eR, q.ra[1], LEN.fa);
+    const kL = add(hip, q.ll[0], TH), fL = add(kL, q.ll[1], SH), kR = add(hip, q.rl[0], TH), fR = add(kR, q.rl[1], SH);
+    const neck = add(hip, 180 - q.lean, TO), sh = [neck[0] + (hip[0] - neck[0]) * 0.1, neck[1] + (hip[1] - neck[1]) * 0.1];
+    const head = add(neck, 180 - q.lean - q.head, R + LEN.neck);
+    // points a hand can be sent to; they follow the head, whatever its size
+    const T = (name, front) => {
+      const hx = head[0], hy = head[1];
+      switch (name) {
+        case 'chin': return [hx + R * 0.32, hy + R * 0.8];
+        case 'mouth': return [hx + R * 0.6, hy + R * 0.45];
+        case 'mouthside': return front ? [hx + R * 0.95, hy + R * 0.5] : [hx + R * 0.15, hy + R * 0.62];
+        case 'eyes': return front ? [hx + R * 0.48, hy] : [hx + R * 0.05, hy + R * 0.02];
+        case 'forehead': return [hx + R * 0.55, hy - R * 0.42];
+        case 'top': return [hx + R * 0.1, hy - R * 1.0];
+        case 'temple': return front ? [hx + R * 0.95, hy - R * 0.2] : [hx - R * 0.95, hy - R * 0.2];
+        case 'ear': return [hx + R * 0.9, hy + R * 0.22];
+        case 'phone': return [hx + R * 1.15, hy + R * 0.85];
+        case 'chest': return [neck[0] + 30, neck[1] + 26];
+        case 'belly': return [neck[0] + (front ? 30 : 18), neck[1] + TO * 0.62];
+        case 'clap': return [neck[0] + 52, neck[1] + 24];
+      }
+      return [hx, hy];
+    };
+    const ik = (S0, P) => {   // two-bone arm: shoulder → elbow → hand on P, elbow kept low
+      const dx = P[0] - S0[0], dy = P[1] - S0[1], d = clamp(Math.hypot(dx, dy), Math.abs(UA - FA) + 1, UA + FA - 0.5);
+      const base = Math.atan2(dx, dy) / D2R, al = Math.acos(clamp((UA * UA + d * d - FA * FA) / (2 * UA * d), -1, 1)) / D2R;
+      const e = [base + al, base - al].map(u => ({ u, e: add(S0, u, UA) })).sort((p1, p2) => p2.e[1] - p1.e[1])[0];
+      return [e.u, Math.atan2(P[0] - e.e[0], P[1] - e.e[1]) / D2R];
+    };
+    if (q.lT) { const r = ik(sh, T(q.lT, false)); q.la = [r[0] + q.la[0], r[1] + q.la[1]]; }
+    if (q.rT) { const r = ik(sh, T(q.rT, true)); q.ra = [r[0] + q.ra[0], r[1] + q.ra[1]]; }
+    const eL = add(sh, q.la[0], UA), hL = add(eL, q.la[1], FA), eR = add(sh, q.ra[0], UA), hR = add(eR, q.ra[1], FA);
     return { hip, kL, fL, kR, fR, neck, sh, head, eL, hL, eR, hR };
   }
 
@@ -1573,7 +1627,8 @@ const SK = (() => {
     const blink = !['laugh', 'sleep', 'cry', 'tired'].includes(kind) && ((t + seed * 1.37) % 3.7) < 0.12;
     const eye = (x, big) => {
       if (ST.bigEyes && !blink) { const rx = r * (big ? 0.17 : 0.14), ry = r * (big ? 0.22 : 0.18); c.save(); c.lineWidth = 2; c.fillStyle = FILLC; c.beginPath(); c.ellipse(x, ey - r * 0.02, rx, ry, 0, 0, 7); c.fill(); c.stroke();
-        c.fillStyle = INK; c.beginPath(); c.arc(x + r * (kind === 'think' ? 0.02 : 0.05), ey + (kind === 'think' ? -r * 0.09 : r * 0.03), r * (big ? 0.06 : 0.075), 0, 7); c.fill(); c.restore(); return; }
+        const px = x + r * (kind === 'think' ? 0.02 : 0.05), py = ey + (kind === 'think' ? -r * 0.09 : r * 0.03); c.fillStyle = INK; c.beginPath(); c.arc(px, py, r * (big ? 0.06 : 0.075), 0, 7); c.fill();
+        if (ST.shine) { c.fillStyle = '#fff'; c.beginPath(); c.arc(px + r * 0.025, py - r * 0.03, r * 0.025, 0, 7); c.fill(); } c.restore(); return; }
       if (blink) { c.beginPath(); c.moveTo(x - r * 0.08, ey); c.lineTo(x + r * 0.08, ey); c.stroke(); return; }
       if (big) { c.beginPath(); c.ellipse(x, ey, r * 0.12, r * 0.15, 0, 0, 7); c.stroke(); c.beginPath(); c.arc(x + r * 0.02, ey + r * 0.02, r * 0.05, 0, 7); c.fill(); }
       else { c.beginPath(); c.ellipse(x + (kind === 'think' ? r * 0.03 : 0), ey - (kind === 'think' ? r * 0.06 : 0), r * 0.065, r * 0.1, 0, 0, 7); c.fill(); }
@@ -1611,10 +1666,31 @@ const SK = (() => {
       const up = kind === 'surprised' || kind === 'scared' ? 0.36 : 0.26; c.lineWidth = 2.2; c.beginPath();
       for (const x of [ex1, ex2]) { c.moveTo(x - r * 0.1, ey - r * (up - 0.03)); c.quadraticCurveTo(x, ey - r * (up + 0.06), x + r * 0.1, ey - r * (up - 0.03)); } c.stroke();
     }
-    if (ST.blush && ['happy', 'laugh', 'smirk'].includes(kind)) { c.fillStyle = 'rgba(255,110,130,0.4)'; for (const x of [ex1 - r * 0.14, ex2 + r * 0.12]) { c.beginPath(); c.ellipse(x, ey + r * 0.27, r * 0.12, r * 0.07, 0, 0, 7); c.fill(); } }
+    if (ST.blush && (['happy', 'laugh', 'smirk'].includes(kind) || (ST.blushAll && !['angry', 'sad', 'cry', 'tired', 'scared'].includes(kind)))) { c.fillStyle = 'rgba(255,110,130,0.4)'; for (const x of [ex1 - r * 0.14, ex2 + r * 0.12]) { c.beginPath(); c.ellipse(x, ey + r * 0.27, r * 0.12, r * 0.07, 0, 0, 7); c.fill(); } }
+    c.restore();
+  }
+  const hairCol = look => look.grey ? '#a7a6ad' : '#2e2a33';
+  function hairBack(c, hx, hy, r, look) {   // behind the head: long hair and bun
+    if (!ST.fullHair) return;
+    c.save(); c.lineWidth = 2.4; c.strokeStyle = INK; c.fillStyle = hairCol(look);
+    if (look.female && look.hair !== 'bun') { c.beginPath(); c.moveTo(hx - r * 0.98, hy - r * 0.2); c.quadraticCurveTo(hx - r * 1.3, hy + r * 1.2, hx - r * 0.55, hy + r * 1.42); c.lineTo(hx + r * 0.35, hy + r * 1.25); c.quadraticCurveTo(hx + r * 1.05, hy + r * 0.8, hx + r * 0.98, hy - r * 0.2); c.closePath(); c.fill(); c.stroke(); }
+    if (look.female && look.hair === 'bun') { c.beginPath(); c.arc(hx - r * 0.62, hy - r * 0.86, r * 0.36, 0, 7); c.fill(); c.stroke(); }
+    c.restore();
+  }
+  function hairCap(c, hx, hy, r, look) {    // in front: the hair on top, with a fringe
+    c.save(); c.lineWidth = 2.4; c.strokeStyle = INK; c.fillStyle = hairCol(look); c.lineJoin = 'round';
+    if (look.hair === 'bald') { for (const sx of [-1, 1]) { c.beginPath(); c.ellipse(hx + sx * r * 0.88, hy - r * 0.05, r * 0.16, r * 0.34, sx * 0.25, 0, 7); c.fill(); c.stroke(); } c.restore(); return; }
+    c.beginPath(); c.arc(hx, hy, r * 1.05, Math.PI * 1.03, Math.PI * 1.97);
+    const n = 7, side = look.female ? 0.25 : 0;
+    for (let k = 0; k <= n; k++) { const x = hx + r * 1.02 - k * (2.04 * r / n), y = hy - r * (k % 2 ? 0.5 : 0.3) + (look.hair === 'tuft2' ? (k / n) * r * 0.25 : 0) + side * r * (k / n - 0.5) * 0.4; c.lineTo(x, y); }
+    c.closePath(); c.fill(); c.stroke();
+    if (look.hair === 'spiky' && !look.female) { c.beginPath(); for (let k = 0; k < 5; k++) { const a = -2.5 + k * 0.33, b0 = [hx + Math.cos(a - 0.12) * r, hy + Math.sin(a - 0.12) * r], b1 = [hx + Math.cos(a + 0.12) * r, hy + Math.sin(a + 0.12) * r]; c.moveTo(...b0); c.lineTo(hx + Math.cos(a) * r * 1.35, hy + Math.sin(a) * r * 1.35); c.lineTo(...b1); } c.fill(); c.stroke(); }
+    if (look.hair === 'tuft' && !look.female) { c.beginPath(); c.moveTo(hx - r * 0.1, hy - r * 1.02); c.quadraticCurveTo(hx + r * 0.05, hy - r * 1.4, hx + r * 0.35, hy - r * 1.3); c.quadraticCurveTo(hx + r * 0.1, hy - r * 1.18, hx + r * 0.15, hy - r * 1.0); c.fill(); c.stroke(); }
+    if (look.female) { c.beginPath(); c.ellipse(hx + r * 0.62, hy - r * 0.78, r * 0.13, r * 0.08, 0.5, 0, 7); c.fillStyle = '#ff6b8b'; c.fill(); c.stroke(); }
     c.restore();
   }
   function hair(c, hx, hy, r, look) {
+    if (ST.fullHair) return hairCap(c, hx, hy, r, look);
     c.save(); c.lineWidth = 2.6; c.strokeStyle = INK; c.lineCap = 'round';
     if (look.female) {
       c.lineWidth = 3; c.beginPath(); c.moveTo(hx - r * 0.95, hy + r * 0.1); c.quadraticCurveTo(hx - r * 1.15, hy - r * 1.2, hx + r * 0.1, hy - r * 1.06);
@@ -1632,7 +1708,7 @@ const SK = (() => {
   }
   function extras(c, hx, hy, r, look) {
     c.save(); c.lineWidth = 2.6; c.strokeStyle = INK; c.lineCap = 'round';
-    if (look.glasses) { c.lineWidth = 2; const gx = hx + r * 0.22, gy = hy - r * 0.1; c.beginPath(); c.arc(gx - r * 0.2, gy, r * 0.17, 0, 7); c.moveTo(gx + r * 0.37, gy); c.arc(gx + r * 0.2, gy, r * 0.17, 0, 7); c.moveTo(gx - r * 0.03, gy); c.lineTo(gx + r * 0.03, gy); c.stroke(); }
+    if (look.glasses) { const gr = ST.bigEyes ? 0.25 : 0.17; c.lineWidth = ST.bigEyes ? 2.6 : 2; const gx = hx + r * 0.22, gy = hy - r * 0.1; c.beginPath(); c.arc(gx - r * 0.2, gy, r * gr, 0, 7); c.moveTo(gx + r * (0.2 + gr), gy); c.arc(gx + r * 0.2, gy, r * gr, 0, 7); c.moveTo(gx - r * 0.03, gy); c.lineTo(gx + r * 0.03, gy); c.stroke(); }
     if (look.mustache) { const mx = hx + r * 0.22, my = hy + r * 0.2; c.fillStyle = INK; c.beginPath(); c.moveTo(mx, my - r * 0.04); c.quadraticCurveTo(mx - r * 0.2, my - r * 0.14, mx - r * 0.36, my + r * 0.08); c.quadraticCurveTo(mx - r * 0.16, my + r * 0.02, mx, my + r * 0.05); c.quadraticCurveTo(mx + r * 0.16, my + r * 0.02, mx + r * 0.36, my + r * 0.08); c.quadraticCurveTo(mx + r * 0.2, my - r * 0.14, mx, my - r * 0.04); c.fill(); }
     c.restore();
   }
@@ -1646,14 +1722,23 @@ const SK = (() => {
     else if (kind === 'book') { const [x2, y2] = J.hL, mx = (hx + x2) / 2, my = (hy + y2) / 2; line(c, [[mx - 26, my - 4], [mx, my + 4], [mx + 26, my - 4], [mx + 26, my - 30], [mx, my - 22], [mx - 26, my - 30], [mx - 26, my - 4]], 6); line(c, [[mx, my + 4], [mx, my - 22]], 7); }
     else if (kind === 'bag') { c.save(); c.translate(hx, hy + 22); c.beginPath(); c.moveTo(-6, -20); c.quadraticCurveTo(-28, 10, -18, 26); c.lineTo(18, 26); c.quadraticCurveTo(28, 10, 6, -20); c.closePath(); c.fillStyle = FILLC; c.fill(); c.stroke(); line(c, [[-9, -19], [9, -19]], 3); say('₹', 0, 8, 24); c.restore(); }
     else if (kind === 'trophy') { c.save(); c.translate(hx, hy - 6); c.beginPath(); c.moveTo(-16, -40); c.lineTo(16, -40); c.quadraticCurveTo(16, -12, 0, -10); c.quadraticCurveTo(-16, -12, -16, -40); c.fillStyle = '#ffd21f'; c.fill(); c.stroke(); line(c, [[0, -10], [0, 2]], 2); line(c, [[-9, 4], [9, 4]], 3); c.restore(); }
-    else if (kind === 'sign') { const [x2, y2] = J.hL, mx = (hx + x2) / 2, my = Math.min(hy, y2) - 10; rect(c, mx - 70, my - 60, 140, 58, 9, FILLC); if (txt) say(txt.slice(0, 12), mx, my - 31, 24); }
+    else if (kind === 'sign') { const [x2, y2] = J.hL, mx = (hx + x2) / 2, my = Math.min(hy, y2, J.head[1] - HR() - 4) - 10; rect(c, mx - 70, my - 60, 140, 58, 9, FILLC); if (txt) say(txt.slice(0, 12), mx, my - 31, 24); }
   }
-  function seatBack(c, kind) {
-    if (kind === 'chair') { line(c, [[-34, -150], [-30, -60], [32, -60]], 11); line(c, [[-30, -60], [-28, 0]], 12); line(c, [[30, -60], [28, 0]], 13); }
+  function seatBack(c, kind, J) {
+    const y = J.hip[1] + 4;
+    if (kind === 'chair') { line(c, [[-34, y - 90], [-30, y], [32, y]], 11); line(c, [[-30, y], [-28, 0]], 12); line(c, [[30, y], [28, 0]], 13); }
+    if (kind === 'sofa') { c.save(); c.fillStyle = '#c96f53'; c.beginPath(); c.roundRect ? c.roundRect(-80, y - 95, 40, 95 - y, 12) : c.rect(-80, y - 95, 40, 95 - y); c.fill(); c.stroke();
+      c.beginPath(); c.roundRect ? c.roundRect(-70, y, 170, -y, 10) : c.rect(-70, y, 170, -y); c.fill(); c.stroke(); c.restore(); }
   }
-  function seatFront(c, kind, t) {
-    if (kind === 'laptop') { line(c, [[66, -128], [200, -128]], 14); line(c, [[78, -128], [80, 0]], 15); line(c, [[188, -128], [186, 0]], 16); line(c, [[92, -130], [150, -130], [168, -186]], 17);
-      c.save(); c.lineWidth = 1.6; c.globalAlpha *= 0.6; c.beginPath(); c.moveTo(156, -150); c.lineTo(160, -162); c.stroke(); c.restore(); }
+  function seatFront(c, kind, t, J) {
+    const top = J.hip[1] - 64, x0 = 64;
+    const desk = () => { line(c, [[x0, top], [x0 + 140, top]], 14); line(c, [[x0 + 12, top], [x0 + 14, 0]], 15); line(c, [[x0 + 128, top], [x0 + 126, 0]], 16); };
+    if (kind === 'laptop') { desk(); line(c, [[x0 + 26, top - 2], [x0 + 86, top - 2], [x0 + 104, top - 58]], 17);
+      c.save(); c.lineWidth = 1.6; c.globalAlpha *= 0.6; c.beginPath(); c.moveTo(x0 + 92, top - 22); c.lineTo(x0 + 96, top - 34); c.stroke(); c.restore(); }
+    if (kind === 'food') { desk(); c.save(); c.lineWidth = 2.6; c.beginPath(); c.ellipse(x0 + 52, top - 6, 30, 7, 0, 0, 7); c.fillStyle = FILLC; c.fill(); c.stroke();
+      c.fillStyle = '#e8a33d'; c.beginPath(); c.ellipse(x0 + 52, top - 11, 16, 6, 0, 0, 7); c.fill(); rect(c, x0 + 98, top - 34, 18, 32, 18, 'rgba(120,190,240,0.5)');
+      for (let k = 0; k < 2; k++) { const ph = (t * 0.7 + k * 0.5) % 1; c.globalAlpha = 1 - ph; c.beginPath(); c.moveTo(x0 + 44 + k * 14, top - 22 - ph * 26); c.quadraticCurveTo(x0 + 50 + k * 14, top - 30 - ph * 26, x0 + 44 + k * 14, top - 38 - ph * 26); c.stroke(); } c.restore(); }
+    if (kind === 'paper') { desk(); c.save(); c.lineWidth = 2; c.beginPath(); c.moveTo(x0 + 14, top - 3); c.lineTo(x0 + 80, top - 3); c.stroke(); c.restore(); }
   }
 
   // ---------- one figure ----------
@@ -1667,11 +1752,11 @@ const SK = (() => {
     if (ST.shadow && !q.lie && !q.seat) { c.save(); if (ST.shadow === 'soft') { c.fillStyle = 'rgba(0,0,0,0.13)'; c.beginPath(); c.ellipse(0, 2, 62, 9, 0, 0, 7); c.fill(); } else { c.lineWidth = 1.6; c.globalAlpha *= 0.6; c.beginPath(); for (let x = -44; x <= 44; x += 9) { c.moveTo(x, 3); c.lineTo(x - 9, 11); } c.stroke(); } c.restore(); }
     c.save();
     if (q.lie) {   // lying down: the standing skeleton turned on its side, head forward, face up
-      if (q.seat === 'bed') { rect(c, -205, -62, 410, 26, 31, FILLC); line(c, [[-205, -36], [-205, 0]], 32); line(c, [[205, -36], [205, 0]], 33); line(c, [[205, -62], [205, -110]], 34); c.translate(-150, -66); }
-      else c.translate(-150, -12);
+      if (q.seat === 'bed') { const hb = -150 + figH() + 8; rect(c, -205, -62, hb + 205, 26, 31, FILLC); line(c, [[-205, -36], [-205, 0]], 32); line(c, [[hb, -36], [hb, 0]], 33); line(c, [[hb, -62], [hb, -70 - HR() * 1.6]], 34); c.translate(-150, -62 - HR() * 0.55); }
+      else c.translate(-150, -HR() * 0.9);
       c.rotate(Math.PI / 2); c.scale(-1, 1);
     }
-    if (q.seat && !q.lie) seatBack(c, q.seat);
+    if (q.seat && !q.lie) seatBack(c, q.seat, J);
     const straight = (a, b, w, col) => { c.save(); c.lineWidth = w; c.strokeStyle = col; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); c.restore(); };
     const l = (a, b, s, part) => {
       if (ST.flat) return straight(a, b, part === 'torso' ? 30 : part === 'leg' ? 12 : 10, part === 'leg' ? PANTS : shirt);
@@ -1692,6 +1777,7 @@ const SK = (() => {
       c.beginPath(); c.moveTo(s0[0], s0[1]); c.lineTo(w[0] - 30, w[1] + 22); c.lineTo(w[0] + 30, w[1] + 22); c.closePath(); c.fillStyle = ST.sil ? INK : ST.flat || ST.accent || ST.bean || ST.comic ? shirt : PAPER; if (ST.flat || ST.accent || ST.tube || ST.sil || ST.bean) c.fill(); c.stroke(); c.restore(); }
     if (f.look.tie && !q.lie) { c.save(); c.fillStyle = INK; c.beginPath(); c.moveTo(J.neck[0], J.neck[1] + 6); c.lineTo(J.neck[0] - 6, J.neck[1] + 40); c.lineTo(J.neck[0], J.neck[1] + 50); c.lineTo(J.neck[0] + 6, J.neck[1] + 40); c.closePath(); c.fill(); c.restore(); }
     curve(J.sh, J.eL, J.hL, 'arm'); hand(J.hL, J.eL);
+    hairBack(c, J.head[0], J.head[1], R, f.look);
     c.save(); if (ST.tube) c.lineWidth = 5; if (ST.flat) c.lineWidth = 2.6; circ(c, J.head[0], J.head[1], R, f.seed, ST.sil ? INK : ST.flat || ST.comic ? SKIN : ST.bean || ST.chibi ? '#fff' : PAPER); c.restore();
     hair(c, J.head[0], J.head[1], R, f.look);
     const ink0 = INK; if (ST.sil) INK = '#f4efe6';
@@ -1699,13 +1785,13 @@ const SK = (() => {
     extras(c, J.head[0], J.head[1], R, f.look); INK = ink0;
     curve(J.sh, J.eR, J.hR, 'arm'); hand(J.hR, J.eR);
     if (q.hold && !q.lie) held(c, q.hold, J, t, f.sign, f.facing);
-    if (q.seat && !q.lie && (POSES[f.pose] || {}).front) seatFront(c, POSES[f.pose].front, t);
+    if (q.seat && !q.lie && (POSES[f.pose] || {}).front) seatFront(c, POSES[f.pose].front, t, J);
     c.restore();
-    if (q.seat === 'bed') { c.fillStyle = FILLC; c.fillRect(-160, -86, 250, 26); line(c, [[-160, -86], [90, -88], [96, -60]], 35); }
+    if (q.seat === 'bed') { const by = -62 - HR() * 0.55, bx = -150 + (LEN.th + LEN.sh + LEN.torso) * BK() + 8; c.fillStyle = FILLC; c.fillRect(-160, by - 18, bx + 160, -62 - (by - 18)); line(c, [[-160, by - 18], [bx, by - 20], [bx + 6, -60]], 35); }
     // Zzz for sleepers
     if (an === 'snore') { c.save(); c.scale(f.facing, 1); for (let k = 0; k < 3; k++) { const ph = (t * 0.5 + k / 3) % 1; c.globalAlpha = Math.sin(Math.PI * ph); text(c, 'z', 150 + ph * 40 + k * 4, -110 - ph * 70, 18 + k * 6); } c.restore(); }
     c.restore();
-    const top = f.y - (q.lie ? 120 : (LEN.th + LEN.sh + LEN.torso + 2 * R + LEN.neck)) * f.s;
+    const top = f.y - (q.lie ? 120 : figH()) * f.s;
     return { x0: f.x - 70 * f.s, x1: f.x + 70 * f.s, y0: top, y1: f.y, head: [f.x + f.facing * J.head[0] * f.s, f.y + J.head[1] * f.s] };
   }
 
@@ -1732,6 +1818,11 @@ const SK = (() => {
       case 'target': { const x = fx, y = G - 230; for (const [r, col] of [[110, FILLC], [82, '#d33'], [54, FILLC], [26, '#d33']]) circ(c, x, y, r, 80 + r, col);
         const k = ease((t - 0.3) / 0.5), ax = x - side * (260 - 260 * k); line(c, [[ax - side * 110, y], [ax, y]], 85); line(c, [[ax - side * 110, y], [ax - side * 128, y - 12]], 86); line(c, [[ax - side * 110, y], [ax - side * 128, y + 12]], 87); break; }
       case 'heart': { const x = fx, y = G - 330, k = 1 + 0.06 * Math.sin(t * 6); c.save(); c.translate(x, y); c.scale(k * 2.6, k * 2.6); heart(c, 0, 0, 50); c.fillStyle = '#ff4d6d'; c.fill(); c.lineWidth = 1.6; c.stroke(); c.restore(); break; }
+      case 'tv': { const x = fx + side * 40, y = G - 250; rect(c, x - 110, y, 220, 140, 120, '#2b2f3a'); c.fillStyle = `hsl(${(t * 40) % 360},55%,62%)`; c.globalAlpha = 0.85; c.fillRect(x - 98, y + 12, 196, 116); c.globalAlpha = 1; line(c, [[x - 40, y + 140], [x - 55, G]], 121); line(c, [[x + 40, y + 140], [x + 55, G]], 122); rect(c, x - 90, G - 40, 180, 40, 123, FILLC); break; }
+      case 'car': { const x = main.x - side * W * 0.3; c.save(); c.fillStyle = '#e4572e'; c.beginPath(); c.moveTo(x - 150, G - 40); c.lineTo(x - 150, G - 95); c.lineTo(x - 90, G - 100); c.lineTo(x - 55, G - 155); c.lineTo(x + 60, G - 155); c.lineTo(x + 100, G - 100); c.lineTo(x + 150, G - 92); c.lineTo(x + 150, G - 40); c.closePath(); c.fill(); c.stroke();
+        c.fillStyle = '#cfe6f5'; c.fillRect(x - 45, G - 145, 45, 40); c.strokeRect(x - 45, G - 145, 45, 40); c.fillRect(x + 8, G - 145, 50, 40); c.strokeRect(x + 8, G - 145, 50, 40); c.restore();
+        for (const wx of [x - 90, x + 90]) circ(c, wx, G - 36, 34, 124 + wx, '#333'); break; }
+      case 'books': { const x = main.x - side * W * 0.25; const cols = ['#2e86ab', '#e4572e', '#3f9e5a', '#f2a541', '#8e5bd6', '#e8446b']; for (let k = 0; k < 6; k++) rect(c, x - 70 + (k % 2) * 8, G - 34 * (k + 1), 140, 32, 130 + k, cols[k]); break; }
       case 'money2': { for (let k = 0; k < 9; k++) { const ph = (t * 0.45 + nz(k, 5)) % 1, xx = W * (0.1 + 0.8 * nz(k, 2)), yy = -40 + ph * (G + 40); c.save(); c.translate(xx, yy); c.rotate(Math.sin(t * 2 + k) * 0.6); rect(c, -26, -13, 52, 26, 90 + k, '#cfe8c4'); text(c, '₹', 0, 1, 16); c.restore(); } break; }
     }
     c.restore();
@@ -1773,6 +1864,10 @@ const SK = (() => {
     ['clock', W_(['=time', 'samay', 'waqt', '=late', 'der ho', 'ghadi', 'deadline', 'subah', 'alarm', 'baj rahe', 'समय', 'वक्त', 'देर', 'घड़ी', 'सुबह', 'बज रहे'])],
     ['rain', W_(['problem', 'musibat', 'pareshan', 'mushkil', 'stress', 'museebat', 'मुसीबत', 'परेशान', 'मुश्किल', 'समस्या'])],
     ['bulb', W_(['idea', 'tarika', '=plan', 'solution', 'yaad aaya', 'samajh aaya', 'आइडिया', 'तरीका', 'उपाय', 'याद आया', 'समझ आया'])],
+    ['tv', W_(['=tv', 'television', 'movie', 'netflix', 'serial', 'cricket match', 'टीवी', 'फिल्म'])],
+    ['food', W_(['khana', 'khaana', 'kha raha', 'kha rahi', 'kha rahe', '=food', 'dinner', 'lunch', 'breakfast', 'nashta', 'naashta', '=roti', 'खाना', 'खा रह', 'नाश्ता', 'रोटी'])],
+    ['car', W_(['=car', 'gaadi', 'gadi', '=drive', 'taxi', 'कार', 'गाड़ी'])],
+    ['books', W_(['library', 'kitaabein', 'kitabein', '=books', 'किताबें', 'लाइब्रेरी'])],
     ['door', W_(['darwaz', '=door', 'bahar', '=exit', 'nikal', 'दरवाज', 'बाहर', 'निकल'])],
     ['board', W_(['school', '=class', 'teacher', 'lecture', 'padhai', 'स्कूल', 'क्लास', 'टीचर', 'पढ़ाई'])],
     ['house', W_(['=ghar', '=home', 'house', '=घर'])],
@@ -1783,9 +1878,26 @@ const SK = (() => {
     ['sleep', PROP_RULES[0][1]],
     ['run', W_(['bhaag', 'daud', '=run', 'running', '=race', 'भाग', 'दौड़', 'दौड'])],
     ['cry', W_(['rone', 'roya', 'royi', 'ro pad', 'aansu', 'ansu', '=cry', 'crying', 'रोने', 'रोया', 'रोई', 'रो पड़', 'आंसू', 'आँसू'])],
+    ['call', W_(['phone kiya', 'phone par baat', 'phone pe baat', 'call kiya', 'call kar', 'baat kar', 'फोन किया', 'कॉल कि'])],
+    ['eat', W_(['kha raha', 'kha rahi', 'kha rahe', 'khana kha', 'khaana kha', 'eating', 'खा रह', 'खाना खा'])],
+    ['write', W_(['likh', 'write', 'writing', 'लिख'])],
+    ['watch', W_(['=tv', 'movie', 'netflix', 'serial', 'टीवी'])],
+    ['dance', W_(['naach', 'nach ', 'dance', 'नाच'])],
+    ['clap', W_(['taali', 'clap', 'ताली'])],
+    ['namaste', W_(['namaste', 'pranam', 'नमस्ते', 'प्रणाम'])],
+    ['hug', W_(['gale lag', '=hug', 'गले लग'])],
+    ['thumbsup', W_(['badhiya', 'shabash', 'perfect', 'well done', 'बढ़िया', 'शाबाश'])],
+    ['fistpump', W_(['kar dikhaya', '=yes!', 'yess', 'कर दिखाया'])],
+    ['yawn', W_(['ubaasi', 'jamhai', 'neend aa', 'उबासी', 'नींद आ'])],
+    ['tired', W_(['thak', 'tired', 'थक'])],
+    ['headache', W_(['sir dard', 'sar dard', 'headache', 'सिर दर्द', 'सर दर्द'])],
+    ['shout', W_(['chilla', 'shout', 'awaaz di', 'awaz di', 'pukara', 'चिल्ला', 'आवाज़ दी', 'पुकार'])],
+    ['stop', W_(['=ruko', '=stop', 'mat karo', 'रुको'])],
+    ['push', W_(['dhakka', '=push', 'dhakel', 'धक्का'])],
+    ['lookup', W_(['upar dekh', 'aasmaan', 'asmaan', '=sky', 'ऊपर देख', 'आसमान'])],
     ['facepalm', W_(['galti', 'mistake', 'bhool', 'oops', 'गलती', 'भूल'])],
     ['shrug', W_(['pata nahi', 'pata nahin', 'kya pata', 'malum nahi', "don't know", 'पता नहीं'])],
-    ['wave', W_(['=bye', 'hello', 'namaste', '=hi', 'alvida', 'नमस्ते', 'अलविदा'])],
+    ['wave', W_(['=bye', 'hello', '=hi', 'alvida', 'अलविदा'])],
     ['sit', W_(['baith', '=sit', 'sitting', 'बैठ'])],
     ['walk', W_(['chal', 'ja raha', 'ja rahi', 'ja rahe', 'walk', 'ghoom', 'चल', 'जा रहा', 'जा रही'])],
     ['think', W_(['soch', 'think', 'wonder', 'सोच'])],
@@ -1801,8 +1913,8 @@ const SK = (() => {
     ['bhai', W_(['=bhai', 'bhaiya', 'brother', 'भाई']), { hair: 'tuft2' }],
     ['behen', W_(['behen', 'didi', 'sister', 'बहन', 'दीदी']), { female: 1, hair: 'long' }],
     ['wife', W_(['=wife', 'patni', 'biwi', 'पत्नी', 'बीवी']), { female: 1, hair: 'long' }],
-    ['dada', W_(['=dada', '=nana', 'dadaji', 'grandpa', 'दादा', 'नाना']), { glasses: 1, mustache: 1, hair: 'bald' }],
-    ['dadi', W_(['=dadi', '=nani', 'grandma', 'दादी', 'नानी']), { female: 1, glasses: 1, hair: 'bun' }],
+    ['dada', W_(['=dada', '=nana', 'dadaji', 'grandpa', 'दादा', 'नाना']), { glasses: 1, mustache: 1, hair: 'bald', grey: 1 }],
+    ['dadi', W_(['=dadi', '=nani', 'grandma', 'दादी', 'नानी']), { female: 1, glasses: 1, hair: 'bun', grey: 1 }],
     ['kid', W_(['bachch', '=beta', '=kid', 'बच्च', 'बेटा']), { kid: 1, hair: 'tuft' }],
     ['beti', W_(['=beti', 'ladki', '=girl', 'बेटी', 'लड़की']), { female: 1, kid: 1, hair: 'long' }],
   ];
@@ -1835,7 +1947,7 @@ const SK = (() => {
   const quoteOf = t => { const m = t.match(/["“”«]([^"“”»]{1,60})["“”»]/) || t.match(/[‘’']([^‘’']{3,40})[‘’']/); if (!m) return ''; const q = m[1].trim(); return q.length > 24 ? q.slice(0, 22).replace(/\s+\S*$/, '') + '…' : q; };
   const MOOD_FACE = { calm: 'neutral', happy: 'happy', laugh: 'laugh', love: 'happy', excited: 'happy', shock: 'surprised', sad: 'sad', angry: 'angry', fear: 'scared', question: 'confused', fast: 'neutral', none: 'neutral' };
   const MOOD_POSE = { happy: 'happy', laugh: 'laugh', love: 'happy', excited: 'jump', shock: 'shock', sad: 'sad', angry: 'angry', fear: 'scared', question: 'scratch', fast: 'run' };
-  const PROP_POSE = { laptop: 'desk', phone: 'phone', book: 'read', cup: 'cup', trophy: 'trophy', money: 'carry', bed: 'sleep' };
+  const PROP_POSE = { laptop: 'desk', phone: 'phone', book: 'read', cup: 'cup', trophy: 'trophy', money: 'carry', bed: 'sleep', tv: 'watch', food: 'eat' };
   const CALM_CYCLE = ['stand', 'hips', 'talk', 'point', 'stand', 'think'];
 
   // The plan of one scene: who is in it, poses, faces, props. Auto from the line, then the scene's own choices on top.
@@ -1858,14 +1970,15 @@ const SK = (() => {
       if (!ov.count) n = clamp(Math.max(n, who.length), 1, 3);
     }
     let pose = PROP_POSE[prop] || '';
-    if (!pose || ['sleep', 'run', 'cry'].includes(act)) pose = act === 'sleep' ? 'sleep' : act || pose;
+    if (!pose || (act && !['sit', 'walk', 'point', 'talk', 'think', 'wave'].includes(act))) pose = act || pose;
     if (act === 'talk' && !PROP_POSE[prop]) pose = { angry: 'angry', laugh: 'laugh', sad: 'sad', shock: 'shock', fear: 'scared', excited: 'happy' }[mood] || 'talk';
     else if (!pose || pose === 'talk' || pose === 'walk' || pose === 'point') { const mp = MOOD_POSE[mood]; if (mp && (!pose || mood !== 'calm')) pose = act === 'walk' && mood === 'fast' ? 'run' : (pose && mood === 'calm' ? pose : mp); }
     if (!pose) pose = CALM_CYCLE[i % CALM_CYCLE.length];
     if (prop === 'board' || prop === 'chartup' || prop === 'chartdown') { if (['stand', 'hips', 'talk', 'point', 'think'].includes(pose)) pose = prop === 'board' ? 'point' : 'present'; }
     if (prop === 'bed') pose = 'sleep';
+    if (mood === 'love' && n >= 2 && ['happy', 'talk', 'stand'].includes(pose)) pose = 'hug';
     if (ov.pose) pose = ov.pose;
-    let fc = MOOD_FACE[mood] || 'neutral'; if (pose === 'sleep') fc = 'sleep'; else if (pose === 'cry') fc = 'cry'; else if (pose === 'think' && fc === 'neutral') fc = 'think'; else if (pose === 'desk' && fc === 'neutral') fc = 'tired';
+    let fc = MOOD_FACE[mood] || 'neutral'; if (fc === 'neutral' && FACE_OF[pose]) fc = FACE_OF[pose]; if (pose === 'sleep') fc = 'sleep'; else if (pose === 'cry') fc = 'cry'; else if (pose === 'think' && fc === 'neutral') fc = 'think'; else if (pose === 'desk' && fc === 'neutral') fc = 'tired';
     if (ov.face) fc = ov.face;
     const q = quoteOf(sg.text); let bub = '';
     if (q && (act === 'talk' || /["“”]/.test(sg.text))) bub = 'speech';
@@ -1873,14 +1986,15 @@ const SK = (() => {
     else if (mood === 'question' || pose === 'scratch') bub = 'thought';
     else if (pose === 'think') bub = 'dots';
     if (ov.bubble) bub = ov.bubble === 'none' ? '' : ov.bubble;
-    let extra = { bulb: 1 }[prop] ? 'none' : prop;
+    let extra = { bulb: 1, food: 1 }[prop] ? 'none' : prop;
     if (n >= 2 && !ov.prop && ['board', 'chartup', 'chartdown', 'target', 'heart', 'stairs'].includes(extra)) extra = 'none';
-    return { n, who, pose, face: fc, prop: extra, bub, quote: q, mood, sign: (sg.text.replace(TAG_RX, '').match(/\*([^*]+)\*/) || [])[1] || '' };
+    const sky = /(^|[^\p{L}])(raat|night|chaand|chand|andher|रात|चांद|चाँद|अंधेर)/u.test(low) ? 'night' : '';
+    return { n, who, pose, face: fc, prop: extra, bub, quote: q, mood, sky, sign: (sg.text.replace(TAG_RX, '').match(/\*([^*]+)\*/) || [])[1] || '' };
   }
 
   // Positions for a scene of size LW × LH.
   function layout(i, LW, LH) {
-    const P = plan(i), G = LH * 0.9, s = Math.min(LH * 0.6 / 320, LW * 0.82 / (P.n * 210 + (P.n === 1 ? 60 : 0))), L = { W: LW, H: LH, G };
+    const P = plan(i), G = LH * 0.9, s = Math.min(LH * 0.62 / figH(), LW * 0.82 / (P.n * 210 + (P.n === 1 ? 60 : 0))), L = { W: LW, H: LH, G };
     const P0 = POSES[P.pose] || POSES.stand, wide = P0.front || ['board', 'chartup', 'chartdown', 'target', 'heart', 'stairs'].includes(P.prop);
     const facing = P.n === 1 ? (wide ? 1 : (i % 2 ? -1 : 1)) : 1;
     const xs = P.n === 1 ? [wide ? 0.3 : (['door', 'house', 'tree'].includes(P.prop) ? 0.62 : 0.5)] : P.n === 2 ? [0.34, 0.66] : [0.5, 0.22, 0.78];
@@ -1898,12 +2012,12 @@ const SK = (() => {
   }
   const spec = new Map();
   function scene(i, LW, LH) {
-    const sg = S.segments[i]; const key = [i, LW, LH, sg && sg.text, (S.segments[i - 1] || {}).text, JSON.stringify((S.segments[i - 1] || {}).draw || {}), JSON.stringify(sg && sg.draw || {}), sg && sg.anim, castOf().length].join('|');
+    const sg = S.segments[i]; const key = [i, LW, LH, sg && sg.text, (S.segments[i - 1] || {}).text, JSON.stringify((S.segments[i - 1] || {}).draw || {}), JSON.stringify(sg && sg.draw || {}), sg && sg.anim, castOf().length, ST.label].join('|');
     let v = spec.get(i); if (v && v.key === key) return v.val;
     v = { key, val: layout(i, LW, LH) }; spec.set(i, v); return v.val;
   }
   // Main figure's box as fractions of the scene (for the camera and the effects).
-  function box(i, LW, LH) { const { figs } = scene(i, LW, LH), f = figs[0], h = 320 * f.s; return { x0: (f.x - 110 * f.s) / LW, x1: (f.x + 110 * f.s) / LW, y0: (f.y - h) / LH, y1: f.y / LH }; }
+  function box(i, LW, LH) { ST = STYLES[S.settings.skStyle] || STYLES.classic; const { figs } = scene(i, LW, LH), f = figs[0], h = figH() * f.s; return { x0: (f.x - 110 * f.s) / LW, x1: (f.x + 110 * f.s) / LW, y0: (f.y - h) / LH, y1: f.y / LH }; }
 
   function draw(c, i, lt, d, LW, LH, style) {
     ST = STYLES[style || S.settings.skStyle] || STYLES.classic;
@@ -1916,9 +2030,12 @@ const SK = (() => {
     if (ST.wall) { c.fillStyle = '#e8f0f6'; c.fillRect(0, 0, LW, L.G); c.fillStyle = '#d5e0e8'; c.fillRect(0, L.G, LW, LH - L.G); }
     c.lineWidth = 3; c.strokeStyle = INK; c.lineCap = 'round';
     line(c, [[LW * 0.04, L.G + 2], [LW * 0.5, L.G + 4], [LW * 0.96, L.G + 1]], 200 + i);
-    const f0 = figs[0], mb = { x: f0.x, facing: f0.facing, y0: f0.y - 320 * f0.s, head: [f0.x, f0.y - 280 * f0.s] };
+    const f0 = figs[0], mb = { x: f0.x, facing: f0.facing, y0: f0.y - figH() * f0.s, head: [f0.x, f0.y - (figH() - HR()) * f0.s] };
     if (['door', 'house', 'tree', 'board', 'chartup', 'chartdown', 'clock', 'sun', 'stairs', 'target', 'heart'].includes(P.prop)) scenery(c, P.prop, f0.s, L, lt, mb);
     if (P.prop === 'money') scenery(c, 'money2', f0.s, L, lt, mb);
+    if (['tv', 'car', 'books'].includes(P.prop)) scenery(c, P.prop, f0.s, L, lt, mb);
+    if (P.sky === 'night') { c.save(); c.fillStyle = 'rgba(30,40,90,0.10)'; c.fillRect(0, 0, LW, L.G); const mx = mb.facing > 0 ? LW * 0.86 : LW * 0.14; c.fillStyle = '#ffe9a0'; c.lineWidth = 3; c.beginPath(); c.arc(mx, LH * 0.16, 48, 0, 7); c.fill(); c.stroke(); c.fillStyle = PAPER; c.beginPath(); c.arc(mx + 24, LH * 0.13, 42, 0, 7); c.fill();
+      for (let k = 0; k < 9; k++) { const sx = LW * (0.08 + 0.84 * nz(k, 21)), sy = LH * (0.06 + 0.3 * nz(k, 22)), tw = 0.6 + 0.4 * Math.sin(lt * 3 + k); c.fillStyle = `rgba(255,205,60,${tw})`; c.beginPath(); for (let n = 0; n < 8; n++) { const a = n * Math.PI / 4, r = n % 2 ? 4 : 11; c.lineTo(sx + r * Math.cos(a), sy + r * Math.sin(a)); } c.fill(); } c.restore(); }
     if (f0.pose === 'walk' || f0.pose === 'run' || f0.pose === 'carry') f0.walk = f0.facing * Math.min(lt, d || 9) * (f0.pose === 'run' ? 90 : 45) - f0.facing * Math.min(d || 3, 3) * (f0.pose === 'run' ? 45 : 22);
     const boxes = figs.map(f => figure(c, f, lt));
     if (P.prop === 'rain') scenery(c, 'rain', f0.s, L, lt, { ...mb, y0: boxes[0].y0, head: boxes[0].head });
@@ -2422,6 +2539,7 @@ $('#newProj').onclick = async () => {
 async function restore(p) {
   S.settings = { ...DEFAULTS, ...(p.settings || {}) };
   if ((S.settings.v || 1) < 2) { S.settings.captions = S.settings.captions === 'off' ? 'off' : 'bar'; S.settings.fit = 'auto'; S.settings.motion = Math.min(S.settings.motion, 6); S.settings.v = 2; }
+  if ((S.settings.v || 1) < 3) { S.settings.skStyle = 'chibi'; S.settings.v = 3; }
   S.script = p.script || ''; S.segments = p.segments || []; S.starts = p.starts || []; S.tts = p.tts || null;
   uid = Math.max(p.uid || 1, ...S.segments.map(s => s.id + 1), 1);
   S.grids = []; R.grids = []; S.overrides = {}; R.overrides = {}; audioBuf = null; analysis = null; S.audioBlob = null;
