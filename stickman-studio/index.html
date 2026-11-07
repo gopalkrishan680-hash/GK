@@ -1521,7 +1521,7 @@ const SK = (() => {
     lie: { label: 'Lying on the floor', la: [-30, -40], ra: [30, 40], ll: [-6, -6], rl: [6, 6], lie: true },
   };
   const FACES = { neutral: 'Neutral', happy: 'Happy', laugh: 'Laughing', sad: 'Sad', cry: 'Crying', angry: 'Angry', surprised: 'Surprised', scared: 'Scared', confused: 'Confused', think: 'Thinking', tired: 'Tired', smirk: 'Proud / smirk', sleep: 'Asleep' };
-  const PROPS = { tv: 'TV', car: 'Car', books: 'Pile of books', none: 'Nothing', laptop: 'Desk + laptop', phone: 'Phone', book: 'Book', cup: 'Chai / coffee', money: 'Money bag', clock: 'Clock', chartup: 'Chart going up', chartdown: 'Chart going down', rain: 'Rain cloud (problem)', bulb: 'Idea bulb', thought: 'Thought bubble ?', door: 'Door', house: 'House', board: 'Blackboard', trophy: 'Trophy', stairs: 'Stairs', target: 'Target / goal', heart: 'Big heart', sun: 'Sun', tree: 'Tree', bed: 'Bed', money2: 'Money falling' };
+  const PROPS = { wordboard: 'Board with the line\'s key word', tv: 'TV', car: 'Car', books: 'Pile of books', none: 'Nothing', laptop: 'Desk + laptop', phone: 'Phone', book: 'Book', cup: 'Chai / coffee', money: 'Money bag', clock: 'Clock', chartup: 'Chart going up', chartdown: 'Chart going down', rain: 'Rain cloud (problem)', bulb: 'Idea bulb', thought: 'Thought bubble ?', door: 'Door', house: 'House', board: 'Blackboard', trophy: 'Trophy', stairs: 'Stairs', target: 'Target / goal', heart: 'Big heart', sun: 'Sun', tree: 'Tree', bed: 'Bed', money2: 'Money falling' };
 
   // ---------- animation of the limbs ----------
   const clone = p => ({ ...p, la: [...p.la], ra: [...p.ra], ll: [...p.ll], rl: [...p.rl], lean: p.lean || 0, head: p.head || 0, lift: 0, dx: 0 });
@@ -1823,6 +1823,18 @@ const SK = (() => {
         c.fillStyle = '#cfe6f5'; c.fillRect(x - 45, G - 145, 45, 40); c.strokeRect(x - 45, G - 145, 45, 40); c.fillRect(x + 8, G - 145, 50, 40); c.strokeRect(x + 8, G - 145, 50, 40); c.restore();
         for (const wx of [x - 90, x + 90]) circ(c, wx, G - 36, 34, 124 + wx, '#333'); break; }
       case 'books': { const x = main.x - side * W * 0.25; const cols = ['#2e86ab', '#e4572e', '#3f9e5a', '#f2a541', '#8e5bd6', '#e8446b']; for (let k = 0; k < 6; k++) rect(c, x - 70 + (k % 2) * 8, G - 34 * (k + 1), 140, 32, 130 + k, cols[k]); break; }
+      case 'wordboard': {
+        const txt = main.word || '', fs0 = 78; c.save(); c.font = `800 ${fs0}px "Comic Sans MS", "Baloo 2", "Hind", sans-serif`; const tw = c.measureText(txt).width; c.restore();
+        const bw = clamp(tw + 110, 300, Math.min(W * 0.5, 640)), bh = 190, fs = Math.min(fs0, fs0 * (bw - 70) / Math.max(1, tw));
+        const x = clamp(main.x + side * W * 0.3, bw / 2 + 20, W - bw / 2 - 20), y = G - 430;
+        line(c, [[x - bw * 0.3, y + bh], [x - bw * 0.38, G]], 140); line(c, [[x + bw * 0.3, y + bh], [x + bw * 0.38, G]], 141); line(c, [[x, y + bh], [x + 8, G - 30]], 142);
+        c.save(); c.lineWidth = 9; c.strokeStyle = '#8a6a4a'; c.fillStyle = FILLC; c.beginPath(); c.roundRect ? c.roundRect(x - bw / 2, y, bw, bh, 10) : c.rect(x - bw / 2, y, bw, bh); c.fill(); c.stroke(); c.restore();
+        c.save(); c.lineWidth = 2; line(c, [[x - bw / 2 + 14, y + bh + 2], [x + bw / 2 - 14, y + bh + 2]], 143); c.restore();
+        // written on, left to right, in the first second of the scene
+        const k = ease(t / 0.9); c.save(); c.beginPath(); c.rect(x - bw / 2 + 8, y + 6, (bw - 16) * k, bh - 12); c.clip();
+        text(c, txt, x, y + bh * 0.47, Math.round(fs), '#1f4fb4', 'center', 800);
+        c.strokeStyle = '#e4572e'; c.lineWidth = 5; c.beginPath(); const uy = y + bh * 0.47 + fs * 0.62, uw = Math.min(tw * fs / fs0, bw - 60) / 2; c.moveTo(x - uw, uy); c.quadraticCurveTo(x, uy + 10, x + uw, uy - 4); c.stroke();
+        c.restore(); break; }
       case 'money2': { for (let k = 0; k < 9; k++) { const ph = (t * 0.45 + nz(k, 5)) % 1, xx = W * (0.1 + 0.8 * nz(k, 2)), yy = -40 + ph * (G + 40); c.save(); c.translate(xx, yy); c.rotate(Math.sin(t * 2 + k) * 0.6); rect(c, -26, -13, 52, 26, 90 + k, '#cfe8c4'); text(c, '₹', 0, 1, 16); c.restore(); } break; }
     }
     c.restore();
@@ -1944,6 +1956,19 @@ const SK = (() => {
     out.sort((a, b) => a.at - b.at);
     return out;
   }
+  const STOPW = new Set(('hai hain tha thi the ho hua hui hue gaya gayi gai gaye raha rahi rahe ka ki ke ko se me mein main par pe aur ya bhi to toh hi ek yeh ye woh wo vo is us isme usme iska iski iske uska uski uske unka unki unke apna apni apne mera meri mere tera teri tumhara hamara hum tum aap kya kyun kyon kaise kab jab tab agar lekin magar phir fir bahut bohot sab sabhi kuch koi nahi nahin na mat abhi aaj kal wala wali wale liye karke kar karna karta karti karte kiya kiye diya liya le de lo do ja jaa jata jati aa aaya aayi aaye sakta sakti sakte chahiye tak sirf bas hota hoti hote hone lagta laga lagi lage ab ne usne unhone maine humne tumne jo jis jise use unhe inhe isko usko yahan wahan ise usse isse bhai yaar matlab sach waise jaise aisa aise vaise itna utna bola boli bole kaha the a an is are was were be been to of in on at and or but so very this that it he she they we you i my your his her their our with for from about then when what why how not no yes also just only all its into than there here dont did does do have has had will would can could should haan ji re arey arre oh zaroor jaroor samjho samjhenge samjhe samjhiye banao banaye karo kijiye lijiye dijiye jaano jaaniye seekho sikho rakho chaliye chalo shuru wapas'
+    + ' है हैं था थी थे हो हुआ हुई गया गई गयी गए रहा रही रहे का की के को से में मैं पर और भी तो ही एक यह वह ये वो इस उस इसे उसे अपना अपनी अपने मेरा मेरी तुम आप हम क्या क्यों कैसे जब तब अगर लेकिन फिर बहुत सब कुछ कोई नहीं ना अब वाला वाली वाले लिए कर करना करता करती किया दिया लिया ने जो').split(' '));
+  function keyWord(text, who) {   // the most telling word or two of a line, for the board
+    const names = new Set((who || []).map(w => String(w.name).toLowerCase())), roleWords = ROLES.map(r => r[0]);
+    const toks = String(text).replace(TAG_RX, ' ').replace(/["“”‘’'*]/g, ' ').split(/[^\p{L}\p{M}\p{N}%₹]+/u).filter(Boolean);
+    let best = [], run = [];
+    const score = r => r.join(' ').length + 2 * Math.max(0, ...r.map(w => w.length));   // long, specific words win
+    const flush = () => { if (run.length) { const r = run.slice(0, 2); if (!best.length || score(r) > score(best)) best = r; } run = []; };
+    for (const w of toks) { const lw = w.toLowerCase(); if (STOPW.has(lw) || names.has(lw) || roleWords.includes(lw) || w.length < 2) flush(); else run.push(w); }
+    flush();
+    const out = best.map(w => /^[a-z]/.test(w) ? w[0].toUpperCase() + w.slice(1) : w).join(' ');
+    return out.length >= 3 ? (out.length > 18 ? out.slice(0, 17) + '…' : out) : '';
+  }
   const quoteOf = t => { const m = t.match(/["“”«]([^"“”»]{1,60})["“”»]/) || t.match(/[‘’']([^‘’']{3,40})[‘’']/); if (!m) return ''; const q = m[1].trim(); return q.length > 24 ? q.slice(0, 22).replace(/\s+\S*$/, '') + '…' : q; };
   const MOOD_FACE = { calm: 'neutral', happy: 'happy', laugh: 'laugh', love: 'happy', excited: 'happy', shock: 'surprised', sad: 'sad', angry: 'angry', fear: 'scared', question: 'confused', fast: 'neutral', none: 'neutral' };
   const MOOD_POSE = { happy: 'happy', laugh: 'laugh', love: 'happy', excited: 'jump', shock: 'shock', sad: 'sad', angry: 'angry', fear: 'scared', question: 'scratch', fast: 'run' };
@@ -1984,18 +2009,25 @@ const SK = (() => {
     if (q && (act === 'talk' || /["“”]/.test(sg.text))) bub = 'speech';
     else if (prop === 'bulb') bub = 'bulb';
     else if (mood === 'question' || pose === 'scratch') bub = 'thought';
-    else if (pose === 'think') bub = 'dots';
+    else if (pose === 'think' && act === 'think') bub = 'dots';
     if (ov.bubble) bub = ov.bubble === 'none' ? '' : ov.bubble;
     let extra = { bulb: 1, food: 1 }[prop] ? 'none' : prop;
-    if (n >= 2 && !ov.prop && ['board', 'chartup', 'chartdown', 'target', 'heart', 'stairs'].includes(extra)) extra = 'none';
+    if (n >= 2 && !ov.prop && ['board', 'chartup', 'chartdown', 'target', 'heart', 'stairs', 'wordboard'].includes(extra)) extra = 'none';
+    // nothing in the library for this line: its key word goes on a board the character points at
+    let word = '';
+    const still = !['walk', 'run', 'carry', 'tired', 'dance', 'sleep', 'lie', 'eat', 'watch', 'write', 'desk', 'call', 'push'].includes(pose);
+    if (ov.prop === 'wordboard' || ov.word || (!ov.prop && extra === 'none' && !bub && n === 1 && still && prop === 'none')) {
+      word = ov.word || keyWord(sg.text, who);
+      if (word) { extra = 'wordboard'; if (!ov.pose && ['stand', 'hips', 'talk', 'point', 'think', 'present'].includes(pose)) pose = 'present'; }
+    }
     const sky = /(^|[^\p{L}])(raat|night|chaand|chand|andher|रात|चांद|चाँद|अंधेर)/u.test(low) ? 'night' : '';
-    return { n, who, pose, face: fc, prop: extra, bub, quote: q, mood, sky, sign: (sg.text.replace(TAG_RX, '').match(/\*([^*]+)\*/) || [])[1] || '' };
+    return { n, who, pose, face: fc, prop: extra, bub, quote: q, mood, sky, word, sign: (sg.text.replace(TAG_RX, '').match(/\*([^*]+)\*/) || [])[1] || '' };
   }
 
   // Positions for a scene of size LW × LH.
   function layout(i, LW, LH) {
     const P = plan(i), G = LH * 0.9, s = Math.min(LH * 0.62 / figH(), LW * 0.82 / (P.n * 210 + (P.n === 1 ? 60 : 0))), L = { W: LW, H: LH, G };
-    const P0 = POSES[P.pose] || POSES.stand, wide = P0.front || ['board', 'chartup', 'chartdown', 'target', 'heart', 'stairs'].includes(P.prop);
+    const P0 = POSES[P.pose] || POSES.stand, wide = P0.front || ['board', 'chartup', 'chartdown', 'target', 'heart', 'stairs', 'wordboard'].includes(P.prop);
     const facing = P.n === 1 ? (wide ? 1 : (i % 2 ? -1 : 1)) : 1;
     const xs = P.n === 1 ? [wide ? 0.3 : (['door', 'house', 'tree'].includes(P.prop) ? 0.62 : 0.5)] : P.n === 2 ? [0.34, 0.66] : [0.5, 0.22, 0.78];
     const figs = [];
@@ -2031,7 +2063,7 @@ const SK = (() => {
     c.lineWidth = 3; c.strokeStyle = INK; c.lineCap = 'round';
     line(c, [[LW * 0.04, L.G + 2], [LW * 0.5, L.G + 4], [LW * 0.96, L.G + 1]], 200 + i);
     const f0 = figs[0], mb = { x: f0.x, facing: f0.facing, y0: f0.y - figH() * f0.s, head: [f0.x, f0.y - (figH() - HR()) * f0.s] };
-    if (['door', 'house', 'tree', 'board', 'chartup', 'chartdown', 'clock', 'sun', 'stairs', 'target', 'heart'].includes(P.prop)) scenery(c, P.prop, f0.s, L, lt, mb);
+    if (['door', 'house', 'tree', 'board', 'chartup', 'chartdown', 'clock', 'sun', 'stairs', 'target', 'heart', 'wordboard'].includes(P.prop)) scenery(c, P.prop, f0.s, L, lt, { ...mb, word: P.word });
     if (P.prop === 'money') scenery(c, 'money2', f0.s, L, lt, mb);
     if (['tv', 'car', 'books'].includes(P.prop)) scenery(c, P.prop, f0.s, L, lt, mb);
     if (P.sky === 'night') { c.save(); c.fillStyle = 'rgba(30,40,90,0.10)'; c.fillRect(0, 0, LW, L.G); const mx = mb.facing > 0 ? LW * 0.86 : LW * 0.14; c.fillStyle = '#ffe9a0'; c.lineWidth = 3; c.beginPath(); c.arc(mx, LH * 0.16, 48, 0, 7); c.fill(); c.stroke(); c.fillStyle = PAPER; c.beginPath(); c.arc(mx + 24, LH * 0.13, 42, 0, 7); c.fill();
@@ -2229,6 +2261,7 @@ function drawMenu(i) {
     ${opt('face', SK.FACES, 'Face: auto · ' + SK.FACES[P.face])}
     ${opt('prop', SK.PROPS, 'Thing: auto · ' + (SK.PROPS[P.prop] || 'Nothing'))}
     ${opt('count', { 1: '1 person', 2: '2 people', 3: '3 people' }, 'People: auto · ' + P.n)}
+    <input type="text" class="anim-sel" data-draw="word" data-i="${i}" value="${esc(ov.word || '')}" placeholder="Board text${P.word ? ' (auto: ' + esc(P.word) + ')' : ''}" style="max-width:210px">
     ${opt('bubble', { none: 'No bubble', speech: 'Speech bubble (the "quote")', thought: 'Thought bubble ?', dots: 'Thinking …', bulb: 'Idea bulb' }, 'Bubble: auto')}
   </div></details>`;
 }

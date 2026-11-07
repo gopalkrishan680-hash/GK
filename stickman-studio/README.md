@@ -59,6 +59,9 @@ silhouette, bean body, neon and comic.
   that is only a "quote" continues with the same people and mood.
 - **Real movement:** arms and legs animate (walk, run, wave, laugh, sob, shake with anger, tremble, hop, type,
   sip, scratch the head, snore…).
+- **Nothing in the library for a line?** Its key word (e.g. *Share Market*, *Emergency Fund*, *Compounding*) is
+  written onto a board on an easel while the character points at it. Type your own board text in ✏️ Drawing,
+  or choose Thing → Nothing to leave the board out.
 - **Change anything:** under each scene, **✏️ Drawing** has Pose, Face, Thing, People and Bubble menus
   (*auto* shows what was chosen). A scene with an uploaded image can be switched to the drawing and back.
 
