@@ -35,6 +35,27 @@ Open it in **Chrome or Edge** (double-click the file). Everything runs locally o
    player. It is usually faster than the video length.
    Older browsers fall back to live recording, which needs the tab to stay open and in front.
 
+## Drawn stickman scenes (offline, no images needed)
+Every scene without an uploaded image gets a stickman drawing made by the app itself (setting
+**Preview + Export → Pictures**: *My images; drawn where there is none* (default), *Always drawn*, or *Only my
+images*). The figures are original, drawn in code with hand-drawn style lines; no image files, no internet.
+- **From the line:** names in the script (Rohan, Neha… keep the same look in every scene; female verbs such as
+  *gayi / rahi / thi* give long hair and a dress), roles (papa → moustache, maa / dadi → bun, teacher → glasses,
+  boss → tie, bachcha → smaller), crowds (*sab log, team, family* → 3 people).
+- **Poses (34):** standing, hands on hips, talking, pointing, presenting, waving, walking, running, cheering,
+  laughing, shocked, sad, crying, angry, scared, thinking, confused, shrugging, facepalm, phone, reading, chai,
+  carrying, holding a sign, trophy, sitting, working at a laptop, sitting on the floor, kneeling, jumping,
+  sleeping in bed, lying down.
+- **Faces (13)**, **things** (desk + laptop, phone, book, chai, money bag, falling money, clock, chart up / down,
+  rain cloud, idea bulb, door, house, tree, sun, blackboard, stairs, target, heart, trophy, bed) and
+  **bubbles**: a "quote" in the line becomes a speech bubble; questions and *soch* get thought bubbles.
+- **Talking:** *X ne kaha / poocha* puts the listener (the previous scene's main character) in the scene; a line
+  that is only a "quote" continues with the same people and mood.
+- **Real movement:** arms and legs animate (walk, run, wave, laugh, sob, shake with anger, tremble, hop, type,
+  sip, scratch the head, snore…).
+- **Change anything:** under each scene, **✏️ Drawing** has Pose, Face, Thing, People and Bubble menus
+  (*auto* shows what was chosen). A scene with an uploaded image can be switched to the drawing and back.
+
 ## Smart animation (offline, automatic)
 In **Preview + Export**, *Smart animation* (on by default) reads every scene's line and animates it by
 itself, with no internet and no extra steps:
