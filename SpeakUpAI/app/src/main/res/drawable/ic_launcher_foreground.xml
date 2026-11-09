@@ -1,0 +1,12 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- speech bubble -->
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M30,32h48a8,8 0,0 1,8 8v22a8,8 0,0 1,-8 8H50l-12,10v-10h-8a8,8 0,0 1,-8 -8V40a8,8 0,0 1,8 -8z"/>
+    <!-- mic -->
+    <path android:fillColor="#4F46E5"
+        android:pathData="M54,38a5,5 0,0 1,5 5v9a5,5 0,0 1,-10 0v-9a5,5 0,0 1,5 -5z"/>
+    <path android:fillColor="#4F46E5"
+        android:pathData="M45,51h2.5a6.5,6.5 0,0 0,13 0H63a9,9 0,0 1,-7.75 8.9V63h-2.5v-3.1A9,9 0,0 1,45 51z"/>
+</vector>
