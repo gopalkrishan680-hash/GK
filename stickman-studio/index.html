@@ -1145,7 +1145,8 @@ function enhanceCanvas(src, tw, th) {
   for (let i = 0; i < D.length; i += 4) {
     let R0 = D[i], G0 = D[i + 1], B0 = D[i + 2];
     const dr = R0 - bl[i], dg = G0 - bl[i + 1], db = B0 - bl[i + 2];
-    if (Math.abs(dr) + Math.abs(dg) + Math.abs(db) > 9) { R0 += 1.4 * dr; G0 += 1.4 * dg; B0 += 1.4 * db; }
+    // edges get darker on the dark side only: lightening next to a line made white halos that ate nearby lines
+    if (Math.abs(dr) + Math.abs(dg) + Math.abs(db) > 9) { const k = dr + dg + db < 0 ? 1.1 : 0.15; R0 += k * dr; G0 += k * dg; B0 += k * db; }
     D[i] = R0; D[i + 1] = G0; D[i + 2] = B0;   // colours are kept exactly as drawn
   }
   x2.putImageData(im, 0, 0); return c2;
