@@ -7,7 +7,40 @@ Open it in **Chrome or Edge** (double-click the file). Everything runs locally o
 > The AI voice panel and the drawn stickman scenes are switched off and not shown; the sections about them below
 > describe code that stays in the file, inactive.
 
-## How to use
+## Layered explainer (default for new projects)
+Step 1 has a **Video style** choice. *Layered explainer* makes the paper-cut-out explainer look: an old-paper
+background, and cut-out pictures (the stickman in different poses, objects), bold keywords and icons that pop in one
+by one on the word where they are spoken. The screen clears at every new **board**.
+
+1. **Script + Voice:** paste the script, add the voiceover, press **Create scenes** (short scenes = exact timing).
+2. **Layers → Plan the boards:** **Auto plan with Gemini** (free API key), or **Copy plan prompt** into ChatGPT /
+   Claude / Gemini and paste the JSON reply, then **Apply plan**. **Quick plan (offline)** makes a simple plan
+   without AI. The plan lists the pictures ("assets") and, per board, which picture / keyword / icon appears on
+   which word. It can be edited by hand under *Edit the plan by hand (JSON)*.
+3. **Layers → Pictures:** each **sheet prompt** asks for up to 6 pictures on one white image. Generate it in
+   ChatGPT / Gemini and paste it into its sheet (or Share → Stickman Studio on Android). The app finds every
+   picture on the sheet, cuts it out and removes the white (line art keeps its ink, the white inside becomes
+   paper). A bad picture: click it, **Single prompt**, then **Replace…**. *Draw all with Gemini* does it by itself
+   when the Google plan includes an image model.
+4. **Preview + Export:** the same exact-frame MP4 export. Sound effects (pop, whoosh, swish, ding, buzz) are made
+   in the app and placed on every entrance; background music gets quieter under the voice and fades in/out.
+
+Plan format (what the AI returns):
+```json
+{"assets": [{"id": "hero_explain", "type": "character", "prompt": "the stickman explaining with one open hand"}],
+ "boards": [{"scene": 1, "layout": "auto", "items": [
+   {"scene": 1, "show": "hero_explain"},
+   {"scene": 2, "show": "brain", "label": "Brain", "word": "brain"},
+   {"scene": 3, "text": "*FORCE*", "icon": "x"},
+   {"scene": 3, "icon": "equals"},
+   {"scene": 4, "strike": "brain"},
+   {"scene": 5, "title": "PHASE 2:"}]}]}
+```
+Icons: x, check, right, left, down, up, equals, plus, vs, question, exclaim. `"layout": "tree"` draws arrows from the
+title to the items. `"row"` and `"big"` adjust the layout. Look settings (background, entrance style, board change,
+idle motion, camera, captions, effects volume) are in the Layers tab.
+
+## How to use (grid images)
 
 1. **Script + Voice:** Paste the script, drop in the voiceover (mp3/wav/m4a) and press **Create scenes**.
    The script is split at every `,` `.` `।` `?` `!` `;`. Each piece becomes one scene (one image).

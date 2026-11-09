@@ -7,7 +7,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Hind:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Baloo+2:wght@600;700;800&family=Hind:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
 /* Layout: sticky studio header + step tabs; each step is one working panel, cards only for grids/batches. */
 :root {
@@ -208,6 +208,37 @@ progress { width: 100%; height: 10px; accent-color: var(--accent); }
 .dl { font-weight: 700; color: var(--blue); }
 details summary { cursor: pointer; font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+
+/* layered explainer mode */
+.mode-layers .grid-only { display: none !important; }
+html:not(.mode-layers) .layers-only { display: none !important; }
+.modepick { display: flex; gap: 10px; flex-wrap: wrap; }
+.modepick label { flex: 1 1 280px; display: flex; gap: 10px; align-items: flex-start; border: 2px solid var(--line); border-radius: var(--r); padding: 10px 12px; cursor: pointer; background: var(--surface); }
+.modepick label:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.modepick input { margin-top: 5px; flex: none; }
+.modepick b { display: block; font-family: var(--font-display); font-size: 16px; }
+.modepick span { font-size: 13px; color: var(--muted); }
+.ltiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(190px, 42%), 1fr)); gap: 10px; padding: 12px; }
+.ltile { border: 1px solid var(--line); border-radius: 8px; padding: 8px; display: grid; gap: 6px; background: var(--surface-2); cursor: pointer; align-content: start; min-width: 0; }
+.ltile.has { border-color: var(--good); }
+.ltile.current { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent); }
+.ltile canvas { width: 100%; height: auto; border-radius: 6px; display: block; }
+.ltile .nm { font: 600 12.5px var(--font-mono); word-break: break-all; }
+.ltile .nm small { color: var(--muted); font-weight: 400; }
+.ltile textarea { font-size: 12.5px; padding: 5px 7px; }
+.ltile .acts { display: flex; gap: 4px; flex-wrap: wrap; }
+.ltile .acts select { font-size: 12px; padding: 3px 6px; }
+.ltile .acts .btn { font-size: 11.5px; padding: 3px 7px; }
+.lboards { display: grid; gap: 8px; max-height: 560px; overflow: auto; }
+.lboard { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; display: grid; gap: 5px; background: var(--surface); }
+.lboard .lb-h { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.lboard .lb-h .tc { margin-right: auto; }
+.lboard .lb-txt { font-size: 13px; color: var(--muted); }
+.lb-items { display: flex; flex-wrap: wrap; gap: 4px; }
+.litem { font-size: 12.5px; border: 1px solid var(--line); border-radius: 99px; padding: 1px 2px 1px 9px; display: inline-flex; gap: 6px; align-items: center; background: var(--surface-2); max-width: 100%; }
+.litem .tc { font-size: 11px; }
+.litem .x { border: 0; background: none; color: var(--bad); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 5px; }
+#lPlanReply, #lJson { font: 12.5px/1.5 var(--font-mono); }
 </style>
 </head>
 <body>
@@ -233,6 +264,7 @@ details summary { cursor: pointer; font-weight: 600; }
   <div class="wrap">
     <nav class="tabs" role="tablist">
       <button role="tab" data-tab="script" aria-selected="true"><span class="n">1</span>Script + Voice</button>
+      <button role="tab" data-tab="layers" aria-selected="false"><span class="n">2</span>Layers</button>
       <button role="tab" data-tab="prompts" aria-selected="false"><span class="n">2</span>Image Prompts</button>
       <button role="tab" data-tab="grids" aria-selected="false"><span class="n">3</span>Grid Upload</button>
       <button role="tab" data-tab="sync" aria-selected="false"><span class="n">4</span>Voice Sync</button>
@@ -247,7 +279,11 @@ details summary { cursor: pointer; font-weight: 600; }
 <section class="step" data-panel="script">
   <div>
     <h2>Write the script, add the voiceover</h2>
-    <p class="lead">The script is split into scenes at every comma, full stop, <b>।</b>, ? and !. One scene = one image. To <b>highlight a word in yellow</b> in the captions, wrap it in <kbd>*stars*</kbd>.</p>
+    <p class="lead">The script is split into scenes at every comma, full stop, <b>।</b>, ? and !. <span class="grid-only">One scene = one image. To <b>highlight a word in yellow</b> in the captions, wrap it in <kbd>*stars*</kbd>.</span><span class="layers-only">Short scenes give the most exact timing: every picture, keyword and icon appears on the word where it is spoken.</span></p>
+  </div>
+  <div class="modepick" role="radiogroup" aria-label="Video style">
+    <label><input type="radio" name="vmode" value="layers"><div><b>Layered explainer (new)</b><span>Paper background; cut-out stickman pictures, bold keywords and icons pop in one by one exactly when they are spoken, with sound effects. You make a few "sticker sheets", the app cuts them apart and removes the white.</span></div></label>
+    <label><input type="radio" name="vmode" value="grid"><div><b>Grid images</b><span>One full picture per scene, made as 3×3 grids and cut by the app (the older style).</span></div></label>
   </div>
   <div class="cols">
     <div class="panel">
@@ -291,7 +327,8 @@ details summary { cursor: pointer; font-weight: 600; }
           </select>
         </label>
       </div>
-      <p class="hint">Next: check the scenes, then open the <b>Image Prompts</b> tab.</p>
+      <p class="hint grid-only">Next: check the scenes, then open the <b>Image Prompts</b> tab.</p>
+      <p class="hint layers-only">Next: check the scenes, then open the <b>Layers</b> tab.</p>
     </div>
   </div>
   <div class="panel" id="aiVoice" hidden>
@@ -357,7 +394,11 @@ details summary { cursor: pointer; font-weight: 600; }
     <progress id="ttsProg" value="0" max="1" hidden></progress>
     <details id="ttsLines" hidden><summary>Lines of the last voiceover (play one, or redo it)</summary><div class="linelist" id="ttsLineList"></div></details>
   </div>
-  <div class="callout" id="gridCallout" hidden>
+  <div class="callout layers-only" id="lCallout" hidden>
+    <div class="grow"><div class="big" id="lCalloutBig"></div><div class="hint">Next: plan the boards and make the pictures.</div></div>
+    <button class="btn primary" data-goto="layers">Open Layers →</button>
+  </div>
+  <div class="callout grid-only" id="gridCallout" hidden>
     <div class="grow"><div class="big" id="calloutBig"></div><div class="hint" id="calloutSub"></div></div>
     <button class="btn primary" data-goto="prompts">Open Image Prompts →</button>
   </div>
@@ -365,6 +406,87 @@ details summary { cursor: pointer; font-weight: 600; }
     <div class="row"><h3 style="margin-right:auto">Scenes <span class="chip" id="sceneCount">0</span></h3>
       <span class="hint">Edit the text, <b>Merge</b> joins two scenes, <b>Split</b> breaks a scene at the cursor.</span></div>
     <div class="scenes" id="scenes"></div>
+  </div>
+</section>
+
+<!-- STEP 2 (layered mode) -->
+<section class="step" data-panel="layers" hidden>
+  <div>
+    <h2>Layers: plan, pictures, look</h2>
+    <p class="lead">The video is built in <b>boards</b>: the screen clears, then pictures, keywords and icons pop in one by one on the word where they are spoken. <b>1.</b> Make the plan, <b>2.</b> make the pictures as sticker sheets (the app cuts them apart and removes the white), <b>3.</b> preview and export.</p>
+  </div>
+  <div class="cols">
+    <div class="panel">
+      <h3>1 · Plan the boards</h3>
+      <p class="hint" style="margin:0">The plan decides which picture, keyword or icon appears on which word. Let Gemini make it by itself, or copy the prompt into ChatGPT / Claude / Gemini and paste the reply here.</p>
+      <div class="row"><input type="password" id="lGemKey" placeholder="Gemini API key (free: aistudio.google.com/apikey)" aria-label="Gemini API key" autocomplete="off" style="flex:1 1 220px"><button class="btn primary" id="lAutoPlan">Auto plan with Gemini</button></div>
+      <div class="row"><button class="btn" id="lCopyPlan">Copy plan prompt</button><button class="btn app-only" data-openapp="chatgpt">Open ChatGPT</button><button class="btn app-only" data-openapp="gemini">Open Gemini</button><button class="btn" id="lQuickPlan" title="A simple plan made in the app, without AI: the stickman + keywords">Quick plan (offline)</button></div>
+      <textarea id="lPlanReply" rows="5" placeholder='Paste the reply here, e.g. {"assets": [...], "boards": [...]}' spellcheck="false"></textarea>
+      <div class="row"><button class="btn primary" id="lApplyPlan">Apply plan</button><span class="hint" id="lPlanInfo"></span></div>
+      <details>
+        <summary>Main character and art style (go into every picture prompt)</summary>
+        <div style="display:grid;gap:8px;margin-top:8px">
+          <label class="f">Main character (keep the same look everywhere)<textarea id="lHero" rows="2"></textarea></label>
+          <label class="f">Art style of the pictures<textarea id="lArt" rows="3"></textarea></label>
+        </div>
+      </details>
+    </div>
+    <div class="panel">
+      <h3>Look and sound</h3>
+      <div class="row">
+        <label class="f">Background <select id="lBg"><option value="parchment">Old paper (parchment)</option><option value="paper">Plain paper</option><option value="white">White</option><option value="notebook">Notebook lines</option><option value="grid">Graph paper</option><option value="custom">My own picture…</option></select></label>
+        <label class="f">Pictures appear <select id="lEnter"><option value="auto">Auto (pop, slide, stamp, draw)</option><option value="pop">Pop</option><option value="slide">Slide up</option><option value="wipe">Draw in (left to right)</option><option value="fade">Fade</option></select></label>
+      </div>
+      <div class="row">
+        <label class="f">Board change <select id="lTrans"><option value="cut">Clean cut (like the reference)</option><option value="pop">Quick shrink away</option><option value="fade">Fade</option><option value="slide">Slide to the next page</option></select></label>
+        <label class="f">Idle motion <select id="lIdle"><option value="subtle">Subtle breathing</option><option value="off">Still</option></select></label>
+      </div>
+      <div class="row">
+        <label class="f">Camera <select id="lCam"><option value="on">Slow push-in on every board</option><option value="off">Still</option></select></label>
+        <label class="f">Captions <select id="lCaps"><option value="off">Off (keywords on screen)</option><option value="on">Word by word at the bottom</option></select></label>
+      </div>
+      <div class="row">
+        <label class="f">Sound effects <select id="sfx"><option value="on">On (pop, whoosh, ding…)</option><option value="off">Off</option></select></label>
+        <label class="f">Effects volume <input type="range" id="sfxVol" min="0" max="1" step="0.05"></label>
+      </div>
+      <div class="row" id="lBgRow" hidden><button class="btn small" id="lBgPick">Choose background picture</button><span class="hint" id="lBgInfo"></span></div>
+      <p class="hint" style="margin:0">Background music: choose it in <b>Preview + Export</b>. It gets quieter while the voice speaks, and fades in and out.</p>
+    </div>
+  </div>
+  <div class="panel flow">
+    <div class="row"><h3 style="margin-right:auto">2 · Pictures</h3><span class="chip" id="lCount">0 / 0 pictures</span></div>
+    <div class="bar"><i id="lBar"></i></div>
+    <ol class="hint">
+      <li>Press <b>Copy next prompt</b> and paste it into ChatGPT or Gemini. One prompt = one sticker sheet with up to 6 pictures on white. <b>Send only one sheet prompt per message</b>: if you paste all of them at once, ChatGPT keeps drawing sheet 1.</li>
+      <li class="app-only">When the image is ready, open it and tap <b>Share → Stickman Studio</b>, or copy it and tap <b>Paste image</b>.</li>
+      <li class="touch-only web-only">Copy the image (long-press → Copy), tap its sheet (it turns yellow), then tap <b>Paste image</b>. Or save it and use <b>Choose file…</b>.</li>
+      <li class="kb-only">Copy the image (right-click → Copy image), click its sheet (it turns yellow) and press <kbd>Ctrl</kbd>+<kbd>V</kbd>.</li>
+      <li>The app finds the pictures on the sheet, cuts them apart and removes the white background. A bad picture? Click it and use <b>Single prompt</b> + <b>Replace…</b>.</li>
+    </ol>
+    <div class="row">
+      <button class="btn primary" id="lCopyNext">Copy next prompt</button>
+      <button class="btn app-only" data-openapp="chatgpt">Open ChatGPT</button>
+      <button class="btn app-only" data-openapp="gemini">Open Gemini</button>
+      <button class="btn" id="lCopyAll" title="For your notes; send them one per message">Copy all prompts (notes)</button>
+      <button class="btn" id="lGemImages" title="Uses your Gemini key; needs an image model on your Google plan">Draw all with Gemini</button>
+      <button class="btn" id="lStop" hidden>Stop</button>
+      <span class="hint" id="lImgInfo"></span>
+    </div>
+    <div class="drop" id="lDrop" tabindex="0" role="button"><strong>Drop several sheet images here at once</strong>They fill the empty sheets in file-name order</div>
+    <input type="file" id="lFiles" accept="image/*" multiple hidden>
+    <input type="file" id="lBgFile" accept="image/*" hidden>
+  </div>
+  <div class="batches" id="lSheets"></div>
+  <div class="panel">
+    <div class="row"><h3 style="margin-right:auto">3 · Boards</h3><span class="hint">▶ jumps to the board in the preview. × removes one item.</span></div>
+    <div class="lboards" id="lBoards"></div>
+    <details>
+      <summary>Edit the plan by hand (JSON)</summary>
+      <div style="display:grid;gap:8px;margin-top:8px">
+        <textarea id="lJson" rows="12" spellcheck="false"></textarea>
+        <div class="row"><button class="btn" id="lJsonLoad">Load current plan</button><button class="btn primary" id="lJsonApply">Apply</button><button class="btn" id="lJsonDl">Download plan</button></div>
+      </div>
+    </details>
   </div>
 </section>
 
@@ -495,6 +617,8 @@ details summary { cursor: pointer; font-weight: 600; }
       </div>
     </div>
     <div class="panel">
+      <p class="hint layers-only" style="margin:0">Background, animation, sound effects and captions of the layered video are set in the <b>Layers</b> tab. <button class="btn small" data-goto="layers">Open Layers</button></p>
+      <div class="grid-only" style="display:grid;gap:12px">
       <h3>Look</h3>
       <div class="row">
         <label class="f">Captions
@@ -538,10 +662,12 @@ details summary { cursor: pointer; font-weight: 600; }
       <label class="f">Picture quality
         <select id="enhance"><option value="on">Sharpen + upscale small panels (recommended)</option><option value="off">Original pixels</option></select>
       </label>
+      </div>
       <h3>Background music</h3>
       <div class="row"><button class="btn small" id="musicBtn">Choose music file</button><button class="btn small danger" id="musicDel">Remove</button><span class="hint" id="musicInfo">No music</span></div>
       <input type="file" id="musicFile" accept="audio/*" hidden>
       <label class="f">Music volume <input type="range" id="musicVol" min="0" max="0.6" step="0.01"></label>
+      <label class="f">Music under the voice <select id="duck"><option value="on">Automatically quieter while the voice speaks, fade in/out</option><option value="off">Same volume all the time</option></select></label>
       <h3>Export</h3>
       <div class="row">
         <label class="f">Quality
@@ -626,7 +752,8 @@ He looked at Papa. Papa smiled, and said, "I am proud of you."`;
 
 /* ============ state ============ */
 const DEFAULTS = { title: '', aspect: '16:9', grid: 3, style: 'stickman', styleText: STYLES.stickman.text, characters: '', gutter: 'auto',
-  splitLevel: 'all', minWords: 2, maxWords: 14, captions: 'bar', fit: 'auto', enhance: 'on', v: 3, capSize: 1, motion: 6, transition: 'fade', transDur: 0.15, res: 1080, fps: 30, musicVol: 0.12, anim: 'on', animAmt: 1, capWords: 'on', pics: 'images', skStyle: 'chibi' };
+  splitLevel: 'all', minWords: 2, maxWords: 14, captions: 'bar', fit: 'auto', enhance: 'on', v: 3, capSize: 1, motion: 6, transition: 'fade', transDur: 0.15, res: 1080, fps: 30, musicVol: 0.12, anim: 'on', animAmt: 1, capWords: 'on', pics: 'images', skStyle: 'chibi',
+  mode: 'layers', lBg: 'parchment', lEnter: 'auto', lTrans: 'cut', lIdle: 'subtle', lCam: 'on', lCaps: 'off', sfx: 'on', sfxVol: 0.5, duck: 'on' };
 try { if (matchMedia('(pointer: coarse)').matches) DEFAULTS.res = 720; } catch (_) {}   // phones: smaller, faster export
 const S = { settings: { ...DEFAULTS }, script: '', segments: [], starts: [], grids: [], overrides: {}, audioBlob: null, audioName: '', musicBlob: null, musicName: '' };
 let uid = 1;
@@ -648,7 +775,7 @@ const DB = {
 function snapshot() {
   return { v: 1, settings: S.settings, script: S.script, segments: S.segments, starts: S.starts, syncVer: S.syncVer || 3, uid, tts: S.tts || null,
     grids: S.grids.map(g => g ? { blob: g.blob, auto: g.auto, trim: g.trim } : null),
-    overrides: S.overrides, audioBlob: S.audioBlob, audioName: S.audioName, musicBlob: S.musicBlob, musicName: S.musicName };
+    overrides: S.overrides, audioBlob: S.audioBlob, audioName: S.audioName, musicBlob: S.musicBlob, musicName: S.musicName, layers: S.layers };
 }
 let saveT;
 function save() { clearTimeout(saveT); saveT = setTimeout(() => { DB.put('project', snapshot()).catch(() => {}); }, 600); }
@@ -877,6 +1004,7 @@ function segmentsChanged(keepTiming) {
   if (!keepTiming && S.starts.length !== S.segments.length) { ratioTiming(); if (analysis) smartTiming(); }
   for (const id of Object.keys(S.overrides)) if (!S.segments.some(s => String(s.id) === id)) { delete S.overrides[id]; delete R.overrides[id]; }
   rebuildCache(); renderScenes(); renderPrompts(); renderGridCards(); renderTimes(); drawTimeline(); drawPreview(); renderStatus(); save();
+  if (curTab === 'layers') lRender();
 }
 
 /* ============ batches & prompts ============ */
@@ -966,6 +1094,7 @@ document.addEventListener('paste', e => {
   if (!it) return; const f = it.getAsFile(); if (!f) return;
   e.preventDefault();
   if (!S.segments.length) return toast('Create scenes first');
+  if (isLayers()) return lPasteBlob(f);
   const gi = pasteTarget != null && pasteTarget < batches().length ? pasteTarget : nextPending();
   if (gi == null) return toast('All grid images are added. Click a card first to replace its image.');
   placeGrid(gi, f);
@@ -2124,6 +2253,7 @@ function drawCaption(ctx, W, H, text, lt, L, dur) {
   ctx.restore();
 }
 function drawFrame(ctx, W, H, t) {
+  if (isLayers()) return lDrawFrame(ctx, W, H, t);
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
   const n = S.segments.length; if (!n) return;
   const i = sceneAt(t); if (i < 0) return;
@@ -2147,7 +2277,7 @@ function drawFrame(ctx, W, H, t) {
 const pv = $('#pv'), pctx = pv.getContext('2d');
 function sizePreview() { const [W, H] = dims(S.settings.aspect === '16:9' ? 540 : 960); const [w2, h2] = S.settings.aspect === '16:9' ? [960, 540] : [W, H]; pv.width = w2; pv.height = h2; }
 let pvRAF = 0, exporting = null;
-function drawPreview() { if (exporting) return; drawFrame(pctx, pv.width, pv.height, vo.currentTime || 0); const D = duration(); $('#pvTime').textContent = `${fmt(vo.currentTime, 0)} / ${fmt(D, 0)}`; $('#pvSeek').value = D ? Math.round((vo.currentTime / D) * 1000) : 0; }
+function drawPreview() { if (exporting) return; drawFrame(pctx, pv.width, pv.height, vo.currentTime || 0); if (S.musicBlob && !music.paused) music.volume = clamp(musicGainAt(vo.currentTime), 0, 1); const D = duration(); $('#pvTime').textContent = `${fmt(vo.currentTime, 0)} / ${fmt(D, 0)}`; $('#pvSeek').value = D ? Math.round((vo.currentTime / D) * 1000) : 0; }
 function loop() { drawPreview(); if (curTab === 'sync') { drawPlayhead(!vo.paused); $('#tlTime').textContent = fmt(vo.currentTime); } if (tap.active) renderTap(); pvRAF = (!vo.paused) ? requestAnimationFrame(loop) : 0; }
 vo.addEventListener('play', () => { syncMusic(true); if (!pvRAF) pvRAF = requestAnimationFrame(loop); $('#pvPlay').textContent = 'Pause'; });
 vo.addEventListener('pause', () => { syncMusic(false); $('#pvPlay').textContent = 'Play'; loop(); });
@@ -2351,6 +2481,12 @@ function renderStatus() {
   const n = S.segments.length, bs = batches(), up = bs.filter(b => S.grids[b.index]).length;
   $('#gridCallout').hidden = !n;
   if (n) { const per = (+S.settings.grid) ** 2; $('#calloutBig').textContent = `${n} scenes → only ${bs.length} image${bs.length > 1 ? 's' : ''} to generate`; $('#calloutSub').textContent = `Each image is a ${S.settings.grid}×${S.settings.grid} grid that covers ${per} scenes. You copy ${bs.length} prompt${bs.length > 1 ? 's' : ''}, not ${n}, and the app cuts every image into its scenes.`; }
+  if (isLayers()) {
+    const A = S.layers.assets, done = A.filter(a => a.png).length, nb = S.layers.boards.length;
+    $('#lCallout').hidden = !n; if (n) $('#lCalloutBig').textContent = `${n} scenes` + (nb ? ` · ${nb} boards · pictures ${done}/${A.length}` : ' → plan the boards');
+    $('#status').innerHTML = `<span class="chip ${n ? 'ok' : 'wait'}">${n} scenes</span><span class="chip ${S.audioBlob ? 'ok' : 'wait'}">${S.audioBlob ? 'Voice ' + fmt(duration(), 0) : 'No voice yet'}</span><span class="chip ${nb ? 'ok' : 'wait'}">${nb} boards</span><span class="chip ${A.length && done === A.length ? 'ok' : 'wait'}">Pictures ${done}/${A.length}</span>`;
+    return;
+  }
   const missing = S.segments.filter((_, i) => !sceneCache[i] && !sceneUsesDraw(i)).length;
   $('#status').innerHTML = `<span class="chip ${n ? 'ok' : 'wait'}">${n} scenes</span><span class="chip ${S.audioBlob ? 'ok' : 'wait'}">${S.audioBlob ? 'Voice ' + fmt(duration(), 0) : 'No voice yet'}</span><span class="chip ${bs.length && up === bs.length ? 'ok' : 'wait'}">Grids ${up}/${bs.length}</span>${missing && n ? `<span class="chip wait">${missing} images missing</span>` : ''}`;
 }
@@ -2395,9 +2531,10 @@ $('#dlPrompts').onclick = () => { const bs = batches(); if (!bs.length) return; 
 $('#loadChars').onclick = () => { const ta = $('#characters'); ta.value = (ta.value.trim() ? ta.value.trim() + '\n' : '') + CHANNEL_CHARS; S.settings.characters = ta.value; renderPrompts(); save(); };
 
 /* ============ settings binding ============ */
-const BIND = ['aspect', 'grid', 'style', 'styleText', 'characters', 'gutter', 'splitLevel', 'minWords', 'maxWords', 'captions', 'fit', 'enhance', 'capSize', 'motion', 'transition', 'transDur', 'res', 'fps', 'musicVol', 'anim', 'animAmt', 'capWords', 'pics', 'skStyle'];
-const NUM = new Set(['grid', 'minWords', 'maxWords', 'capSize', 'motion', 'transDur', 'res', 'fps', 'musicVol', 'animAmt']);
-function applySettingsToUI() { BIND.forEach(k => { const el = $('#' + k); if (el) el.value = S.settings[k]; }); $('#projTitle').value = S.settings.title || ''; }
+const BIND = ['aspect', 'grid', 'style', 'styleText', 'characters', 'gutter', 'splitLevel', 'minWords', 'maxWords', 'captions', 'fit', 'enhance', 'capSize', 'motion', 'transition', 'transDur', 'res', 'fps', 'musicVol', 'anim', 'animAmt', 'capWords', 'pics', 'skStyle',
+  'lBg', 'lEnter', 'lTrans', 'lIdle', 'lCam', 'lCaps', 'sfx', 'sfxVol', 'duck'];
+const NUM = new Set(['grid', 'minWords', 'maxWords', 'capSize', 'motion', 'transDur', 'res', 'fps', 'musicVol', 'animAmt', 'sfxVol']);
+function applySettingsToUI() { BIND.forEach(k => { const el = $('#' + k); if (el) el.value = S.settings[k]; }); $('#projTitle').value = S.settings.title || ''; lApplyMode(); }
 BIND.forEach(k => { const el = $('#' + k); if (!el) return; el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => {
   S.settings[k] = NUM.has(k) ? +el.value : el.value;
   if (k === 'style') { if (S.settings.style !== 'custom') { S.settings.styleText = STYLES[S.settings.style].text; $('#styleText').value = S.settings.styleText; } }
@@ -2414,12 +2551,15 @@ $('#projTitle').addEventListener('input', e => { S.settings.title = e.target.val
 /* ============ tabs ============ */
 let curTab = 'script';
 function showTab(name) {
+  if (isLayers() && (name === 'prompts' || name === 'grids')) name = 'layers';
+  if (!isLayers() && name === 'layers') name = 'prompts';
   curTab = name; $$('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === name)); $$('section.step').forEach(s => s.hidden = s.dataset.panel !== name);
   try { localStorage.setItem('ss-tab', name); } catch (_) {}
   if (name === 'sync') { renderTimes(); requestAnimationFrame(drawTimeline); }
   if (name === 'video') drawPreview();
   if (name === 'grids') drawCellThumbs();
   updateTargetUI();
+  if (name === 'layers') lRender();
 }
 $$('nav.tabs button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
 document.addEventListener('keydown', e => {
@@ -2449,7 +2589,10 @@ async function pickAudioCodec(sr) {
 async function mixAudio(sr) {
   const D = audioBuf.duration, oc = new OfflineAudioContext(2, Math.ceil(D * sr), sr);
   const v = oc.createBufferSource(); v.buffer = audioBuf; v.connect(oc.destination); v.start(0);
-  if (S.musicBlob) { try { const mb = await actxDecode.decodeAudioData(await S.musicBlob.arrayBuffer()); const m = oc.createBufferSource(); m.buffer = mb; m.loop = true; const g = oc.createGain(); g.gain.value = S.settings.musicVol; m.connect(g).connect(oc.destination); m.start(0); } catch (_) {} }
+  if (S.musicBlob) { try { const mb = await actxDecode.decodeAudioData(await S.musicBlob.arrayBuffer()); const m = oc.createBufferSource(); m.buffer = mb; m.loop = true; const g = oc.createGain(); g.gain.setValueCurveAtTime(musicCurve(D), 0, D); m.connect(g).connect(oc.destination); m.start(0); } catch (_) {} }
+  // sound effects of the layered video, at the moment each picture / keyword / icon appears
+  const ev = lSfxEvents();
+  if (ev.length) { const bank = sfxBank(oc); for (const e of ev) { if (e.t >= D) continue; const s = oc.createBufferSource(); s.buffer = bank[e.s]; const g = oc.createGain(); g.gain.value = S.settings.sfxVol * e.v; s.connect(g).connect(oc.destination); s.start(Math.max(0, e.t)); } }
   return await oc.startRendering();
 }
 // Renders every frame at its exact time (frame k = k / fps seconds) and writes a normal, seekable MP4.
@@ -2513,8 +2656,9 @@ function pickMime() {
 $('#exportBtn').onclick = async () => {
   if (!S.audioBlob) return toast('Upload the voiceover first'); if (!S.segments.length) return toast('Create scenes first');
   if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) return toast('This browser cannot export video. Use Chrome or Edge.');
-  const missing = S.segments.filter((_, i) => !sceneCache[i] && !sceneUsesDraw(i)).length;
-  if (missing && !$('#exportBtn').dataset.confirm) { $('#exportBtn').dataset.confirm = '1'; $('#exportInfo').textContent = `${missing} scenes still have no image (they will show "image missing"). Press again to export anyway.`; return; }
+  const missing = isLayers() ? S.layers.assets.filter(a => !a.png).length : S.segments.filter((_, i) => !sceneCache[i] && !sceneUsesDraw(i)).length;
+  if (isLayers() && !S.layers.boards.length && !$('#exportBtn').dataset.confirm) { $('#exportBtn').dataset.confirm = '1'; $('#exportInfo').textContent = 'There is no plan yet (Layers tab), so the video shows only the background. Press again to export anyway.'; return; }
+  if (missing && !$('#exportBtn').dataset.confirm) { $('#exportBtn').dataset.confirm = '1'; $('#exportInfo').textContent = isLayers() ? `${missing} pictures are still missing (they show as dashed boxes). Press again to export anyway.` : `${missing} scenes still have no image (they will show "image missing"). Press again to export anyway.`; return; }
   delete $('#exportBtn').dataset.confirm;
   if (window.VideoEncoder && window.AudioEncoder && window.Mp4Muxer && audioBuf) { const done = await exportOffline(); if (done) return; }
   vo.pause(); try { await document.fonts.load('800 40px "Baloo 2"'); } catch (_) {}
@@ -2559,13 +2703,14 @@ $('#saveFile').onclick = async () => {
   for (const g of s.grids) out.grids.push(g ? { ...g, blob: await b2d(g.blob) } : null);
   for (const [k, v] of Object.entries(s.overrides)) out.overrides[k] = await b2d(v);
   out.audioBlob = s.audioBlob ? await b2d(s.audioBlob) : null; out.musicBlob = s.musicBlob ? await b2d(s.musicBlob) : null;
+  out.layers = await lPack(s.layers, b2d);
   download(new Blob([JSON.stringify(out)], { type: 'application/json' }), safeName() + '.ssproj');
 };
 $('#openFileBtn').onclick = async () => {
   const [f] = await pickFile($('#openFile')); if (!f) return;
   try { const p = JSON.parse(await f.text()); p.grids = await Promise.all((p.grids || []).map(async g => g ? { ...g, blob: await d2b(g.blob) } : null));
     const ov = {}; for (const [k, v] of Object.entries(p.overrides || {})) ov[k] = await d2b(v); p.overrides = ov;
-    p.audioBlob = await d2b(p.audioBlob); p.musicBlob = await d2b(p.musicBlob); await restore(p); save(); toast('Project opened'); }
+    p.audioBlob = await d2b(p.audioBlob); p.musicBlob = await d2b(p.musicBlob); p.layers = await lPack(p.layers, d2b); await restore(p); save(); toast('Project opened'); }
   catch (e) { toast('This is not a valid project file'); }
 };
 let newArm = 0;
@@ -2577,6 +2722,9 @@ async function restore(p) {
   S.settings = { ...DEFAULTS, ...(p.settings || {}) };
   if ((S.settings.v || 1) < 2) { S.settings.captions = S.settings.captions === 'off' ? 'off' : 'bar'; S.settings.fit = 'auto'; S.settings.motion = Math.min(S.settings.motion, 6); S.settings.v = 2; }
   if ((S.settings.v || 1) < 3) { S.settings.skStyle = 'chibi'; S.settings.v = 3; }
+  // projects from before the layered mode keep their grid pictures
+  if (!(p.settings && p.settings.mode)) S.settings.mode = (p.grids || []).some(Boolean) || Object.keys(p.overrides || {}).length ? 'grid' : 'layers';
+  await lRestore(p.layers);
   S.script = p.script || ''; S.segments = p.segments || []; S.starts = p.starts || []; S.tts = p.tts || null;
   uid = Math.max(p.uid || 1, ...S.segments.map(s => s.id + 1), 1);
   S.grids = []; R.grids = []; S.overrides = {}; R.overrides = {}; audioBuf = null; analysis = null; S.audioBlob = null;
@@ -2595,6 +2743,1010 @@ async function restore(p) {
   if (resync) { save(); toast('Scene timing was redone with the improved Smart Sync'); }
   renderTtsLines();
 }
+
+/* ============ LAYERED EXPLAINER ============
+   A paper background; cut-out pictures (stickman poses, objects), bold keywords and icons pop in one by one
+   on the word where they are spoken. The screen is cleared at every new "board".
+   Plan (JSON, from Gemini / ChatGPT / Claude / offline) -> sticker sheets (up to 6 pictures per AI image)
+   -> the app finds every picture on the sheet, cuts it out and removes the white -> layout + animation + SFX. */
+const L_ART = 'Simple hand-drawn doodle like a YouTube whiteboard explainer: clean bold black ink outlines with a slight hand-drawn wobble, simple cartoon line art with light pencil shading, flat accent colours used sparingly (red, soft pink, a little green or blue) only where they help. No gradients, no realistic painting, no 3D.';
+const L_HERO = 'a classic stickman: perfectly round head with a thin black outline and no hair, simple expressive face (dot eyes, eyebrows, mouth), thin single black lines for the body, arms and legs';
+const L_ICONS = ['x', 'check', 'right', 'left', 'down', 'up', 'equals', 'plus', 'vs', 'question', 'exclaim'];
+const L_RED = '#df2a2a', L_INK = '#141414';
+S.layers = { assets: [], boards: [], hero: '', art: '', bgBlob: null };
+const RL = { img: {}, ver: 1, bg: new Map(), bgUser: null, bgVer: 0, res: null, lay: new Map(), mctx: null, models: null };
+let lTarget = null;   // {sheet: k} or {asset: id}: where the next pasted / shared picture goes
+const isLayers = () => S.settings.mode === 'layers';
+const lAsset = id => S.layers.assets.find(a => a.id === id);
+const lHero = () => (S.layers.hero || '').trim() || L_HERO;
+const lArt = () => (S.layers.art || '').trim() || L_ART;
+const lId = s => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'pic';
+const lIsChar = it => it && it.kind === 'img' && lAsset(it.asset)?.type === 'char';
+const easeOutBack = p => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2); };
+const easeOutCubic = p => 1 - Math.pow(1 - p, 3);
+const easeInOut = p => p * p * (3 - 2 * p);
+function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function lIconName(v) {
+  const s = String(v || '').trim().toLowerCase();
+  const map = { 'x': 'x', '✗': 'x', '✘': 'x', '❌': 'x', cross: 'x', wrong: 'x', no: 'x', 'check': 'check', '✓': 'check', '✔': 'check', '✅': 'check', tick: 'check', yes: 'check', correct: 'check',
+    right: 'right', arrow: 'right', arrow_right: 'right', '→': 'right', left: 'left', arrow_left: 'left', '←': 'left', down: 'down', arrow_down: 'down', '↓': 'down', up: 'up', arrow_up: 'up', '↑': 'up',
+    equals: 'equals', equal: 'equals', '=': 'equals', plus: 'plus', '+': 'plus', vs: 'vs', versus: 'vs', question: 'question', '?': 'question', exclaim: 'exclaim', exclamation: 'exclaim', '!': 'exclaim' };
+  return map[s] || map[s.replace(/[\s-]+/g, '_')] || '';
+}
+
+/* ---- sheets & prompts ---- */
+function lSheets() {
+  const A = S.layers.assets, out = [];
+  for (let s = 0; s < A.length; s += 6) {
+    const ids = A.slice(s, s + 6).map(a => a.id), k = ids.length;
+    const [cols, rows] = k === 1 ? [1, 1] : k === 2 ? [2, 1] : k === 3 ? [3, 1] : k === 4 ? [2, 2] : [3, 2];
+    out.push({ index: out.length, ids, cols, rows });
+  }
+  return out;
+}
+const lSheetDone = sh => !!sh && sh.ids.every(id => lAsset(id)?.png);
+function lNextSheet() { const sh = lSheets().find(s => !lSheetDone(s)); return sh ? sh.index : null; }
+function lDesc(a) { return (a.type === 'char' ? 'Full body from head to feet: ' : '') + (a.prompt || a.id.replace(/_/g, ' ')); }
+function lSheetPrompt(sh) {
+  const k = sh.ids.length, n = sh.cols * sh.rows;
+  let t = sh.index != null ? `SHEET ${sh.index + 1} OF ${lSheets().length}: one new image with exactly these ${k} drawing${k > 1 ? 's' : ''} (different from any earlier sheet).\n` : '';
+  t += k === 1 ? 'Draw a square image with ONE drawing in the middle and wide empty white space all around it.\n'
+    : `Draw a landscape image (3:2) that is a sticker sheet of ${k} separate drawings in ${sh.rows} row${sh.rows > 1 ? 's' : ''} of ${sh.cols}${k < n ? ' (the last place stays empty)' : ''}. Every drawing stands alone in the middle of its own area, with wide empty white space around it. The drawings must not touch or overlap. No frames, no grid lines, no numbers, no titles, no captions.\n`;
+  t += 'No text or letters inside a drawing unless its description asks for them.\n';
+  t += `ART STYLE (the same for every drawing): ${lArt()}\n`;
+  t += 'BACKGROUND: plain pure white (#FFFFFF) everywhere. No shadow on the ground, no floor line, no paper texture, no frame, not transparent, no checkerboard.\n';
+  t += `THE MAIN STICKMAN (draw exactly this whenever a description says "the stickman"): ${lHero()}\n\n`;
+  let j = 0;
+  for (let r = 0; r < sh.rows; r++) {
+    const row = sh.ids.slice(r * sh.cols, r * sh.cols + sh.cols); if (!row.length) break;
+    if (k > 1) t += `Row ${r + 1}, left to right:\n`;
+    row.forEach(id => { j++; const a = lAsset(id); t += `${k > 1 ? j + '. ' : ''}${a ? lDesc(a) : id}\n`; });
+  }
+  return t.trim();
+}
+const lSinglePrompt = id => lSheetPrompt({ ids: [id], cols: 1, rows: 1 });
+function lLang() { const s = S.script || ''; return /[ऀ-ॿ]/.test(s) ? 'Hindi in Devanagari (keep English words in English)' : /\b(hai|nahi|kya|aur|mein|tha|kar)\b/i.test(s) ? 'Hinglish' : 'English'; }
+function lPlanPrompt() {
+  const D = duration(), n = S.segments.length, target = clamp(Math.round(D / 4.5), 8, 60);
+  const scenes = S.segments.map((s, i) => `${i + 1} [${fmt(S.starts[i] || 0, 0)}]: ${plain(s.text)}`).join('\n');
+  return `You are the visual director of a YouTube explainer video in the "layered stickman doodle" style: a plain paper background, and simple cut-out drawings (the stickman in different poses, objects, a brain, a phone…) plus short bold keywords and icons that POP IN one by one exactly when the narrator says them. The screen is cleared every few seconds and a new "board" is built up.
+
+The narration is below, split into ${n} numbered scenes (short pieces of the voiceover, with their start time).
+
+Return ONLY a JSON object (no explanation, no markdown fences) in exactly this shape:
+{
+  "assets": [
+    {"id": "hero_explain", "type": "character", "prompt": "the stickman standing, smiling, explaining with one open hand"},
+    {"id": "brain", "type": "object", "prompt": "a human brain, simple sketch, side view"}
+  ],
+  "boards": [
+    {"scene": 1, "items": [
+      {"scene": 1, "show": "hero_explain"},
+      {"scene": 2, "show": "brain", "label": "Brain", "word": "brain"},
+      {"scene": 3, "text": "FORCE", "icon": "x"}
+    ]}
+  ]
+}
+
+RULES
+- "assets" = every picture that must be drawn. type "character" = the stickman or other people; type "object" = everything else (props, places, body parts, devices, symbols). "prompt" = a short visual description of ONE drawing (pose, expression, what it holds, what it looks like). Do NOT describe the art style, it is added later. ids: lowercase with underscores.
+- VARIETY: the viewer must keep seeing NEW pictures. Use about ${target} assets in total. Use each asset on at most 2 boards in the whole video, never on two boards in a row, and never twice on the same board. Make a new, specific picture for every new idea (not the same brain / the same group of friends again and again). The main stickman gets many different poses and situations as separate assets (explaining, thinking, shocked, happy, sad, walking, at a desk, on the phone, cooking…), each used at most twice.
+- "boards": a new board (screen clears) starts about every 5–9 seconds, normally at the start of a sentence or a new idea. The first board starts at scene 1, board "scene" numbers go up, and every scene belongs to some board.
+- Each board has 2–4 items, listed in the order they appear, and EVERY board has at least one picture ("show"). Never a board with only a title or only keywords. The FIRST item of every board is a picture with no "word", so it appears the moment the board starts.
+- Each item appears at its "scene"; if you also give "word", it appears exactly on that word (copy the word exactly as written in that scene).
+- At most 2 keywords ("text") per board.
+- Item kinds, exactly one of these keys per item:
+  "show": an asset id. Optional "label": a 1–2 word caption under the picture.
+  "text": a SHORT keyword, 1–2 words, at most 14 letters, in big bold letters (no sentences, no questions). Put *stars* around a word to make it red, e.g. "*DOPAMINE* TRAP". Optional "icon": "x" or "check" shown after the text.
+  "title": a heading at the top of the board, e.g. "PHASE 2:".
+  "icon": one of x, check, right, left, down, up, equals, plus, vs, question, exclaim.
+  "strike": the id of an asset already on this board: a big red X is drawn over it ("no", "wrong", "stop doing this").
+- Optional on any item: "row": 1 or 2 (which row it goes in), "big": true (draw it large).
+- Optional on a board: "layout": "tree" (the title at the top with arrows down to the items below; for "3 steps", "2 types"…).
+- Good boards: the stickman on the left explaining + 1–3 pictures or keywords on the right; a keyword with ✗ or ✓; "A = B" with an equals icon; a before/after with an arrow; a title with a list of steps.
+- Keywords and labels in ${lLang()}; short English keywords are fine too.
+- Main character for reference: ${lHero()}
+
+SCENES
+${scenes}`;
+}
+
+/* ---- plan: parse, apply, export, offline quick plan ---- */
+function lParseJSON(txt) {
+  let s = String(txt || '').trim().replace(/^```[a-z]*\s*/i, '').replace(/```\s*$/, '');
+  const a = s.indexOf('{'), b = s.lastIndexOf('}'); if (a < 0 || b <= a) throw new Error('No JSON object found in the reply');
+  s = s.slice(a, b + 1);
+  try { return JSON.parse(s); } catch (e) { return JSON.parse(s.replace(/[“”]/g, '"').replace(/,\s*([}\]])/g, '$1')); }
+}
+function lApplyPlan(p) {
+  if (!p || !Array.isArray(p.boards) || !p.boards.length) throw new Error('The reply has no "boards" list');
+  const n = S.segments.length; if (!n) throw new Error('Create scenes first (step 1)');
+  const old = new Map(S.layers.assets.map(a => [a.id, a])), given = new Map(), assets = [], seen = new Set();
+  (p.assets || []).forEach(a => { if (a && a.id) given.set(lId(a.id), a); });
+  const useAsset = (raw, type, prompt) => {
+    const id = lId(raw); if (seen.has(id)) return id; seen.add(id);
+    const g = given.get(id), o = old.get(id), ty = (g && g.type) || type || (o && (o.type === 'char' ? 'character' : 'object')) || '';
+    assets.push({ id, type: /char|person|people|human|stick|man|woman|boy|girl|hero|kid/i.test(ty) || /^(hero|stick|man|woman|boy|girl|person|kid)/.test(id) ? 'char' : 'object',
+      prompt: String((g && (g.prompt || g.description || g.desc)) || prompt || (o && o.prompt) || id.replace(/_/g, ' ')).trim(), cut: (o && o.cut) || 'auto', raw: (o && o.raw) || null, png: (o && o.png) || null });
+    return id;
+  };
+  const sn = v => clamp(Math.round(+v || 1), 1, n);
+  const boards = [];
+  [...p.boards].filter(Boolean).sort((a, b) => sn(a.scene ?? a.start) - sn(b.scene ?? b.start)).forEach(b => {
+    const bs = sn(b.scene ?? b.start ?? (b.items && b.items[0] && b.items[0].scene));
+    const items = [];
+    (b.items || []).forEach(it => {
+      if (!it || typeof it !== 'object') return;
+      const s = Math.max(bs, sn(it.scene ?? bs));
+      const base = { seg: S.segments[s - 1].id, word: String(it.word || '').trim() };
+      if (it.anim) base.anim = String(it.anim); if (+it.row) base.row = clamp(+it.row, 1, 3); if (it.big) base.big = true;
+      const show = it.show || it.asset || it.image || it.picture;
+      if (show) { const id = lId(show); if (items.some(x => x.kind === 'img' && x.asset === id)) return; items.push({ ...base, kind: 'img', asset: useAsset(show, it.type, it.prompt), label: String(it.label || '').trim() }); }
+      else if (it.title) items.push({ ...base, kind: 'title', text: String(it.title).trim() });
+      else if (it.text) items.push({ ...base, kind: 'text', text: String(it.text).trim(), icon: lIconName(it.icon) === 'x' || lIconName(it.icon) === 'check' ? lIconName(it.icon) : '' });
+      else if (it.strike) items.push({ ...base, kind: 'strike', target: lId(it.strike) });
+      else if (lIconName(it.icon)) items.push({ ...base, kind: 'icon', icon: lIconName(it.icon) });
+    });
+    if (!items.length) return;
+    const prev = boards[boards.length - 1];
+    if (prev && prev._s === bs) { prev.items.push(...items); return; }
+    boards.push({ _s: bs, seg: S.segments[bs - 1].id, layout: b.layout === 'tree' ? 'tree' : 'auto', items });
+  });
+  if (!boards.length) throw new Error('The plan has no usable items');
+  boards[0].seg = S.segments[0].id;
+  boards.forEach(b => delete b._s);
+  // keep the order the AI listed its assets in (so a sheet groups related pictures)
+  const order = [...given.keys()]; assets.sort((a, b) => { const x = order.indexOf(a.id), y = order.indexOf(b.id); return (x < 0 ? 1e4 : x) - (y < 0 ? 1e4 : y); });
+  for (const id of Object.keys(RL.img)) if (!assets.some(a => a.id === id && a.png)) delete RL.img[id];
+  S.layers.assets = assets; S.layers.boards = boards; lTarget = null; RL.ver++;
+  lRender(); renderStatus(); drawPreview(); save();
+  const nItems = boards.reduce((s, b) => s + b.items.length, 0), have = assets.filter(a => a.png).length;
+  // variety check: pictures shown too often, or on two boards in a row
+  const uses = new Map(); let backToBack = 0, noPic = 0;
+  boards.forEach((b, k) => { const ids = new Set(b.items.filter(x => x.kind === 'img').map(x => x.asset)); if (!ids.size) noPic++; ids.forEach(id => uses.set(id, (uses.get(id) || 0) + 1)); if (k && boards[k - 1].items.some(x => x.kind === 'img' && ids.has(x.asset))) backToBack++; });
+  const often = [...uses].filter(([, n2]) => n2 > 2).sort((a, b) => b[1] - a[1]);
+  const warn = [often.length ? `repeated a lot: ${often.slice(0, 5).map(([id, n2]) => `${id} ×${n2}`).join(', ')}` : '', backToBack ? `${backToBack} boards repeat a picture from the board before` : '', noPic ? `${noPic} boards have no picture` : ''].filter(Boolean);
+  return `${boards.length} boards, ${nItems} items, ${assets.length} pictures (${lSheets().length} sheet prompt${lSheets().length === 1 ? '' : 's'})${have ? ` · ${have} pictures kept from before` : ''}${warn.length ? ` · ⚠ ${warn.join('; ')}. For more variety ask the AI again or edit the plan.` : ''}`;
+}
+function lExportPlan() {
+  const idx = new Map(S.segments.map((s, i) => [s.id, i + 1]));
+  return { assets: S.layers.assets.map(a => ({ id: a.id, type: a.type === 'char' ? 'character' : 'object', prompt: a.prompt })),
+    boards: S.layers.boards.map(b => ({ scene: idx.get(b.seg) || 1, ...(b.layout === 'tree' ? { layout: 'tree' } : {}), items: b.items.map(it => {
+      const o = { scene: idx.get(it.seg) || idx.get(b.seg) || 1 };
+      if (it.kind === 'img') { o.show = it.asset; if (it.label) o.label = it.label; }
+      else if (it.kind === 'title') o.title = it.text; else if (it.kind === 'text') { o.text = it.text; if (it.icon) o.icon = it.icon; }
+      else if (it.kind === 'strike') o.strike = it.target; else if (it.kind === 'icon') o.icon = it.icon;
+      if (it.word) o.word = it.word; if (it.row) o.row = it.row; if (it.big) o.big = true; if (it.anim) o.anim = it.anim;
+      return o; }) })) };
+}
+const L_STOP = new Set(('the and for that this with from have your you are was were will what when then than they them their there here about into just like only also very more most some such been being because which while where after before over under again every these those would could should ' +
+  'aur hai hain tha thi the ke ki ka ko mein se par bhi toh hi nahi nahin ki yeh woh vo ek kar karna karte jo lekin kyunki aap hum main tum us is apne apni apna kuch sab bahut abhi phir jab tab kaise kya ' +
+  'और है हैं था थी थे के की का को में से पर भी तो ही नहीं कि यह वह एक कर करना करते जो लेकिन क्योंकि आप हम मैं तुम उस इस अपने अपनी अपना कुछ सब बहुत अभी फिर जब तब कैसे क्या').split(/\s+/));
+function lQuickPlan() {
+  const groups = sentenceGroups(); if (!groups.length) throw new Error('Create scenes first (step 1)');
+  const assets = [
+    { id: 'hero_explain', type: 'character', prompt: 'the stickman standing, smiling, explaining with one open hand held out to the side' },
+    { id: 'hero_think', type: 'character', prompt: 'the stickman thinking, one hand on the chin, eyes looking up' },
+    { id: 'hero_happy', type: 'character', prompt: 'the stickman very happy, both arms raised, big smile' },
+    { id: 'hero_sad', type: 'character', prompt: 'the stickman sad, shoulders down, looking at the floor' },
+    { id: 'hero_shock', type: 'character', prompt: 'the stickman shocked, both hands on the cheeks, mouth wide open' },
+    { id: 'hero_point', type: 'character', prompt: 'the stickman pointing to the right with a serious face' }];
+  const boards = [];
+  // join short sentences so a board lasts at least ~4 s
+  const merged = []; groups.forEach(g => { const last = merged[merged.length - 1]; const dur = segEnd(g[g.length - 1]) - S.starts[g[0]]; if (last && (last.dur < 4 || dur < 1.5)) { last.g.push(...g); last.dur += dur; } else merged.push({ g: [...g], dur }); });
+  merged.forEach(({ g }, k) => {
+    const text = g.map(i => S.segments[i].text).join(' '), mood = detectMood(text);
+    const hero = /\?/.test(text) || mood === 'question' ? 'hero_think' : ['sad', 'fear'].includes(mood) ? 'hero_sad' : ['shock', 'angry'].includes(mood) ? 'hero_shock' : ['happy', 'excited', 'laugh', 'love'].includes(mood) ? 'hero_happy' : k % 3 === 2 ? 'hero_point' : 'hero_explain';
+    const items = [{ scene: g[0] + 1, show: hero }], used = new Set();
+    for (const i of g) {
+      if (items.length >= 3) break;
+      const t = S.segments[i].text, star = [...t.matchAll(/\*([^*]+)\*/g)].map(m => m[1].trim());
+      const cands = star.length ? star : plain(t).split(/\s+/).map(w => w.replace(/[^\p{L}\p{N}\p{M}]/gu, '')).filter(w => [...w].length >= 4 && !L_STOP.has(w.toLowerCase())).sort((a, b) => b.length - a.length).slice(0, 1);
+      for (const c of cands) { if (items.length >= 3 || used.has(c.toLowerCase())) continue; used.add(c.toLowerCase()); items.push({ scene: i + 1, text: /[ऀ-ॿ]/.test(c) ? c : c.toUpperCase(), word: c.split(/\s+/)[0] }); }
+    }
+    boards.push({ scene: g[0] + 1, items });
+  });
+  return { assets: assets.filter(a => boards.some(b => b.items.some(it => it.show === a.id))), boards };
+}
+
+/* ---- timing: when each board and item appears ---- */
+function lKey() { let k = (S.starts.length * 7 + S.segments.length * 3 + RL.ver * 13) | 0; for (const x of S.starts) k = (Math.imul(k, 31) + Math.round(x * 1000)) | 0; return k + '|' + duration().toFixed(2) + '|' + S.layers.boards.length; }
+const lNorm = s => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}\p{M}]+/gu, '');
+function lWordTime(i, word) {
+  const st = S.starts[i] || 0; if (!word) return st + 0.05;
+  const toks = captionTokens(S.segments[i].text); if (!toks.length) return st + 0.05;
+  const w0 = lNorm(String(word).split(/\s+/)[0]); if (!w0) return st + 0.05;
+  let k = toks.findIndex(t => lNorm(t.w) === w0);
+  if (k < 0) k = toks.findIndex(t => { const a = lNorm(t.w); return a && Math.min(a.length, w0.length) >= 3 && (a.startsWith(w0) || w0.startsWith(a)); });
+  if (k <= 0) return st + 0.05;
+  const d = segEnd(i) - st, wgt = toks.map(t => t.w.length + 2), tot = wgt.reduce((a, b) => a + b, 0), span = Math.max(0.25, d * 0.88 - 0.05);
+  let acc = 0; for (let j = 0; j < k; j++) acc += wgt[j];
+  return st + 0.05 + span * acc / tot - 0.06;
+}
+function lResolve() {
+  const key = lKey(); if (RL.res && RL.res.key === key) return RL.res;
+  const idx = new Map(S.segments.map((s, i) => [s.id, i])), D = duration(), out = [];
+  for (const b of S.layers.boards) {
+    const i0 = idx.get(b.seg); if (i0 == null) continue;
+    const last = out[out.length - 1];
+    if (last && last.i0 === i0) { last.items.push(...b.items); continue; }
+    if (last && last.i0 > i0) continue;
+    out.push({ b, i0, items: b.items.slice() });
+  }
+  out.forEach((o, k) => {
+    o.k = k; o.t0 = k === 0 ? 0 : S.starts[o.i0]; o.t1 = k < out.length - 1 ? S.starts[out[k + 1].i0] : D;
+    const lo = k === 0 ? Math.max(0, (S.starts[0] || 0)) : o.t0, hi = Math.max(lo + 0.02, o.t1 - 0.3);
+    let prev = null;
+    o.items = o.items.map(src => {
+      let i = idx.get(src.seg); if (i == null || i < o.i0) i = o.i0;
+      let t = lWordTime(i, src.word);
+      if (prev && !src.word && i === prev.i && t < prev.t + 0.4) t = prev.t + 0.4;
+      if (prev && t < prev.t + 0.12) t = prev.t + 0.12;
+      t = clamp(t, lo + 0.02, hi);
+      const r = { ...src, src, i, t }; prev = r; return r;
+    });
+  });
+  // never an empty page: the old board stays until the new board's first picture / keyword appears
+  out.forEach((o, k) => { if (k > 0 && o.items.length) o.t0 = Math.max(o.t0, o.items[0].t - 0.03); });
+  out.forEach((o, k) => { o.t1 = k < out.length - 1 ? out[k + 1].t0 : D; });
+  RL.res = { key, boards: out }; RL.lay.clear(); return RL.res;
+}
+
+/* ---- layout: where each item sits on its board (computed for the finished board, so nothing jumps) ---- */
+const L_FONT = '"Anton", "Oswald", Impact, "Arial Narrow", sans-serif';
+const lDeva = s => /[ऀ-ॿ]/.test(s);
+function lFont(s, fs) { return lDeva(s) ? `800 ${fs}px "Baloo 2", "Hind", sans-serif` : `400 ${fs}px ${L_FONT}`; }
+function lRuns(line) {
+  const t = String(line);
+  if (t.includes('*')) return t.split(/(\*[^*]+\*)/).filter(Boolean).map(p => /^\*[^*]+\*$/.test(p) ? { s: p.slice(1, -1), red: true } : { s: p.replace(/\*/g, ''), red: false });
+  const m = t.match(/^\s*[\p{L}\p{N}]/u);
+  if (!m || lDeva(m[0])) return [{ s: t, red: false }];   // never split Devanagari letters (it would break their shapes)
+  if (/^\s*\d/.test(t)) { const n = t.match(/^\s*[\d.,:%+-]+/)[0]; return [{ s: n, red: true }, { s: t.slice(n.length), red: false }]; }
+  return [{ s: m[0], red: true }, { s: t.slice(m[0].length), red: false }];
+}
+const lLines = text => String(text || '').split(/\s*\|\s*|\n/).filter(s => s.trim());
+function lMeasure(text, fs) {
+  const mc = RL.mctx || (RL.mctx = document.createElement('canvas').getContext('2d'));
+  let w = 0; for (const line of lLines(text)) { let lw = 0; for (const r of lRuns(line)) { mc.font = lFont(r.s, fs); lw += mc.measureText(r.s).width; } w = Math.max(w, lw); }
+  return w;
+}
+function lAspect(it) { const im = RL.img[it.asset]; if (im && im.width) return im.width / im.height; return lIsChar(it) ? 0.62 : 1.15; }
+function lWeight(it) {
+  if (it.kind === 'img') return (it.big ? 1.6 : 1) * 1.5 * clamp(Math.pow(lAspect(it), 0.75), 0.55, 1.7);   // pictures lead, keywords wrap if needed
+  if (it.kind === 'text') { const w = lMeasure(it.text, 100) / 100 + (it.icon ? 1.2 : 0); return clamp(w * 0.28, 1, 2.4) * (it.big ? 1.4 : 1); }
+  if (it.kind === 'icon') return it.icon === 'vs' ? 0.55 : 0.45;
+  return 1;
+}
+function lLayout(o, W, H) {
+  const ck = o.k + '|' + W + 'x' + H; if (RL.lay.has(ck)) return RL.lay.get(ck);
+  const items = o.items, L = { items: new Array(items.length), tree: null }, port = H > W * 1.1;
+  const capBand = S.settings.lCaps === 'on' ? H * (port ? 0.13 : 0.16) : 0;
+  const area = { x: W * 0.06, y: H * 0.08, w: W * 0.88, h: H * 0.84 - capBand };
+  // titles across the top
+  const titles = items.map((it, j) => j).filter(j => items[j].kind === 'title');
+  titles.forEach(j => {
+    const th = Math.min(H * 0.15, area.h * 0.24), fsW = 100 * area.w * 0.94 / Math.max(1, lMeasure(items[j].text, 100));
+    const fs = Math.min(th * 0.78 / lLines(items[j].text).length, fsW, H * 0.12);
+    L.items[j] = { cx: W / 2, cy: area.y + th / 2, fs, box: { x: area.x, y: area.y, w: area.w, h: th } };
+    area.y += th + H * 0.02; area.h -= th + H * 0.02;
+  });
+  const flow = items.map((it, j) => j).filter(j => ['img', 'text', 'icon'].includes(items[j].kind));
+  const tree = o.b.layout === 'tree', explicitRows = flow.some(j => items[j].row);
+  // boards that compare things ("A = B", "A → B", "A vs B") keep everything in one reading order
+  const relational = items.some((it, j) => it.kind === 'icon' && ['equals', 'plus', 'vs', 'right', 'left'].includes(it.icon) && (items[j - 1]?.kind === 'img' || items[j + 1]?.kind === 'img'));
+  // the narrator: only ONE standing stickman that opens the board gets a tall column (groups and wide pictures never do);
+  // it alternates left / right from board to board
+  const f0 = flow[0];
+  const hero = !tree && !relational && !explicitRows && f0 != null && flow.length > 1 && lIsChar(items[f0]) && !items[f0].big && lAspect(items[f0]) < 0.95 ? f0 : null;
+  let R = { ...area };
+  if (hero != null) {
+    const it = items[hero];
+    if (!port) {
+      const cw = clamp(area.h * 0.96 * lAspect(it), area.w * 0.2, area.w * 0.34), left = o.k % 2 === 0, gap = W * 0.025;
+      lPlaceImg(L, it, hero, { x: left ? area.x : area.x + area.w - cw, y: area.y, w: cw, h: area.h }, true, H);
+      R = { x: left ? area.x + cw + gap : area.x, y: area.y, w: area.w - cw - gap, h: area.h };
+    } else {
+      const ch = area.h * 0.4; lPlaceImg(L, it, hero, { x: area.x, y: area.y + area.h - ch, w: area.w, h: ch }, true, H);
+      R = { x: area.x, y: area.y, w: area.w, h: area.h - ch - H * 0.02 };
+    }
+  }
+  const rest = flow.filter(j => j !== hero);
+  if (tree || relational || explicitRows) lFlow(L, items, rest, R, W, H, tree);
+  else lCompose(L, items, rest, R, W, H, port, o.k);
+  // strikes sit on the last matching picture / keyword before them
+  items.forEach((it, j) => {
+    if (it.kind !== 'strike') return;
+    for (let m = j - 1; m >= 0; m--) { const x = items[m]; if ((x.kind === 'img' && x.asset === it.target) || ((x.kind === 'text' || x.kind === 'title') && lId(x.text.replace(/\*/g, '')) === it.target)) { L.items[j] = { of: m }; return; } }
+    for (let m = j - 1; m >= 0; m--) if (items[m].kind === 'img') { L.items[j] = { of: m }; return; }
+  });
+  if (o.b.layout === 'tree' && titles.length) { const tb = L.items[titles[titles.length - 1]].box; L.tree = { x: W / 2, y: tb.y + tb.h * 0.95 }; }
+  RL.lay.set(ck, L); return L;
+}
+function lPlaceImg(L, it, j, cell, bottom, H) {
+  const fitL = it.label ? 100 * cell.w * 1.05 / Math.max(1, lMeasure(it.label, 100)) : 0;
+  const fsL = it.label ? Math.min(Math.max(cell.h * 0.13, H * 0.05), H * 0.075, fitL) : 0;   // labels never shrink to crumbs
+  const lab = it.label ? fsL * 1.35 : 0, aw = cell.w * 0.9, ah = (cell.h - lab) * 0.94, asp = lAspect(it);
+  let w = aw, h = w / asp; if (h > ah) { h = ah; w = h * asp; }
+  const blockH = h + lab, y = bottom ? cell.y + cell.h - blockH : cell.y + (cell.h - blockH) / 2;
+  L.items[j] = { box: { x: cell.x + (cell.w - w) / 2, y, w, h }, label: lab ? { y: y + h + lab * 0.55, fs: fsL } : null };
+}
+// a keyword gets the biggest size that fits; if that is too small it is wrapped onto two lines instead of shrinking
+function lTextFit(text, icon, cw, ch, H, big) {
+  const cap = H * (big ? 0.14 : 0.1), minFs = H * 0.06;
+  const fitW = t => 100 * cw * 0.94 / Math.max(1, lMeasure(t, 100) + (icon ? 115 : 0));
+  let t = String(text), ln = lLines(t).length, fs = Math.min(fitW(t), ch * 0.72 / ln, cap);
+  if (fs < minFs && ln === 1) {
+    const w = t.trim().split(/\s+/); let best = null;
+    for (let k = 1; k < w.length; k++) {
+      const a = w.slice(0, k).join(' '), b = w.slice(k).join(' '); if ((a.split('*').length - 1) % 2) continue;   // keep *red words* whole
+      const t2 = a + '|' + b, f = Math.min(fitW(t2), ch * 0.72 / 2, cap); if (!best || f > best.f) best = { t: t2, f };
+    }
+    if (best && best.f > fs) { t = best.t; fs = best.f; ln = 2; }
+  }
+  return { text: t, ln, fs: Math.max(fs, Math.min(minFs * 0.85, fitW(t) * 1.06)) };
+}
+// pictures get the big space; keywords get their own strip or column. The recipe changes with the board number,
+// so neighbouring boards look different (picture left / right, keywords above / below / beside).
+function lCompose(L, items, js, R, W, H, port, k) {
+  if (!js.length) return;
+  const pics = js.filter(j => items[j].kind === 'img'), words = js.filter(j => items[j].kind !== 'img'), gap = H * 0.025;
+  if (!pics.length) return lWordsStack(L, items, words, R, H);
+  if (!words.length) return lFlow(L, items, pics, R, W, H, false);
+  if (!port && pics.length === 1 && words.length <= 3) {   // one picture big on one side, keywords stacked beside it
+    // the keyword column is as wide as its words need at a good size; the picture takes the rest
+    const need = Math.max(...words.map(j => items[j].kind === 'text' ? lMeasure(items[j].text, H * 0.085) + (items[j].icon ? H * 0.1 : 0) : H * 0.12)) * 1.08;
+    const picLeft = k % 2 === 1, pw = clamp(R.w - need - gap, R.w * 0.36, R.w * 0.6);
+    lPlaceImg(L, items[pics[0]], pics[0], { x: picLeft ? R.x : R.x + R.w - pw, y: R.y, w: pw, h: R.h }, false, H);
+    lWordsStack(L, items, words, { x: picLeft ? R.x + pw + gap : R.x, y: R.y, w: R.w - pw - gap, h: R.h }, H);
+    return;
+  }
+  if (port) {   // tall video: keywords one under the other on top, pictures below
+    const wh = Math.min(R.h * 0.45, H * (0.075 * words.length + 0.02));
+    lWordsStack(L, items, words, { x: R.x, y: R.y, w: R.w, h: wh }, H);
+    return lFlow(L, items, pics, { x: R.x, y: R.y + wh + gap, w: R.w, h: R.h - wh - gap }, W, H, false);
+  }
+  const wh = Math.min(R.h * 0.3, H * (words.length > 3 ? 0.26 : 0.19)), top = Math.floor(k / 2) % 2 === 0;
+  lFlow(L, items, pics, { x: R.x, y: top ? R.y + wh + gap : R.y, w: R.w, h: R.h - wh - gap }, W, H, false);
+  lWordsRow(L, items, words, { x: R.x, y: top ? R.y : R.y + R.h - wh, w: R.w, h: wh }, H);
+}
+function lPlaceWord(L, items, j, cell, H) {
+  const it = items[j];
+  if (it.kind === 'text') return lPlaceText(L, it, j, cell, H);
+  const s = Math.min(cell.w * 0.8, cell.h * 0.7, H * 0.13);
+  L.items[j] = { cx: cell.x + cell.w / 2, cy: cell.y + cell.h / 2, s, box: { x: cell.x + cell.w / 2 - s / 2, y: cell.y + cell.h / 2 - s / 2, w: s, h: s } };
+}
+function lWordsStack(L, items, js, R, H) {   // keywords one under the other, centred in R
+  if (!js.length) return; const rh = Math.min(R.h / js.length, H * 0.2); let y = R.y + (R.h - rh * js.length) / 2;
+  js.forEach(j => { lPlaceWord(L, items, j, { x: R.x, y, w: R.w, h: rh }, H); y += rh; });
+}
+function lWordsRow(L, items, js, R, H) {      // keywords side by side in a strip (two lines when there are many)
+  if (!js.length) return; const rows = js.length > 3 ? [js.slice(0, Math.ceil(js.length / 2)), js.slice(Math.ceil(js.length / 2))] : [js], rh = R.h / rows.length;
+  rows.forEach((row, ri) => { const wt = row.map(j => lWeight(items[j])), tw = wt.reduce((a, b) => a + b, 0); let x = R.x;
+    row.forEach((j, m) => { const w = R.w * wt[m] / tw; lPlaceWord(L, items, j, { x, y: R.y + ri * rh, w, h: rh }, H); x += w; }); });
+}
+function lPlaceText(L, it, j, cell, H) {
+  const f = lTextFit(it.text, it.icon, cell.w, cell.h, H, it.big), fs = f.fs, cy = cell.y + cell.h / 2;
+  const tw2 = lMeasure(f.text, fs) + (it.icon ? fs * 1.15 : 0);
+  L.items[j] = { text: f.text, cx: cell.x + cell.w / 2 - (it.icon ? fs * 0.575 : 0), cy, fs, box: { x: cell.x + (cell.w - tw2) / 2, y: cy - fs * 0.6 * f.ln, w: tw2, h: fs * 1.2 * f.ln }, icon: it.icon ? { cx: cell.x + (cell.w + tw2) / 2 - fs * 0.5, cy, s: fs * 0.95 } : null };
+}
+// keywords that follow each other stack on top of each other (like "FORCE ✗ / WILLPOWER ✗"), never squeezed side by side
+const lRelUnit = (items, u) => !!u && !u.stack && items[u.js[0]].kind === 'icon' && ['equals', 'plus', 'vs', 'right', 'left'].includes(items[u.js[0]].icon);
+function lUnits(items, js, tree) {
+  const out = [], rel = u => lRelUnit(items, u);
+  for (const j of js) {
+    const it = items[j], last = out[out.length - 1];
+    // "A vs B": B stays on the line with A instead of starting a stack with what comes after it
+    if (!tree && it.kind === 'text' && last && last.stack && last.js.length < 3 && !rel(out[out.length - 2])) last.js.push(j);
+    else out.push({ stack: it.kind === 'text', js: [j] });
+  }
+  return out;
+}
+const lUnitW = (items, u) => u.stack ? Math.max(...u.js.map(j => lWeight(items[j]))) : lWeight(items[u.js[0]]);
+const lUnitH = (items, u) => u.stack ? Math.min(1, 0.42 * u.js.length + 0.15) : items[u.js[0]].kind === 'img' ? 1 : 0.5;
+function lFlow(L, items, js, R, W, H, tree) {
+  if (!js.length) return;
+  let rows;
+  if (js.some(j => items[j].row)) {
+    const m = new Map(); js.forEach(j => { const r = items[j].row || 1; if (!m.has(r)) m.set(r, []); m.get(r).push(j); });
+    rows = [...m.keys()].sort((a, b) => a - b).map(r => lUnits(items, m.get(r), tree));
+  } else {
+    const U = lUnits(items, js, tree);
+    if (H > W * 1.1 && !tree) {   // tall video (Shorts): stack the units, at most two side by side
+      const per = U.length <= 3 ? 1 : 2; rows = [];
+      U.forEach((u, m) => {
+        const last = rows[rows.length - 1];
+        if (last && lRelUnit(items, u) && last.length >= 2) rows.push([last.pop(), u]);   // "A → B" starts its own row
+        else if (last && (last.length < per || ((lRelUnit(items, u) || lRelUnit(items, U[m - 1])) && last.length < 3))) last.push(u);
+        else rows.push([u]);
+      });
+    } else {
+      const wt = U.map(u => lUnitW(items, u)), tot = wt.reduce((a, b) => a + b, 0);
+      const nr = tree ? 1 : U.length <= 3 ? 1 : U.length <= 6 ? 2 : 3;
+      rows = Array.from({ length: nr }, () => []); let acc = 0, prevR = 0;
+      U.forEach((u, m) => {
+        let r = Math.min(nr - 1, Math.floor((acc + wt[m] / 2) / (tot / nr)));
+        if (m && (lRelUnit(items, u) || lRelUnit(items, U[m - 1]))) r = prevR;   // "A = B", "A → B" never break across rows
+        r = Math.max(r, prevR); rows[r].push(u); prevR = r; acc += wt[m];
+      });
+      rows = rows.filter(r => r.length);
+    }
+  }
+  const hw = rows.map(r => Math.max(...r.map(u => lUnitH(items, u)))), hs = hw.reduce((a, b) => a + b, 0);
+  let y = R.y;
+  rows.forEach((row, ri) => {
+    const rh = R.h * hw[ri] / hs, wt = row.map(u => lUnitW(items, u)), tw = wt.reduce((a, b) => a + b, 0);
+    const unit = Math.min(R.w / tw, rh * 1.6);          // do not stretch a lonely item across the whole row
+    let x = R.x + (R.w - unit * tw) / 2;
+    row.forEach((u, m) => {
+      const cell = { x, y, w: unit * wt[m], h: rh }; x += cell.w;
+      if (u.stack) { const lh = cell.h / u.js.length; u.js.forEach((j, q) => lPlaceText(L, items[j], j, { x: cell.x, y: cell.y + q * lh, w: cell.w, h: lh }, H)); return; }
+      const j = u.js[0], it = items[j];
+      if (it.kind === 'img') lPlaceImg(L, it, j, cell, false, H);
+      else if (it.kind === 'icon') {
+        const s = Math.min(cell.w * 0.8, cell.h * 0.55, H * 0.17);
+        L.items[j] = { cx: cell.x + cell.w / 2, cy: cell.y + cell.h / 2, s, box: { x: cell.x + cell.w / 2 - s / 2, y: cell.y + cell.h / 2 - s / 2, w: s, h: s } };
+      }
+    });
+    y += rh;
+  });
+}
+
+/* ---- drawing ---- */
+function lBgCanvas(W, H) {
+  const kind = S.settings.lBg || 'parchment', key = `${kind}|${W}x${H}|${kind === 'custom' ? RL.bgVer : 0}`;
+  if (RL.bg.has(key)) return RL.bg.get(key);
+  const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d'), rnd = mulberry32(7), M = Math.max(W, H);
+  const grain = (amt, step = 1) => { const id = x.getImageData(0, 0, W, H), d = id.data; for (let p = 0; p < d.length; p += 4 * step) { const n = (rnd() - 0.5) * amt; d[p] += n; d[p + 1] += n; d[p + 2] += n; } x.putImageData(id, 0, 0); };
+  if (kind === 'custom' && RL.bgUser) drawCover(x, RL.bgUser, W, H, 1, 0.5, 0.5);
+  else if (kind === 'white') { x.fillStyle = '#ffffff'; x.fillRect(0, 0, W, H); }
+  else if (kind === 'paper' || kind === 'notebook' || kind === 'grid') {
+    x.fillStyle = kind === 'paper' ? '#f6f2e8' : '#fbfaf5'; x.fillRect(0, 0, W, H);
+    if (kind === 'notebook') { x.strokeStyle = 'rgba(70,120,200,0.28)'; x.lineWidth = Math.max(1, H / 600); for (let y = H * 0.12; y < H; y += H / 16) { x.beginPath(); x.moveTo(0, y); x.lineTo(W, y); x.stroke(); } x.strokeStyle = 'rgba(220,60,60,0.4)'; x.beginPath(); x.moveTo(W * 0.08, 0); x.lineTo(W * 0.08, H); x.stroke(); }
+    if (kind === 'grid') { x.strokeStyle = 'rgba(70,130,200,0.16)'; x.lineWidth = Math.max(1, H / 900); const st = H / 22; for (let gx = 0; gx < W; gx += st) { x.beginPath(); x.moveTo(gx, 0); x.lineTo(gx, H); x.stroke(); } for (let gy = 0; gy < H; gy += st) { x.beginPath(); x.moveTo(0, gy); x.lineTo(W, gy); x.stroke(); } }
+    grain(10, 1);
+    const v = x.createRadialGradient(W / 2, H / 2, M * 0.3, W / 2, H / 2, M * 0.75); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(90,70,40,0.16)'); x.fillStyle = v; x.fillRect(0, 0, W, H);
+  } else {   // parchment: warm paper, soft stains, burnt top and bottom edges
+    x.fillStyle = '#efe1c3'; x.fillRect(0, 0, W, H);
+    for (let k = 0; k < 70; k++) {
+      const cx = rnd() * W, cy = rnd() * H, r = M * (0.04 + rnd() * 0.2), dark = rnd() < 0.6;
+      const g = x.createRadialGradient(cx, cy, 0, cx, cy, r); g.addColorStop(0, dark ? `rgba(150,105,50,${0.03 + rnd() * 0.06})` : `rgba(255,250,235,${0.12 + rnd() * 0.18})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+      x.fillStyle = g; x.fillRect(cx - r, cy - r, r * 2, r * 2);
+    }
+    const band = (y0, y1, a) => { const g = x.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, `rgba(120,72,25,${a})`); g.addColorStop(0.45, `rgba(150,100,45,${a * 0.35})`); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0, Math.min(y0, y1), W, Math.abs(y1 - y0)); };
+    band(0, H * 0.16, 0.62); band(H, H * 0.84, 0.62);
+    const side = (x0, x1, a) => { const g = x.createLinearGradient(x0, 0, x1, 0); g.addColorStop(0, `rgba(120,72,25,${a})`); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(Math.min(x0, x1), 0, Math.abs(x1 - x0), H); };
+    side(0, W * 0.07, 0.35); side(W, W * 0.93, 0.35);
+    for (let k = 0; k < 60; k++) {   // uneven burns along the edges
+      const top = rnd() < 0.5, cx = rnd() * W, cy = top ? rnd() * H * 0.06 : H - rnd() * H * 0.06, r = M * (0.02 + rnd() * 0.06);
+      const g = x.createRadialGradient(cx, cy, 0, cx, cy, r); g.addColorStop(0, `rgba(105,62,20,${0.15 + rnd() * 0.25})`); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(cx - r, cy - r, r * 2, r * 2);
+    }
+    grain(16, 1);
+  }
+  if (RL.bg.size > 3) RL.bg.clear();
+  RL.bg.set(key, c); return c;
+}
+function lTextDraw(ctx, text, cx, cy, fs, allRed) {
+  const lines = lLines(text), lh = fs * 1.06; let y = cy - (lines.length - 1) * lh / 2;
+  ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  for (const line of lines) {
+    const runs = lRuns(line); let w = 0; for (const r of runs) { ctx.font = lFont(r.s, fs); w += ctx.measureText(r.s).width; }
+    let x = cx - w / 2;
+    for (const r of runs) { ctx.font = lFont(r.s, fs); ctx.fillStyle = r.red || allRed ? L_RED : L_INK; ctx.fillText(r.s, x, y + fs * 0.03); x += ctx.measureText(r.s).width; }
+    y += lh;
+  }
+}
+function lIcon(ctx, name, cx, cy, s) {
+  ctx.save(); ctx.translate(cx, cy); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const r = s / 2;
+  if (name === 'x' || name === 'check') {
+    ctx.fillStyle = name === 'x' ? '#e0262b' : '#1fa64a'; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = s * 0.14; ctx.beginPath();
+    if (name === 'x') { ctx.moveTo(-r * 0.42, -r * 0.42); ctx.lineTo(r * 0.42, r * 0.42); ctx.moveTo(r * 0.42, -r * 0.42); ctx.lineTo(-r * 0.42, r * 0.42); }
+    else { ctx.moveTo(-r * 0.45, 0.02 * r); ctx.lineTo(-r * 0.1, r * 0.36); ctx.lineTo(r * 0.5, -r * 0.34); }
+    ctx.stroke();
+  } else if (['right', 'left', 'down', 'up'].includes(name)) {
+    const rot = { right: 0, down: Math.PI / 2, left: Math.PI, up: -Math.PI / 2 }[name]; ctx.rotate(rot);
+    ctx.strokeStyle = ctx.fillStyle = name === 'down' ? '#e0262b' : name === 'up' ? '#1fa64a' : L_INK; ctx.lineWidth = s * 0.11;
+    ctx.beginPath(); ctx.moveTo(-r, 0); ctx.lineTo(r * 0.55, 0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(r, 0); ctx.lineTo(r * 0.35, -r * 0.42); ctx.lineTo(r * 0.35, r * 0.42); ctx.closePath(); ctx.fill();
+  } else if (name === 'equals' || name === 'plus') {
+    ctx.fillStyle = L_INK; const t = s * 0.13, L2 = s * 0.42;
+    if (name === 'equals') { ctx.fillRect(-L2, -t * 1.6, L2 * 2, t); ctx.fillRect(-L2, t * 0.6, L2 * 2, t); }
+    else { ctx.fillRect(-L2, -t / 2, L2 * 2, t); ctx.fillRect(-t / 2, -L2, t, L2 * 2); }
+  } else {
+    const ch = name === 'vs' ? 'VS' : name === 'question' ? '?' : '!';
+    ctx.fillStyle = name === 'vs' ? L_INK : L_RED; ctx.font = `400 ${s * (name === 'vs' ? 0.7 : 1)}px ${L_FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(ch, 0, s * 0.04);
+  }
+  ctx.restore();
+}
+function lPlaceholder(ctx, x, y, w, h, id) {
+  ctx.save(); ctx.strokeStyle = 'rgba(90,70,40,0.55)'; ctx.setLineDash([w * 0.04, w * 0.03]); ctx.lineWidth = Math.max(1.5, w * 0.012);
+  ctx.strokeRect(x + 2, y + 2, w - 4, h - 4); ctx.setLineDash([]);
+  const fs = Math.min(h * 0.1, w * 0.85 / Math.max(4, id.length * 0.55)); ctx.fillStyle = 'rgba(90,70,40,0.75)'; ctx.font = `600 ${fs}px "JetBrains Mono", monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(id, x + w / 2, y + h / 2);
+  ctx.restore();
+}
+function lAnimName(it) {
+  if (it.kind === 'strike') return 'draw';
+  if (it.anim && it.anim !== 'auto') return it.anim;
+  if (it.kind === 'icon' && ['x', 'check', 'question', 'exclaim'].includes(it.icon)) return 'stamp';
+  const g = S.settings.lEnter; if (g && g !== 'auto') return g;
+  if (it.kind === 'title') return 'wipe';
+  if (it.kind === 'icon') return ['right', 'left', 'down', 'up'].includes(it.icon) ? 'wipe' : 'pop';
+  if (lIsChar(it)) return 'slide';
+  return 'pop';
+}
+function lEnterFx(name, u) {
+  if (name === 'slide') { const p = clamp(u / 0.42, 0, 1); return { s: 1, dy: (1 - easeOutCubic(p)) * 0.55, a: clamp(u / 0.14, 0, 1), clip: 1 }; }
+  if (name === 'wipe' || name === 'draw') { const p = clamp(u / 0.45, 0, 1); return { s: 1, dy: 0, a: 1, clip: easeOutCubic(p) }; }
+  if (name === 'fade') { const p = clamp(u / 0.35, 0, 1); return { s: 0.96 + 0.04 * p, dy: 0, a: p, clip: 1 }; }
+  if (name === 'stamp') { const p = clamp(u / 0.24, 0, 1); return { s: 1.75 - 0.75 * easeOutCubic(p), dy: 0, a: clamp(u / 0.08, 0, 1), clip: 1 }; }
+  if (name === 'none') return { s: 1, dy: 0, a: 1, clip: 1 };
+  const p = clamp(u / 0.34, 0, 1); return { s: 0.2 + 0.8 * easeOutBack(p), dy: 0, a: clamp(u / 0.08, 0, 1), clip: 1 };   // pop
+}
+function lClip(ctx, b, clip, dir) {
+  if (clip >= 1) return; ctx.beginPath();
+  if (dir === 'down') ctx.rect(b.x - 4, b.y - 4, b.w + 8, (b.h + 8) * clip);
+  else if (dir === 'up') ctx.rect(b.x - 4, b.y + b.h + 4 - (b.h + 8) * clip, b.w + 8, (b.h + 8) * clip);
+  else if (dir === 'left') ctx.rect(b.x + b.w + 4 - (b.w + 8) * clip, b.y - 4, (b.w + 8) * clip, b.h + 8);
+  else ctx.rect(b.x - 4, b.y - 4, (b.w + 8) * clip, b.h + 8);
+  ctx.clip();
+}
+function lStrike(ctx, b, p) {
+  const e = b.w * 0.06, x0 = b.x - e, y0 = b.y - e, x1 = b.x + b.w + e, y1 = b.y + b.h + e;
+  ctx.save(); ctx.strokeStyle = L_RED; ctx.lineCap = 'round'; ctx.lineWidth = Math.max(4, Math.min(b.w, b.h) * 0.07);
+  const p1 = clamp(p * 2, 0, 1), p2 = clamp(p * 2 - 1, 0, 1);
+  if (p1 > 0) { ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + (x1 - x0) * p1, y0 + (y1 - y0) * p1); ctx.stroke(); }
+  if (p2 > 0) { ctx.beginPath(); ctx.moveTo(x1, y0); ctx.lineTo(x1 + (x0 - x1) * p2, y0 + (y1 - y0) * p2); ctx.stroke(); }
+  ctx.restore();
+}
+function lDrawItem(ctx, o, it, j, L, u, t, H) {
+  const Lj = L.items[j]; if (!Lj) return;
+  if (it.kind === 'strike') { const tb = L.items[Lj.of]?.box; if (tb) lStrike(ctx, tb, clamp(u / 0.45, 0, 1)); return; }
+  const fx = lEnterFx(lAnimName(it), u), b = Lj.box;
+  let s = fx.s, dy = fx.dy * b.h;
+  if (S.settings.lIdle !== 'off' && u > 0.45 && it.kind === 'img') { const ph = j * 1.7 + o.k; if (lIsChar(it)) s *= 1 + 0.01 * Math.sin(t * 2.3 + ph); else dy += Math.sin(t * 1.9 + ph) * b.h * 0.012; }
+  ctx.save(); ctx.globalAlpha *= fx.a;
+  const px = b.x + b.w / 2, py = lIsChar(it) ? b.y + b.h : b.y + b.h / 2;   // characters grow from their feet
+  ctx.translate(px, py + dy); ctx.scale(s, s); ctx.translate(-px, -py);
+  if (it.kind === 'img') {
+    const full = Lj.label ? { x: b.x - b.w * 0.3, y: b.y, w: b.w * 1.6, h: (Lj.label.y + Lj.label.fs) - b.y } : b;
+    lClip(ctx, full, fx.clip);
+    const im = RL.img[it.asset];
+    if (im) ctx.drawImage(im, b.x, b.y, b.w, b.h); else lPlaceholder(ctx, b.x, b.y, b.w, b.h, it.asset);
+    if (Lj.label) lTextDraw(ctx, it.label, b.x + b.w / 2, Lj.label.y, Lj.label.fs);
+  } else if (it.kind === 'text' || it.kind === 'title') {
+    lClip(ctx, b, fx.clip);
+    lTextDraw(ctx, Lj.text || it.text, Lj.cx, Lj.cy, Lj.fs);
+  } else if (it.kind === 'icon') {
+    lClip(ctx, b, fx.clip, it.icon);
+    lIcon(ctx, it.icon, Lj.cx, Lj.cy, Lj.s);
+  }
+  ctx.restore();
+  if (it.kind === 'text' && Lj.icon && u > 0.18) {   // the ✗ / ✓ after a keyword stamps in a moment later
+    const f2 = lEnterFx('stamp', u - 0.18); ctx.save(); ctx.globalAlpha *= f2.a; ctx.translate(Lj.icon.cx, Lj.icon.cy); ctx.scale(f2.s, f2.s); lIcon(ctx, it.icon, 0, 0, Lj.icon.s); ctx.restore();
+  }
+}
+function lDrawBoard(ctx, o, t, W, H, opt = {}) {
+  const L = lLayout(o, W, H); ctx.save();
+  if (opt.alpha != null) ctx.globalAlpha = clamp(opt.alpha, 0, 1);
+  if (opt.dx) ctx.translate(opt.dx, 0);
+  let z = 1; if (S.settings.lCam !== 'off') z = 1 + 0.035 * easeInOut(clamp((t - o.t0) / Math.max(0.5, o.t1 - o.t0), 0, 1));
+  if (opt.shrink != null) z *= opt.shrink;
+  if (z !== 1) { ctx.translate(W / 2, H / 2); ctx.scale(z, z); ctx.translate(-W / 2, -H / 2); }
+  if (L.tree) {   // arrows from the title down to each item
+    ctx.save(); ctx.strokeStyle = ctx.fillStyle = L_INK; ctx.lineWidth = Math.max(2, H * 0.005); ctx.lineCap = 'round';
+    o.items.forEach((it, j) => {
+      if (it.kind === 'title' || it.kind === 'strike' || !L.items[j] || t < it.t) return;
+      const b = L.items[j].box, ex = b.x + b.w / 2, ey = b.y - H * 0.025, my = L.tree.y + (ey - L.tree.y) * 0.35, p = clamp((t - it.t) / 0.3, 0, 1);
+      const pts = [[L.tree.x, L.tree.y], [L.tree.x, my], [ex, my], [ex, ey]], segs = [my - L.tree.y, Math.abs(ex - L.tree.x), ey - my], tot = segs[0] + segs[1] + segs[2];
+      let left = tot * p; ctx.beginPath(); ctx.moveTo(...pts[0]);
+      for (let k = 0; k < 3 && left > 0; k++) { const f = Math.min(1, left / Math.max(1e-6, segs[k])); ctx.lineTo(pts[k][0] + (pts[k + 1][0] - pts[k][0]) * f, pts[k][1] + (pts[k + 1][1] - pts[k][1]) * f); left -= segs[k]; }
+      ctx.stroke();
+      if (p >= 1) { const a = H * 0.018; ctx.beginPath(); ctx.moveTo(ex, ey + a * 0.4); ctx.lineTo(ex - a * 0.7, ey - a); ctx.lineTo(ex + a * 0.7, ey - a); ctx.closePath(); ctx.fill(); }
+    });
+    ctx.restore();
+  }
+  o.items.forEach((it, j) => { const u = t - it.t; if (u >= 0) lDrawItem(ctx, o, it, j, L, u, t, H); });
+  ctx.restore();
+}
+function lDrawFrame(ctx, W, H, t) {
+  ctx.drawImage(lBgCanvas(W, H), 0, 0);
+  if (!S.segments.length) return;
+  const B = lResolve().boards;
+  if (!B.length) {
+    ctx.save(); ctx.fillStyle = 'rgba(90,65,35,0.8)'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `700 ${Math.round(H * 0.05)}px "Baloo 2", sans-serif`; ctx.fillText('Layered video', W / 2, H * 0.44);
+    ctx.font = `500 ${Math.round(H * 0.032)}px "Hind", sans-serif`; ctx.fillText('Make the plan in the Layers tab', W / 2, H * 0.53); ctx.restore();
+  } else {
+    let k = 0; for (let j = 0; j < B.length; j++) if (B[j].t0 <= t) k = j;
+    const o = B[k], u = t - o.t0, tr = S.settings.lTrans || 'cut';
+    if (k > 0 && tr === 'fade' && u < 0.3) { lDrawBoard(ctx, B[k - 1], t, W, H, { alpha: 1 - u / 0.3 }); lDrawBoard(ctx, o, t, W, H, { alpha: u / 0.3 }); }
+    else if (k > 0 && tr === 'slide' && u < 0.45) { const e = easeInOut(u / 0.45); lDrawBoard(ctx, B[k - 1], t, W, H, { dx: -e * W }); lDrawBoard(ctx, o, t, W, H, { dx: (1 - e) * W }); }
+    else if (k > 0 && tr === 'pop' && u < 0.2) { const e = u / 0.2; lDrawBoard(ctx, B[k - 1], t, W, H, { shrink: 1 - 0.6 * e, alpha: 1 - e }); lDrawBoard(ctx, o, t, W, H); }
+    else lDrawBoard(ctx, o, t, W, H);
+  }
+  if (S.settings.lCaps === 'on') { const i = sceneAt(t); if (i >= 0) { const st = S.starts[i], cs = S.settings.captions; S.settings.captions = 'bottom'; try { drawCaption(ctx, W, H, S.segments[i].text, t - st, { band: 0, ph: H }, segEnd(i) - st); } finally { S.settings.captions = cs; } } }
+}
+
+/* ---- cutting pictures out of a sticker sheet, removing the white ---- */
+function lBorderStats(d, w, h) {
+  const bs = []; for (let i = 0; i < w; i++) { bs.push(i, (h - 1) * w + i); } for (let j = 1; j < h - 1; j++) { bs.push(j * w, j * w + w - 1); }
+  const med = ch => { const v = bs.map(p => d[p * 4 + ch]).sort((a, b) => a - b); return v[v.length >> 1]; };
+  const r = med(0), g = med(1), b = med(2), lum = bs.map(p => (d[p * 4] + d[p * 4 + 1] + d[p * 4 + 2]) / 3).sort((a, b2) => a - b2);
+  return { bs, r, g, b, l: (r + g + b) / 3, lo: lum[Math.floor(lum.length * 0.08)], light: (r + g + b) / 3 > 170 };
+}
+function lCanvas(w, h) { const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h)); return c; }
+function lCutout(src, mode, maxSide = 900) {
+  const k = Math.min(1, maxSide / Math.max(src.width, src.height)), w = Math.max(1, Math.round(src.width * k)), h = Math.max(1, Math.round(src.height * k));
+  const c = lCanvas(w, h), x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(src, 0, 0, w, h);
+  if (mode === 'none') return c;
+  const id = x.getImageData(0, 0, w, h), d = id.data, N = w * h, B = lBorderStats(d, w, h);
+  const thr = Math.max(165, Math.min(B.l, B.lo) - 16);
+  const isBg = p => { const o = p * 4, r = d[o], g = d[o + 1], b = d[o + 2]; if (B.light) return Math.max(r, g, b) - Math.min(r, g, b) < 30 && (r + g + b) / 3 >= thr; const dr = r - B.r, dg = g - B.g, db = b - B.b; return dr * dr + dg * dg + db * db < 2300; };
+  // flood fill the background from the border
+  const out = new Uint8Array(N), st = new Int32Array(N); let sp = 0;
+  for (const p of B.bs) if (!out[p] && isBg(p)) { out[p] = 1; st[sp++] = p; }
+  while (sp) {
+    const p = st[--sp], px = p % w;
+    if (px > 0 && !out[p - 1] && isBg(p - 1)) { out[p - 1] = 1; st[sp++] = p - 1; }
+    if (px < w - 1 && !out[p + 1] && isBg(p + 1)) { out[p + 1] = 1; st[sp++] = p + 1; }
+    if (p >= w && !out[p - w] && isBg(p - w)) { out[p - w] = 1; st[sp++] = p - w; }
+    if (p < N - w && !out[p + w] && isBg(p + w)) { out[p + w] = 1; st[sp++] = p + w; }
+  }
+  const br = Math.max(1, B.r), bgc = Math.max(1, B.g), bb = Math.max(1, B.b);
+  const c2a = o => { const r = d[o], g = d[o + 1], b = d[o + 2]; const aN = Math.max((br - r) / br, (bgc - g) / bgc, (bb - b) / bb, 0); const ch = Math.max(r, g, b) - Math.min(r, g, b); const a = Math.max(aN, clamp((ch - 30) / 60, 0, 1)); return a < 0.06 ? 0 : Math.min(1, a * 1.08); };
+  for (let p = 0; p < N; p++) {
+    const o = p * 4; let a;
+    if (out[p]) a = 0;
+    else if (mode === 'outer' || !B.light) {
+      const px = p % w; a = 1;
+      if ((px > 0 && out[p - 1]) || (px < w - 1 && out[p + 1]) || (p >= w && out[p - w]) || (p < N - w && out[p + w])) a = B.light ? Math.max(0.35, c2a(o)) : 0.6;
+    } else a = c2a(o);   // line art: white and light grey become see-through, ink and colours stay
+    if (a > 0 && a < 1 && B.light) { d[o] = clamp((d[o] - br * (1 - a)) / a, 0, 255); d[o + 1] = clamp((d[o + 1] - bgc * (1 - a)) / a, 0, 255); d[o + 2] = clamp((d[o + 2] - bb * (1 - a)) / a, 0, 255); }
+    d[o + 3] = Math.round(a * 255);
+  }
+  x.putImageData(id, 0, 0);
+  // crop to the drawing (ignore lonely specks)
+  const colS = new Uint32Array(w), rowS = new Uint32Array(h);
+  for (let p = 0; p < N; p++) if (d[p * 4 + 3] > 40) { colS[p % w]++; rowS[(p / w) | 0]++; }
+  const mc = Math.max(1, h * 0.004), mr = Math.max(1, w * 0.004);
+  let x0 = 0; while (x0 < w && colS[x0] < mc) x0++; let x1 = w - 1; while (x1 > x0 && colS[x1] < mc) x1--;
+  let y0 = 0; while (y0 < h && rowS[y0] < mr) y0++; let y1 = h - 1; while (y1 > y0 && rowS[y1] < mr) y1--;
+  if (x0 >= x1 || y0 >= y1) return c;
+  const pad = Math.round(Math.max(w, h) * 0.015); x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(w - 1, x1 + pad); y1 = Math.min(h - 1, y1 + pad);
+  const o2 = lCanvas(x1 - x0 + 1, y1 - y0 + 1); o2.getContext('2d').drawImage(c, x0, y0, o2.width, o2.height, 0, 0, o2.width, o2.height);
+  return o2;
+}
+function lCrop(src, x, y, w, h, maxSide = 1400) {
+  x = clamp(Math.floor(x), 0, src.width - 1); y = clamp(Math.floor(y), 0, src.height - 1); w = clamp(Math.ceil(w), 1, src.width - x); h = clamp(Math.ceil(h), 1, src.height - y);
+  const k = Math.min(1, maxSide / Math.max(w, h)), c = lCanvas(w * k, h * k); c.getContext('2d').drawImage(src, x, y, w, h, 0, 0, c.width, c.height); return c;
+}
+function lBestCut(prof, ex, rad) {   // the middle of the empty gap nearest to the expected cut
+  const a = Math.max(1, Math.round(ex - rad)), b = Math.min(prof.length - 2, Math.round(ex + rad));
+  let best = null;
+  for (let x = a; x <= b; x++) { if (prof[x] > 0) continue; let e = x; while (e + 1 <= b && prof[e + 1] === 0) e++; const mid = (x + e) / 2, score = (e - x + 1) * 2 - Math.abs(mid - ex); if (!best || score > best.score) best = { mid, score }; x = e; }
+  if (best) return best.mid;
+  let m = a; for (let x = a; x <= b; x++) if (prof[x] < prof[m] || (prof[x] === prof[m] && Math.abs(x - ex) < Math.abs(m - ex))) m = x; return m;
+}
+function lSplit(bmp, cols, rows, k) {
+  const W = bmp.width, H = bmp.height; if (k <= 1) return [lCrop(bmp, 0, 0, W, H)];
+  const s = Math.min(1, 300 / Math.max(W, H)), w = Math.max(8, Math.round(W * s)), h = Math.max(8, Math.round(H * s));
+  const c = lCanvas(w, h), x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(bmp, 0, 0, w, h);
+  const d = x.getImageData(0, 0, w, h).data, B = lBorderStats(d, w, h), N = w * h, ink = new Uint8Array(N);
+  for (let p = 0; p < N; p++) { const o = p * 4, dr = d[o] - B.r, dg = d[o + 1] - B.g, db = d[o + 2] - B.b; ink[p] = dr * dr + dg * dg + db * db > 1800 ? 1 : 0; }
+  // 1) separate drawings = separate blobs (after joining strokes that are close together)
+  const r = Math.max(2, Math.round(Math.max(w, h) * 0.022)), tmp = new Uint8Array(N), dil = new Uint8Array(N);
+  for (let yy = 0; yy < h; yy++) { let cnt = 0; for (let xx = -r; xx < w; xx++) { if (xx + r < w && ink[yy * w + xx + r]) cnt++; if (xx - r - 1 >= 0 && ink[yy * w + xx - r - 1]) cnt--; if (xx >= 0) tmp[yy * w + xx] = cnt > 0 ? 1 : 0; } }
+  for (let xx = 0; xx < w; xx++) { let cnt = 0; for (let yy = -r; yy < h; yy++) { if (yy + r < h && tmp[(yy + r) * w + xx]) cnt++; if (yy - r - 1 >= 0 && tmp[(yy - r - 1) * w + xx]) cnt--; if (yy >= 0) dil[yy * w + xx] = cnt > 0 ? 1 : 0; } }
+  const lab = new Int32Array(N), comps = [], stk = new Int32Array(N);
+  for (let p0 = 0; p0 < N; p0++) {
+    if (!dil[p0] || lab[p0]) continue;
+    const id = comps.length + 1, cp = { x0: w, y0: h, x1: 0, y1: 0, n: 0 }; let sp = 0; stk[sp++] = p0; lab[p0] = id;
+    while (sp) { const p = stk[--sp], px = p % w, py = (p - px) / w; cp.n++; if (px < cp.x0) cp.x0 = px; if (px > cp.x1) cp.x1 = px; if (py < cp.y0) cp.y0 = py; if (py > cp.y1) cp.y1 = py;
+      for (const q of [px > 0 ? p - 1 : -1, px < w - 1 ? p + 1 : -1, py > 0 ? p - w : -1, py < h - 1 ? p + w : -1]) if (q >= 0 && dil[q] && !lab[q]) { lab[q] = id; stk[sp++] = q; } }
+    comps.push(cp);
+  }
+  const big = comps.filter(cp => cp.n > N * 0.006);
+  let boxes;
+  if (big.length === k) {
+    big.forEach(cp => { cp.cx = (cp.x0 + cp.x1) / 2; cp.cy = (cp.y0 + cp.y1) / 2; });
+    big.sort((a, b) => a.cy - b.cy); const ordered = [];
+    for (let rr = 0, at = 0; rr < rows && at < big.length; rr++) { const cnt = Math.min(cols, big.length - at); ordered.push(...big.slice(at, at + cnt).sort((a, b) => a.cx - b.cx)); at += cnt; }
+    const pad = Math.max(w, h) * 0.008;
+    boxes = ordered.map(cp => ({ x: (cp.x0 - pad) / s, y: (cp.y0 - pad) / s, w: (cp.x1 - cp.x0 + 1 + 2 * pad) / s, h: (cp.y1 - cp.y0 + 1 + 2 * pad) / s }));
+  } else {
+    // 2) otherwise cut along the empty gaps nearest to an even grid
+    const colP = new Uint32Array(w), rowP = new Uint32Array(h);
+    for (let p = 0; p < N; p++) if (ink[p]) { colP[p % w]++; rowP[(p / w) | 0]++; }
+    const xs = [0]; for (let i = 1; i < cols; i++) xs.push(lBestCut(colP, w * i / cols, w / cols * 0.4)); xs.push(w);
+    const ys = [0]; for (let i = 1; i < rows; i++) ys.push(lBestCut(rowP, h * i / rows, h / rows * 0.4)); ys.push(h);
+    boxes = []; for (let j = 0; j < k; j++) { const ri = Math.floor(j / cols), ci = j % cols; boxes.push({ x: xs[ci] / s, y: ys[ri] / s, w: (xs[ci + 1] - xs[ci]) / s, h: (ys[ri + 1] - ys[ri]) / s }); }
+  }
+  return boxes.map(b => lCrop(bmp, b.x, b.y, b.w, b.h));
+}
+const lBlob = c => new Promise(res => c.toBlob(b => b ? res(b) : c.toBlob(res, 'image/png'), 'image/webp', 0.94));
+async function lProcess(a) {
+  if (!a.raw) return; const bmp = await createImageBitmap(a.raw);
+  const c = lCutout(bmp, a.cut || 'auto'); try { bmp.close(); } catch (_) {}
+  a.png = await lBlob(c); RL.img[a.id] = c; RL.ver++;
+}
+function lAfterPicture(msg) {
+  const nx = lNextSheet(); lTarget = nx != null ? { sheet: nx } : null;
+  RL.ver++; lRender(); renderStatus(); drawPreview(); save();
+  toast(msg + (nx == null ? ' · all pictures done!' : ` · next ${PK} goes to sheet ${nx + 1}`));
+}
+async function lPlaceSheet(k, blob) {
+  const sh = lSheets()[k]; if (!sh) return toast('Make the plan first');
+  let bmp; try { bmp = await createImageBitmap(blob); } catch (_) { return toast('Could not open this image'); }
+  const cells = lSplit(bmp, sh.cols, sh.rows, sh.ids.length); try { bmp.close(); } catch (_) {}
+  for (let j = 0; j < sh.ids.length; j++) { const a = lAsset(sh.ids[j]); if (!a || !cells[j]) continue; a.raw = await lBlob(cells[j]); await lProcess(a); }
+  lAfterPicture(`Sheet ${k + 1}: ${sh.ids.length} picture${sh.ids.length > 1 ? 's' : ''} cut out`);
+}
+async function lSetAssetImage(id, blob) {
+  const a = lAsset(id); if (!a) return;
+  let bmp; try { bmp = await createImageBitmap(blob); } catch (_) { return toast('Could not open this image'); }
+  a.raw = await lBlob(lCrop(bmp, 0, 0, bmp.width, bmp.height)); try { bmp.close(); } catch (_) {}
+  await lProcess(a); lAfterPicture(`Picture "${id}" added`);
+}
+async function lPasteBlob(blob) {
+  if (!S.layers.assets.length) return toast('Make the plan first (Layers tab, step 1)');
+  const t = lTarget && (lTarget.asset ? lAsset(lTarget.asset) : lSheets()[lTarget.sheet]) ? lTarget : (lNextSheet() != null ? { sheet: lNextSheet() } : null);
+  if (!t) return toast('All pictures are done. Click a sheet or a picture first to replace it.');
+  if (t.asset) return lSetAssetImage(t.asset, blob);
+  return lPlaceSheet(t.sheet, blob);
+}
+async function lClipImage() {
+  try {
+    if (APP) { const r = AndroidBridge.clipboardImage(); if (r) { const k = r.indexOf(';'); return new Blob([Uint8Array.from(atob(r.slice(k + 1)), c => c.charCodeAt(0))], { type: r.slice(0, k) }); } toast('No image copied. In ChatGPT/Gemini use Share → Stickman Studio, or Choose file…'); return null; }
+    if (!navigator.clipboard || !navigator.clipboard.read) throw new Error('no clipboard');
+    for (const it of await navigator.clipboard.read()) { const t = it.types.find(x => x.startsWith('image/')); if (t) return await it.getType(t); }
+    toast('No image on the clipboard. Copy the image first, or use Choose file…'); return null;
+  } catch (_) { toast(TOUCH ? 'This browser did not share the copied image. Save it and use Choose file…' : 'Could not read the clipboard. Press Ctrl+V instead, or use Choose file…'); return null; }
+}
+
+/* ---- sound effects (made in the app, no files) + music that ducks under the voice ---- */
+const SFX_BANKS = new WeakMap();
+function lBandNoise(d, sr, rnd, f0, f1) {
+  let lp = 0, bp = 0; const q = 0.8;
+  for (let i = 0; i < d.length; i++) { const p = i / d.length, f = f0 + (f1 - f0) * p, F = 2 * Math.sin(Math.PI * Math.min(f, sr / 6) / sr), xn = rnd() * 2 - 1, hp = xn - lp - q * bp; bp += F * hp; lp += F * bp; d[i] = bp * Math.pow(Math.sin(Math.PI * Math.pow(p, 0.55)), 2); }
+}
+function sfxBank(actx) {
+  if (SFX_BANKS.has(actx)) return SFX_BANKS.get(actx);
+  const sr = actx.sampleRate, rnd = mulberry32(11);
+  const mk = (dur, fn) => { const n = Math.ceil(dur * sr), b = actx.createBuffer(1, n, sr), d = b.getChannelData(0); fn(d); let pk = 0; for (let i = 0; i < n; i++) pk = Math.max(pk, Math.abs(d[i])); if (pk) for (let i = 0; i < n; i++) d[i] *= 0.9 / pk; return b; };
+  const bank = {
+    pop: mk(0.14, d => { let ph = 0; for (let i = 0; i < d.length; i++) { const t = i / sr, f = 240 + 820 * Math.exp(-t * 36); ph += 2 * Math.PI * f / sr; d[i] = Math.sin(ph) * Math.exp(-t * 28) * Math.min(1, t * 900); } }),
+    swish: mk(0.26, d => lBandNoise(d, sr, rnd, 900, 4200)),
+    whoosh: mk(0.42, d => lBandNoise(d, sr, rnd, 300, 1700)),
+    paper: mk(0.2, d => lBandNoise(d, sr, rnd, 2600, 1200)),
+    ding: mk(0.7, d => { for (let i = 0; i < d.length; i++) { const t = i / sr; d[i] = (Math.sin(2 * Math.PI * 1318.5 * t) + 0.55 * Math.sin(2 * Math.PI * 1975.5 * t) + 0.2 * Math.sin(2 * Math.PI * 2637 * t)) * Math.exp(-t * 7) * Math.min(1, t * 500); } }),
+    wrong: mk(0.38, d => { for (let i = 0; i < d.length; i++) { const t = i / sr, k = t < 0.17 ? 0 : 1, lt = t - k * 0.19; if (lt < 0) { d[i] = 0; continue; } const f = k ? 220 : 294; d[i] = (2 / Math.PI) * Math.asin(Math.sin(2 * Math.PI * f * lt)) * Math.exp(-lt * 13) * Math.min(1, lt * 300); } }),
+    tick: mk(0.07, d => { for (let i = 0; i < d.length; i++) { const t = i / sr; d[i] = (rnd() * 2 - 1) * Math.exp(-t * 140) * 0.5 + Math.sin(2 * Math.PI * 1900 * t) * Math.exp(-t * 80); } })
+  };
+  SFX_BANKS.set(actx, bank); return bank;
+}
+function lSfxEvents() {
+  if (!isLayers() || S.settings.sfx === 'off' || !S.segments.length) return [];
+  const ev = [];
+  lResolve().boards.forEach((o, k) => {
+    if (k > 0) ev.push({ t: o.t0, s: 'paper', v: 0.35 });
+    o.items.forEach(it => {
+      let s = 'pop', v = 0.8;
+      if (it.kind === 'text' || it.kind === 'title') { s = 'swish'; v = 0.65; }
+      else if (it.kind === 'icon') { s = it.icon === 'check' ? 'ding' : it.icon === 'x' ? 'wrong' : ['right', 'left', 'down', 'up'].includes(it.icon) ? 'whoosh' : 'tick'; v = 0.7; }
+      else if (it.kind === 'strike') { s = 'wrong'; v = 0.8; }
+      else if (lIsChar(it)) { s = 'whoosh'; v = 0.5; }
+      ev.push({ t: it.t, s, v });
+      if (it.kind === 'text' && it.icon) ev.push({ t: it.t + 0.18, s: it.icon === 'check' ? 'ding' : 'wrong', v: 0.6 });
+    });
+  });
+  return ev;
+}
+const sfxLive = { ctx: null, nodes: [] };
+function sfxStop() { sfxLive.nodes.forEach(n => { try { n.stop(); } catch (_) {} }); sfxLive.nodes = []; }
+function sfxStart() {
+  sfxStop(); if (exporting || vo.paused) return; const ev = lSfxEvents(); if (!ev.length) return;
+  try {
+    const c = sfxLive.ctx || (sfxLive.ctx = new (window.AudioContext || window.webkitAudioContext)()); if (c.state === 'suspended') c.resume();
+    const bank = sfxBank(c), now = vo.currentTime, base = c.currentTime + 0.03 - now;
+    for (const e of ev) { if (e.t < now - 0.01) continue; const src = c.createBufferSource(); src.buffer = bank[e.s]; const g = c.createGain(); g.gain.value = S.settings.sfxVol * e.v; src.connect(g).connect(c.destination); src.start(Math.max(c.currentTime, base + e.t)); sfxLive.nodes.push(src); }
+  } catch (_) {}
+}
+vo.addEventListener('play', sfxStart); vo.addEventListener('pause', sfxStop); vo.addEventListener('seeked', () => { if (!vo.paused) sfxStart(); }); vo.addEventListener('ended', sfxStop);
+let duckEnv = null;
+function duckCurve() {
+  if (!audioBuf) return null; if (duckEnv && duckEnv.buf === audioBuf) return duckEnv;
+  const d = audioBuf.getChannelData(0), sr = audioBuf.sampleRate, hop = 0.05, HP = Math.floor(sr * hop), n = Math.ceil(d.length / HP), rms = new Float32Array(n);
+  for (let k = 0; k < n; k++) { let s = 0, c = 0; for (let i = k * HP, e = Math.min(d.length, (k + 1) * HP); i < e; i += 4) { s += d[i] * d[i]; c++; } rms[k] = Math.sqrt(s / Math.max(1, c)); }
+  const so = Float32Array.from(rms).sort(), thr = (so[Math.floor(n * 0.9)] || 0) * 0.16, g = new Float32Array(n);
+  let cur = 1, hold = 0;
+  for (let k = 0; k < n; k++) { const talk = rms[Math.min(n - 1, k + 2)] > thr || rms[k] > thr; if (talk) hold = 8; else if (hold > 0) hold--; const tgt = hold > 0 ? 0.38 : 1; cur += (tgt - cur) * (tgt < cur ? 0.45 : 0.1); g[k] = cur; }
+  duckEnv = { buf: audioBuf, hop, g }; return duckEnv;
+}
+function musicGainAt(t) {
+  const D = duration(); let v = S.settings.musicVol;
+  if (S.settings.duck !== 'off') { const e = duckCurve(); if (e) v *= e.g[clamp(Math.floor(t / e.hop), 0, e.g.length - 1)]; v *= clamp(t / 1.5, 0, 1) * clamp((D - t) / 2.5, 0, 1); }
+  return v;
+}
+function musicCurve(D) { const n = Math.max(2, Math.ceil(D * 20) + 1), c = new Float32Array(n); for (let k = 0; k < n; k++) c[k] = musicGainAt(k / 20); return c; }
+
+/* ---- Gemini: plan and pictures straight from the app (optional) ---- */
+async function lGemModel(kind) {
+  if (!RL.models) { const j = await gemFetch('/models?pageSize=200'); RL.models = (j.models || []).filter(m => (m.supportedGenerationMethods || []).includes('generateContent')).map(m => m.name.replace(/^models\//, '')); }
+  const ver = s => { const m = s.match(/(\d+(?:\.\d+)?)/); return m ? +m[1] : 0; };
+  let c = kind === 'image' ? RL.models.filter(n => /gemini/i.test(n) && /image/i.test(n)) : RL.models.filter(n => /^gemini/i.test(n) && !/tts|image|embed|aqa|live|audio|native|robotics|computer|learnlm/i.test(n));
+  if (kind === 'text') { const f = c.filter(n => /flash/i.test(n) && !/lite/i.test(n)); if (f.length) c = f; }
+  c.sort((a, b) => ver(b) - ver(a) || (/preview|exp/.test(a) - /preview|exp/.test(b)) || a.length - b.length);
+  if (!c.length) throw new Error(kind === 'image' ? 'this key has no Gemini image model' : 'no Gemini text model found for this key');
+  return c[0];
+}
+const lGemText = j => (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
+function lBusy(on, info) { $('#lStop').hidden = !on; $('#lAutoPlan').disabled = on; $('#lGemImages').disabled = on; if (info != null) $('#lImgInfo').textContent = info; }
+
+/* ---- UI ---- */
+function lApplyMode() {
+  const L = isLayers(); document.documentElement.classList.toggle('mode-layers', L);
+  $$('input[name=vmode]').forEach(r => r.checked = r.value === (L ? 'layers' : 'grid'));
+  const order = L ? ['script', 'layers', 'sync', 'video'] : ['script', 'prompts', 'grids', 'sync', 'video'];
+  $$('nav.tabs button').forEach(b => { const k = order.indexOf(b.dataset.tab); b.hidden = k < 0; const n = b.querySelector('.n'); if (n && k >= 0) n.textContent = k + 1; });
+  $('#lBgRow').hidden = S.settings.lBg !== 'custom';
+}
+function lThumb(cv, id) {
+  const x = cv.getContext('2d'), W = cv.width, H = cv.height; x.drawImage(lBgCanvas(W, H), 0, 0);
+  const im = RL.img[id];
+  if (!im) { lPlaceholder(x, W * 0.1, H * 0.1, W * 0.8, H * 0.8, 'waiting'); return; }
+  const k = Math.min(W * 0.9 / im.width, H * 0.9 / im.height), w = im.width * k, h = im.height * k; x.drawImage(im, (W - w) / 2, (H - h) / 2, w, h);
+}
+function lItemLabel(it) {
+  if (it.kind === 'img') return `🖼 ${esc(it.asset)}${it.label ? ` “${esc(it.label)}”` : ''}`;
+  if (it.kind === 'title') return `<b>${esc(it.text.replace(/\*/g, ''))}</b>`;
+  if (it.kind === 'text') return `“${esc(it.text.replace(/\*/g, ''))}”${it.icon === 'x' ? ' ✗' : it.icon === 'check' ? ' ✓' : ''}`;
+  if (it.kind === 'strike') return `✗ over ${esc(it.target)}`;
+  return { x: '✗', check: '✓', right: '→', left: '←', down: '↓', up: '↑', equals: '=', plus: '+', vs: 'VS', question: '?', exclaim: '!' }[it.icon] || esc(it.icon);
+}
+function lRender() {
+  if (!$('#lSheets')) return;
+  $('#lHero').placeholder = L_HERO; $('#lArt').placeholder = L_ART;
+  const A = S.layers.assets, done = A.filter(a => a.png).length, sh = lSheets();
+  $('#lCount').textContent = `${done} / ${A.length} pictures`; $('#lBar').style.width = A.length ? (100 * done / A.length) + '%' : '0';
+  const el = $('#lSheets');
+  el.innerHTML = !sh.length ? '<div class="panel"><p class="hint" style="margin:0">No pictures yet: make the plan first (step 1). Each sheet prompt then asks for up to 6 pictures in one image.</p></div>'
+    : sh.map(s => {
+      const ok = lSheetDone(s), cur = lTarget && lTarget.sheet === s.index;
+      return `<div class="batch${cur ? ' current' : ''}" data-lcard="${s.index}" id="lsheet-${s.index}"><div class="batch-h"><h3>Sheet ${s.index + 1} · ${s.ids.length} picture${s.ids.length > 1 ? 's' : ''}</h3><span class="chip ${ok ? 'ok' : 'wait'}">${ok ? 'done' : 'waiting'}</span><span class="chip sel sel-only">Selected · ${PK} goes here</span>
+        <button class="btn small primary" data-lcopy="${s.index}">Copy prompt</button><button class="btn small" data-lpaste="${s.index}">Paste image</button><button class="btn small" data-lpick="${s.index}">Choose file…</button></div>
+        <div class="ltiles">${s.ids.map(id => { const a = lAsset(id), tc = lTarget && lTarget.asset === id; return `<div class="ltile${a.png ? ' has' : ''}${tc ? ' current' : ''}" data-ltile="${esc(id)}"><canvas data-lthumb="${esc(id)}" width="240" height="160"></canvas><div class="nm">${esc(id)} <small>${a.type === 'char' ? 'character' : 'object'}${tc ? ` · ${PK} replaces it` : ''}</small></div><textarea rows="2" data-lprompt="${esc(id)}" aria-label="Picture description">${esc(a.prompt)}</textarea><div class="acts"><select data-lcut="${esc(id)}" title="Background removal" aria-label="Background removal"><option value="auto">Remove white (line art)</option><option value="outer">Remove only the outside</option><option value="none">Keep as it is</option></select><button class="btn small" data-lone="${esc(id)}">Single prompt</button><button class="btn small" data-lrep="${esc(id)}">Replace…</button>${a.png ? `<button class="btn small danger" data-ldel="${esc(id)}">Remove</button>` : ''}</div></div>`; }).join('')}</div>
+        <details class="ptext"><summary>Show the prompt</summary><pre class="prompt">${esc(lSheetPrompt(s))}</pre></details></div>`;
+    }).join('');
+  el.querySelectorAll('[data-lcut]').forEach(s => { s.value = lAsset(s.dataset.lcut)?.cut || 'auto'; });
+  el.querySelectorAll('canvas[data-lthumb]').forEach(c => lThumb(c, c.dataset.lthumb));
+  // boards
+  const res = lResolve(), bl = $('#lBoards');
+  bl.innerHTML = !res.boards.length ? '<p class="hint" style="margin:0">No boards yet.</p>' : res.boards.map((o, k) => {
+    const i1 = k < res.boards.length - 1 ? res.boards[k + 1].i0 : S.segments.length;
+    return `<div class="lboard"><div class="lb-h"><b>Board ${k + 1}</b><span class="tc">${fmt(o.t0)} – ${fmt(o.t1)}</span><button class="btn small" data-lplay="${k}">▶ Preview</button></div><div class="lb-txt">${esc(S.segments.slice(o.i0, i1).map(s => plain(s.text)).join(' '))}</div><div class="lb-items">${o.items.map((it, j) => `<span class="litem">${lItemLabel(it)} <span class="tc">${fmt(it.t)}</span><button class="x" data-lidel="${k}:${j}" title="Remove this item" aria-label="Remove">×</button></span>`).join('')}</div></div>`;
+  }).join('');
+  lUpdateTarget();
+}
+function lUpdateTarget() {
+  $$('[data-lcard]').forEach(el => el.classList.toggle('current', !!lTarget && lTarget.sheet === +el.dataset.lcard));
+  $$('[data-ltile]').forEach(el => el.classList.toggle('current', !!lTarget && lTarget.asset === el.dataset.ltile));
+  if (curTab !== 'layers') return;
+  const badge = $('#pasteBadge'), nx = lNextSheet(), t = lTarget || (nx != null ? { sheet: nx } : null), sh = t && t.sheet != null ? lSheets()[t.sheet] : null;
+  badge.hidden = TOUCH || !t || (!sh && !t.asset);
+  if (sh) badge.innerHTML = `${PK} → Sheet ${sh.index + 1}<small>${sh.ids.length} pictures${lSheetDone(sh) ? ' · replaces them' : ''}</small>`;
+  else if (t && t.asset) badge.innerHTML = `${PK} → ${esc(t.asset)}<small>one picture${lAsset(t.asset)?.png ? ' · replaces it' : ''}</small>`;
+}
+async function lRestore(pl) {
+  S.layers = { assets: [], boards: [], hero: '', art: '', bgBlob: null, ...(pl || {}) };
+  S.layers.assets = (S.layers.assets || []).filter(a => a && a.id); S.layers.boards = S.layers.boards || [];
+  RL.img = {}; RL.res = null; RL.lay.clear(); RL.bgUser = null; RL.bgVer++; RL.ver++; lTarget = null;
+  for (const a of S.layers.assets) if (a.png) { try { const b = await createImageBitmap(a.png); const c = lCanvas(b.width, b.height); c.getContext('2d').drawImage(b, 0, 0); RL.img[a.id] = c; b.close && b.close(); } catch (_) {} }
+  if (S.layers.bgBlob) { try { RL.bgUser = await createImageBitmap(S.layers.bgBlob); } catch (_) {} }
+  $('#lHero').value = S.layers.hero || ''; $('#lArt').value = S.layers.art || '';
+  $('#lBgInfo').textContent = S.layers.bgBlob ? 'Own picture in use' : '';
+}
+async function lPack(L, conv) {   // project file: blobs <-> data URLs
+  if (!L) return L;
+  return { ...L, bgBlob: L.bgBlob ? await conv(L.bgBlob) : null, assets: await Promise.all((L.assets || []).map(async a => ({ ...a, raw: a.raw ? await conv(a.raw) : null, png: a.png ? await conv(a.png) : null }))) };
+}
+
+$$('input[name=vmode]').forEach(r => r.addEventListener('change', () => {
+  if (!r.checked) return; S.settings.mode = r.value; lApplyMode(); RL.res = null;
+  renderStatus(); drawPreview(); save();
+  toast(isLayers() ? 'Layered explainer: next, open the Layers tab' : 'Grid images: next, open the Image Prompts tab');
+}));
+['lBg', 'lTrans', 'lEnter', 'lIdle', 'lCam', 'lCaps', 'sfx', 'sfxVol'].forEach(k => { const el = $('#' + k); el && el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => {
+  RL.lay.clear(); if (k === 'lBg') { $('#lBgRow').hidden = S.settings.lBg !== 'custom'; if (S.settings.lBg === 'custom' && !RL.bgUser) $('#lBgPick').click(); if (curTab === 'layers') lRender(); }
+  if ((k === 'sfx' || k === 'sfxVol') && !vo.paused) sfxStart();
+}); });
+$('#lBgPick').onclick = async () => { const [f] = await pickFile($('#lBgFile')); if (!f) return; try { RL.bgUser = await createImageBitmap(f); S.layers.bgBlob = f; RL.bgVer++; $('#lBgInfo').textContent = f.name; drawPreview(); if (curTab === 'layers') lRender(); save(); } catch (_) { toast('Could not open this image'); } };
+$('#lHero').addEventListener('input', e => { S.layers.hero = e.target.value; save(); });
+$('#lArt').addEventListener('input', e => { S.layers.art = e.target.value; save(); });
+$('#lHero').addEventListener('change', () => lRender()); $('#lArt').addEventListener('change', () => lRender());
+$('#lGemKey').addEventListener('input', e => { VP.gemKey = e.target.value.trim(); saveVP(); RL.models = null; });
+$('#lCopyPlan').onclick = () => { if (!S.segments.length) return toast('Create scenes first (step 1)'); copyText(lPlanPrompt()); $('#lPlanInfo').textContent = 'Plan prompt copied. Paste it into ChatGPT / Claude / Gemini, then paste the reply above and press Apply plan.'; };
+$('#lApplyPlan').onclick = () => { try { $('#lPlanInfo').textContent = 'Plan applied: ' + lApplyPlan(lParseJSON($('#lPlanReply').value)); } catch (e) { $('#lPlanInfo').textContent = 'Could not use this reply: ' + e.message; } };
+$('#lQuickPlan').onclick = () => { try { const p = lQuickPlan(); $('#lPlanReply').value = JSON.stringify(p, null, 1); $('#lPlanInfo').textContent = 'Quick plan: ' + lApplyPlan(p) + '. For richer boards use Gemini or the plan prompt.'; } catch (e) { $('#lPlanInfo').textContent = e.message; } };
+$('#lAutoPlan').onclick = async () => {
+  if (!S.segments.length) return toast('Create scenes first (step 1)');
+  if (!(VP.gemKey || '').trim()) { $('#lGemKey').focus(); return toast('Paste your Gemini API key first (free at aistudio.google.com/apikey)'); }
+  gemStop = false; lBusy(true, ''); const info = $('#lPlanInfo');
+  try {
+    info.textContent = 'Finding a Gemini model…'; const m = await lGemModel('text');
+    info.textContent = `Gemini (${m}) is planning ${S.segments.length} scenes… (about 20–90 s)`;
+    const j = await gemFetch(`/models/${m}:generateContent`, { contents: [{ role: 'user', parts: [{ text: lPlanPrompt() }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.6 } }, 300);
+    const txt = lGemText(j); $('#lPlanReply').value = txt;
+    info.textContent = `Plan by ${m}: ` + lApplyPlan(lParseJSON(txt));
+  } catch (e) { info.textContent = 'Gemini: ' + e.message + ' → you can still use "Copy plan prompt".'; }
+  lBusy(false);
+};
+$('#lGemImages').onclick = async () => {
+  if (!S.layers.assets.length) return toast('Make the plan first');
+  if (!(VP.gemKey || '').trim()) { $('#lGemKey').focus(); return toast('Paste your Gemini API key first'); }
+  const todo = lSheets().filter(s => !lSheetDone(s)); if (!todo.length) return toast('All pictures are done');
+  gemStop = false; lBusy(true, 'Finding a Gemini image model…');
+  try {
+    const m = await lGemModel('image');
+    for (const sh of todo) {
+      if (gemStop) break;
+      $('#lImgInfo').textContent = `Gemini (${m}) is drawing sheet ${sh.index + 1} of ${lSheets().length}…`;
+      const body = { contents: [{ role: 'user', parts: [{ text: lSheetPrompt(sh) }] }], generationConfig: { responseModalities: ['TEXT', 'IMAGE'], imageConfig: { aspectRatio: sh.ids.length === 1 ? '1:1' : '3:2' } } };
+      let j; try { j = await gemFetch(`/models/${m}:generateContent`, body, 300); } catch (e) { if (!/imageConfig|aspect/i.test(e.message)) throw e; delete body.generationConfig.imageConfig; j = await gemFetch(`/models/${m}:generateContent`, body, 300); }
+      const part = (j.candidates?.[0]?.content?.parts || []).map(p => p.inlineData || p.inline_data).find(d => d && /^image\//.test(d.mimeType || d.mime_type || ''));
+      if (!part) throw new Error(`no picture came back for sheet ${sh.index + 1}`);
+      await lPlaceSheet(sh.index, new Blob([Uint8Array.from(atob(part.data), c => c.charCodeAt(0))], { type: part.mimeType || part.mime_type }));
+    }
+    $('#lImgInfo').textContent = gemStop ? 'Stopped.' : 'Done. Check every picture; replace any bad one with Single prompt.';
+  } catch (e) { $('#lImgInfo').textContent = 'Gemini: ' + e.message + ' → copy the prompts into ChatGPT / Gemini instead.'; }
+  lBusy(false);
+};
+$('#lStop').onclick = () => { gemStop = true; try { gemAbort && gemAbort.abort(); } catch (_) {} };
+$('#lCopyNext').onclick = () => { const nx = lNextSheet(); if (nx == null) return toast(S.layers.assets.length ? 'All pictures are done' : 'Make the plan first'); copyText(lSheetPrompt(lSheets()[nx])); lTarget = { sheet: nx }; lUpdateTarget(); document.getElementById('lsheet-' + nx)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); };
+$('#lCopyAll').onclick = () => {
+  const sh = lSheets(); if (!sh.length) return toast('Make the plan first');
+  copyText(`(For your notes. ChatGPT and Gemini make only ONE image per message: paste ONE sheet prompt per message, wait for the image, then send the next one.)\n\n` + sh.map(s => `===== SHEET ${s.index + 1} =====\n${lSheetPrompt(s)}`).join('\n\n'));
+  $('#lImgInfo').textContent = 'All prompts copied, for your notes. Send them to ChatGPT / Gemini one sheet per message (Copy next prompt does exactly that).';
+};
+$('#lJsonLoad').onclick = () => { $('#lJson').value = JSON.stringify(lExportPlan(), null, 1); };
+$('#lJsonApply').onclick = () => { try { toast('Plan applied: ' + lApplyPlan(lParseJSON($('#lJson').value))); } catch (e) { toast('Could not apply: ' + e.message); } };
+$('#lJsonDl').onclick = () => download(new Blob([JSON.stringify(lExportPlan(), null, 1)], { type: 'application/json' }), safeName() + '-plan.json');
+setupDrop($('#lDrop'), async files => {
+  files = files.filter(f => f.type.startsWith('image/')).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  if (!S.layers.assets.length) return toast('Make the plan first');
+  let n = 0; for (const sh of lSheets()) { if (!files.length) break; if (lSheetDone(sh)) continue; await lPlaceSheet(sh.index, files.shift()); n++; }
+  toast(`${n} sheet image(s) added${files.length ? `, ${files.length} left over` : ''}`);
+}, $('#lFiles'), true);
+document.addEventListener('click', e => {   // choose where the next pasted picture goes
+  if (e.target.closest('summary, pre, input, label, textarea, select')) return;
+  const tile = e.target.closest('[data-ltile]'); if (tile) { lTarget = { asset: tile.dataset.ltile }; lUpdateTarget(); return; }
+  const card = e.target.closest('[data-lcard]'); if (card) { lTarget = { sheet: +card.dataset.lcard }; lUpdateTarget(); }
+}, true);
+document.addEventListener('click', async e => {
+  const b = e.target.closest('button'); if (!b) return; const d = b.dataset;
+  if (d.lcopy != null) copyText(lSheetPrompt(lSheets()[+d.lcopy]));
+  else if (d.lpaste != null) { const blob = await lClipImage(); if (blob) lPlaceSheet(+d.lpaste, blob); }
+  else if (d.lpick != null) { const [f] = await pickFile($('#oneFile')); if (f) lPlaceSheet(+d.lpick, f); }
+  else if (d.lone != null) { copyText(lSinglePrompt(d.lone)); lTarget = { asset: d.lone }; lUpdateTarget(); }
+  else if (d.lrep != null) { const [f] = await pickFile($('#oneFile')); if (f) lSetAssetImage(d.lrep, f); }
+  else if (d.ldel != null) { const a = lAsset(d.ldel); if (a) { a.raw = a.png = null; delete RL.img[a.id]; RL.ver++; lTarget = { asset: a.id }; lRender(); renderStatus(); drawPreview(); save(); } }
+  else if (d.lplay != null) { const o = lResolve().boards[+d.lplay]; if (o) { showTab('video'); vo.currentTime = o.t0; drawPreview(); } }
+  else if (d.lidel != null) {
+    const [k, j] = d.lidel.split(':').map(Number), o = lResolve().boards[k], it = o && o.items[j]; if (!it) return;
+    for (const bd of S.layers.boards) { const m = bd.items.indexOf(it.src); if (m >= 0) { bd.items.splice(m, 1); break; } }
+    S.layers.boards = S.layers.boards.filter(bd => bd.items.length); RL.ver++; lRender(); renderStatus(); drawPreview(); save();
+  }
+});
+document.addEventListener('change', async e => {
+  const t = e.target, d = t.dataset;
+  if (d.lcut != null) { const a = lAsset(d.lcut); if (!a) return; a.cut = t.value; if (a.raw) { await lProcess(a); lRender(); drawPreview(); } save(); }
+  if (d.lprompt != null) lRender();
+});
+document.addEventListener('input', e => { const d = e.target.dataset; if (d.lprompt != null) { const a = lAsset(d.lprompt); if (a) { a.prompt = e.target.value; save(); } } });
+$('#pasteBadge').onclick = () => {
+  if (curTab === 'layers') { const nx = lNextSheet(), t = lTarget || (nx != null ? { sheet: nx } : null); const el = t && (t.asset ? document.querySelector(`[data-ltile="${CSS.escape(t.asset)}"]`) : document.getElementById('lsheet-' + t.sheet)); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+  const id = (curTab === 'grids' ? 'gcard-' : 'batch-') + pasteTarget; const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+};
 
 /* ============ boot ============ */
 /* ============ AI voice (talks to the Colab voice server) ============ */
@@ -3147,6 +4299,7 @@ window.receiveSharedEnd = async (id, name, mime) => {
   const blob = new Blob(parts, { type: mime });
   if (mime.startsWith('image/')) {
     if (!S.segments.length) return toast('Create scenes first, then share the image again');
+    if (isLayers()) { if (curTab !== 'layers') showTab('layers'); return lPasteBlob(blob); }
     const gi = pasteTarget != null && pasteTarget < batches().length ? pasteTarget : nextPending();
     if (gi == null) return toast('All grid images are added. Tap a card first to replace its image.');
     if (curTab !== 'grids') showTab('prompts');
@@ -3177,7 +4330,7 @@ window.addEventListener('error', e => console.log('SSAPP-ERR ' + e.message + ' @
 (async function boot() {
   sizePreview();
   try { await DB.open(); } catch (_) {}
-  await loadVP(); vpToUI();
+  await loadVP(); vpToUI(); $('#lGemKey').value = VP.gemKey || '';
   let p = null; try { p = await DB.get('project'); } catch (_) {}
   if (p && (p.script || (p.segments && p.segments.length))) await restore(p);
   else {
