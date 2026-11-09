@@ -40,7 +40,7 @@ class MainActivity : ComponentActivity() {
                     val nav = rememberNavController()
                     val p = graph.store.profile
                     val start = when {
-                        p.name.isBlank() || p.apiKey.isBlank() -> "onboarding"
+                        p.name.isBlank() || p.activeKey.isBlank() -> "onboarding"
                         p.level.isBlank() -> "levelTest"
                         else -> "home"
                     }

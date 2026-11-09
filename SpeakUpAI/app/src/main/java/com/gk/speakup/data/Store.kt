@@ -35,6 +35,7 @@ class Store(context: Context) {
         val p = profile
         prefs.edit()
             .putString("name", p.name).putString("goal", p.goal).putString("apiKey", p.apiKey)
+            .putString("provider", p.provider).putString("geminiKey", p.geminiKey).putString("geminiModel", p.geminiModel)
             .putString("level", p.level).putBoolean("hinglish", p.hinglish).putString("persona", p.personaId)
             .putString("model", p.model).putString("accent", p.accent).putFloat("rate", p.speechRate)
             .putBoolean("handsFree", p.handsFree).putInt("dailyGoal", p.dailyGoalMin)
@@ -45,6 +46,10 @@ class Store(context: Context) {
         name = prefs.getString("name", "")!!,
         goal = prefs.getString("goal", "")!!,
         apiKey = prefs.getString("apiKey", "")!!,
+        // Existing users who already set a Claude key stay on Claude.
+        provider = prefs.getString("provider", null) ?: if (prefs.getString("apiKey", "").isNullOrBlank()) "gemini" else "claude",
+        geminiKey = prefs.getString("geminiKey", "")!!,
+        geminiModel = prefs.getString("geminiModel", "")!!,
         level = prefs.getString("level", "")!!,
         hinglish = prefs.getBoolean("hinglish", true),
         personaId = prefs.getString("persona", "emma")!!,

@@ -49,6 +49,8 @@ android {
 dependencies {
     // Claude (Anthropic) official Java/Kotlin SDK
     implementation("com.anthropic:anthropic-java:3.6.0")
+    // HTTP client for the Google Gemini REST API
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     implementation(platform("androidx.compose:compose-bom:2024.12.01"))
     implementation("androidx.compose.ui:ui")

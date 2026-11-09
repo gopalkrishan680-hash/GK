@@ -65,11 +65,11 @@ fun HomeScreen(nav: NavController) {
     }
 
     var daily by remember { mutableStateOf<JSONObject?>(null) }
-    LaunchedEffect(profile.level, profile.apiKey) {
+    LaunchedEffect(profile.level, profile.activeKey) {
         val cached = store.dailyCache()
         if (cached != null && cached.first == LocalDate.now().toEpochDay()) {
             daily = runCatching { JSONObject(cached.second) }.getOrNull()
-        } else if (profile.apiKey.isNotBlank()) {
+        } else if (profile.activeKey.isNotBlank()) {
             daily = runCatching {
                 withContext(Dispatchers.IO) {
                     graph.ai().askJson(

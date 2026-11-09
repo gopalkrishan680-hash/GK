@@ -54,9 +54,10 @@ fun SettingsScreen(nav: NavController) {
     var name by remember { mutableStateOf(p.name) }
     var goal by remember { mutableStateOf(p.goal) }
     var key by remember { mutableStateOf(p.apiKey) }
+    var gKey by remember { mutableStateOf(p.geminiKey) }
     var confirmReset by remember { mutableStateOf(false) }
 
-    fun save() = store.updateProfile { it.copy(name = name.trim(), goal = goal.trim(), apiKey = key.trim()) }
+    fun save() = store.updateProfile { it.copy(name = name.trim(), goal = goal.trim(), apiKey = key.trim(), geminiKey = gKey.trim()) }
 
     Scaffold(topBar = {
         TopAppBar(
@@ -116,18 +117,40 @@ fun SettingsScreen(nav: NavController) {
             }
             Gap()
             SectionCard {
-                Header("AI model & API key")
-                ModelRow(ClaudeService.MODEL_BEST, "Claude Opus 5.5 - best corrections (recommended)", p.model) {
-                    store.updateProfile { it.copy(model = ClaudeService.MODEL_BEST) }
+                Header("AI provider & API key")
+                ModelRow("gemini", "Google Gemini - FREE", p.provider) {
+                    save(); store.updateProfile { it.copy(provider = "gemini") }
                 }
-                ModelRow(ClaudeService.MODEL_FAST, "Claude Haiku 5.5 - faster replies, much cheaper", p.model) {
-                    store.updateProfile { it.copy(model = ClaudeService.MODEL_FAST) }
+                ModelRow("claude", "Claude (Anthropic) - paid, best corrections", p.provider) {
+                    save(); store.updateProfile { it.copy(provider = "claude") }
                 }
                 Gap(8.dp)
-                OutlinedTextField(
-                    key, { key = it.trim() }, label = { Text("Anthropic API key") }, singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth(),
-                )
+                if (p.usesGemini) {
+                    OutlinedTextField(
+                        gKey, { gKey = it.trim() }, label = { Text("Gemini API key (free)") }, singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        "Model: " + p.geminiModel.ifBlank { "auto (best free Flash model)" },
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Text(
+                        "Free key: aistudio.google.com → Get API key. Free limit poori ho jaye to thoda ruk kar ya agle din try karein.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                } else {
+                    ModelRow(ClaudeService.MODEL_BEST, "Claude Opus 5.5 - best corrections", p.model) {
+                        store.updateProfile { it.copy(model = ClaudeService.MODEL_BEST) }
+                    }
+                    ModelRow(ClaudeService.MODEL_FAST, "Claude Haiku 5.5 - faster, much cheaper", p.model) {
+                        store.updateProfile { it.copy(model = ClaudeService.MODEL_FAST) }
+                    }
+                    Gap(8.dp)
+                    OutlinedTextField(
+                        key, { key = it.trim() }, label = { Text("Anthropic API key") }, singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth(),
+                    )
+                }
                 Gap(8.dp)
                 Button(onClick = { save() }) { Text("Save") }
             }

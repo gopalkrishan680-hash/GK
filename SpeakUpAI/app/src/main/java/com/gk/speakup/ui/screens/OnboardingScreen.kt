@@ -26,6 +26,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -63,6 +64,8 @@ fun OnboardingScreen(onDone: () -> Unit) {
     var name by remember { mutableStateOf(graph.store.profile.name) }
     var selectedGoals by remember { mutableStateOf(setOf<String>()) }
     var apiKey by remember { mutableStateOf(graph.store.profile.apiKey) }
+    var geminiKey by remember { mutableStateOf(graph.store.profile.geminiKey) }
+    var provider by remember { mutableStateOf(graph.store.profile.provider) }
     var persona by remember { mutableStateOf(graph.store.profile.personaId) }
     val micLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
@@ -91,6 +94,7 @@ fun OnboardingScreen(onDone: () -> Unit) {
                 Gap(28.dp)
                 Feature("🎙️", "Bolo, aur AI real-time me sunega", "Talk out loud with a friendly AI character, just like a real conversation.")
                 Feature("✍️", "Har galti turant sudhregi", "Every mistake is corrected instantly, with a simple Hinglish explanation.")
+                Feature("🆓", "Free me chalaayein", "Works with a free Google Gemini API key - no card, no recharge.")
                 Feature("📊", "Aapke level ke hisaab se", "A quick speaking test finds your level (A1 to C2) and the AI adapts to you.")
                 Feature("🎭", "Real-life role-plays", "Job interviews, restaurants, airports, office meetings, IELTS and more.")
                 Feature("🔤", "Pronunciation, vocab & progress", "Pronunciation drills, a word notebook, mistake journal, streaks and XP.")
@@ -153,36 +157,70 @@ fun OnboardingScreen(onDone: () -> Unit) {
             }
 
             3 -> {
-                Title("Connect the AI", "The coach runs on Claude by Anthropic.")
-                SectionCard(container = MaterialTheme.colorScheme.secondaryContainer) {
-                    Text("API key kaise milegi:", fontWeight = FontWeight.Bold)
-                    Gap(6.dp)
-                    Text("1. console.anthropic.com par sign up karein\n2. Billing me thode credits add karein\n3. 'API Keys' me jaakar 'Create Key' dabayein\n4. Key copy karke yahan paste karein")
-                    TextButton(onClick = {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://console.anthropic.com/settings/keys")))
-                    }) { Text("Open console.anthropic.com") }
+                Title("Connect the AI", "Kaunsa AI use karna hai?")
+                ProviderOption(
+                    selected = provider == "gemini",
+                    title = "Google Gemini - FREE (recommended)",
+                    body = "Free key, card ki zaroorat nahi. Roz ki practice ke liye kaafi.",
+                ) { provider = "gemini" }
+                ProviderOption(
+                    selected = provider == "claude",
+                    title = "Claude (Anthropic) - paid",
+                    body = "Sabse achhe corrections. Credits recharge karne padte hain.",
+                ) { provider = "claude" }
+                Gap(12.dp)
+                if (provider == "gemini") {
+                    SectionCard(container = MaterialTheme.colorScheme.secondaryContainer) {
+                        Text("Free Gemini key kaise milegi:", fontWeight = FontWeight.Bold)
+                        Gap(6.dp)
+                        Text("1. Neeche button dabakar aistudio.google.com kholein\n2. Apne Gmail account se login karein\n3. 'Get API key' → 'Create API key' dabayein\n4. Key copy karke yahan paste karein")
+                        TextButton(onClick = {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://aistudio.google.com/app/apikey")))
+                        }) { Text("Open aistudio.google.com") }
+                    }
+                    Gap(12.dp)
+                    OutlinedTextField(
+                        value = geminiKey, onValueChange = { geminiKey = it.trim() },
+                        label = { Text("Gemini API key (AIza...)") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else {
+                    SectionCard(container = MaterialTheme.colorScheme.secondaryContainer) {
+                        Text("Claude API key kaise milegi:", fontWeight = FontWeight.Bold)
+                        Gap(6.dp)
+                        Text("1. console.anthropic.com par sign up karein\n2. Billing me thode credits add karein\n3. 'API Keys' me jaakar 'Create Key' dabayein\n4. Key copy karke yahan paste karein")
+                        TextButton(onClick = {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://console.anthropic.com/settings/keys")))
+                        }) { Text("Open console.anthropic.com") }
+                    }
+                    Gap(12.dp)
+                    OutlinedTextField(
+                        value = apiKey, onValueChange = { apiKey = it.trim() },
+                        label = { Text("Anthropic API key (sk-ant-...)") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
-                Gap(16.dp)
-                OutlinedTextField(
-                    value = apiKey, onValueChange = { apiKey = it.trim() },
-                    label = { Text("Anthropic API key (sk-ant-...)") },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    modifier = Modifier.fillMaxWidth(),
-                )
                 Gap(6.dp)
                 Text(
-                    "Key sirf aapke phone me save hoti hai aur seedha Anthropic ko jaati hai.",
+                    "Key sirf aapke phone me save hoti hai aur seedha AI company ko jaati hai.",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Gap(24.dp)
+                val keyOk = if (provider == "gemini") geminiKey.length > 20 else apiKey.length > 20
                 Button(
                     onClick = {
                         graph.store.updateProfile {
                             it.copy(
                                 name = name.trim(),
                                 goal = selectedGoals.joinToString(", "),
+                                provider = provider,
+                                geminiKey = geminiKey.trim(),
                                 apiKey = apiKey.trim(),
                                 personaId = persona,
                                 accent = Catalog.persona(persona).accent,
@@ -191,7 +229,7 @@ fun OnboardingScreen(onDone: () -> Unit) {
                         micLauncher.launch(Manifest.permission.RECORD_AUDIO)
                         onDone()
                     },
-                    enabled = apiKey.length > 20,
+                    enabled = keyOk,
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                 ) { Text("Start my level test") }
             }
@@ -208,6 +246,20 @@ private fun Title(title: String, sub: String) {
     Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
     Text(sub, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
     Gap(20.dp)
+}
+
+@Composable
+private fun ProviderOption(selected: Boolean, title: String, body: String, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().clickable { onClick() }.padding(vertical = 4.dp),
+    ) {
+        RadioButton(selected = selected, onClick = onClick)
+        Column {
+            Text(title, fontWeight = FontWeight.Bold)
+            Text(body, style = MaterialTheme.typography.bodySmall)
+        }
+    }
 }
 
 @Composable

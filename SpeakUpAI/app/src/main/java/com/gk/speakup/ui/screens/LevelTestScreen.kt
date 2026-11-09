@@ -39,9 +39,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.anthropic.models.messages.OutputConfig
 import com.gk.speakup.LocalGraph
 import com.gk.speakup.ai.ChatTurn
+import com.gk.speakup.ai.Effort
 import com.gk.speakup.ai.Prompts
 import com.gk.speakup.data.Catalog
 import com.gk.speakup.data.Store
@@ -97,7 +97,7 @@ fun LevelTestScreen(onFinished: () -> Unit, onSkip: () -> Unit) {
                 val json = withContext(Dispatchers.IO) {
                     graph.ai().askJson(
                         Prompts.levelSystem, listOf(ChatTurn(true, transcript)), Prompts.levelSchema,
-                        effort = OutputConfig.Effort.MEDIUM, maxTokens = 16000L,
+                        effort = Effort.MEDIUM, maxTokens = 16000L,
                     )
                 }
                 graph.store.saveLevel(Store.levelFromJson(json))

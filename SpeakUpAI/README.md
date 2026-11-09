@@ -2,7 +2,7 @@
 
 An Android app where you **speak English out loud** to an AI character. It listens in real time,
 replies with its voice, and **corrects your mistakes as you talk**, with simple Hinglish explanations.
-It runs on Claude (Anthropic).
+It works **free with a Google Gemini API key** (default), or with Claude (Anthropic, paid) for the best corrections.
 
 ## Features
 
@@ -27,16 +27,23 @@ It runs on Claude (Anthropic).
 1. Open the repo's **Releases** page on GitHub → **SpeakUp AI (latest build)** → download `SpeakUpAI.apk`.
    (Or **Actions** → *Build SpeakUp AI APK* → the latest run → artifact `SpeakUpAI-apk`.)
 2. Open the APK. Allow "Install unknown apps" if Android asks.
-3. You need an **Anthropic API key**: sign up at https://console.anthropic.com, add some credits under Billing,
-   then go to **API Keys → Create Key**. Paste the key in the app during setup.
+3. Get a **free Gemini API key**: open https://aistudio.google.com/app/apikey, log in with your Google account,
+   click **Create API key** and paste it in the app during setup. No card needed.
+   (Optional: choose **Claude** instead and use an Anthropic API key from https://console.anthropic.com, which needs prepaid credits.)
 4. Allow microphone permission. Speech recognition uses Google's speech service, so keep the Google app updated.
 
-## Cost / model
+## AI providers
 
-- Default model: **Claude Opus 5.5** (best corrections). Switch to **Claude Haiku 5.5** in Settings for faster and much cheaper replies.
-- Conversation turns run at low effort so replies come back quickly. The level test grading runs at medium effort.
-- Prompt caching is on, so long conversations cost less.
-- With Opus, the app turns on Anthropic's server-side refusal fallback: if a safety filter declines a message, the API automatically retries on another model.
+**Google Gemini (free, default)**
+- The free tier has per-minute and per-day request limits. If you hit one, the app says so; wait a minute (or until the next day).
+- The app picks the best free **Flash** model your key can use and switches to another Flash model if one hits its limit.
+- On the free tier Google may use your conversations to improve its products, so don't say anything private.
+
+**Claude (Anthropic, paid)**
+- Prepaid credits. Default model **Claude Opus 5.5** (best corrections); **Claude Haiku 5.5** is faster and much cheaper.
+- Prompt caching is on, and with Opus the app turns on Anthropic's server-side refusal fallback.
+
+Switch provider anytime in **Settings → AI provider & API key**.
 
 ## Build it yourself
 
@@ -53,6 +60,8 @@ Every push that changes `SpeakUpAI/` also builds the APK on GitHub Actions (`.gi
 
 ```
 app/src/main/java/com/gk/speakup/
+  ai/AiService.kt          Common interface for both providers
+  ai/GeminiService.kt      Google Gemini REST call (free tier), model auto-pick, JSON schema
   ai/ClaudeService.kt      Anthropic Java SDK call, structured JSON output, errors, caching
   ai/Prompts.kt            Tutor / examiner / report / pronunciation prompts + JSON schemas
   data/                    Profile, stats, vocab, mistakes (SharedPreferences)
@@ -61,5 +70,5 @@ app/src/main/java/com/gk/speakup/
                            Vocab, Mistakes, Progress, Settings
 ```
 
-Note: the API key is stored only on your phone (app-private storage) and is sent only to Anthropic.
+Note: API keys are stored only on your phone (app-private storage) and are sent only to Google or Anthropic.
 Don't share the APK with your key already entered.

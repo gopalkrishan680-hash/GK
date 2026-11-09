@@ -3,7 +3,10 @@ package com.gk.speakup.data
 data class Profile(
     val name: String = "",
     val goal: String = "",
-    val apiKey: String = "",
+    val provider: String = "gemini",   // "gemini" (free) or "claude"
+    val geminiKey: String = "",
+    val geminiModel: String = "",      // auto-detected best free model
+    val apiKey: String = "",           // Anthropic (Claude) key
     val level: String = "",            // CEFR level, blank until the level test is done
     val hinglish: Boolean = true,      // explain mistakes in Hinglish
     val personaId: String = "emma",
@@ -12,7 +15,10 @@ data class Profile(
     val speechRate: Float = 0.95f,
     val handsFree: Boolean = true,     // auto-listen again after the tutor speaks
     val dailyGoalMin: Int = 10,
-)
+) {
+    val usesGemini get() = provider != "claude"
+    val activeKey get() = if (usesGemini) geminiKey else apiKey
+}
 
 data class Correction(
     val original: String,

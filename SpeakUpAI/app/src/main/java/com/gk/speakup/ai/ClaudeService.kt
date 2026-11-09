@@ -26,7 +26,7 @@ class AiException(message: String) : Exception(message)
  * Every call asks Claude for JSON that matches a schema (structured outputs), so the
  * app can show corrections, scores and new words as proper UI instead of parsing prose.
  */
-class ClaudeService(apiKey: String, private val model: String) {
+class ClaudeService(apiKey: String, private val model: String) : AiService {
 
     private val client: AnthropicClient = AnthropicOkHttpClient.builder()
         .apiKey(apiKey)
@@ -37,12 +37,12 @@ class ClaudeService(apiKey: String, private val model: String) {
      * History is replayed as plain text turns only, so it stays append-only and stable
      * (good for prompt caching).
      */
-    fun askJson(
+    override fun askJson(
         system: String,
         history: List<ChatTurn>,
         schema: JSONObject,
-        effort: OutputConfig.Effort = OutputConfig.Effort.LOW,
-        maxTokens: Long = 8000L,
+        effort: Effort,
+        maxTokens: Long,
     ): JSONObject {
         require(history.isNotEmpty() && history.last().fromUser) { "Last turn must be from the user" }
 
@@ -54,7 +54,7 @@ class ClaudeService(apiKey: String, private val model: String) {
             .cacheControl(CacheControlEphemeral.builder().build())
             .outputConfig(
                 OutputConfig.builder()
-                    .effort(effort)
+                    .effort(if (effort == Effort.MEDIUM) OutputConfig.Effort.MEDIUM else OutputConfig.Effort.LOW)
                     .format(
                         JsonOutputFormat.builder()
                             .schema(schemaOf(schema))
@@ -99,11 +99,7 @@ class ClaudeService(apiKey: String, private val model: String) {
             .joinToString("")
             .trim()
         if (text.isEmpty()) throw AiException("AI se khaali jawab aaya. Dobara try karein.")
-        return try {
-            JSONObject(text)
-        } catch (e: Exception) {
-            throw AiException("AI ka jawab samajh nahi aaya. Dobara try karein.")
-        }
+        return parseJsonObject(text)
     }
 
     private fun schemaOf(schema: JSONObject): JsonOutputFormat.Schema {
