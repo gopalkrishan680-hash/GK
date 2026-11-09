@@ -1139,16 +1139,14 @@ function enhanceCanvas(src, tw, th) {
   if (w1 > src.width * 1.3) { const im = x1.getImageData(0, 0, w1, h1), bl = new Uint8ClampedArray(im.data.length); boxBlur(im.data, bl, w1, h1, 1); for (let i = 0; i < bl.length; i += 4) for (let c = 0; c < 3; c++) im.data[i + c] = (im.data[i + c] + bl[i + c]) >> 1; x1.putImageData(im, 0, 0); }
   // 2. up to the size it is shown at
   const c2 = mk(tw, th), x2 = c2.getContext('2d', { willReadFrequently: true }); x2.imageSmoothingQuality = 'high'; x2.drawImage(c1, 0, 0, tw, th);
-  // 3. unsharp mask, then push near-black to black and near-white to white (smooth ramps, colours kept)
+  // 3. unsharp mask on edges only; flat areas and colours stay as they are
   const im = x2.getImageData(0, 0, tw, th), D = im.data, bl = new Uint8ClampedArray(D.length), r = clamp(Math.round(tw / src.width), 1, 4);
   boxBlur(D, bl, tw, th, r); boxBlur(bl, bl, tw, th, r);
   for (let i = 0; i < D.length; i += 4) {
     let R0 = D[i], G0 = D[i + 1], B0 = D[i + 2];
     const dr = R0 - bl[i], dg = G0 - bl[i + 1], db = B0 - bl[i + 2];
     if (Math.abs(dr) + Math.abs(dg) + Math.abs(db) > 9) { R0 += 1.4 * dr; G0 += 1.4 * dg; B0 += 1.4 * db; }
-    const l = 0.299 * R0 + 0.587 * G0 + 0.114 * B0;
-    const dk = clamp((70 - l) / 50, 0, 1) * 0.6, lt = clamp((l - 212) / 30, 0, 1) * 0.85;
-    D[i] = (R0 * (1 - dk)) + (255 - R0 * (1 - dk)) * lt; D[i + 1] = (G0 * (1 - dk)) + (255 - G0 * (1 - dk)) * lt; D[i + 2] = (B0 * (1 - dk)) + (255 - B0 * (1 - dk)) * lt;
+    D[i] = R0; D[i + 1] = G0; D[i + 2] = B0;   // colours are kept exactly as drawn
   }
   x2.putImageData(im, 0, 0); return c2;
 }
@@ -1209,8 +1207,8 @@ const MOODS = {
   love: { label: 'Love', desc: 'push-in + hearts', cam: 'pushin', fig: 'breathe', fx: 'hearts' },
   excited: { label: 'Excited', desc: 'zoom punch + hop + sparkles', cam: 'punch', fig: 'hop', fx: 'sparkle' },
   shock: { label: 'Shock / suddenly', desc: 'zoom punch + shake + "!"', cam: 'punch', shake: 1, fig: 'jolt', fx: 'bang' },
-  sad: { label: 'Sad', desc: 'slow zoom out + tears, faded colour', cam: 'pullout', fig: 'droop', fx: 'tears', grade: 'sad' },
-  angry: { label: 'Angry', desc: 'shake + 💢, red edges', cam: 'gentle', tremble: 1, fig: 'tremble', fx: 'anger', grade: 'angry' },
+  sad: { label: 'Sad', desc: 'slow zoom out + tears', cam: 'pullout', fig: 'droop', fx: 'tears', grade: 'sad' },
+  angry: { label: 'Angry', desc: 'shake + 💢', cam: 'gentle', tremble: 1, fig: 'tremble', fx: 'anger', grade: 'angry' },
   fear: { label: 'Scared / tense', desc: 'push-in + trembling + sweat', cam: 'pushin', fig: 'tremble', fx: 'sweat', grade: 'dark' },
   question: { label: 'Question / thinking', desc: 'push-in + "?"', cam: 'pushin', fig: 'lean', fx: 'question' },
   fast: { label: 'Fast / running', desc: 'pan + speed lines', cam: 'pan', fig: 'run', fx: 'speed' },
@@ -1295,7 +1293,7 @@ function figLayer(src) {
       if (near / n >= 0.55 && x1 > x0 && y1 > y0) {
         for (let k = 0; k < D.length; k += 4) {
           const dr = D[k] - pr, dg = D[k + 1] - pg, db = D[k + 2] - pb, dd = Math.sqrt(dr * dr + dg * dg + db * db);
-          D[k + 3] = dd <= 16 ? 0 : dd >= 56 ? 255 : Math.round((dd - 16) * 6.375);
+          D[k + 3] = dd <= 9 ? 0 : dd >= 21 ? 255 : Math.round((dd - 9) * 21.25);
         }
         x.putImageData(im, 0, 0);
         const box = { x0: x0 / w, y0: y0 / h, x1: (x1 + step) / w, y1: (y1 + step) / h };
@@ -1332,6 +1330,7 @@ function figMotion(kind, lt, i, A) {
   return f;
 }
 function drawGrade(ctx, g, lt, A, W, H) {
+  return;   // the picture's own colours are always kept
   if (!g) return; const k = ease(lt / 0.6) * Math.min(1, A);
   ctx.save();
   if (g === 'sad') {
