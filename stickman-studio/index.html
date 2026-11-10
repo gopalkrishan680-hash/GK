@@ -457,7 +457,7 @@ html:not(.mode-layers) .layers-only { display: none !important; }
     <div class="row"><h3 style="margin-right:auto">2 · Pictures</h3><span class="chip" id="lCount">0 / 0 pictures</span></div>
     <div class="bar"><i id="lBar"></i></div>
     <ol class="hint">
-      <li>Press <b>Copy next prompt</b> and paste it into ChatGPT or Gemini. One prompt = one sticker sheet with up to 6 pictures on white. <b>Send only one sheet prompt per message</b>: if you paste all of them at once, ChatGPT keeps drawing sheet 1.</li>
+      <li>Press <b>Copy next prompt</b> and paste it into ChatGPT or Gemini. One prompt = one sticker sheet with up to 9 pictures on white (or 6, see <b>Pictures per sheet</b>). <b>Send only one sheet prompt per message</b>: if you paste all of them at once, ChatGPT keeps drawing sheet 1.</li>
       <li class="app-only">When the image is ready, open it and tap <b>Share → Stickman Studio</b>, or copy it and tap <b>Paste image</b>.</li>
       <li class="touch-only web-only">Copy the image (long-press → Copy), tap its sheet (it turns yellow), then tap <b>Paste image</b>. Or save it and use <b>Choose file…</b>.</li>
       <li class="kb-only">Copy the image (right-click → Copy image), click its sheet (it turns yellow) and press <kbd>Ctrl</kbd>+<kbd>V</kbd>.</li>
@@ -472,10 +472,22 @@ html:not(.mode-layers) .layers-only { display: none !important; }
       <button class="btn" id="lStop" hidden>Stop</button>
       <span class="hint" id="lImgInfo"></span>
     </div>
+    <div class="row">
+      <label class="f">Pictures per sheet <select id="lPer"><option value="9">9 (3×3) – fewer prompts, faster</option><option value="6">6 (3×2) – each picture sharper</option></select></label>
+    </div>
     <div class="drop" id="lDrop" tabindex="0" role="button"><strong>Drop several sheet images here at once</strong>They fill the empty sheets in file-name order</div>
     <input type="file" id="lFiles" accept="image/*" multiple hidden>
     <input type="file" id="lBgFile" accept="image/*" hidden>
   </div>
+  <details class="panel" id="libPanel">
+    <summary><b>My picture library</b> <span class="chip" id="libCount">0 pictures</span></summary>
+    <p class="hint">Every picture you cut out is kept here, inside the app's own memory (not in your gallery or files). When a new plan needs a picture you already have (same art style and main character, same kind, and the same name or a very similar name and description), it is used again and left out of the sheet prompts, so only the missing pictures are drawn. The plan prompt also tells the AI which pictures you have, so it can pick them.</p>
+    <div class="row"><label class="f">Use pictures from my library <select id="lLib"><option value="on">On</option><option value="off">Off</option></select></label>
+      <input type="search" id="libSearch" placeholder="Search, e.g. brain, sad, phone" aria-label="Search the library" style="flex:1 1 200px"></div>
+    <div class="ltiles" id="libGrid"></div>
+    <div class="row"><button class="btn small" id="libAddAll">Add this project's pictures</button><button class="btn small" id="libBackup" title="One file with every picture; keep it safe (e.g. Google Drive) for a new phone or a reinstall">Back up library (file)</button><button class="btn small" id="libRestore">Restore from a backup</button><button class="btn small danger" id="libClear">Empty the library</button></div>
+    <input type="file" id="libFile" accept=".json,application/json" hidden>
+  </details>
   <div class="batches" id="lSheets"></div>
   <div class="panel">
     <div class="row"><h3 style="margin-right:auto">3 · Boards</h3><span class="hint">▶ jumps to the board in the preview. × removes one item.</span></div>
@@ -752,7 +764,7 @@ He looked at Papa. Papa smiled, and said, "I am proud of you."`;
 
 /* ============ state ============ */
 const DEFAULTS = { title: '', aspect: '16:9', grid: 3, style: 'stickman', styleText: STYLES.stickman.text, characters: '', gutter: 'auto',
-  splitLevel: 'all', minWords: 2, maxWords: 14, captions: 'bar', fit: 'auto', enhance: 'on', v: 3, capSize: 1, motion: 6, transition: 'fade', transDur: 0.15, res: 1080, fps: 30, musicVol: 0.12, anim: 'on', animAmt: 1, capWords: 'on', pics: 'images', skStyle: 'chibi',
+  splitLevel: 'all', minWords: 2, maxWords: 14, captions: 'bar', fit: 'auto', enhance: 'on', v: 3, capSize: 1, motion: 6, transition: 'fade', transDur: 0.15, res: 1080, fps: 30, musicVol: 0.12, anim: 'on', animAmt: 1, capWords: 'on', pics: 'images', skStyle: 'chibi', lPer: 9, lLib: 'on',
   mode: 'layers', lBg: 'parchment', lEnter: 'auto', lTrans: 'cut', lIdle: 'subtle', lCam: 'on', lCaps: 'off', sfx: 'on', sfxVol: 0.5, duck: 'on' };
 try { if (matchMedia('(pointer: coarse)').matches) DEFAULTS.res = 720; } catch (_) {}   // phones: smaller, faster export
 const S = { settings: { ...DEFAULTS }, script: '', segments: [], starts: [], grids: [], overrides: {}, audioBlob: null, audioName: '', musicBlob: null, musicName: '' };
@@ -2532,8 +2544,8 @@ $('#loadChars').onclick = () => { const ta = $('#characters'); ta.value = (ta.va
 
 /* ============ settings binding ============ */
 const BIND = ['aspect', 'grid', 'style', 'styleText', 'characters', 'gutter', 'splitLevel', 'minWords', 'maxWords', 'captions', 'fit', 'enhance', 'capSize', 'motion', 'transition', 'transDur', 'res', 'fps', 'musicVol', 'anim', 'animAmt', 'capWords', 'pics', 'skStyle',
-  'lBg', 'lEnter', 'lTrans', 'lIdle', 'lCam', 'lCaps', 'sfx', 'sfxVol', 'duck'];
-const NUM = new Set(['grid', 'minWords', 'maxWords', 'capSize', 'motion', 'transDur', 'res', 'fps', 'musicVol', 'animAmt', 'sfxVol']);
+  'lBg', 'lEnter', 'lTrans', 'lIdle', 'lCam', 'lCaps', 'sfx', 'sfxVol', 'duck', 'lPer', 'lLib'];
+const NUM = new Set(['grid', 'minWords', 'maxWords', 'capSize', 'motion', 'transDur', 'res', 'fps', 'musicVol', 'animAmt', 'sfxVol', 'lPer']);
 function applySettingsToUI() { BIND.forEach(k => { const el = $('#' + k); if (el) el.value = S.settings[k]; }); $('#projTitle').value = S.settings.title || ''; lApplyMode(); }
 BIND.forEach(k => { const el = $('#' + k); if (!el) return; el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => {
   S.settings[k] = NUM.has(k) ? +el.value : el.value;
@@ -2541,6 +2553,7 @@ BIND.forEach(k => { const el = $('#' + k); if (!el) return; el.addEventListener(
   if (k === 'musicVol') music.volume = S.settings.musicVol;
   if (['enhance', 'fit', 'motion', 'captions', 'capSize', 'aspect'].includes(k)) enh.clear();
   if (k === 'anim' || k === 'pics' || k === 'skStyle') { renderScenes(); renderStatus(); }
+  if (k === 'lPer' || k === 'lLib') { lTarget = null; lRender(); renderStatus(); libRender(); }
   if (k === 'aspect') { sizePreview(); }
   if (['aspect', 'grid', 'gutter', 'style'].includes(k)) { R.grids.forEach((r, gi) => { if (r) { r.cells = null; } }); rebuildCache(); renderGridCards(); renderScenes(); renderStatus(); }
   if (['style', 'styleText', 'characters', 'gutter', 'aspect', 'grid'].includes(k)) renderPrompts();
@@ -2747,7 +2760,7 @@ async function restore(p) {
 /* ============ LAYERED EXPLAINER ============
    A paper background; cut-out pictures (stickman poses, objects), bold keywords and icons pop in one by one
    on the word where they are spoken. The screen is cleared at every new "board".
-   Plan (JSON, from Gemini / ChatGPT / Claude / offline) -> sticker sheets (up to 6 pictures per AI image)
+   Plan (JSON, from Gemini / ChatGPT / Claude / offline) -> sticker sheets (6 or 9 pictures per AI image)
    -> the app finds every picture on the sheet, cuts it out and removes the white -> layout + animation + SFX. */
 const L_ART = 'Simple hand-drawn doodle like a YouTube whiteboard explainer: clean bold black ink outlines with a slight hand-drawn wobble, simple cartoon line art with light pencil shading, flat accent colours used sparingly (red, soft pink, a little green or blue) only where they help. No gradients, no realistic painting, no 3D.';
 const L_HERO = 'a classic stickman: perfectly round head with a thin black outline and no hair, simple expressive face (dot eyes, eyebrows, mouth), thin single black lines for the body, arms and legs';
@@ -2774,12 +2787,91 @@ function lIconName(v) {
   return map[s] || map[s.replace(/[\s-]+/g, '_')] || '';
 }
 
+/* ---- picture library: every cut-out picture is kept on this device and used again in later projects ----
+   Index in DB key 'libIndex' (small), each picture in 'lib:<style>|<id>'. A picture is used again only for the
+   same art style + main character, and only for the same kind (character / object) with the same name, or a
+   name and description close enough (words compared after simple stemming). */
+const LIB = { list: [], ready: false };
+const LIB_STOP = new Set('a an the of with and in on at to for his her its their one two some very little big small simple sketch drawing side view front full body from head feet that this is are it as by or'.split(' '));
+function libToks(s) {
+  return [...new Set(String(s || '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(w => w.length > 1 && !LIB_STOP.has(w))
+    .map(w => w.length > 4 ? w.replace(/(ing|ed|es|s)$/, '') : w))];
+}
+const libJac = (a, b) => { if (!a.length || !b.length) return 0; const B = new Set(b); let n = 0; a.forEach(x => { if (B.has(x)) n++; }); return n / (a.length + b.length - n); };
+function libStyle() { const t = lArt() + '|' + lHero(); let h = 7; for (const ch of t) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h.toString(36); }
+async function libLoad() { try { const v = await DB.get('libIndex'); LIB.list = Array.isArray(v) ? v : []; } catch (_) { LIB.list = []; } LIB.ready = true; libRender(); }
+function libSaveIndex() { DB.put('libIndex', LIB.list).catch(() => {}); }
+async function libSave(a) {
+  if (!a || !a.png || S.settings.lLib === 'off' || !LIB.ready) return;
+  const style = libStyle(), key = style + '|' + a.id;
+  try { await DB.put('lib:' + key, a.png); } catch (_) { return; }
+  const m = { key, id: a.id, type: a.type, prompt: a.prompt, style, toks: libToks(a.id), ptoks: libToks(a.prompt), t: Date.now() };
+  const k = LIB.list.findIndex(x => x.key === key);
+  if (k >= 0) LIB.list[k] = { ...LIB.list[k], ...m }; else LIB.list.push({ ...m, n: 0 });
+  libSaveIndex(); libRender();
+}
+function libFind(a, taken) {
+  const style = libStyle(), it = libToks(a.id), pt = libToks(a.prompt); let best = null, bs = 0;
+  for (const m of LIB.list) {
+    if (m.style !== style || m.type !== a.type || taken.has(m.key)) continue;
+    let sc = 0;
+    if (m.id === a.id) sc = 3;
+    else { const ij = libJac(it, m.toks), pj = libJac(pt, m.ptoks); if (ij >= 0.999 || (ij >= 0.6 && pj >= 0.45)) sc = ij + pj; }
+    if (sc > bs) { bs = sc; best = m; }
+  }
+  return best;
+}
+async function libFill() {   // pictures the plan needs that the library already has
+  if (S.settings.lLib === 'off' || !LIB.list.length) return 0;
+  const taken = new Set(S.layers.assets.filter(a => a.lib).map(a => a.lib)); let n = 0;
+  for (const a of S.layers.assets) {
+    if (a.png) continue;
+    const m = libFind(a, taken); if (!m) continue;
+    let blob = null; try { blob = await DB.get('lib:' + m.key); } catch (_) {}
+    if (!blob) continue;
+    try { const b = await createImageBitmap(blob); const c = lCanvas(b.width, b.height); c.getContext('2d').drawImage(b, 0, 0); RL.img[a.id] = c; b.close && b.close(); } catch (_) { continue; }
+    a.png = blob; a.raw = null; a.lib = m.key; taken.add(m.key); m.n = (m.n || 0) + 1; n++;
+  }
+  if (n) { RL.ver++; libSaveIndex(); }
+  return n;
+}
+async function lApplyPlanLib(p) {
+  const msg = lApplyPlan(p), n = await libFill();
+  if (n) { lTarget = null; lRender(); renderStatus(); drawPreview(); save(); }
+  return msg + (n ? ` · ${n} picture${n > 1 ? 's' : ''} taken from your library (not on the sheets)` : '');
+}
+function libPromptList() {   // tells the AI which pictures already exist, so it can reuse their ids
+  if (S.settings.lLib === 'off') return '';
+  const style = libStyle(), mine = LIB.list.filter(m => m.style === style); if (!mine.length) return '';
+  const words = new Set(libToks(S.segments.map(x => plain(x.text)).join(' ')));
+  const rank = m => m.toks.filter(t => words.has(t)).length * 3 + m.ptoks.filter(t => words.has(t)).length + (m.n || 0) * 0.2;
+  const top = [...mine].sort((a, b) => rank(b) - rank(a)).slice(0, 120);
+  return `\nPICTURES I ALREADY HAVE (already drawn, no need to draw them again). When one of them fits an idea, use its exact id in "show" and list it in "assets" with the same id and type. Create new assets only for ideas none of these cover:\n${top.map(m => `- ${m.id} (${m.type === 'char' ? 'character' : 'object'}): ${m.prompt}`).join('\n')}\n`;
+}
+async function libThumb(cv, key) {
+  let blob = null; try { blob = await DB.get('lib:' + key); } catch (_) {}
+  const x = cv.getContext('2d'); x.fillStyle = '#f4efe3'; x.fillRect(0, 0, cv.width, cv.height); if (!blob) return;
+  try { const b = await createImageBitmap(blob); const k = Math.min(cv.width / b.width, cv.height / b.height) * 0.92; x.drawImage(b, (cv.width - b.width * k) / 2, (cv.height - b.height * k) / 2, b.width * k, b.height * k); b.close && b.close(); } catch (_) {}
+}
+function libRender() {
+  const el = $('#libGrid'); if (!el) return;
+  const style = LIB.ready ? libStyle() : '', mine = LIB.list.filter(m => m.style === style).length;
+  $('#libCount').textContent = `${LIB.list.length} picture${LIB.list.length === 1 ? '' : 's'}${LIB.list.length && mine !== LIB.list.length ? ` · ${mine} in this art style` : ''}`;
+  if (!$('#libPanel').open) return;
+  const q = libToks($('#libSearch').value);
+  const list = LIB.list.filter(m => !q.length || q.every(w => m.toks.some(t => t.startsWith(w)) || m.ptoks.some(t => t.startsWith(w)))).sort((a, b) => (b.t || 0) - (a.t || 0));
+  el.innerHTML = list.slice(0, 90).map(m => `<div class="ltile has"><canvas data-libthumb="${esc(m.key)}" width="200" height="140"></canvas><div class="nm">${esc(m.id)} <small>${m.type === 'char' ? 'character' : 'object'}${m.style !== style ? ' · other art style' : ''}${m.n ? ` · used ${m.n}×` : ''}</small></div><div class="acts"><button class="btn small danger" data-libdel="${esc(m.key)}">Remove</button></div></div>`).join('')
+    + (list.length > 90 ? `<p class="hint">…and ${list.length - 90} more. Search to find them.</p>` : '') + (!list.length ? '<p class="hint" style="margin:0">No pictures yet. Every picture you cut out from a sheet is added here.</p>' : '');
+  el.querySelectorAll('canvas[data-libthumb]').forEach(c => libThumb(c, c.dataset.libthumb));
+}
+
 /* ---- sheets & prompts ---- */
 function lSheets() {
-  const A = S.layers.assets, out = [];
-  for (let s = 0; s < A.length; s += 6) {
-    const ids = A.slice(s, s + 6).map(a => a.id), k = ids.length;
-    const [cols, rows] = k === 1 ? [1, 1] : k === 2 ? [2, 1] : k === 3 ? [3, 1] : k === 4 ? [2, 2] : [3, 2];
+  // pictures taken from the library are not drawn again, so they are not on any sheet
+  const A = S.layers.assets.filter(a => !a.lib), out = [], per = +S.settings.lPer === 6 ? 6 : 9;
+  for (let s = 0; s < A.length; s += per) {
+    const ids = A.slice(s, s + per).map(a => a.id), k = ids.length;
+    const [cols, rows] = k === 1 ? [1, 1] : k === 2 ? [2, 1] : k === 3 ? [3, 1] : k === 4 ? [2, 2] : k <= 6 ? [3, 2] : [3, 3];
     out.push({ index: out.length, ids, cols, rows });
   }
   return out;
@@ -2791,7 +2883,7 @@ function lSheetPrompt(sh) {
   const k = sh.ids.length, n = sh.cols * sh.rows;
   let t = sh.index != null ? `SHEET ${sh.index + 1} OF ${lSheets().length}: one new image with exactly these ${k} drawing${k > 1 ? 's' : ''} (different from any earlier sheet).\n` : '';
   t += k === 1 ? 'Draw a square image with ONE drawing in the middle and wide empty white space all around it.\n'
-    : `Draw a landscape image (3:2) that is a sticker sheet of ${k} separate drawings in ${sh.rows} row${sh.rows > 1 ? 's' : ''} of ${sh.cols}${k < n ? ' (the last place stays empty)' : ''}. Every drawing stands alone in the middle of its own area, with wide empty white space around it. The drawings must not touch or overlap. No frames, no grid lines, no numbers, no titles, no captions.\n`;
+    : `Draw a ${sh.rows === 3 ? 'square image (1:1)' : 'landscape image (3:2)'} that is a sticker sheet of ${k} separate drawings in ${sh.rows} row${sh.rows > 1 ? 's' : ''} of ${sh.cols}${k < n ? ` (the last ${n - k > 1 ? n - k + ' places stay' : 'place stays'} empty)` : ''}. Every drawing stands alone in the middle of its own area, with wide empty white space around it. The drawings must not touch or overlap. No frames, no grid lines, no numbers, no titles, no captions.\n`;
   t += 'No text or letters inside a drawing unless its description asks for them.\n';
   t += `ART STYLE (the same for every drawing): ${lArt()}\n`;
   t += 'BACKGROUND: plain pure white (#FFFFFF) everywhere. No shadow on the ground, no floor line, no paper texture, no frame, not transparent, no checkerboard.\n';
@@ -2846,7 +2938,7 @@ RULES
 - Good boards: the stickman on the left explaining + 1–3 pictures or keywords on the right; a keyword with ✗ or ✓; "A = B" with an equals icon; a before/after with an arrow; a title with a list of steps.
 - Keywords and labels in ${lLang()}; short English keywords are fine too.
 - Main character for reference: ${lHero()}
-
+${libPromptList()}
 SCENES
 ${scenes}`;
 }
@@ -3469,6 +3561,7 @@ async function lProcess(a) {
   if (!a.raw) return; const bmp = await createImageBitmap(a.raw);
   const c = lCutout(bmp, a.cut || 'auto'); try { bmp.close(); } catch (_) {}
   a.png = await lBlob(c); RL.img[a.id] = c; RL.ver++;
+  libSave(a);
 }
 function lAfterPicture(msg) {
   const nx = lNextSheet(); lTarget = nx != null ? { sheet: nx } : null;
@@ -3485,6 +3578,7 @@ async function lPlaceSheet(k, blob) {
 async function lSetAssetImage(id, blob) {
   const a = lAsset(id); if (!a) return;
   let bmp; try { bmp = await createImageBitmap(blob); } catch (_) { return toast('Could not open this image'); }
+  a.lib = null;
   a.raw = await lBlob(lCrop(bmp, 0, 0, bmp.width, bmp.height)); try { bmp.close(); } catch (_) {}
   await lProcess(a); lAfterPicture(`Picture "${id}" added`);
 }
@@ -3609,15 +3703,17 @@ function lRender() {
   $('#lHero').placeholder = L_HERO; $('#lArt').placeholder = L_ART;
   const A = S.layers.assets, done = A.filter(a => a.png).length, sh = lSheets();
   $('#lCount').textContent = `${done} / ${A.length} pictures`; $('#lBar').style.width = A.length ? (100 * done / A.length) + '%' : '0';
-  const el = $('#lSheets');
-  el.innerHTML = !sh.length ? '<div class="panel"><p class="hint" style="margin:0">No pictures yet: make the plan first (step 1). Each sheet prompt then asks for up to 6 pictures in one image.</p></div>'
+  const el = $('#lSheets'), fromLib = A.filter(a => a.lib);
+  const libCard = !fromLib.length ? '' : `<div class="batch"><div class="batch-h"><h3>From your library · ${fromLib.length} picture${fromLib.length > 1 ? 's' : ''}</h3><span class="chip ok">no need to draw</span></div>
+    <div class="ltiles">${fromLib.map(a => `<div class="ltile has" data-ltile="${esc(a.id)}"><canvas data-lthumb="${esc(a.id)}" width="240" height="160"></canvas><div class="nm">${esc(a.id)} <small>${a.type === 'char' ? 'character' : 'object'} · from library</small></div><div class="hint" style="margin:0">${esc(a.prompt)}</div><div class="acts"><button class="btn small" data-lnew="${esc(a.id)}" title="Leave the library picture and draw a new one on a sheet">Draw a new one</button></div></div>`).join('')}</div></div>`;
+  el.innerHTML = libCard + (!sh.length && fromLib.length ? '<div class="panel"><p class="hint" style="margin:0">Every picture of this plan came from your library: nothing to draw.</p></div>' : '') + (!sh.length && fromLib.length ? '' : !sh.length ? '<div class="panel"><p class="hint" style="margin:0">No pictures yet: make the plan first (step 1). Each sheet prompt then asks for up to 9 (or 6) pictures in one image.</p></div>'
     : sh.map(s => {
       const ok = lSheetDone(s), cur = lTarget && lTarget.sheet === s.index;
       return `<div class="batch${cur ? ' current' : ''}" data-lcard="${s.index}" id="lsheet-${s.index}"><div class="batch-h"><h3>Sheet ${s.index + 1} · ${s.ids.length} picture${s.ids.length > 1 ? 's' : ''}</h3><span class="chip ${ok ? 'ok' : 'wait'}">${ok ? 'done' : 'waiting'}</span><span class="chip sel sel-only">Selected · ${PK} goes here</span>
         <button class="btn small primary" data-lcopy="${s.index}">Copy prompt</button><button class="btn small" data-lpaste="${s.index}">Paste image</button><button class="btn small" data-lpick="${s.index}">Choose file…</button></div>
         <div class="ltiles">${s.ids.map(id => { const a = lAsset(id), tc = lTarget && lTarget.asset === id; return `<div class="ltile${a.png ? ' has' : ''}${tc ? ' current' : ''}" data-ltile="${esc(id)}"><canvas data-lthumb="${esc(id)}" width="240" height="160"></canvas><div class="nm">${esc(id)} <small>${a.type === 'char' ? 'character' : 'object'}${tc ? ` · ${PK} replaces it` : ''}</small></div><textarea rows="2" data-lprompt="${esc(id)}" aria-label="Picture description">${esc(a.prompt)}</textarea><div class="acts"><select data-lcut="${esc(id)}" title="Background removal" aria-label="Background removal"><option value="auto">Remove white (line art)</option><option value="outer">Remove only the outside</option><option value="none">Keep as it is</option></select><button class="btn small" data-lone="${esc(id)}">Single prompt</button><button class="btn small" data-lrep="${esc(id)}">Replace…</button>${a.png ? `<button class="btn small danger" data-ldel="${esc(id)}">Remove</button>` : ''}</div></div>`; }).join('')}</div>
         <details class="ptext"><summary>Show the prompt</summary><pre class="prompt">${esc(lSheetPrompt(s))}</pre></details></div>`;
-    }).join('');
+    }).join(''));
   el.querySelectorAll('[data-lcut]').forEach(s => { s.value = lAsset(s.dataset.lcut)?.cut || 'auto'; });
   el.querySelectorAll('canvas[data-lthumb]').forEach(c => lThumb(c, c.dataset.lthumb));
   // boards
@@ -3665,9 +3761,40 @@ $('#lHero').addEventListener('input', e => { S.layers.hero = e.target.value; sav
 $('#lArt').addEventListener('input', e => { S.layers.art = e.target.value; save(); });
 $('#lHero').addEventListener('change', () => lRender()); $('#lArt').addEventListener('change', () => lRender());
 $('#lGemKey').addEventListener('input', e => { VP.gemKey = e.target.value.trim(); saveVP(); RL.models = null; });
+document.addEventListener('click', async e => {
+  const t = e.target.closest('[data-lnew],[data-libdel],#libAddAll,#libClear,#libBackup,#libRestore'); if (!t) return;
+  if (t.dataset.lnew != null) { const a = lAsset(t.dataset.lnew); if (!a) return; a.lib = null; a.png = null; a.raw = null; delete RL.img[a.id]; RL.ver++; lTarget = null; lRender(); renderStatus(); drawPreview(); save(); toast(`"${a.id}" will be drawn on a sheet`); }
+  else if (t.dataset.libdel != null) { const key = t.dataset.libdel; LIB.list = LIB.list.filter(m => m.key !== key); DB.del('lib:' + key).catch(() => {}); libSaveIndex(); libRender(); }
+  else if (t.id === 'libBackup') {
+    if (!LIB.list.length) return toast('The library is empty');
+    toast('Packing the library…'); const items = [];
+    for (const m of LIB.list) { let blob = null; try { blob = await DB.get('lib:' + m.key); } catch (_) {} if (blob) items.push({ ...m, data: await blobB64(blob), mime: blob.type || 'image/webp' }); }
+    download(new Blob([JSON.stringify({ app: 'stickman-studio-library', v: 1, items })], { type: 'application/json' }), 'stickman-picture-library.json');
+  }
+  else if (t.id === 'libRestore') $('#libFile').click();
+  else if (t.id === 'libAddAll') { let n = 0; for (const a of S.layers.assets) if (a.png && !a.lib) { await libSave(a); n++; } toast(n ? `${n} pictures added to the library` : 'No own pictures in this project yet'); }
+  else if (t.id === 'libClear') { if (!t.dataset.sure) { t.dataset.sure = '1'; t.textContent = 'Press again to empty it'; setTimeout(() => { delete t.dataset.sure; t.textContent = 'Empty the library'; }, 4000); return; }
+    for (const m of LIB.list) DB.del('lib:' + m.key).catch(() => {}); LIB.list = []; libSaveIndex(); libRender(); delete t.dataset.sure; t.textContent = 'Empty the library'; toast('Library emptied'); }
+});
+$('#libPanel').addEventListener('toggle', libRender);
+$('#libFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const j = JSON.parse(await f.text()); if (!j || j.app !== 'stickman-studio-library' || !Array.isArray(j.items)) throw new Error('not a library backup');
+    let n = 0;
+    for (const it of j.items) {
+      if (!it.key || !it.data) continue;
+      const blob = new Blob([Uint8Array.from(atob(it.data), ch => ch.charCodeAt(0))], { type: it.mime || 'image/webp' });
+      await DB.put('lib:' + it.key, blob); const { data, mime, ...m } = it;
+      const k = LIB.list.findIndex(x => x.key === m.key); if (k >= 0) LIB.list[k] = m; else LIB.list.push(m); n++;
+    }
+    libSaveIndex(); libRender(); toast(`${n} pictures restored to the library`);
+  } catch (err) { toast('Could not restore: ' + err.message); }
+});
+$('#libSearch').addEventListener('input', libRender);
 $('#lCopyPlan').onclick = () => { if (!S.segments.length) return toast('Create scenes first (step 1)'); copyText(lPlanPrompt()); $('#lPlanInfo').textContent = 'Plan prompt copied. Paste it into ChatGPT / Claude / Gemini, then paste the reply above and press Apply plan.'; };
-$('#lApplyPlan').onclick = () => { try { $('#lPlanInfo').textContent = 'Plan applied: ' + lApplyPlan(lParseJSON($('#lPlanReply').value)); } catch (e) { $('#lPlanInfo').textContent = 'Could not use this reply: ' + e.message; } };
-$('#lQuickPlan').onclick = () => { try { const p = lQuickPlan(); $('#lPlanReply').value = JSON.stringify(p, null, 1); $('#lPlanInfo').textContent = 'Quick plan: ' + lApplyPlan(p) + '. For richer boards use Gemini or the plan prompt.'; } catch (e) { $('#lPlanInfo').textContent = e.message; } };
+$('#lApplyPlan').onclick = async () => { try { $('#lPlanInfo').textContent = 'Plan applied: ' + await lApplyPlanLib(lParseJSON($('#lPlanReply').value)); } catch (e) { $('#lPlanInfo').textContent = 'Could not use this reply: ' + e.message; } };
+$('#lQuickPlan').onclick = async () => { try { const p = lQuickPlan(); $('#lPlanReply').value = JSON.stringify(p, null, 1); $('#lPlanInfo').textContent = 'Quick plan: ' + await lApplyPlanLib(p) + '. For richer boards use Gemini or the plan prompt.'; } catch (e) { $('#lPlanInfo').textContent = e.message; } };
 $('#lAutoPlan').onclick = async () => {
   if (!S.segments.length) return toast('Create scenes first (step 1)');
   if (!(VP.gemKey || '').trim()) { $('#lGemKey').focus(); return toast('Paste your Gemini API key first (free at aistudio.google.com/apikey)'); }
@@ -3677,7 +3804,7 @@ $('#lAutoPlan').onclick = async () => {
     info.textContent = `Gemini (${m}) is planning ${S.segments.length} scenes… (about 20–90 s)`;
     const j = await gemFetch(`/models/${m}:generateContent`, { contents: [{ role: 'user', parts: [{ text: lPlanPrompt() }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.6 } }, 300);
     const txt = lGemText(j); $('#lPlanReply').value = txt;
-    info.textContent = `Plan by ${m}: ` + lApplyPlan(lParseJSON(txt));
+    info.textContent = `Plan by ${m}: ` + await lApplyPlanLib(lParseJSON(txt));
   } catch (e) { info.textContent = 'Gemini: ' + e.message + ' → you can still use "Copy plan prompt".'; }
   lBusy(false);
 };
@@ -3709,7 +3836,7 @@ $('#lCopyAll').onclick = () => {
   $('#lImgInfo').textContent = 'All prompts copied, for your notes. Send them to ChatGPT / Gemini one sheet per message (Copy next prompt does exactly that).';
 };
 $('#lJsonLoad').onclick = () => { $('#lJson').value = JSON.stringify(lExportPlan(), null, 1); };
-$('#lJsonApply').onclick = () => { try { toast('Plan applied: ' + lApplyPlan(lParseJSON($('#lJson').value))); } catch (e) { toast('Could not apply: ' + e.message); } };
+$('#lJsonApply').onclick = async () => { try { toast('Plan applied: ' + await lApplyPlanLib(lParseJSON($('#lJson').value))); } catch (e) { toast('Could not apply: ' + e.message); } };
 $('#lJsonDl').onclick = () => download(new Blob([JSON.stringify(lExportPlan(), null, 1)], { type: 'application/json' }), safeName() + '-plan.json');
 setupDrop($('#lDrop'), async files => {
   files = files.filter(f => f.type.startsWith('image/')).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
@@ -4331,6 +4458,7 @@ window.addEventListener('error', e => console.log('SSAPP-ERR ' + e.message + ' @
   sizePreview();
   try { await DB.open(); } catch (_) {}
   await loadVP(); vpToUI(); $('#lGemKey').value = VP.gemKey || '';
+  await libLoad();
   let p = null; try { p = await DB.get('project'); } catch (_) {}
   if (p && (p.script || (p.segments && p.segments.length))) await restore(p);
   else {

@@ -17,11 +17,18 @@ by one on the word where they are spoken. The screen clears at every new **board
    Claude / Gemini and paste the JSON reply, then **Apply plan**. **Quick plan (offline)** makes a simple plan
    without AI. The plan lists the pictures ("assets") and, per board, which picture / keyword / icon appears on
    which word. It can be edited by hand under *Edit the plan by hand (JSON)*.
-3. **Layers → Pictures:** each **sheet prompt** asks for up to 6 pictures on one white image. Generate it in
+3. **Layers → Pictures:** each **sheet prompt** asks for up to 9 pictures (3×3, square image) on one white image;
+   *Pictures per sheet* can be set to 6 (3×2) for sharper pictures. Generate it in
    ChatGPT / Gemini and paste it into its sheet (or Share → Stickman Studio on Android). The app finds every
    picture on the sheet, cuts it out and removes the white (line art keeps its ink, the white inside becomes
    paper). A bad picture: click it, **Single prompt**, then **Replace…**. *Draw all with Gemini* does it by itself
    when the Google plan includes an image model.
+   **My picture library:** every cut-out picture is kept inside the app (not in the gallery). When a new plan needs
+   a picture the library already has (same art style and main character, same kind, same name or a very similar name
+   and description), it is used again and left out of the sheet prompts, so only missing pictures are drawn. The plan
+   prompt lists the library so the AI can pick those pictures. *Draw a new one* drops a library picture for one
+   project. **Back up library** saves everything to one file; **Restore** brings it back on a new phone or after a
+   reinstall.
 4. **Preview + Export:** the same exact-frame MP4 export. Sound effects (pop, whoosh, swish, ding, buzz) are made
    in the app and placed on every entrance; background music gets quieter under the voice and fades in/out.
 
