@@ -48,10 +48,10 @@ jobs:
 
       - name: List library versions
         run: |
-          for a in camera-media3-effect camera-core camera-effects; do
-            echo "== $a"; curl -s "https://dl.google.com/dl/android/maven2/androidx/camera/$a/maven-metadata.xml" | grep -o '<version>[^<]*' | tail -12
-          done
-          echo "== media3-effect"; curl -s "https://dl.google.com/dl/android/maven2/androidx/media3/media3-effect/maven-metadata.xml" | grep -o '<version>[^<]*' | tail -6
+          curl -s "https://dl.google.com/dl/android/maven2/androidx/camera/group-index.xml" | head -60 || true
+          echo "== androidx.camera.media3"
+          curl -s "https://dl.google.com/dl/android/maven2/androidx/camera/media3/group-index.xml" | head -40 || true
+          curl -s "https://dl.google.com/dl/android/maven2/androidx/camera/media3/media3-effect/maven-metadata.xml" | grep -o '<version>[^<]*' | tail -8 || true
 
       - name: Build APK
         working-directory: camera-app
