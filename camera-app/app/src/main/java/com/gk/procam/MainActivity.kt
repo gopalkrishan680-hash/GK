@@ -6,12 +6,18 @@ import android.content.ContentValues
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraMetadata
 import android.hardware.camera2.CaptureRequest
+import android.media.ExifInterface
 import android.media.MediaActionSound
 import android.net.Uri
 import android.os.Bundle
@@ -31,6 +37,7 @@ import android.view.ScaleGestureDetector
 import android.view.Surface
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.SeekBar
@@ -42,6 +49,7 @@ import androidx.camera.camera2.interop.Camera2CameraControl
 import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.CaptureRequestOptions
 import androidx.camera.core.Camera
+import androidx.camera.core.CameraEffect
 import androidx.camera.core.CameraInfo
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.DynamicRange
@@ -51,12 +59,14 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.MirrorMode
 import androidx.camera.core.Preview
 import androidx.camera.core.UseCase
+import androidx.camera.core.UseCaseGroup
 import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.extensions.ExtensionMode
 import androidx.camera.extensions.ExtensionsManager
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.media3.effect.Media3Effect
 import androidx.camera.video.FallbackStrategy
 import androidx.camera.video.MediaStoreOutputOptions
 import androidx.camera.video.Quality
@@ -71,6 +81,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.media3.effect.SingleColorLut
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -78,6 +89,7 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
+import kotlin.math.hypot
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.properties.ReadWriteProperty
@@ -87,7 +99,16 @@ class MainActivity : AppCompatActivity() {
 
     private enum class Mode { PHOTO, VIDEO, PRO }
 
+    /** A rear lens: its field of view relative to the main lens (0.5 = ultrawide, 3 = tele). */
+    private class Lens(val ratio: Float, val selector: CameraSelector)
+
+    private class Filter(
+        val name: String, val sat: Float, val contrast: Float, val warmth: Float,
+        val bright: Float = 0f, val fade: Float = 0f
+    )
+
     // ---- views ----
+    private lateinit var root: View
     private lateinit var previewView: PreviewView
     private lateinit var gridView: GridOverlayView
     private lateinit var focusRing: View
@@ -97,6 +118,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var recTime: TextView
     private lateinit var infoText: TextView
     private lateinit var proPanel: LinearLayout
+    private lateinit var filterScroll: View
+    private lateinit var filterRow: LinearLayout
     private lateinit var evRow: View
     private lateinit var evSeek: SeekBar
     private lateinit var evValue: TextView
@@ -131,8 +154,13 @@ class MainActivity : AppCompatActivity() {
     private var stab by pref("stab", 1)
     private var mic by pref("mic", 1)
     private var front by pref("front", 0)
+    private var filterIdx by pref("filter", 0)
+    private var sharp by pref("sharp", 0)          // DETAIL+ sharpening of saved photos
+    private var mirror by pref("mirror", 1)        // save selfies as seen in the preview
+    private var nightVideo by pref("nightVideo", 0)
 
     private val mode: Mode get() = Mode.values()[modeIdx.coerceIn(0, 2)]
+    private val filter: Filter get() = FILTERS[filterIdx.coerceIn(0, FILTERS.size - 1)]
 
     // ---- camera state ----
     private var provider: ProcessCameraProvider? = null
@@ -140,11 +168,21 @@ class MainActivity : AppCompatActivity() {
     private var camera: Camera? = null
     private var imageCapture: ImageCapture? = null
     private var videoCapture: VideoCapture<Recorder>? = null
+    private var videoEffect: Media3Effect? = null
     private var recording: Recording? = null
     private var recordingPaused = false
-    private var backCams: List<CameraInfo> = emptyList()
-    private var lensIndex = 0
     private var torch = false
+    private var fillLight = false
+
+    // rear lenses
+    private var backCams: List<CameraInfo> = emptyList()
+    private var lenses: List<Lens> = emptyList()
+    private var mainLens = 0
+    private var lensIdx = 0
+    private var mainMin = 1f
+    private var mainMax = 10f
+    private var mainLogical = false
+    private var pendingZoom: Float? = null
 
     // capabilities of the currently selected camera
     private var ultraHdrOk = false
@@ -153,9 +191,11 @@ class MainActivity : AppCompatActivity() {
     private var hlgOk = false
     private var fps60Ok = false
     private var rawActive = false
+    private var nightTuning = false
+    private var sceneNightOk = false
     private var statusLabel = ""
 
-    // zoom
+    // zoom of the bound camera
     private var curZoom = 1f
     private var minZoom = 1f
     private var maxZoom = 1f
@@ -178,6 +218,7 @@ class MainActivity : AppCompatActivity() {
 
     private val handler = Handler(Looper.getMainLooper())
     private val io: ExecutorService = Executors.newSingleThreadExecutor()
+    private val proc: ExecutorService = Executors.newSingleThreadExecutor()
     private val sound = MediaActionSound()
     private lateinit var orientationListener: OrientationEventListener
 
@@ -195,6 +236,7 @@ class MainActivity : AppCompatActivity() {
         prefs = getSharedPreferences("gkcamera", MODE_PRIVATE)
         setContentView(R.layout.activity_main)
 
+        root = findViewById(R.id.root)
         previewView = findViewById(R.id.preview)
         gridView = findViewById(R.id.grid)
         focusRing = findViewById(R.id.focusRing)
@@ -204,6 +246,8 @@ class MainActivity : AppCompatActivity() {
         recTime = findViewById(R.id.recTime)
         infoText = findViewById(R.id.infoText)
         proPanel = findViewById(R.id.proPanel)
+        filterScroll = findViewById(R.id.filterScroll)
+        filterRow = findViewById(R.id.filterRow)
         evRow = findViewById(R.id.evRow)
         evSeek = findViewById(R.id.evSeek)
         evValue = findViewById(R.id.evValue)
@@ -214,10 +258,10 @@ class MainActivity : AppCompatActivity() {
         shutter = findViewById(R.id.shutter)
         switchCam = findViewById(R.id.switchCam)
         thumb.clipToOutline = true
+        previewView.setScreenFlashWindow(window)
 
         // Full screen, with the controls kept clear of the cutout and navigation bar.
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        val root = findViewById<View>(R.id.root)
         WindowCompat.getInsetsController(window, root).apply {
             hide(WindowInsetsCompat.Type.statusBars())
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
@@ -234,7 +278,8 @@ class MainActivity : AppCompatActivity() {
         switchCam.setOnClickListener {
             if (recording != null) return@setOnClickListener
             front = 1 - front
-            lensIndex = 0
+            lensIdx = mainLens
+            pendingZoom = 1f
             bind()
         }
         thumb.setOnClickListener { openLast() }
@@ -293,6 +338,7 @@ class MainActivity : AppCompatActivity() {
 
         renderModes()
         renderChips()
+        renderFilters()
 
         val wanted = arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
         if (hasPermission(Manifest.permission.CAMERA)) startCamera()
@@ -314,6 +360,7 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         io.shutdown()
+        proc.shutdown()
         sound.release()
     }
 
@@ -333,6 +380,7 @@ class MainActivity : AppCompatActivity() {
             val p = future.get()
             provider = p
             backCams = p.availableCameraInfos.filter { it.lensFacing == CameraSelector.LENS_FACING_BACK }
+            discoverLenses()
             val extFuture = ExtensionsManager.getInstanceAsync(this, p)
             extFuture.addListener({
                 extensions = try { extFuture.get() } catch (e: Exception) { null }
@@ -341,33 +389,91 @@ class MainActivity : AppCompatActivity() {
         }, ContextCompat.getMainExecutor(this))
     }
 
+    /** 35mm-equivalent focal length of a camera, used to tell ultrawide / main / tele apart. */
+    private fun equivFocal(info: CameraInfo): Float? = try {
+        val c2 = Camera2CameraInfo.from(info)
+        val f = c2.getCameraCharacteristic(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
+            ?.firstOrNull()
+        val size = c2.getCameraCharacteristic(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE)
+        if (f == null || size == null) null else f * 43.27f / hypot(size.width, size.height)
+    } catch (e: Exception) {
+        null
+    }
+
+    /**
+     * Finds every rear lens the phone exposes: separate camera ids as well as the physical
+     * cameras hidden behind the main (logical) camera.
+     */
+    private fun discoverLenses() {
+        val found = ArrayList<Lens>()
+        found.add(Lens(1f, CameraSelector.DEFAULT_BACK_CAMERA))
+        val main = backCams.firstOrNull()
+        val mainEq = if (main != null) equivFocal(main) else null
+        if (main != null && mainEq != null) {
+            fun consider(info: CameraInfo, selector: CameraSelector) {
+                val eq = equivFocal(info) ?: return
+                val r = eq / mainEq
+                if (r < 0.2f || r > 15f) return
+                if (found.none { abs(it.ratio / r - 1f) < 0.15f }) found.add(Lens(r, selector))
+            }
+            for (info in backCams.drop(1)) {
+                try { consider(info, info.cameraSelector) } catch (e: Exception) { Log.w(TAG, "lens skipped", e) }
+            }
+            try {
+                val physical = main.physicalCameraInfos
+                mainLogical = physical.size > 1
+                for (ph in physical) {
+                    val id = Camera2CameraInfo.from(ph).cameraId
+                    consider(
+                        ph,
+                        CameraSelector.Builder()
+                            .requireLensFacing(CameraSelector.LENS_FACING_BACK)
+                            .setPhysicalCameraId(id)
+                            .build()
+                    )
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "physical lenses not available", e)
+            }
+        }
+        lenses = found.sortedBy { it.ratio }
+        mainLens = lenses.indexOfFirst { it.ratio == 1f }.coerceAtLeast(0)
+        lensIdx = mainLens
+    }
+
     private fun baseSelector(): CameraSelector = when {
         front == 1 -> CameraSelector.DEFAULT_FRONT_CAMERA
-        lensIndex > 0 && lensIndex < backCams.size -> backCams[lensIndex].cameraSelector
+        lensIdx in lenses.indices -> lenses[lensIdx].selector
         else -> CameraSelector.DEFAULT_BACK_CAMERA
     }
 
     /**
      * (Re)binds the use cases for the current mode and settings. If the device rejects the
      * requested combination it is retried with fewer extras: [level] 1 drops stabilisation,
-     * 50MP readout and vendor extensions; level 2 also drops HDR, 60fps, RAW and lens choice.
+     * 50MP readout and vendor extensions; level 2 also drops HDR, 60fps, RAW, video filters
+     * and the lens choice.
      */
     private fun bind(level: Int = 0) {
-        val lite = level >= 1
-        val safe = level >= 2
-        if (safe) lensIndex = 0
         val p = provider ?: return
         if (!hasPermission(Manifest.permission.CAMERA)) return
+        val lite = level >= 1
+        val safe = level >= 2
+        if (safe) lensIdx = mainLens
+        if (pendingZoom == null && camera != null) pendingZoom = curZoom
         camera?.cameraInfo?.zoomState?.removeObservers(this)
         try {
             p.unbindAll()
             imageCapture = null
             videoCapture = null
             torch = false
+            setFillLight(false)
+            try { videoEffect?.close() } catch (e: Exception) { Log.w(TAG, "effect close", e) }
+            videoEffect = null
 
             var selector = baseSelector()
             if (!p.hasCamera(selector)) {
                 front = 0
+                lensIdx = mainLens
                 selector = CameraSelector.DEFAULT_BACK_CAMERA
             }
             val info = p.getCameraInfo(selector)
@@ -382,7 +488,17 @@ class MainActivity : AppCompatActivity() {
             ).filter { em.isExtensionAvailable(selector, it) }
             val videoCaps = Recorder.getVideoCapabilities(info)
             hlgOk = videoCaps.supportedDynamicRanges.contains(DynamicRange.HLG_10_BIT)
-            fps60Ok = info.supportedFrameRateRanges.any { it.lower >= 60 && it.upper >= 60 }
+            val fpsRanges = info.supportedFrameRateRanges
+            fps60Ok = fpsRanges.any { it.lower >= 60 && it.upper >= 60 }
+            // Lets auto-exposure use slower shutter speeds, which is what brightens dark scenes.
+            val slowRange = fpsRanges.filter { it.upper == 30 && it.lower < 30 }.minByOrNull { it.lower }
+            sceneNightOk = try {
+                Camera2CameraInfo.from(info)
+                    .getCameraCharacteristic(CameraCharacteristics.CONTROL_AVAILABLE_SCENE_MODES)
+                    ?.contains(CameraMetadata.CONTROL_SCENE_MODE_NIGHT) == true
+            } catch (e: Exception) {
+                false
+            }
 
             val wide = mode == Mode.VIDEO || ratio == 1
             val aspectStrategy =
@@ -395,11 +511,18 @@ class MainActivity : AppCompatActivity() {
                     ResolutionSelector.Builder().setAspectRatioStrategy(aspectStrategy).build()
                 )
             val useCases = ArrayList<UseCase>()
+            val f = filter
+            val filtered = filterIdx > 0
+            var livePaint = false
+            nightTuning = false
 
             if (mode == Mode.VIDEO) {
-                val dr = if (hdrVideo == 1 && hlgOk && !safe) DynamicRange.HLG_10_BIT else DynamicRange.SDR
+                val useFilter = filtered && !safe
+                val dr = if (hdrVideo == 1 && hlgOk && !safe && !useFilter) DynamicRange.HLG_10_BIT
+                else DynamicRange.SDR
                 val wantedQ = listOf(Quality.UHD, Quality.FHD, Quality.HD)[vq.coerceIn(0, 2)]
-                val useFps = if (fps == 60 && fps60Ok && !safe) 60 else 30
+                val night = nightVideo == 1 && !safe
+                val useFps = if (fps == 60 && fps60Ok && !safe && !night) 60 else 30
                 var bitrate = when (wantedQ) {
                     Quality.UHD -> 60_000_000
                     Quality.FHD -> 24_000_000
@@ -414,7 +537,9 @@ class MainActivity : AppCompatActivity() {
                     .build()
                 val vb = VideoCapture.Builder(recorder)
                     .setDynamicRange(dr)
-                    .setTargetFrameRate(Range(useFps, useFps))
+                    .setTargetFrameRate(
+                        if (night && slowRange != null) slowRange else Range(useFps, useFps)
+                    )
                     .setMirrorMode(MirrorMode.MIRROR_MODE_ON_FRONT_ONLY)
                     .setTargetRotation(curRotation)
                 var steady = false
@@ -430,11 +555,31 @@ class MainActivity : AppCompatActivity() {
                 val vc = vb.build()
                 videoCapture = vc
                 useCases.add(vc)
+                nightTuning = night
+                if (useFilter) {
+                    // Colour filter rendered on the GPU into both the preview and the recording.
+                    val fx = Media3Effect(
+                        this, CameraEffect.PREVIEW or CameraEffect.VIDEO_CAPTURE,
+                        ContextCompat.getMainExecutor(this)
+                    ) { t ->
+                        Log.e(TAG, "video filter failed", t)
+                        runOnUiThread {
+                            toast("Video filter is phone par nahi chala — filter band kar diya")
+                            filterIdx = 0
+                            renderFilters()
+                            if (recording == null) bind()
+                        }
+                    }
+                    fx.setEffects(listOf(SingleColorLut.createFromCube(lutCube(filterMatrix(f)))))
+                    videoEffect = fx
+                }
                 statusLabel = listOfNotNull(
                     arrayOf("4K", "1080p", "720p")[vq.coerceIn(0, 2)],
                     "${useFps}fps",
                     if (dr == DynamicRange.HLG_10_BIT) "HDR10-bit" else null,
-                    if (steady) "Steady" else null
+                    if (steady) "Steady" else null,
+                    if (night) "Night" else null,
+                    if (useFilter) f.name else null
                 ).joinToString(" · ")
                 rawActive = false
             } else {
@@ -444,22 +589,43 @@ class MainActivity : AppCompatActivity() {
                     selector = em.getExtensionEnabledCameraSelector(selector, process)
                     activeExt = process
                 }
+                // Night picked but the phone offers no night extension here: tune exposure ourselves.
+                nightTuning = mode == Mode.PHOTO && process == ExtensionMode.NIGHT &&
+                    activeExt == ExtensionMode.NONE && !safe
+                if (nightTuning && slowRange != null) previewBuilder.setTargetFrameRate(slowRange)
+
                 rawActive = mode == Mode.PRO && raw == 1 && rawOk && !safe
                 val ultra = !rawActive && !safe && activeExt == ExtensionMode.NONE &&
                     ultraHdrOk && (process == 0 || mode == Mode.PRO)
                 val full = hiRes == 1 && !lite && activeExt == ExtensionMode.NONE
 
-                val rs = ResolutionSelector.Builder()
-                    .setAspectRatioStrategy(aspectStrategy)
-                    .setResolutionStrategy(ResolutionStrategy.HIGHEST_AVAILABLE_STRATEGY)
-                if (full) rs.setAllowedResolutionMode(ResolutionSelector.PREFER_HIGHER_RESOLUTION_OVER_CAPTURE_RATE)
+                // Default to the binned ~12MP readout: it gathers far more light per pixel than
+                // the full 50MP mode, so it is sharper and cleaner indoors (selfie camera too).
+                val rs = ResolutionSelector.Builder().setAspectRatioStrategy(aspectStrategy)
+                if (full) {
+                    rs.setResolutionStrategy(ResolutionStrategy.HIGHEST_AVAILABLE_STRATEGY)
+                    rs.setAllowedResolutionMode(ResolutionSelector.PREFER_HIGHER_RESOLUTION_OVER_CAPTURE_RATE)
+                } else {
+                    rs.setResolutionStrategy(
+                        ResolutionStrategy(
+                            Size(4096, 3072),
+                            ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER
+                        )
+                    )
+                }
 
                 val ib = ImageCapture.Builder()
                     .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
                     .setJpegQuality(100)
-                    .setFlashMode(flashConst())
                     .setTargetRotation(curRotation)
                     .setResolutionSelector(rs.build())
+                val screenFlash = previewView.screenFlash
+                if (front == 1 && flash != 0 && screenFlash != null) {
+                    ib.setScreenFlash(screenFlash)
+                    ib.setFlashMode(ImageCapture.FLASH_MODE_SCREEN)
+                } else {
+                    ib.setFlashMode(flashConst())
+                }
                 when {
                     rawActive -> ib.setOutputFormat(ImageCapture.OUTPUT_FORMAT_RAW_JPEG)
                     ultra -> ib.setOutputFormat(ImageCapture.OUTPUT_FORMAT_JPEG_ULTRA_HDR)
@@ -467,19 +633,40 @@ class MainActivity : AppCompatActivity() {
                 val ic = ib.build()
                 imageCapture = ic
                 useCases.add(ic)
-                statusLabel = when {
-                    rawActive -> "RAW + JPEG"
-                    activeExt != ExtensionMode.NONE -> processLabel(activeExt)
-                    ultra -> "Ultra HDR"
-                    else -> "Standard"
-                }
+                livePaint = filtered
+                statusLabel = listOfNotNull(
+                    when {
+                        rawActive -> "RAW + JPEG"
+                        activeExt != ExtensionMode.NONE -> processLabel(activeExt)
+                        nightTuning -> "Night"
+                        ultra -> "Ultra HDR"
+                        else -> "Standard"
+                    },
+                    if (filtered) f.name else null,
+                    if (sharp == 1) "Detail+" else null
+                ).joinToString(" · ")
             }
+
+            // Live filter preview for photos: tint the preview view itself. That needs the
+            // TextureView-based preview; without a filter the faster SurfaceView is used.
+            previewView.implementationMode =
+                if (livePaint) PreviewView.ImplementationMode.COMPATIBLE
+                else PreviewView.ImplementationMode.PERFORMANCE
+            applyPreviewPaint(livePaint)
 
             val preview = previewBuilder.build()
             preview.setSurfaceProvider(previewView.surfaceProvider)
             useCases.add(0, preview)
 
-            val cam = p.bindToLifecycle(this, selector, *useCases.toTypedArray())
+            val fx = videoEffect
+            val cam = if (fx != null) {
+                val group = UseCaseGroup.Builder()
+                for (u in useCases) group.addUseCase(u)
+                group.addEffect(fx)
+                p.bindToLifecycle(this, selector, group.build())
+            } else {
+                p.bindToLifecycle(this, selector, *useCases.toTypedArray())
+            }
             camera = cam
             onBound(cam)
         } catch (e: Exception) {
@@ -494,11 +681,24 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onBound(cam: Camera) {
+        val onMain = front == 0 && lensIdx == mainLens
         cam.cameraInfo.zoomState.observe(this) { z ->
             curZoom = z.zoomRatio
             minZoom = z.minZoomRatio
             maxZoom = z.maxZoomRatio
+            if (onMain) {
+                mainMin = minZoom
+                mainMax = maxZoom
+            }
             renderZoom()
+        }
+        val want = pendingZoom
+        pendingZoom = null
+        if (want != null && abs(want - 1f) > 0.01f) {
+            val z = cam.cameraInfo.zoomState.value
+            val lo = z?.minZoomRatio ?: 1f
+            val hi = z?.maxZoomRatio ?: 1f
+            cam.cameraControl.setZoomRatio(want.coerceIn(lo, hi.coerceAtLeast(lo)))
         }
 
         val st = cam.cameraInfo.exposureState
@@ -519,12 +719,13 @@ class MainActivity : AppCompatActivity() {
             expRange = null
             minFocusDist = 0f
         }
-        applyPro()
+        applyTuning()
 
         shutter.videoMode = mode == Mode.VIDEO
         gridView.show = grid == 1
         renderChips()
         renderPro()
+        renderFilters()
         infoText.text = statusLabel
         handler.postDelayed({ updateInfo() }, 700)
     }
@@ -541,6 +742,18 @@ class MainActivity : AppCompatActivity() {
         1 -> ImageCapture.FLASH_MODE_AUTO
         2 -> ImageCapture.FLASH_MODE_ON
         else -> ImageCapture.FLASH_MODE_OFF
+    }
+
+    /** Warm screen light for selfie video: bright cream border around a smaller preview. */
+    private fun setFillLight(on: Boolean) {
+        fillLight = on
+        root.setBackgroundColor(if (on) 0xFFFFF1DC.toInt() else Color.BLACK)
+        previewView.scaleX = if (on) 0.78f else 1f
+        previewView.scaleY = if (on) 0.78f else 1f
+        val lp = window.attributes
+        lp.screenBrightness =
+            if (on) 1f else WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        window.attributes = lp
     }
 
     // ------------------------------------------------------------------ photo
@@ -586,6 +799,8 @@ class MainActivity : AppCompatActivity() {
     private fun takePhoto() {
         val ic = imageCapture ?: return
         val name = "IMG_" + stamp()
+        val meta = ImageCapture.Metadata()
+        meta.isReversedHorizontal = front == 1 && mirror == 1
         fun out(ext: String, mime: String): ImageCapture.OutputFileOptions {
             val values = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, "$name.$ext")
@@ -594,13 +809,30 @@ class MainActivity : AppCompatActivity() {
             }
             return ImageCapture.OutputFileOptions.Builder(
                 contentResolver, MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values
-            ).build()
+            ).setMetadata(meta).build()
         }
+
+        // Filter and sharpening are applied to the saved JPEG at full resolution.
+        val matrix = if (filterIdx > 0) filterMatrix(filter) else null
+        val sharpen = sharp == 1
 
         val callback = object : ImageCapture.OnImageSavedCallback {
             override fun onImageSaved(results: ImageCapture.OutputFileResults) {
                 val uri = results.savedUri ?: return
-                runOnUiThread { showThumb(uri, "image/*") }
+                val isJpeg = contentResolver.getType(uri) == "image/jpeg"
+                if (isJpeg && (matrix != null || sharpen)) {
+                    proc.execute {
+                        try {
+                            postProcess(uri, matrix, sharpen)
+                        } catch (t: Throwable) {
+                            Log.e(TAG, "post-process failed", t)
+                            runOnUiThread { toast("Filter apply nahi hua — original photo save hai") }
+                        }
+                        runOnUiThread { showThumb(uri, "image/*") }
+                    }
+                } else if (isJpeg) {
+                    runOnUiThread { showThumb(uri, "image/*") }
+                }
             }
             override fun onError(e: ImageCaptureException) {
                 Log.e(TAG, "capture failed", e)
@@ -620,6 +852,157 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Log.e(TAG, "takePicture threw", e)
             toast("Capture fail: ${e.message}")
+        }
+    }
+
+    /**
+     * Rewrites a saved JPEG in place with the colour [matrix] and/or a mild sharpen applied.
+     * Works row by row so only one copy of the image is held in memory.
+     */
+    private fun postProcess(uri: Uri, matrix: FloatArray?, sharpen: Boolean) {
+        val saved = HashMap<String, String>()
+        contentResolver.openInputStream(uri)?.use { input ->
+            val exif = ExifInterface(input)
+            for (tag in EXIF_TAGS) exif.getAttribute(tag)?.let { saved[tag] = it }
+        }
+        val opts = BitmapFactory.Options()
+        opts.inMutable = true
+        opts.inPreferredConfig = Bitmap.Config.ARGB_8888
+        val bmp = contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
+            ?: return
+        val w = bmp.width
+        val h = bmp.height
+        var prev = IntArray(w)
+        var cur = IntArray(w)
+        var next = IntArray(w)
+        val out = IntArray(w)
+        bmp.getPixels(cur, 0, w, 0, 0, w, 1)
+        System.arraycopy(cur, 0, prev, 0, w)
+        for (y in 0 until h) {
+            if (y + 1 < h) bmp.getPixels(next, 0, w, 0, y + 1, w, 1)
+            else System.arraycopy(cur, 0, next, 0, w)
+            for (x in 0 until w) {
+                val c = cur[x]
+                var r = (c shr 16) and 0xFF
+                var g = (c shr 8) and 0xFF
+                var b = c and 0xFF
+                if (sharpen) {
+                    val l = cur[if (x > 0) x - 1 else 0]
+                    val rt = cur[if (x < w - 1) x + 1 else x]
+                    val u = prev[x]
+                    val d = next[x]
+                    // Only real edges are boosted, so sensor noise is left alone.
+                    val dr = 4 * r - ((l shr 16) and 0xFF) - ((rt shr 16) and 0xFF) -
+                        ((u shr 16) and 0xFF) - ((d shr 16) and 0xFF)
+                    val dg = 4 * g - ((l shr 8) and 0xFF) - ((rt shr 8) and 0xFF) -
+                        ((u shr 8) and 0xFF) - ((d shr 8) and 0xFF)
+                    val db = 4 * b - (l and 0xFF) - (rt and 0xFF) - (u and 0xFF) - (d and 0xFF)
+                    if (abs(dr) + abs(dg) + abs(db) > 18) {
+                        r = clamp(r + dr * 70 / 256)
+                        g = clamp(g + dg * 70 / 256)
+                        b = clamp(b + db * 70 / 256)
+                    }
+                }
+                if (matrix != null) {
+                    val nr = matrix[0] * r + matrix[1] * g + matrix[2] * b + matrix[4]
+                    val ng = matrix[5] * r + matrix[6] * g + matrix[7] * b + matrix[9]
+                    val nb = matrix[10] * r + matrix[11] * g + matrix[12] * b + matrix[14]
+                    r = clamp(nr.toInt())
+                    g = clamp(ng.toInt())
+                    b = clamp(nb.toInt())
+                }
+                out[x] = (c and 0xFF000000.toInt()) or (r shl 16) or (g shl 8) or b
+            }
+            bmp.setPixels(out, 0, w, 0, y, w, 1)
+            val t = prev
+            prev = cur
+            cur = next
+            next = t
+        }
+        contentResolver.openOutputStream(uri, "wt")?.use { bmp.compress(Bitmap.CompressFormat.JPEG, 97, it) }
+        bmp.recycle()
+        // Put orientation and shooting details back; re-encoding drops them.
+        try {
+            contentResolver.openFileDescriptor(uri, "rw")?.use { pfd ->
+                val exif = ExifInterface(pfd.fileDescriptor)
+                for ((tag, value) in saved) exif.setAttribute(tag, value)
+                exif.saveAttributes()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "exif restore failed", e)
+        }
+    }
+
+    private fun clamp(v: Int): Int = if (v < 0) 0 else if (v > 255) 255 else v
+
+    // ------------------------------------------------------------------ filters
+
+    private fun diag(rs: Float, gs: Float, bs: Float, off: Float) = ColorMatrix(
+        floatArrayOf(
+            rs, 0f, 0f, 0f, off,
+            0f, gs, 0f, 0f, off,
+            0f, 0f, bs, 0f, off,
+            0f, 0f, 0f, 1f, 0f
+        )
+    )
+
+    private fun filterMatrix(f: Filter): FloatArray {
+        val cm = ColorMatrix()
+        cm.setSaturation(f.sat)
+        cm.postConcat(diag(f.contrast, f.contrast, f.contrast, 127.5f * (1f - f.contrast) + f.bright * 255f))
+        if (f.warmth != 0f) cm.postConcat(diag(1f + f.warmth, 1f + f.warmth * 0.25f, 1f - f.warmth, 0f))
+        if (f.fade > 0f) cm.postConcat(diag(1f - f.fade, 1f - f.fade, 1f - f.fade, f.fade * 255f))
+        return cm.array
+    }
+
+    /** The same colour transform as a 3D lookup table, which is what the video pipeline takes. */
+    private fun lutCube(m: FloatArray): Array<Array<IntArray>> {
+        val n = 17
+        return Array(n) { ri ->
+            Array(n) { gi ->
+                IntArray(n) { bi ->
+                    val r = ri * 255f / (n - 1)
+                    val g = gi * 255f / (n - 1)
+                    val b = bi * 255f / (n - 1)
+                    Color.rgb(
+                        clamp((m[0] * r + m[1] * g + m[2] * b + m[4]).roundToInt()),
+                        clamp((m[5] * r + m[6] * g + m[7] * b + m[9]).roundToInt()),
+                        clamp((m[10] * r + m[11] * g + m[12] * b + m[14]).roundToInt())
+                    )
+                }
+            }
+        }
+    }
+
+    private fun applyPreviewPaint(on: Boolean) {
+        if (on) {
+            val paint = Paint()
+            paint.colorFilter = ColorMatrixColorFilter(filterMatrix(filter))
+            previewView.setLayerType(View.LAYER_TYPE_HARDWARE, paint)
+        } else {
+            previewView.setLayerType(View.LAYER_TYPE_NONE, null)
+        }
+    }
+
+    private fun renderFilters() {
+        filterRow.removeAllViews()
+        for (i in FILTERS.indices) {
+            chip(filterRow, FILTERS[i].name, i == filterIdx) {
+                if (recording != null) {
+                    toast("Recording ke dauraan filter nahi badal sakte")
+                    return@chip
+                }
+                val was = filterIdx
+                filterIdx = i
+                // Between two photo filters only the tint changes; anything else needs a rebind.
+                if (mode != Mode.VIDEO && was > 0 && i > 0) {
+                    applyPreviewPaint(true)
+                    renderFilters()
+                    renderChips()
+                } else {
+                    bind()
+                }
+            }
         }
     }
 
@@ -685,6 +1068,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.chipScroll).visibility = idle
         modeRow.visibility = idle
         switchCam.visibility = idle
+        if (active) filterScroll.visibility = View.GONE
         thumb.visibility = if (active) View.GONE else View.VISIBLE
         pauseBtn.visibility = if (active) View.VISIBLE else View.GONE
         pauseBtn.text = "II"
@@ -703,6 +1087,7 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             return
         }
+        if (fillLight) return
         focusRing.animate().cancel()
         focusRing.x = previewView.x + x - focusRing.width / 2f
         focusRing.y = previewView.y + y - focusRing.height / 2f
@@ -715,30 +1100,80 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
 
+    /** Zoom on the lens that is currently bound (pinch). */
     private fun setZoom(value: Float) {
-        camera?.cameraControl?.setZoomRatio(value.coerceIn(minZoom, maxZoom))
+        camera?.cameraControl?.setZoomRatio(value.coerceIn(minZoom, maxZoom.coerceAtLeast(minZoom)))
+    }
+
+    private fun rearLens(): Boolean = front == 0 && lenses.isNotEmpty()
+
+    /** Zoom relative to the main lens, whichever lens is active. */
+    private fun effectiveZoom(): Float =
+        if (rearLens() && lensIdx in lenses.indices) lenses[lensIdx].ratio * curZoom else curZoom
+
+    private fun zoomTargets(): List<Float> {
+        val all = ArrayList<Float>()
+        if (rearLens()) {
+            for (l in lenses) all.add(l.ratio)
+            if (mainMin < 0.95f) all.add(mainMin)
+            all.add(2f)
+        } else {
+            if (minZoom < 0.95f) all.add(minZoom)
+            all.add(1f)
+            if (maxZoom >= 2f) all.add(2f)
+        }
+        all.sort()
+        val out = ArrayList<Float>()
+        for (t in all) if (out.isEmpty() || t / out.last() > 1.15f) out.add(t)
+        return out
+    }
+
+    /** Jumps to a zoom level, switching to the lens that reaches it optically when there is one. */
+    private fun goZoom(target: Float) {
+        if (!rearLens()) {
+            setZoom(target)
+            return
+        }
+        val opticalBetween = lenses.any { it.ratio > 1.05f && it.ratio <= target + 0.02f }
+        val useMain =
+            if (target < 0.95f) mainMin <= target + 0.02f
+            else target <= mainMax && (mainLogical || !opticalBetween)
+        val idx = if (useMain) mainLens else
+            lenses.indices.filter { lenses[it].ratio <= target + 0.02f }
+                .maxByOrNull { lenses[it].ratio } ?: 0
+        val z = target / lenses[idx].ratio
+        if (idx == lensIdx) {
+            setZoom(z)
+        } else if (recording != null) {
+            toast("Recording ke dauraan lens nahi badal sakte")
+        } else {
+            lensIdx = idx
+            pendingZoom = z
+            bind()
+        }
     }
 
     private fun renderZoom() {
         zoomRow.removeAllViews()
-        val stops = ArrayList<Float>()
-        if (minZoom < 0.95f) stops.add(minZoom)
-        for (s in floatArrayOf(1f, 2f, 3f, 5f, 10f)) if (s <= maxZoom + 0.01f) stops.add(s)
-        if (stops.size < 2) return
-        val nearest = stops.minByOrNull { abs(it - curZoom) }
-        for (s in stops) {
-            val active = s == nearest
-            val label = if (active) fmtZoom(curZoom) + "x" else fmtZoom(s)
-            chip(zoomRow, label, active) { setZoom(s) }
+        val targets = zoomTargets()
+        if (targets.size < 2) return
+        val eff = effectiveZoom()
+        val active = targets.lastOrNull { it <= eff * 1.03f } ?: targets.first()
+        for (t in targets) {
+            val on = t == active
+            val label = if (on) fmtZoom(eff) + "x" else fmtZoom(t)
+            chip(zoomRow, label, on) { goZoom(t) }
         }
     }
 
     private fun fmtZoom(z: Float): String {
-        val r = (z * 10).roundToInt() / 10f
-        return if (r == r.toInt().toFloat()) r.toInt().toString() else r.toString()
+        // Lens ratios come out as 0.52 or 2.9; show them as the familiar 0.5 and 3.
+        val half = (z * 2).roundToInt() / 2f
+        val v = if (half > 0f && abs(half - z) / z < 0.08f) half else (z * 10).roundToInt() / 10f
+        return if (v == v.toInt().toFloat()) v.toInt().toString() else v.toString()
     }
 
-    // ------------------------------------------------------------------ pro controls
+    // ------------------------------------------------------------------ pro controls / tuning
 
     private fun isoValue(): Int {
         val r = isoRange ?: return 100
@@ -756,7 +1191,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun focusDiopters(): Float = minFocusDist * focusP / 1000f
 
-    private fun applyPro() {
+    /** Pushes manual (Pro) settings and night tuning to the camera. */
+    private fun applyTuning() {
         val cam = camera ?: return
         try {
             val b = CaptureRequestOptions.Builder()
@@ -773,10 +1209,20 @@ class MainActivity : AppCompatActivity() {
                 if (wbIdx > 0) {
                     b.setCaptureRequestOption(CaptureRequest.CONTROL_AWB_MODE, WB_MODES[wbIdx])
                 }
+            } else if (nightTuning && sceneNightOk) {
+                b.setCaptureRequestOption(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_USE_SCENE_MODE)
+                b.setCaptureRequestOption(CaptureRequest.CONTROL_SCENE_MODE, CameraMetadata.CONTROL_SCENE_MODE_NIGHT)
             }
             Camera2CameraControl.from(cam.cameraControl).setCaptureRequestOptions(b.build())
         } catch (e: Exception) {
-            Log.w(TAG, "pro controls not applied", e)
+            Log.w(TAG, "tuning not applied", e)
+        }
+        try {
+            if (cam.cameraInfo.isLowLightBoostSupported) {
+                cam.cameraControl.enableLowLightBoostAsync(nightTuning)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "low light boost not applied", e)
         }
     }
 
@@ -823,7 +1269,7 @@ class MainActivity : AppCompatActivity() {
                 if (!fromUser) return
                 set(progress)
                 v.text = value()
-                applyPro()
+                applyTuning()
             }
             override fun onStartTrackingTouch(s: SeekBar) {}
             override fun onStopTrackingTouch(s: SeekBar) {}
@@ -847,6 +1293,8 @@ class MainActivity : AppCompatActivity() {
         if (ultraHdrOk) list.add(0)
         list.add(-1)
         list.addAll(exts)
+        // Night is always offered; without a vendor night mode the app tunes exposure itself.
+        if (!list.contains(ExtensionMode.NIGHT)) list.add(ExtensionMode.NIGHT)
         return list
     }
 
@@ -862,12 +1310,11 @@ class MainActivity : AppCompatActivity() {
     private fun renderChips() {
         chipRow.removeAllViews()
         val m = mode
+        chip(chipRow, if (filterIdx > 0) filter.name else "FILTER", filterIdx > 0) {
+            filterScroll.visibility =
+                if (filterScroll.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+        }
         if (m != Mode.VIDEO) {
-            chip(chipRow, "FLASH " + arrayOf("OFF", "AUTO", "ON")[flash.coerceIn(0, 2)], flash != 0) {
-                flash = (flash + 1) % 3
-                imageCapture?.flashMode = flashConst()
-                renderChips()
-            }
             if (m == Mode.PHOTO) {
                 val opts = processOptions()
                 val current = if (opts.contains(process)) process else opts[0]
@@ -875,6 +1322,22 @@ class MainActivity : AppCompatActivity() {
                     process = opts[(opts.indexOf(current) + 1) % opts.size]
                     bind()
                 }
+            }
+            if (front == 1) {
+                chip(chipRow, if (flash != 0) "SCREEN FLASH" else "FLASH OFF", flash != 0) {
+                    flash = if (flash != 0) 0 else 2
+                    bind()
+                }
+            } else {
+                chip(chipRow, "FLASH " + arrayOf("OFF", "AUTO", "ON")[flash.coerceIn(0, 2)], flash != 0) {
+                    flash = (flash + 1) % 3
+                    imageCapture?.flashMode = flashConst()
+                    renderChips()
+                }
+            }
+            chip(chipRow, "DETAIL+", sharp == 1) {
+                sharp = 1 - sharp
+                renderChips()
             }
             chip(chipRow, if (timer == 0) "TIMER" else "TIMER ${timer}s", timer != 0) {
                 timer = when (timer) { 0 -> 3; 3 -> 10; else -> 0 }
@@ -888,6 +1351,12 @@ class MainActivity : AppCompatActivity() {
                 hiRes = 1 - hiRes
                 bind()
             }
+            if (front == 1) {
+                chip(chipRow, "MIRROR", mirror == 1) {
+                    mirror = 1 - mirror
+                    renderChips()
+                }
+            }
             if (m == Mode.PRO) {
                 chip(chipRow, "RAW", raw == 1 && rawOk, rawOk) {
                     raw = 1 - raw
@@ -895,18 +1364,31 @@ class MainActivity : AppCompatActivity() {
                 }
                 chip(chipRow, if (manualExp) "EXP MANUAL" else "EXP AUTO", manualExp, isoRange != null) {
                     manualExp = !manualExp
-                    applyPro(); renderPro(); renderChips()
+                    applyTuning(); renderPro(); renderChips()
                 }
                 chip(chipRow, if (manualFocus) "FOCUS MF" else "FOCUS AF", manualFocus, minFocusDist > 0f) {
                     manualFocus = !manualFocus
-                    applyPro(); renderPro(); renderChips()
+                    applyTuning(); renderPro(); renderChips()
                 }
                 chip(chipRow, "WB " + WB_NAMES[wbIdx], wbIdx != 0) {
                     wbIdx = (wbIdx + 1) % WB_MODES.size
-                    applyPro(); renderChips()
+                    applyTuning(); renderChips()
                 }
             }
         } else {
+            chip(chipRow, "NIGHT", nightVideo == 1) {
+                nightVideo = 1 - nightVideo
+                bind()
+            }
+            chip(chipRow, "LIGHT", torch || fillLight) {
+                if (front == 1) {
+                    setFillLight(!fillLight)
+                } else {
+                    torch = !torch
+                    camera?.cameraControl?.enableTorch(torch)
+                }
+                renderChips()
+            }
             chip(chipRow, arrayOf("4K", "1080p", "720p")[vq.coerceIn(0, 2)], false) {
                 vq = (vq + 1) % 3
                 bind()
@@ -927,22 +1409,11 @@ class MainActivity : AppCompatActivity() {
                 mic = 1 - mic
                 renderChips()
             }
-            chip(chipRow, "LIGHT", torch) {
-                torch = !torch
-                camera?.cameraControl?.enableTorch(torch)
-                renderChips()
-            }
         }
         chip(chipRow, "GRID", grid == 1) {
             grid = 1 - grid
             gridView.show = grid == 1
             renderChips()
-        }
-        if (front == 0 && backCams.size > 1) {
-            chip(chipRow, "LENS ${lensIndex + 1}/${backCams.size}", lensIndex != 0) {
-                lensIndex = (lensIndex + 1) % backCams.size
-                bind()
-            }
         }
     }
 
@@ -1043,6 +1514,33 @@ class MainActivity : AppCompatActivity() {
             CameraMetadata.CONTROL_AWB_MODE_CLOUDY_DAYLIGHT,
             CameraMetadata.CONTROL_AWB_MODE_INCANDESCENT,
             CameraMetadata.CONTROL_AWB_MODE_FLUORESCENT
+        )
+
+        private val FILTERS = listOf(
+            Filter("ORIGINAL", 1f, 1f, 0f),
+            Filter("VIVID", 1.32f, 1.12f, 0f),
+            Filter("VIVID WARM", 1.32f, 1.12f, 0.09f),
+            Filter("VIVID COOL", 1.32f, 1.12f, -0.09f),
+            Filter("DRAMATIC", 0.82f, 1.3f, 0f, -0.03f),
+            Filter("DRAMATIC WARM", 0.82f, 1.3f, 0.09f, -0.03f),
+            Filter("DRAMATIC COOL", 0.82f, 1.3f, -0.09f, -0.03f),
+            Filter("MONO", 0f, 1.06f, 0f),
+            Filter("SILVERTONE", 0f, 1.22f, 0f, 0.03f, 0.06f),
+            Filter("NOIR", 0f, 1.5f, 0f, -0.04f)
+        )
+
+        private val EXIF_TAGS = arrayOf(
+            ExifInterface.TAG_ORIENTATION,
+            ExifInterface.TAG_DATETIME,
+            ExifInterface.TAG_DATETIME_ORIGINAL,
+            ExifInterface.TAG_MAKE,
+            ExifInterface.TAG_MODEL,
+            ExifInterface.TAG_F_NUMBER,
+            ExifInterface.TAG_EXPOSURE_TIME,
+            ExifInterface.TAG_ISO_SPEED_RATINGS,
+            ExifInterface.TAG_FOCAL_LENGTH,
+            ExifInterface.TAG_FLASH,
+            ExifInterface.TAG_WHITE_BALANCE
         )
     }
 }

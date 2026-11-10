@@ -13,15 +13,23 @@ Photos aur videos `DCIM/GKCamera` folder mein save hote hain.
 
 ## Features
 
+**Dono cameras (rear + selfie)**
+- Lens buttons shutter ke upar: 0.5x (ultrawide) / 1x / 2x / 3x (tele) — jo lens phone deta hai
+- 10 filters: Vivid, Vivid Warm, Vivid Cool, Dramatic, Dramatic Warm, Dramatic Cool, Mono,
+  Silvertone, Noir (FILTER button) — live preview, photo aur video dono mein
+- Tap to focus, pinch zoom, EV slider, grid, timer (3s / 10s)
+
 **PHOTO**
-- Ultra HDR photos (HDR screen par zyada bright highlights), max-quality capture, JPEG quality 100
+- Ultra HDR photos, max-quality capture; default ~12MP binned (kam roshni mein saaf), 50MP button alag
 - Phone ki apni processing: HDR+, NIGHT, PORTRAIT, AI AUTO (jo bhi Motorola third-party apps ko deta hai)
-- 50MP full-resolution mode, 4:3 / 16:9, flash, timer (3s / 10s), grid
-- Tap to focus, pinch zoom, lens buttons (0.5x / 1x / 2x / 3x ...), EV slider
+- NIGHT hamesha milta hai: phone ka night mode na ho to app khud slow shutter / low-light boost lagati hai
+- DETAIL+ (halki sharpening), selfie ke liye SCREEN FLASH aur MIRROR
+- 4:3 / 16:9, flash
 
 **VIDEO**
 - 4K / 1080p / 720p, 30 ya 60 fps, high bitrate
-- HDR 10-bit (HLG) video, stabilisation (STEADY), pause/resume, torch, mic on/off
+- NIGHT (andhere mein zyada bright video), LIGHT (rear: torch, selfie: screen fill-light)
+- HDR 10-bit (HLG) video, stabilisation (STEADY), pause/resume, mic on/off
 
 **PRO**
 - RAW (DNG) + JPEG

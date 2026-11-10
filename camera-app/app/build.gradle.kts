@@ -11,8 +11,8 @@ android {
         applicationId = "com.gk.procam"
         minSdk = 29
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
     }
 
     // CI creates a signing key outside the repo and points to it with GK_KEYSTORE.
@@ -59,4 +59,8 @@ dependencies {
     implementation("androidx.camera:camera-video:$camerax")
     implementation("androidx.camera:camera-view:$camerax")
     implementation("androidx.camera:camera-extensions:$camerax")
+    // Live colour filters for video.
+    implementation("androidx.camera:camera-media3-effect:$camerax")
+    implementation("androidx.media3:media3-effect:1.5.1")
+    implementation("androidx.media3:media3-common:1.5.1")
 }
