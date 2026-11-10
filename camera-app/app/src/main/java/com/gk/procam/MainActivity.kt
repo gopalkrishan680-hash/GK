@@ -41,7 +41,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.camera2.interop.Camera2CameraControl
 import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.CaptureRequestOptions
-import androidx.camera.core.AspectRatio
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraInfo
 import androidx.camera.core.CameraSelector
@@ -342,17 +341,21 @@ class MainActivity : AppCompatActivity() {
         }, ContextCompat.getMainExecutor(this))
     }
 
-    private fun baseSelector(safe: Boolean): CameraSelector = when {
+    private fun baseSelector(): CameraSelector = when {
         front == 1 -> CameraSelector.DEFAULT_FRONT_CAMERA
-        !safe && lensIndex > 0 && lensIndex < backCams.size -> backCams[lensIndex].cameraSelector
+        lensIndex > 0 && lensIndex < backCams.size -> backCams[lensIndex].cameraSelector
         else -> CameraSelector.DEFAULT_BACK_CAMERA
     }
 
     /**
      * (Re)binds the use cases for the current mode and settings. If the device rejects the
-     * requested combination, it is retried once with conservative settings ([safe]).
+     * requested combination it is retried with fewer extras: [level] 1 drops stabilisation,
+     * 50MP readout and vendor extensions; level 2 also drops HDR, 60fps, RAW and lens choice.
      */
-    private fun bind(safe: Boolean = false) {
+    private fun bind(level: Int = 0) {
+        val lite = level >= 1
+        val safe = level >= 2
+        if (safe) lensIndex = 0
         val p = provider ?: return
         if (!hasPermission(Manifest.permission.CAMERA)) return
         camera?.cameraInfo?.zoomState?.removeObservers(this)
@@ -362,7 +365,7 @@ class MainActivity : AppCompatActivity() {
             videoCapture = null
             torch = false
 
-            var selector = baseSelector(safe)
+            var selector = baseSelector()
             if (!p.hasCamera(selector)) {
                 front = 0
                 selector = CameraSelector.DEFAULT_BACK_CAMERA
@@ -415,7 +418,7 @@ class MainActivity : AppCompatActivity() {
                     .setMirrorMode(MirrorMode.MIRROR_MODE_ON_FRONT_ONLY)
                     .setTargetRotation(curRotation)
                 var steady = false
-                if (stab == 1 && !safe) {
+                if (stab == 1 && !lite) {
                     if (Preview.getPreviewCapabilities(info).isStabilizationSupported) {
                         previewBuilder.setPreviewStabilizationEnabled(true)
                         steady = true
@@ -437,14 +440,14 @@ class MainActivity : AppCompatActivity() {
             } else {
                 // Vendor processing (HDR / Night / Portrait) via camera extensions, photo mode only.
                 var activeExt = ExtensionMode.NONE
-                if (mode == Mode.PHOTO && !safe && em != null && process > 0 && exts.contains(process)) {
+                if (mode == Mode.PHOTO && !lite && em != null && process > 0 && exts.contains(process)) {
                     selector = em.getExtensionEnabledCameraSelector(selector, process)
                     activeExt = process
                 }
                 rawActive = mode == Mode.PRO && raw == 1 && rawOk && !safe
                 val ultra = !rawActive && !safe && activeExt == ExtensionMode.NONE &&
                     ultraHdrOk && (process == 0 || mode == Mode.PRO)
-                val full = hiRes == 1 && !safe && activeExt == ExtensionMode.NONE
+                val full = hiRes == 1 && !lite && activeExt == ExtensionMode.NONE
 
                 val rs = ResolutionSelector.Builder()
                     .setAspectRatioStrategy(aspectStrategy)
@@ -480,10 +483,10 @@ class MainActivity : AppCompatActivity() {
             camera = cam
             onBound(cam)
         } catch (e: Exception) {
-            Log.e(TAG, "bind failed (safe=$safe)", e)
+            Log.e(TAG, "bind failed (level=$level)", e)
             if (!safe) {
-                toast("Yeh combination is lens par support nahi hai — safe settings use ho rahi hain")
-                bind(true)
+                if (lite) toast("Yeh combination is lens par support nahi hai — safe settings use ho rahi hain")
+                bind(level + 1)
             } else {
                 toast("Camera start nahi hua: ${e.message}")
             }
@@ -989,7 +992,6 @@ class MainActivity : AppCompatActivity() {
                 toast("Yeh feature is lens / phone par available nahi hai")
                 return@setOnClickListener
             }
-            if (recording != null) return@setOnClickListener
             it.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
             onClick()
         }
