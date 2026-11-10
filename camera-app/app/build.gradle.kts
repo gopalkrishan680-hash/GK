@@ -61,4 +61,7 @@ dependencies {
     implementation("androidx.camera:camera-extensions:$camerax")
     // Live colour filters for video.
     implementation("androidx.camera.media3:media3-effect:1.0.0-alpha04")
+    // Lower bounds only: Gradle picks whatever newer version the CameraX effect needs.
+    implementation("androidx.media3:media3-effect:1.5.1")
+    implementation("androidx.media3:media3-common:1.5.1")
 }
