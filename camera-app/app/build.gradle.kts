@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.gk.procam"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.gk.procam"
