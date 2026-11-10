@@ -92,7 +92,6 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 import kotlin.math.hypot
-import kotlin.math.ln
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.properties.ReadWriteProperty
@@ -127,8 +126,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var evSeek: SeekBar
     private lateinit var evValue: TextView
     private lateinit var zoomRow: LinearLayout
-    private lateinit var zoomSeekRow: View
-    private lateinit var zoomSeek: SeekBar
+    private lateinit var zoomDial: ZoomDial
     private lateinit var modeRow: LinearLayout
     private lateinit var thumb: ImageView
     private lateinit var pauseBtn: TextView
@@ -205,7 +203,6 @@ class MainActivity : AppCompatActivity() {
     private var minZoom = 1f
     private var maxZoom = 1f
     private var zoomChips: List<Float> = emptyList()
-    private var zoomTracking = false
     private var zoomAnim: ValueAnimator? = null
 
     // pro controls
@@ -260,8 +257,7 @@ class MainActivity : AppCompatActivity() {
         evSeek = findViewById(R.id.evSeek)
         evValue = findViewById(R.id.evValue)
         zoomRow = findViewById(R.id.zoomRow)
-        zoomSeekRow = findViewById(R.id.zoomSeekRow)
-        zoomSeek = findViewById(R.id.zoomSeek)
+        zoomDial = findViewById(R.id.zoomDial)
         modeRow = findViewById(R.id.modeRow)
         thumb = findViewById(R.id.thumb)
         pauseBtn = findViewById(R.id.pauseBtn)
@@ -330,18 +326,12 @@ class MainActivity : AppCompatActivity() {
             override fun onStopTrackingTouch(sb: SeekBar) {}
         })
 
-        // Zoom slider: drag left / right with the thumb. Logarithmic, so each bit of travel
-        // feels like the same amount of zoom at 1x and at 10x.
-        zoomSeek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
-                if (!fromUser || maxZoom <= minZoom) return
-                zoomAnim?.cancel()
-                val ratio = (maxZoom / minZoom).toDouble()
-                setZoom((minZoom * ratio.pow(progress / 1000.0)).toFloat())
-            }
-            override fun onStartTrackingTouch(sb: SeekBar) { zoomTracking = true }
-            override fun onStopTrackingTouch(sb: SeekBar) { zoomTracking = false }
-        })
+        // Round zoom dial: drag it left / right with the thumb. It works in "main lens"
+        // units, so 0.5 / 1 / 3 on the dial match the lens buttons.
+        zoomDial.onChange = { eff ->
+            zoomAnim?.cancel()
+            setZoom(eff / lensScale())
+        }
 
         orientationListener = object : OrientationEventListener(this) {
             override fun onOrientationChanged(o: Int) {
@@ -1223,12 +1213,13 @@ class MainActivity : AppCompatActivity() {
             styleChip(tv, on)
         }
         val canZoom = maxZoom > minZoom * 1.01f
-        zoomSeekRow.visibility = if (canZoom) View.VISIBLE else View.INVISIBLE
-        if (canZoom && !zoomTracking && curZoom > 0f) {
-            val pos = ln((curZoom / minZoom).toDouble()) / ln((maxZoom / minZoom).toDouble())
-            zoomSeek.progress = (pos * 1000).roundToInt().coerceIn(0, 1000)
-        }
+        zoomDial.visibility = if (canZoom) View.VISIBLE else View.INVISIBLE
+        zoomDial.setRange(minZoom * lensScale(), maxZoom * lensScale())
+        if (!zoomDial.tracking) zoomDial.value = eff
     }
+
+    private fun lensScale(): Float =
+        if (rearLens() && lensIdx in lenses.indices) lenses[lensIdx].ratio else 1f
 
     private fun fmtZoom(z: Float): String {
         // Lens ratios come out as 0.52 or 2.9; show them as the familiar 0.5 and 3.
