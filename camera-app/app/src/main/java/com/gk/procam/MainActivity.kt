@@ -1,6 +1,7 @@
 package com.gk.procam
 
 import android.Manifest
+import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.Intent
@@ -38,6 +39,7 @@ import android.view.Surface
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.view.animation.DecelerateInterpolator
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.SeekBar
@@ -90,6 +92,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 import kotlin.math.hypot
+import kotlin.math.ln
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.properties.ReadWriteProperty
@@ -124,6 +127,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var evSeek: SeekBar
     private lateinit var evValue: TextView
     private lateinit var zoomRow: LinearLayout
+    private lateinit var zoomSeekRow: View
+    private lateinit var zoomSeek: SeekBar
     private lateinit var modeRow: LinearLayout
     private lateinit var thumb: ImageView
     private lateinit var pauseBtn: TextView
@@ -199,6 +204,9 @@ class MainActivity : AppCompatActivity() {
     private var curZoom = 1f
     private var minZoom = 1f
     private var maxZoom = 1f
+    private var zoomChips: List<Float> = emptyList()
+    private var zoomTracking = false
+    private var zoomAnim: ValueAnimator? = null
 
     // pro controls
     private var manualExp = false
@@ -252,6 +260,8 @@ class MainActivity : AppCompatActivity() {
         evSeek = findViewById(R.id.evSeek)
         evValue = findViewById(R.id.evValue)
         zoomRow = findViewById(R.id.zoomRow)
+        zoomSeekRow = findViewById(R.id.zoomSeekRow)
+        zoomSeek = findViewById(R.id.zoomSeek)
         modeRow = findViewById(R.id.modeRow)
         thumb = findViewById(R.id.thumb)
         pauseBtn = findViewById(R.id.pauseBtn)
@@ -288,6 +298,7 @@ class MainActivity : AppCompatActivity() {
         val scaleDetector = ScaleGestureDetector(this,
             object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
                 override fun onScale(detector: ScaleGestureDetector): Boolean {
+                    zoomAnim?.cancel()
                     setZoom(curZoom * detector.scaleFactor)
                     return true
                 }
@@ -317,6 +328,19 @@ class MainActivity : AppCompatActivity() {
             }
             override fun onStartTrackingTouch(sb: SeekBar) {}
             override fun onStopTrackingTouch(sb: SeekBar) {}
+        })
+
+        // Zoom slider: drag left / right with the thumb. Logarithmic, so each bit of travel
+        // feels like the same amount of zoom at 1x and at 10x.
+        zoomSeek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
+                if (!fromUser || maxZoom <= minZoom) return
+                zoomAnim?.cancel()
+                val ratio = (maxZoom / minZoom).toDouble()
+                setZoom((minZoom * ratio.pow(progress / 1000.0)).toFloat())
+            }
+            override fun onStartTrackingTouch(sb: SeekBar) { zoomTracking = true }
+            override fun onStopTrackingTouch(sb: SeekBar) { zoomTracking = false }
         })
 
         orientationListener = object : OrientationEventListener(this) {
@@ -461,6 +485,7 @@ class MainActivity : AppCompatActivity() {
         if (safe) lensIdx = mainLens
         if (pendingZoom == null && camera != null) pendingZoom = curZoom
         camera?.cameraInfo?.zoomState?.removeObservers(this)
+        zoomAnim?.cancel()
         try {
             p.unbindAll()
             imageCapture = null
@@ -1131,7 +1156,7 @@ class MainActivity : AppCompatActivity() {
     /** Jumps to a zoom level, switching to the lens that reaches it optically when there is one. */
     private fun goZoom(target: Float) {
         if (!rearLens()) {
-            setZoom(target)
+            animateZoomTo(target)
             return
         }
         val opticalBetween = lenses.any { it.ratio > 1.05f && it.ratio <= target + 0.02f }
@@ -1143,7 +1168,7 @@ class MainActivity : AppCompatActivity() {
                 .maxByOrNull { lenses[it].ratio } ?: 0
         val z = target / lenses[idx].ratio
         if (idx == lensIdx) {
-            setZoom(z)
+            animateZoomTo(z)
         } else if (recording != null) {
             toast("Recording ke dauraan lens nahi badal sakte")
         } else {
@@ -1153,16 +1178,55 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** Glides to a zoom level instead of jumping, so tapping a zoom button does not jerk. */
+    private fun animateZoomTo(value: Float) {
+        zoomAnim?.cancel()
+        val from = curZoom
+        val to = value.coerceIn(minZoom, maxZoom.coerceAtLeast(minZoom))
+        if (from <= 0f || abs(to - from) < 0.01f) {
+            setZoom(to)
+            return
+        }
+        val step = (to / from).toDouble()
+        val anim = ValueAnimator.ofFloat(0f, 1f)
+        anim.duration = 280
+        anim.interpolator = DecelerateInterpolator()
+        anim.addUpdateListener {
+            val t = (it.animatedValue as Float).toDouble()
+            camera?.cameraControl?.setZoomRatio((from * step.pow(t)).toFloat())
+        }
+        anim.start()
+        zoomAnim = anim
+    }
+
     private fun renderZoom() {
-        zoomRow.removeAllViews()
         val targets = zoomTargets()
-        if (targets.size < 2) return
         val eff = effectiveZoom()
-        val active = targets.lastOrNull { it <= eff * 1.03f } ?: targets.first()
-        for (t in targets) {
-            val on = t == active
-            val label = if (on) fmtZoom(eff) + "x" else fmtZoom(t)
-            chip(zoomRow, label, on) { goZoom(t) }
+        // The buttons are built once and only restyled afterwards, with a fixed width,
+        // so the row never shifts while zooming.
+        if (targets != zoomChips || zoomRow.childCount != (if (targets.size < 2) 0 else targets.size)) {
+            zoomRow.removeAllViews()
+            zoomChips = targets
+            if (targets.size >= 2) {
+                for (t in targets) {
+                    val tv = chip(zoomRow, fmtZoom(t), false) { goZoom(t) }
+                    tv.minWidth = dp(56)
+                    tv.gravity = Gravity.CENTER
+                }
+            }
+        }
+        val active = targets.lastOrNull { it <= eff * 1.03f } ?: targets.firstOrNull()
+        for (i in 0 until zoomRow.childCount) {
+            val tv = zoomRow.getChildAt(i) as TextView
+            val on = targets[i] == active
+            tv.text = if (on) fmtZoom(eff) + "x" else fmtZoom(targets[i])
+            styleChip(tv, on)
+        }
+        val canZoom = maxZoom > minZoom * 1.01f
+        zoomSeekRow.visibility = if (canZoom) View.VISIBLE else View.INVISIBLE
+        if (canZoom && !zoomTracking && curZoom > 0f) {
+            val pos = ln((curZoom / minZoom).toDouble()) / ln((maxZoom / minZoom).toDouble())
+            zoomSeek.progress = (pos * 1000).roundToInt().coerceIn(0, 1000)
         }
     }
 
@@ -1441,17 +1505,13 @@ class MainActivity : AppCompatActivity() {
     private fun chip(
         parent: LinearLayout, text: String, active: Boolean,
         enabled: Boolean = true, onClick: () -> Unit
-    ) {
+    ): TextView {
         val tv = TextView(this)
         tv.text = text
         tv.textSize = 12f
         tv.typeface = Typeface.DEFAULT_BOLD
-        tv.setTextColor(if (active) Color.BLACK else Color.WHITE)
         tv.setPadding(dp(12), dp(7), dp(12), dp(7))
-        tv.background = GradientDrawable().apply {
-            cornerRadius = dp(18).toFloat()
-            setColor(if (active) 0xFFFFD60A.toInt() else 0x66000000)
-        }
+        styleChip(tv, active)
         tv.alpha = if (enabled) 1f else 0.4f
         val lp = LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
@@ -1465,6 +1525,17 @@ class MainActivity : AppCompatActivity() {
             }
             it.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
             onClick()
+        }
+        return tv
+    }
+
+    private fun styleChip(tv: TextView, active: Boolean) {
+        if (tv.tag == active) return
+        tv.tag = active
+        tv.setTextColor(if (active) Color.BLACK else Color.WHITE)
+        tv.background = GradientDrawable().apply {
+            cornerRadius = dp(18).toFloat()
+            setColor(if (active) 0xFFFFD60A.toInt() else 0x66000000)
         }
     }
 
