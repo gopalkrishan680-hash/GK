@@ -58,7 +58,7 @@ jobs:
         run: |
           export GK_KEYSTORE="$HOME/gk-signing/gkcamera.jks"
           export GK_KEYSTORE_PASS="$(cat ~/gk-signing/pass)"
-          ./gradlew assembleRelease --stacktrace
+          ./gradlew assembleRelease
 
       - name: Collect APK
         run: cp camera-app/app/build/outputs/apk/release/app-release.apk GKCamera.apk
