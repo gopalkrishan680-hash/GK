@@ -24,9 +24,13 @@ class GeminiService(
 
     private val http = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
-        .readTimeout(120, TimeUnit.SECONDS)
+        .readTimeout(240, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
+        .callTimeout(270, TimeUnit.SECONDS)
         .build()
+
+    /** Models that rejected our thinkingConfig; we send them requests without it. */
+    private val noThinkingConfig = java.util.Collections.synchronizedSet(mutableSetOf<String>())
 
     @Volatile private var candidates: List<String>? = null
     @Volatile private var lastGood: String? = null
@@ -48,36 +52,63 @@ class GeminiService(
                     .put("parts", JSONArray().put(JSONObject().put("text", turn.text)))
             )
         }
-        val body = JSONObject()
-            .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", system))))
-            .put("contents", contents)
-            .put(
-                "generationConfig", JSONObject()
-                    .put("responseMimeType", "application/json")
-                    .put("responseSchema", toGeminiSchema(schema))
-                    .put("maxOutputTokens", maxTokens.coerceAtMost(65536L))
-                    .put("temperature", if (effort == Effort.LOW) 0.8 else 0.3)
-            )
-            .toString()
+        val geminiSchema = toGeminiSchema(schema)
+        fun bodyFor(model: String, withThinking: Boolean): String {
+            val config = JSONObject()
+                .put("responseMimeType", "application/json")
+                .put("responseSchema", geminiSchema)
+                .put("maxOutputTokens", maxTokens.coerceAtMost(65536L))
+                .put("temperature", if (effort == Effort.LOW) 0.8 else 0.3)
+            if (withThinking) config.put("thinkingConfig", thinkingConfig(model, effort))
+            return JSONObject()
+                .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", system))))
+                .put("contents", contents)
+                .put("generationConfig", config)
+                .toString()
+        }
 
         var lastError: AiException? = null
+        var timeouts = 0
         for (model in modelList()) {
             try {
-                val json = generate(model, body)
+                val json = try {
+                    generate(model, bodyFor(model, model !in noThinkingConfig))
+                } catch (e: BadThinkingConfig) {
+                    // This model doesn't accept our thinking setting: send the request without it.
+                    noThinkingConfig.add(model)
+                    generate(model, bodyFor(model, false))
+                }
                 if (lastGood != model) {
                     lastGood = model
                     if (model != preferredModel) onModelChosen(model)
                 }
                 return json
+            } catch (e: TimedOut) {
+                lastError = AiException(e.message ?: "Timeout")
+                if (++timeouts >= 2) break
             } catch (e: RetryOtherModel) {
                 lastError = AiException(e.message ?: "Model error")
-                continue
+            } catch (e: BadThinkingConfig) {
+                lastError = AiException(e.message ?: "Model error")
             }
         }
         throw lastError ?: AiException("Koi Gemini model available nahi mila.")
     }
 
-    private class RetryOtherModel(message: String) : Exception(message)
+    private open class RetryOtherModel(message: String) : Exception(message)
+    private class TimedOut(message: String) : RetryOtherModel(message)
+    private class BadThinkingConfig(message: String) : Exception(message)
+
+    /**
+     * Keep "thinking" short so replies come back fast (Flash models think by default,
+     * which made long requests like level-test grading time out).
+     * Gemini 2.x uses thinkingBudget; newer models use thinkingLevel.
+     */
+    private fun thinkingConfig(model: String, effort: Effort): JSONObject =
+        if (Regex("""gemini-2\.""").containsMatchIn(model))
+            JSONObject().put("thinkingBudget", if (effort == Effort.LOW) 0 else 1024)
+        else
+            JSONObject().put("thinkingLevel", "low")
 
     private fun generate(model: String, body: String): JSONObject {
         val req = Request.Builder()
@@ -87,6 +118,9 @@ class GeminiService(
             .build()
         val (code, text) = try {
             http.newCall(req).execute().use { it.code to (it.body?.string() ?: "") }
+        } catch (e: java.io.InterruptedIOException) {
+            // Read/call timeout: the model took too long. Try the next (often faster) model.
+            throw TimedOut("AI ne jawab dene me bahut der lagayi. Dobara 'Finish/Send' dabayein.")
         } catch (e: IOException) {
             throw AiException("Internet connection check karein: ${e.message}")
         }
@@ -95,9 +129,12 @@ class GeminiService(
             val msg = runCatching { JSONObject(text).getJSONObject("error").optString("message") }.getOrNull()
                 ?: text.take(200)
             when (code) {
-                400 -> if (msg.contains("API key", ignoreCase = true))
-                    throw AiException("Gemini API key galat hai. Settings me sahi key daalein (aistudio.google.com).")
-                else throw RetryOtherModel("Gemini error: $msg")
+                400 -> when {
+                    msg.contains("API key", ignoreCase = true) ->
+                        throw AiException("Gemini API key galat hai. Settings me sahi key daalein (aistudio.google.com).")
+                    msg.contains("thinking", ignoreCase = true) -> throw BadThinkingConfig("Gemini error: $msg")
+                    else -> throw RetryOtherModel("Gemini error: $msg")
+                }
                 401, 403 -> throw AiException("Gemini API key kaam nahi kar rahi: $msg")
                 404 -> throw RetryOtherModel("Model $model nahi mila")
                 429 -> throw RetryOtherModel(

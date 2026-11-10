@@ -4,7 +4,11 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -37,6 +41,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             SpeakUpTheme {
                 CompositionLocalProvider(LocalGraph provides graph) {
+                  // Paint the theme background so text is readable in both light and dark mode.
+                  Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     val nav = rememberNavController()
                     val p = graph.store.profile
                     val start = when {
@@ -79,6 +85,7 @@ class MainActivity : ComponentActivity() {
                         composable("progress") { ProgressScreen(nav) }
                         composable("settings") { SettingsScreen(nav) }
                     }
+                  }
                 }
             }
         }

@@ -105,7 +105,7 @@ fun LevelTestScreen(onFinished: () -> Unit, onSkip: () -> Unit) {
                 graph.store.addActivity(totalSecs, answers.sumOf { wordCount(it) }, xp = 50)
                 onFinished()
             } catch (e: Exception) {
-                error = e.message ?: "Kuch gadbad ho gayi"
+                error = (e.message ?: "Kuch gadbad ho gayi") + "\nAapke jawab save hain - 'Finish' dobara dabayein."
                 stage = "questions"
             }
         }
@@ -262,7 +262,8 @@ fun LevelTestScreen(onFinished: () -> Unit, onSkip: () -> Unit) {
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                 )
                 Text(
-                    "Grammar, vocabulary, fluency aur pronunciation", style = MaterialTheme.typography.bodyMedium,
+                    "Grammar, vocabulary, fluency aur pronunciation\n(30-60 second lag sakte hain, app band mat karein)",
+                    style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center,
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                 )
             }
