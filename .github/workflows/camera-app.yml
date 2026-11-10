@@ -46,19 +46,13 @@ jobs:
               -alias gkcamera -keyalg RSA -keysize 2048 -validity 20000 -dname "CN=GK Camera"
           fi
 
-      - name: List library versions
-        run: |
-          curl -s "https://dl.google.com/dl/android/maven2/androidx/camera/group-index.xml" | head -60 || true
-          echo "== androidx.camera.media3"
-          curl -s "https://dl.google.com/dl/android/maven2/androidx/camera/media3/group-index.xml" | head -40 || true
-          curl -s "https://dl.google.com/dl/android/maven2/androidx/camera/media3/media3-effect/maven-metadata.xml" | grep -o '<version>[^<]*' | tail -8 || true
-
       - name: Build APK
         working-directory: camera-app
         run: |
           export GK_KEYSTORE="$HOME/gk-signing/gkcamera.jks"
           export GK_KEYSTORE_PASS="$(cat ~/gk-signing/pass)"
           ./gradlew assembleRelease
+          ./gradlew -q :app:dependencies --configuration releaseRuntimeClasspath | grep -E "camera-core|media3-effect|media3-common" | sort -u | head -8
 
       - name: Collect APK
         run: cp camera-app/app/build/outputs/apk/release/app-release.apk GKCamera.apk

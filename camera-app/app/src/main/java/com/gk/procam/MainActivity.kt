@@ -51,6 +51,7 @@ import androidx.camera.camera2.interop.Camera2CameraControl
 import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.CaptureRequestOptions
 import androidx.camera.core.Camera
+import androidx.camera.core.CameraEffect
 import androidx.camera.core.CameraInfo
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.DynamicRange
@@ -60,12 +61,14 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.MirrorMode
 import androidx.camera.core.Preview
 import androidx.camera.core.UseCase
+import androidx.camera.core.UseCaseGroup
 import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.extensions.ExtensionMode
 import androidx.camera.extensions.ExtensionsManager
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.media3.effect.Media3Effect
 import androidx.camera.video.FallbackStrategy
 import androidx.camera.video.MediaStoreOutputOptions
 import androidx.camera.video.Quality
@@ -80,6 +83,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.media3.effect.SingleColorLut
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -167,6 +171,7 @@ class MainActivity : AppCompatActivity() {
     private var camera: Camera? = null
     private var imageCapture: ImageCapture? = null
     private var videoCapture: VideoCapture<Recorder>? = null
+    private var videoEffect: Media3Effect? = null
     private var recording: Recording? = null
     private var recordingPaused = false
     private var torch = false
@@ -477,6 +482,8 @@ class MainActivity : AppCompatActivity() {
             videoCapture = null
             torch = false
             setFillLight(false)
+            try { videoEffect?.close() } catch (e: Exception) { Log.w(TAG, "effect close", e) }
+            videoEffect = null
 
             var selector = baseSelector()
             if (!p.hasCamera(selector)) {
@@ -525,7 +532,7 @@ class MainActivity : AppCompatActivity() {
             nightTuning = false
 
             if (mode == Mode.VIDEO) {
-                val useFilter = false // video filters are not wired up yet
+                val useFilter = filtered && !safe
                 val dr = if (hdrVideo == 1 && hlgOk && !safe && !useFilter) DynamicRange.HLG_10_BIT
                 else DynamicRange.SDR
                 val wantedQ = listOf(Quality.UHD, Quality.FHD, Quality.HD)[vq.coerceIn(0, 2)]
@@ -564,6 +571,23 @@ class MainActivity : AppCompatActivity() {
                 videoCapture = vc
                 useCases.add(vc)
                 nightTuning = night
+                if (useFilter) {
+                    // Colour filter rendered on the GPU into both the preview and the recording.
+                    val fx = Media3Effect(
+                        this, CameraEffect.PREVIEW or CameraEffect.VIDEO_CAPTURE,
+                        ContextCompat.getMainExecutor(this)
+                    ) { t ->
+                        Log.e(TAG, "video filter failed", t)
+                        runOnUiThread {
+                            toast("Video filter is phone par nahi chala — filter band kar diya")
+                            filterIdx = 0
+                            renderFilters()
+                            if (recording == null) bind()
+                        }
+                    }
+                    fx.setEffects(listOf(SingleColorLut.createFromCube(lutCube(filterMatrix(f)))))
+                    videoEffect = fx
+                }
                 statusLabel = listOfNotNull(
                     arrayOf("4K", "1080p", "720p")[vq.coerceIn(0, 2)],
                     "${useFps}fps",
@@ -649,7 +673,15 @@ class MainActivity : AppCompatActivity() {
             preview.setSurfaceProvider(previewView.surfaceProvider)
             useCases.add(0, preview)
 
-            val cam = p.bindToLifecycle(this, selector, *useCases.toTypedArray())
+            val fx = videoEffect
+            val cam = if (fx != null) {
+                val group = UseCaseGroup.Builder()
+                for (u in useCases) group.addUseCase(u)
+                group.addEffect(fx)
+                p.bindToLifecycle(this, selector, group.build())
+            } else {
+                p.bindToLifecycle(this, selector, *useCases.toTypedArray())
+            }
             camera = cam
             onBound(cam)
         } catch (e: Exception) {
@@ -936,6 +968,25 @@ class MainActivity : AppCompatActivity() {
         if (f.warmth != 0f) cm.postConcat(diag(1f + f.warmth, 1f + f.warmth * 0.25f, 1f - f.warmth, 0f))
         if (f.fade > 0f) cm.postConcat(diag(1f - f.fade, 1f - f.fade, 1f - f.fade, f.fade * 255f))
         return cm.array
+    }
+
+    /** The same colour transform as a 3D lookup table, which is what the video pipeline takes. */
+    private fun lutCube(m: FloatArray): Array<Array<IntArray>> {
+        val n = 17
+        return Array(n) { ri ->
+            Array(n) { gi ->
+                IntArray(n) { bi ->
+                    val r = ri * 255f / (n - 1)
+                    val g = gi * 255f / (n - 1)
+                    val b = bi * 255f / (n - 1)
+                    Color.rgb(
+                        clamp((m[0] * r + m[1] * g + m[2] * b + m[4]).roundToInt()),
+                        clamp((m[5] * r + m[6] * g + m[7] * b + m[9]).roundToInt()),
+                        clamp((m[10] * r + m[11] * g + m[12] * b + m[14]).roundToInt())
+                    )
+                }
+            }
+        }
     }
 
     private fun applyPreviewPaint(on: Boolean) {
@@ -1314,12 +1365,11 @@ class MainActivity : AppCompatActivity() {
     private fun renderChips() {
         chipRow.removeAllViews()
         val m = mode
-        if (m == Mode.VIDEO) filterScroll.visibility = View.GONE
+        chip(chipRow, if (filterIdx > 0) filter.name else "FILTER", filterIdx > 0) {
+            filterScroll.visibility =
+                if (filterScroll.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+        }
         if (m != Mode.VIDEO) {
-            chip(chipRow, if (filterIdx > 0) filter.name else "FILTER", filterIdx > 0) {
-                filterScroll.visibility =
-                    if (filterScroll.visibility == View.VISIBLE) View.GONE else View.VISIBLE
-            }
             if (m == Mode.PHOTO) {
                 val opts = processOptions()
                 val current = if (opts.contains(process)) process else opts[0]

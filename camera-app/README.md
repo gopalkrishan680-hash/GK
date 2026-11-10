@@ -16,7 +16,7 @@ Photos aur videos `DCIM/GKCamera` folder mein save hote hain.
 **Dono cameras (rear + selfie)**
 - Lens buttons shutter ke upar: 0.5x (ultrawide) / 1x / 2x / 3x (tele) — jo lens phone deta hai
 - 10 filters: Vivid, Vivid Warm, Vivid Cool, Dramatic, Dramatic Warm, Dramatic Cool, Mono,
-  Silvertone, Noir (FILTER button) — live preview ke saath, photos par
+  Silvertone, Noir (FILTER button) — live preview, photo aur video dono mein
 - Zoom slider (thumb se left-right), smooth zoom buttons, pinch zoom
 - Tap to focus, EV slider, grid, timer (3s / 10s)
 
