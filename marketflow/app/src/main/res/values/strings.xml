@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GK MarketFlow</string>
+    <string name="channel_alerts">Price alerts</string>
+    <string name="channel_alerts_desc">Notifications when a price or market-flow alert you created is triggered</string>
+</resources>

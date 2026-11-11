@@ -1,0 +1,46 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.gk.marketflow'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.gk.marketflow'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '1.0.0'
+    }
+
+    signingConfigs {
+        // Shared sideload key so every build can be installed over the previous one.
+        sideload {
+            storeFile file('../keystore/sideload.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.sideload
+        }
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.sideload
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+}
