@@ -10,7 +10,7 @@ import kotlin.math.sqrt
 object Pitch {
     private const val RATE = MODEL_RATE / 2 // analysis runs on 2x decimated audio
     private const val WIN = 512
-    private const val MIN_LAG = RATE / 400
+    private const val MIN_LAG = RATE / 500
     private const val MAX_LAG = RATE / 60
 
     /** Seconds between two values of [track]. */

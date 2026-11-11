@@ -305,11 +305,14 @@ class EngineTest {
         val dir = System.getenv("MERI_AWAAZ_MODELS")
         assumeTrue(dir != null, "MERI_AWAAZ_MODELS not set")
         val work = java.nio.file.Files.createTempDirectory("meri_awaaz").toFile()
+        val wavs = System.getenv("MERI_AWAAZ_WAVS")
+        val pairs = if (wavs == null) listOf("") else listOf("", "2").filter { File(wavs, "source$it.wav").exists() }
         VoiceEngine("$dir/tone_encoder.onnx", "$dir/converter.onnx", 4).use { engine ->
-            val wavs = System.getenv("MERI_AWAAZ_WAVS")
+          for (pair in pairs) {
+            println("---- pair '$pair'")
             // Without recordings: 13 s of bursts (three model chunks) and a higher-pitched "sample".
-            val src = if (wavs != null) readWav(File(wavs, "source.wav")) else bursts(13, 0.005, 0.0)
-            val tgt = if (wavs != null) readWav(File(wavs, "target.wav")) else
+            val src = if (wavs != null) readWav(File(wavs, "source$pair.wav")) else bursts(13, 0.005, 0.0)
+            val tgt = if (wavs != null) readWav(File(wavs, "target$pair.wav")) else
                 voice(210.0, MODEL_RATE * 12).also { for (i in it.indices) if ((i / 20000) % 4 == 3) it[i] = 0f }
             val rawSrc = File(work, "src.raw").also { f -> PcmWriter(f).use { it.write(src, 0, src.size) } }
             val rawTgt = File(work, "tgt.raw").also { f -> PcmWriter(f).use { it.write(tgt, 0, tgt.size) } }
@@ -371,6 +374,7 @@ class EngineTest {
                 assertTrue(similarity["bare model"]!! > before, "conversion did not move the voice towards the target")
                 assertTrue(melody["default"]!! > 0.5f, "intonation of the voiceover was lost: ${melody["default"]}")
             }
+          }
         }
         work.deleteRecursively()
     }

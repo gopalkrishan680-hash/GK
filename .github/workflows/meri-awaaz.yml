@@ -57,15 +57,19 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg espeak-ng
           mkdir -p "$RUNNER_TEMP/wavs" && cd "$RUNNER_TEMP/wavs"
           base=https://raw.githubusercontent.com/myshell-ai/OpenVoice/main/resources
-          if curl -fsSL --retry 3 -o s.mp3 "$base/demo_speaker1.mp3" && curl -fsSL --retry 3 -o t.mp3 "$base/example_reference.mp3"; then
-            ffmpeg -v error -y -i s.mp3 -t 40 -ac 1 -ar 22050 -c:a pcm_s16le source.wav
-            ffmpeg -v error -y -i t.mp3 -ac 1 -ar 22050 -c:a pcm_s16le target.wav
+          ok=1
+          for f in example_reference demo_speaker0 demo_speaker2; do curl -fsSL --retry 3 -o $f.mp3 "$base/$f.mp3" || ok=0; done
+          if [ "$ok" = 1 ]; then
+            wav() { ffmpeg -v error -y -i "$1.mp3" -t 25 -ac 1 -ar 22050 -c:a pcm_s16le "$2.wav"; }
+            # Pair 1: higher voice (~200 Hz) into a low male voice. Pair 2: male into male.
+            wav example_reference source && wav demo_speaker0 target
+            wav demo_speaker0 source2 && wav demo_speaker2 target2
           else
             text="This is a test of the voice changer. The quick brown fox jumps over the lazy dog, and then it runs back home through the quiet green forest before the evening rain begins to fall."
             espeak-ng -v en-us+m3 -p 30 -s 150 -w source.wav "$text"
             espeak-ng -v en-us+f3 -p 75 -s 150 -w target.wav "$text Here is some different text for the second speaker, so that both recordings are not the same."
           fi
-          ffprobe -v error -show_entries format=duration -of csv=p=0 source.wav target.wav || true
+          ls -l
 
       - name: Engine tests (with the real model)
         run: |
