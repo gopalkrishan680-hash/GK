@@ -155,7 +155,7 @@
     /* ---------- rank all strategies ---------- */
     function showRank() {
       killCharts();
-      body.innerHTML = form(false) + '<button class="btn block mb" data-go>Rank all strategies</button><div data-res></div>' + (MF.research ? MF.research.card() : '');
+      body.innerHTML = form(false) + '<button class="btn block mb" data-go>Rank all strategies</button><div data-res></div>';
       bindForm(showRank);
       U.$('[data-go]', body).onclick = function () {
         var res = U.$('[data-res]', body), sy = sym(), btn = U.$('[data-go]', body);

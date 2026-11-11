@@ -1,0 +1,35 @@
+name: Build GK MarketFlow APK
+
+on:
+  push:
+    paths:
+      - 'marketflow/**'
+      - '.github/workflows/marketflow-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: marketflow
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Unit tests
+        run: node test/run.js
+      - name: Build APK
+        run: ./gradlew assembleRelease --console=plain
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GK-MarketFlow-apk
+          path: marketflow/app/build/outputs/apk/release/app-release.apk

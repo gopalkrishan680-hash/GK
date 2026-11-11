@@ -123,7 +123,7 @@
   /* ---------------- guides ---------------- */
   function strategyPage(el) {
     var label = { intraday: 'Intraday', swing: 'Swing', long: 'Long term' };
-    el.innerHTML = '<div class="note mt-s">Every strategy here is a fixed set of rules, so it can be tested on history. None of them wins all the time. Use the Backtest tab to see how each one behaved on the stock and period you care about.</div>' + (MF.research ? MF.research.card() : '') +
+    el.innerHTML = '<div class="note mt-s">Every strategy here is a fixed set of rules, so it can be tested on history. None of them wins all the time. Use the Backtest tab to see how each one behaved on the stock and period you care about.</div>' +
       ST.list.map(function (s) {
         return '<div class="card"><div class="card-h"><h2>' + s.name + '</h2><div>' + s.styles.map(function (x) { return '<span class="pill info">' + label[x] + '</span>'; }).join(' ') + '</div></div><p>' + s.summary + '</p><p class="muted">' + s.logic + '</p><button class="btn small ghost" data-sid="' + s.id + '" data-style="' + s.styles[0] + '">Backtest this</button></div>';
       }).join('');
