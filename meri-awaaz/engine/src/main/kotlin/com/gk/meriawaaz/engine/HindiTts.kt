@@ -66,7 +66,8 @@ class HindiTts(modelPath: String, tokensPath: String, threads: Int) : Closeable 
             ids.add(id)
             ids.add(BLANK)
         }
-        if (ids.size < 3) return FloatArray(0)
+        // Nothing but spaces or unknown symbols: there is nothing to say.
+        if (phrase.none { !it.isWhitespace() && (it in tokens || it.lowercaseChar() in tokens) }) return FloatArray(0)
         val x = LongArray(ids.size) { ids[it] }
         fun scalar(v: Float) = OnnxTensor.createTensor(env, FloatBuffer.wrap(floatArrayOf(v)), longArrayOf(1))
         OnnxTensor.createTensor(env, LongBuffer.wrap(x), longArrayOf(1, x.size.toLong())).use { tx ->
