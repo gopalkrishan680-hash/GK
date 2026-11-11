@@ -7,13 +7,31 @@ koi doosra app nahi, internet bhi nahi chahiye.** App koi internet permission ma
 ## Kaise use kare
 
 1. **Voiceover** chuno — koi bhi audio ya video file (mp3, wav, m4a, mp4 …).
-2. **Apni awaaz ka sample** chuno — 30 second se 2 minute ki saaf recording
-   (bina music, bina shor). Ye ek baar dena hai; app use yaad rakhta hai.
+2. **Apni awaaz ka sample** chuno — 30 second se 2 minute ki recording.
+   Ye ek baar dena hai; app use yaad rakhta hai aur batata hai sample kitna accha hai.
 3. **Convert karo** dabao. Pura voiceover aapki awaaz me ban jayega.
 4. **Suno / Save / Share.**
 
 Output 22.05 kHz mono WAV hota hai. Speed phone par depend karti hai — lagbhag
 utna hi time lagta hai jitna lamba audio hai (purane phone par zyada).
+
+## Quality ke liye app khud kya karta hai
+
+**Sample par (hamesha, automatic):**
+- 70 Hz se neeche ki ghar-ghar (rumble/hum) hatata hai
+- background shor (fan, hiss) hatata hai — shor ka namoona recording ke sabse shaant palon se seekhta hai
+- chuppi aur lambe pause nikaal deta hai, sirf bolne wala hissa leta hai
+- loudness ek standard level par lata hai (dheemi recording bhi chalegi)
+- sample ko tukdo me sunta hai aur jo tukde baaki se alag hain (khaansi, shor) unhe chhod deta hai
+- aapki bolne ki pitch naapta hai
+- report dikhata hai: kitni saaf awaaz mili, shor kitna hai, aur zaroorat ho to tip
+
+**Voiceover par:**
+- wahi safai (rumble, shor, loudness) — "Voiceover ka shor hatao" option
+- **Pitch match** — voiceover ki pitch aapki awaaz ki pitch tak le jata hai (duration nahi badalti).
+  Isse sabse bada farak padta hai jab voiceover kisi aur tarah ki awaaz me ho (jaise mahila/AI voice → purush)
+- convert ke baad: original ke pause shaant rakhta hai (saans jaisi awaaz nahi aati) aur
+  final loudness poori, bina clipping ke
 
 ## APK kahan se milega
 
@@ -34,7 +52,7 @@ repo → **Actions** → **Meri Awaaz APK** → sabse upar wala green run → **
 
 | Folder | Kya hai |
 | --- | --- |
-| `engine/` | Pure Kotlin: resampler, lambi audio ko tukdo me process karna, model runner (+ tests) |
+| `engine/` | Pure Kotlin: cleaner (noise removal), pitch match, resampler, lambi audio ko tukdo me process karna, model runner (+ tests) |
 | `app/` | Android UI, audio decoder (MediaCodec), save/share |
 | `tools/export_onnx.py` | Model → ONNX export aur jaanch |
 
@@ -52,7 +70,9 @@ python tools/export_onnx.py --checkpoint checkpoint.pth --config config.json --o
 
 - Ye awaaz ka *rang* badalta hai; lehja (accent) aur bolne ka style original voiceover ka hi rehta hai.
   Isliye result "aap jaisa" lagta hai, par 100% aapki copy nahi.
-- Sample jitna saaf aur lamba (1–2 minute), result utna behtar.
+- App sample saaf zaroor karta hai, par bahut zyada shor, echo ya music wala sample phir bhi kharab result dega.
+  Shaant kamre me 1–2 minute aaram se bol kar record karo.
+- Sample me atakna/rukna koi dikkat nahi — model sirf awaaz ka rang leta hai, shabd nahi; pause app khud hata deta hai.
 - Voiceover me background music ho to wo bhi bigad jayega — sirf awaaz wali file do.
 - Signing key (`signing/`) repo me rakhi hai taki har naya build purane ke upar install ho sake;
   ye Play Store release ke liye nahi hai.

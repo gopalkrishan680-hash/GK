@@ -10,16 +10,18 @@ import android.provider.OpenableColumns
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.core.content.FileProvider
+import com.gk.meriawaaz.engine.ConvertOptions
 import com.gk.meriawaaz.engine.MODEL_RATE
-import com.gk.meriawaaz.engine.PcmWriter
-import com.gk.meriawaaz.engine.RawPcmFile
+import com.gk.meriawaaz.engine.SampleTooShortException
+import com.gk.meriawaaz.engine.Stage
+import com.gk.meriawaaz.engine.Studio
 import com.gk.meriawaaz.engine.VoiceEngine
+import com.gk.meriawaaz.engine.VoiceProfile
 import java.io.File
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -32,6 +34,9 @@ class MainActivity : Activity() {
     private lateinit var status: TextView
     private lateinit var resultBox: View
     private lateinit var play: Button
+    private lateinit var sampleQuality: TextView
+    private lateinit var denoise: CheckBox
+    private lateinit var pitchMatch: CheckBox
     private lateinit var pickers: List<Button>
 
     private var voiceoverUri: Uri? = null
@@ -45,7 +50,7 @@ class MainActivity : Activity() {
     @Volatile
     private var cancel = false
 
-    private val voiceFile get() = File(filesDir, "my_voice.f32")
+    private val voiceFile get() = File(filesDir, "my_voice.profile")
     private val prefs get() = getSharedPreferences("app", MODE_PRIVATE)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,6 +63,9 @@ class MainActivity : Activity() {
         status = findViewById(R.id.status)
         resultBox = findViewById(R.id.resultBox)
         play = findViewById(R.id.play)
+        sampleQuality = findViewById(R.id.sampleQuality)
+        denoise = findViewById(R.id.denoise)
+        pitchMatch = findViewById(R.id.pitchMatch)
         val pickVoiceover = findViewById<Button>(R.id.pickVoiceover)
         val pickSample = findViewById<Button>(R.id.pickSample)
         pickers = listOf(pickVoiceover, pickSample)
@@ -114,13 +122,18 @@ class MainActivity : Activity() {
     /** Syncs labels and buttons with the current state. */
     private fun refresh() {
         val running = worker != null
-        val savedVoice = if (voiceFile.exists()) prefs.getString(KEY_VOICE_NAME, null) else null
+        val saved = if (voiceFile.exists()) VoiceProfile.fromBytes(voiceFile.readBytes()) else null
+        val savedVoice = if (saved != null) prefs.getString(KEY_VOICE_NAME, "sample") else null
+        sampleQuality.text = if (saved != null && sampleUri == null) describe(saved) else ""
+        sampleQuality.visibility = if (sampleQuality.text.isEmpty()) View.GONE else View.VISIBLE
         sampleName.text = when {
             sampleUri != null -> sampleLabel
             savedVoice != null -> getString(R.string.saved_voice, savedVoice)
             else -> getString(R.string.none_chosen)
         }
         pickers.forEach { it.isEnabled = !running }
+        denoise.isEnabled = !running
+        pitchMatch.isEnabled = !running
         convert.isEnabled = running || (voiceoverUri != null && (sampleUri != null || savedVoice != null))
         convert.setText(if (running) R.string.cancel else R.string.convert)
         progress.visibility = if (running) View.VISIBLE else View.GONE
@@ -132,15 +145,16 @@ class MainActivity : Activity() {
         val voiceover = voiceoverUri ?: return
         val sample = sampleUri
         val label = sampleLabel
+        val options = ConvertOptions(denoise = denoise.isChecked, pitchMatch = pitchMatch.isChecked)
         stopPlayer()
         cancel = false
         resultBox.visibility = View.GONE
         worker = Thread {
             val message = try {
-                runJob(voiceover, sample, label)
+                runJob(voiceover, sample, label, options)
             } catch (e: NoAudioException) {
                 getString(R.string.err_no_audio)
-            } catch (e: ShortSampleException) {
+            } catch (e: SampleTooShortException) {
                 getString(R.string.err_short_sample)
             } catch (e: OutOfMemoryError) {
                 getString(R.string.err_memory)
@@ -176,7 +190,7 @@ class MainActivity : Activity() {
     }
 
     /** Runs on the worker thread; returns the final status message. */
-    private fun runJob(voiceover: Uri, sample: Uri?, sampleLabel: String?): String {
+    private fun runJob(voiceover: Uri, sample: Uri?, sampleLabel: String?, options: ConvertOptions): String {
         val cancelled = { cancel }
         val work = File(cacheDir, "work").apply { deleteRecursively(); mkdirs() }
         val outDir = File(filesDir, "output").apply { deleteRecursively(); mkdirs() }
@@ -186,63 +200,75 @@ class MainActivity : Activity() {
         val (encoderPath, converterPath) = Models.prepare(this)
         val threads = Runtime.getRuntime().availableProcessors().coerceIn(1, 4)
         VoiceEngine(encoderPath, converterPath, threads).use { engine ->
-            val target: FloatArray
+            val studio = Studio(engine, work)
+            val profile: VoiceProfile
             if (sample != null) {
                 val text = getString(R.string.st_sample)
                 stage(text, 0f)
                 val raw = File(work, "sample.raw")
-                AudioDecoder.decode(this, sample, raw, SAMPLE_MAX_SECONDS, { stage(text, it * 0.5f) }, cancelled)
+                AudioDecoder.decode(this, sample, raw, SAMPLE_MAX_SECONDS, { stage(text, it * 0.3f) }, cancelled)
                 if (cancel) return getString(R.string.st_cancelled)
-                target = RawPcmFile(raw).use { pcm ->
-                    if (pcm.length < SAMPLE_MIN_SECONDS * MODEL_RATE) throw ShortSampleException()
-                    engine.embed(pcm, SAMPLE_MAX_SECONDS) { stage(text, 0.5f + it * 0.5f) }
+                profile = studio.profile(raw, { stage(text, 0.3f + it * 0.7f) }, cancelled)
+                    ?: return getString(R.string.st_cancelled)
+                voiceFile.writeBytes(profile.toBytes())
+                prefs.edit().putString(KEY_VOICE_NAME, sampleLabel ?: "sample").apply()
+                runOnUiThread {
+                    sampleUri = null
+                    refresh()
                 }
-                saveVoice(target, sampleLabel ?: "sample")
-                runOnUiThread { sampleUri = null }
             } else {
-                target = loadVoice()
+                profile = VoiceProfile.fromBytes(voiceFile.readBytes()) ?: throw SampleTooShortException()
             }
 
             val decodeText = getString(R.string.st_decode)
             stage(decodeText, 0f)
             val raw = File(work, "voiceover.raw")
-            AudioDecoder.decode(this, voiceover, raw, 0, { stage(decodeText, it) }, cancelled)
+            val samples = AudioDecoder.decode(this, voiceover, raw, 0, { stage(decodeText, it) }, cancelled)
             if (cancel) return getString(R.string.st_cancelled)
+            if (samples < MODEL_RATE / 2) throw NoAudioException()
 
-            RawPcmFile(raw).use { pcm ->
-                if (pcm.length < MODEL_RATE / 2) throw NoAudioException()
-                stage(getString(R.string.st_analyse), null)
-                val source = engine.embed(pcm)
-                val name = "meri_awaaz_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) + ".wav"
-                val out = File(outDir, name)
-                val began = SystemClock.elapsedRealtime()
-                val finished = PcmWriter(out, MODEL_RATE).use { writer ->
-                    engine.convert(pcm, source, target, writer::write,
-                        { stage(getString(R.string.st_convert, (it * 100).toInt()), it) }, cancelled)
+            val name = "meri_awaaz_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) + ".wav"
+            val out = File(outDir, name)
+            val began = SystemClock.elapsedRealtime()
+            val result = studio.convert(raw, profile, options, out, { s, f ->
+                when (s) {
+                    Stage.CLEAN -> stage(getString(R.string.st_clean), f)
+                    Stage.PITCH -> stage(getString(R.string.st_pitch), f)
+                    Stage.ANALYSE -> stage(getString(R.string.st_analyse), f)
+                    Stage.CONVERT -> stage(getString(R.string.st_convert, (f * 100).toInt()), f)
+                    Stage.FINISH -> stage(getString(R.string.st_finish), null)
                 }
-                if (!finished) {
-                    out.delete()
-                    return getString(R.string.st_cancelled)
-                }
-                output = out
-                val took = (SystemClock.elapsedRealtime() - began) / 1000
-                return getString(R.string.st_done, clock(pcm.length / MODEL_RATE), clock(took))
+            }, cancelled)
+            if (!result.finished) {
+                out.delete()
+                return getString(R.string.st_cancelled)
             }
+            output = out
+            val took = (SystemClock.elapsedRealtime() - began) / 1000
+            var message = getString(R.string.st_done, clock(samples / MODEL_RATE), clock(took))
+            if (result.semitones != 0f) {
+                message += "\n" + getString(R.string.st_pitch_done, String.format(Locale.US, "%+.1f", result.semitones))
+            }
+            return message
         }
     }
 
     private fun clock(seconds: Long) = String.format(Locale.US, "%d:%02d", seconds / 60, seconds % 60)
 
-    private fun saveVoice(g: FloatArray, label: String) {
-        val bytes = ByteBuffer.allocate(g.size * 4).order(ByteOrder.LITTLE_ENDIAN)
-        bytes.asFloatBuffer().put(g)
-        voiceFile.writeBytes(bytes.array())
-        prefs.edit().putString(KEY_VOICE_NAME, label).apply()
-    }
-
-    private fun loadVoice(): FloatArray {
-        val fb = ByteBuffer.wrap(voiceFile.readBytes()).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer()
-        return FloatArray(fb.remaining()).also { fb.get(it) }
+    /** One line telling the user how good the stored voice sample is. */
+    private fun describe(p: VoiceProfile): String {
+        val noise = getString(
+            when {
+                p.snrDb >= 35 -> R.string.q_noise_low
+                p.snrDb >= 20 -> R.string.q_noise_mid
+                else -> R.string.q_noise_high
+            }
+        )
+        var text = getString(R.string.q_summary, p.speechSeconds.toInt(), noise)
+        if (p.f0 > 0) text += " · " + getString(R.string.q_pitch, p.f0.toInt())
+        if (p.speechSeconds < 20) text += "\n" + getString(R.string.q_tip_longer)
+        if (p.snrDb < 20) text += "\n" + getString(R.string.q_tip_quiet)
+        return text
     }
 
     private fun togglePlay() {
@@ -297,14 +323,11 @@ class MainActivity : Activity() {
         startActivity(Intent.createChooser(intent, getString(R.string.share)))
     }
 
-    private class ShortSampleException : Exception()
-
     private companion object {
         const val REQ_VOICEOVER = 1
         const val REQ_SAMPLE = 2
         const val REQ_SAVE = 3
         const val KEY_VOICE_NAME = "voice_name"
-        const val SAMPLE_MIN_SECONDS = 10
         const val SAMPLE_MAX_SECONDS = 180
     }
 }

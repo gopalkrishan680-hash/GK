@@ -37,23 +37,36 @@ class VoiceEngine(encoderPath: String, converterPath: String, threads: Int) : Cl
         require(speech.size >= MODEL_RATE / 2) { "Audio is too short" }
 
         val seg = 10 * MODEL_RATE
-        val sum = FloatArray(EMBED_DIM)
-        var count = 0
+        val parts = ArrayList<FloatArray>()
         var pos = 0
         while (pos < speech.size) {
             var end = minOf(speech.size, pos + seg)
             if (speech.size - end < 3 * MODEL_RATE) end = speech.size
-            val g = encode(speech.copyOfRange(pos, end))
-            for (i in sum.indices) sum[i] += g[i]
-            count++
+            parts.add(encode(speech.copyOfRange(pos, end)))
             pos = end
             progress(pos.toFloat() / speech.size)
         }
-        for (i in sum.indices) sum[i] /= count
+        // With enough pieces, leave out the ones least like the rest (a cough, a noisy stretch).
+        var mean = meanOf(parts)
+        if (parts.size >= 4) {
+            val ranked = parts.sortedByDescending { cosine(it, mean) }
+            mean = meanOf(ranked.take(parts.size - parts.size / 4))
+        }
+        return mean
+    }
+
+    private fun meanOf(parts: List<FloatArray>): FloatArray {
+        val sum = FloatArray(EMBED_DIM)
+        for (g in parts) for (i in sum.indices) sum[i] += g[i]
+        for (i in sum.indices) sum[i] /= parts.size
         return sum
     }
 
-    /** Re-voices [src] from speaker [gSrc] to speaker [gTgt]. Returns false if cancelled. */
+    /**
+     * Re-voices [src] from speaker [gSrc] to speaker [gTgt]. Returns false if cancelled.
+     * With [gate], pauses of the original stay quiet instead of turning into breathy noise;
+     * it expects audio at the loudness [AudioCleaner] produces.
+     */
     fun convert(
         src: PcmSource,
         gSrc: FloatArray,
@@ -61,8 +74,10 @@ class VoiceEngine(encoderPath: String, converterPath: String, threads: Int) : Cl
         sink: (FloatArray, Int, Int) -> Unit,
         progress: (Float) -> Unit = {},
         cancelled: () -> Boolean = { false },
-    ): Boolean = Chunker(CORE, CTX, XF, HOP, MIN_INPUT)
-        .run(src, { convertChunk(it, gSrc, gTgt) }, sink, progress, cancelled)
+        gate: Boolean = false,
+    ): Boolean = Chunker(CORE, CTX, XF, HOP, MIN_INPUT).run(src, { input ->
+        convertChunk(input, gSrc, gTgt).also { if (gate) applyGate(input, it) }
+    }, sink, progress, cancelled)
 
     private fun encode(audio: FloatArray): FloatArray =
         tensor(audio, audio.size).use { t ->
@@ -129,6 +144,29 @@ class VoiceEngine(encoderPath: String, converterPath: String, threads: Int) : Cl
         }
 
         private const val HANG = 4
+        private const val GATE_THRESHOLD = 0.004f // about 30 dB below normal speech level
+        private const val GATE_FLOOR = 0.1f
+        private const val GATE_HOLD = 8 // blocks (~90 ms) kept open around speech
+
+        /** Turns [out] down wherever the time-aligned [input] is silent. */
+        fun applyGate(input: FloatArray, out: FloatArray) {
+            val blocks = input.size / HOP
+            if (blocks == 0) return
+            val open = BooleanArray(blocks)
+            for (b in 0 until blocks) {
+                var e = 0.0
+                for (i in b * HOP until (b + 1) * HOP) e += input[i] * input[i]
+                if (sqrt(e / HOP) >= GATE_THRESHOLD) {
+                    for (k in maxOf(0, b - GATE_HOLD)..minOf(blocks - 1, b + GATE_HOLD)) open[k] = true
+                }
+            }
+            var g = if (open[0]) 1f else GATE_FLOOR
+            for (i in out.indices) {
+                val target = if (open[minOf(i / HOP, blocks - 1)]) 1f else GATE_FLOOR
+                g += (target - g) * 0.006f // ~8 ms glide, no clicks
+                out[i] *= g
+            }
+        }
 
         fun cosine(a: FloatArray, b: FloatArray): Float {
             var ab = 0.0
