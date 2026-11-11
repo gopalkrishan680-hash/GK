@@ -25,17 +25,26 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Restore exported models
+      - name: Restore models
         id: models
         uses: actions/cache@v4
         with:
-          path: meri-awaaz/app/src/main/assets/*.onnx
-          key: models-v1-${{ hashFiles('meri-awaaz/tools/export_onnx.py') }}
+          path: |
+            meri-awaaz/app/src/main/assets/*.onnx
+            meri-awaaz/app/src/main/assets/*.txt
+          key: models-v2-${{ hashFiles('meri-awaaz/tools/export_onnx.py', 'meri-awaaz/tools/fetch_tts.py') }}
 
       - uses: actions/setup-python@v5
         if: steps.models.outputs.cache-hit != 'true'
         with:
           python-version: "3.12"
+
+      # Hindi text-to-speech model (Meta MMS-TTS, CC-BY-NC), also bundled into the APK.
+      - name: Fetch text-to-speech model
+        if: steps.models.outputs.cache-hit != 'true'
+        run: |
+          pip install --quiet onnxruntime==1.31.1 numpy
+          python tools/fetch_tts.py --out app/src/main/assets
 
       # The only download of the whole build: the open (MIT) OpenVoice V2 converter weights.
       # They end up inside the APK, so the app itself never needs the internet.
