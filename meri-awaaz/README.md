@@ -28,10 +28,15 @@ utna hi time lagta hai jitna lamba audio hai (purane phone par zyada).
 
 **Voiceover par:**
 - wahi safai (rumble, shor, loudness) — "Voiceover ka shor hatao" option
-- **Pitch match** — voiceover ki pitch aapki awaaz ki pitch tak le jata hai (duration nahi badalti).
-  Isse sabse bada farak padta hai jab voiceover kisi aur tarah ki awaaz me ho (jaise mahila/AI voice → purush)
+- pitch: model khud hi pitch ko aapki awaaz ke register me le aata hai. "Extra pitch shift"
+  option isliye band rehta hai — asli awaazon par naapne par usse awaaz bhari/robotic hui
+- **Natural tone** — agar sample patla, tez ya dabi awaaz wala ho (jaise WhatsApp recording) to model
+  wahi rang copy kar leta hai; ye option 600 Hz se upar ke un hisso ko wapas natural balance ki taraf lata hai
 - convert ke baad: original ke pause shaant rakhta hai (saans jaisi awaaz nahi aati) aur
   final loudness poori, bina clipping ke
+
+Build ke tests har option ka asar asli (insaani) awaazon par naapte hain: target se similarity
+aur voiceover ka utaar-chadhaav (intonation) kitna bacha.
 
 ## APK kahan se milega
 
@@ -52,7 +57,7 @@ repo → **Actions** → **Meri Awaaz APK** → sabse upar wala green run → **
 
 | Folder | Kya hai |
 | --- | --- |
-| `engine/` | Pure Kotlin: cleaner (noise removal), pitch match, resampler, lambi audio ko tukdo me process karna, model runner (+ tests) |
+| `engine/` | Pure Kotlin: cleaner (noise removal), tone balance, pitch tools, resampler, lambi audio ko tukdo me process karna, model runner (+ tests) |
 | `app/` | Android UI, audio decoder (MediaCodec), save/share |
 | `tools/export_onnx.py` | Model → ONNX export aur jaanch |
 
@@ -70,6 +75,7 @@ python tools/export_onnx.py --checkpoint checkpoint.pth --config config.json --o
 
 - Ye awaaz ka *rang* badalta hai; lehja (accent) aur bolne ka style original voiceover ka hi rehta hai.
   Isliye result "aap jaisa" lagta hai, par 100% aapki copy nahi.
+- **Sample sabse zaroori hai.** Phone ke Recorder app se seedha record karo (WhatsApp/call recording nahi — wo awaaz ko compress karke ajeeb bana deti hai).
 - App sample saaf zaroor karta hai, par bahut zyada shor, echo ya music wala sample phir bhi kharab result dega.
   Shaant kamre me 1–2 minute aaram se bol kar record karo.
 - Sample me atakna/rukna koi dikkat nahi — model sirf awaaz ka rang leta hai, shabd nahi; pause app khud hata deta hai.
