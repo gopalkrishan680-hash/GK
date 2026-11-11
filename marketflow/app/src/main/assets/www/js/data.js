@@ -22,7 +22,7 @@
   /* =====================================================================================
    * Groww Trade API
    * ===================================================================================== */
-  var BASE = 'https://api.groww.in';
+  var BASE = MF.store.get('devApiBase', null) || 'https://api.groww.in'; // devApiBase is only used by the automated tests
   var chain = Promise.resolve(), GAP_MS = 130;
 
   function throttled(fn) {
@@ -221,7 +221,7 @@
     var baseVol = isIdx ? 0 : Math.round(2e5 + r() * 6e6);
 
     for (var i = 0; i < OLD_DAYS; i++) {
-      if (regimeLeft-- <= 0) { regime = (r() - 0.42) * 0.0022; regimeLeft = 40 + Math.floor(r() * 120); }
+      if (regimeLeft-- <= 0) { regime = (r() - 0.34) * 0.0024; regimeLeft = 40 + Math.floor(r() * 120); }
       var o = price * (1 + gauss(r) * dVol * 0.3), c = o * (1 + regime + gauss(r) * dVol);
       var h = Math.max(o, c) * (1 + Math.abs(gauss(r)) * dVol * 0.45), l = Math.min(o, c) * (1 - Math.abs(gauss(r)) * dVol * 0.45);
       var v = baseVol ? Math.round(baseVol * Math.exp(gauss(r) * 0.45) * (1 + 6 * Math.abs(c / o - 1) / dVol * 0.12)) : 0;
@@ -230,7 +230,7 @@
     }
     var m = new Float32Array(INTRA_DAYS * SESSION_MIN * 5), idx = 0;
     for (var d = 0; d < INTRA_DAYS; d++) {
-      if (regimeLeft-- <= 0) { regime = (r() - 0.42) * 0.0022; regimeLeft = 40 + Math.floor(r() * 120); }
+      if (regimeLeft-- <= 0) { regime = (r() - 0.34) * 0.0024; regimeLeft = 40 + Math.floor(r() * 120); }
       price *= 1 + gauss(r) * dVol * 0.3;
       var burstAt = r() < 0.35 ? Math.floor(r() * 330) : -1, burstDir = r() < 0.5 ? -1 : 1, dayDrift = regime / SESSION_MIN + gauss(r) * dVol * 0.5 / SESSION_MIN;
       for (var mi = 0; mi < SESSION_MIN; mi++) {

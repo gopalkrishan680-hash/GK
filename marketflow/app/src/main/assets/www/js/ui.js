@@ -106,17 +106,18 @@
       vol = chart.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: 'vol', lastValueVisible: false, priceLineVisible: false });
       chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
     }
-    var lines = [], priceLines = [];
+    var lines = [], priceLines = [], count = 0;
     function tt(t) { return t + IST; }
     function bar(c) { return { time: tt(c.t), open: c.o, high: c.h, low: c.l, close: c.c }; }
     function vbar(c) { return { time: tt(c.t), value: c.v || 0, color: c.c >= c.o ? 'rgba(34,197,94,.45)' : 'rgba(239,68,68,.45)' }; }
     var api = {
       chart: chart, main: main,
       setCandles: function (c) {
+        count = c.length;
         main.setData(c.map(bar));
         if (vol) vol.setData(c.some(function (x) { return x.v > 0; }) ? c.map(vbar) : []);
       },
-      update: function (c) { main.update(bar(c)); if (vol && c.v > 0) vol.update(vbar(c)); },
+      update: function (c) { main.update(bar(c)); if (c.t !== api._lastT) { if (api._lastT !== undefined && c.t > api._lastT) count++; api._lastT = c.t; } if (vol && c.v > 0) vol.update(vbar(c)); },
       setLine: function (points) { main.setData(points.map(function (p) { return { time: tt(p.t), value: p.v }; })); },
       /* lines: [{ name, color, data: [values aligned with candles] }] */
       setLines: function (c, defs) {
@@ -127,6 +128,10 @@
           for (var i = 0; i < c.length && i < d.data.length; i++) if (d.data[i] !== null && d.data[i] !== undefined) pts.push({ time: tt(c[i].t), value: d.data[i] });
           s.setData(pts); lines.push(s);
         });
+      },
+      /* Appends one more point to each line created by setLines (used by replay). */
+      updateLines: function (t, values) {
+        for (var i = 0; i < lines.length && i < values.length; i++) if (values[i] !== null && values[i] !== undefined) lines[i].update({ time: tt(t), value: values[i] });
       },
       addLine: function (color, points, dashed) {
         var s = chart.addLineSeries({ color: color, lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, lineStyle: dashed ? 2 : 0 });
@@ -148,7 +153,7 @@
         (defs || []).forEach(function (d) { if (d.price === null || d.price === undefined || isNaN(d.price)) return; priceLines.push(main.createPriceLine({ price: d.price, color: d.color || '#8b98ad', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: d.title || '' })); });
       },
       fit: function () { chart.timeScale().fitContent(); },
-      showLast: function (n) { chart.timeScale().setVisibleLogicalRange({ from: -n, to: 4 }); },
+      showLast: function (n) { chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, count - n) - 0.5, to: count + 3 }); },
       scrollToEnd: function () { chart.timeScale().scrollToRealTime(); },
       setIntraday: function (intra) { chart.applyOptions({ timeScale: { timeVisible: !!intra } }); },
       destroy: function () { chart.remove(); }
