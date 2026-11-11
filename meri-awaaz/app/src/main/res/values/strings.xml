@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Meri Awaaz</string>
+    <string name="subtitle">Koi bhi voiceover → aapki awaaz me. Sab kuch phone ke andar, bina internet.</string>
+    <string name="step_voiceover">1. Voiceover</string>
+    <string name="step_sample">2. Aapki awaaz ka sample</string>
+    <string name="hint_voiceover">Jis audio/video ko badalna hai</string>
+    <string name="hint_sample">30 second – 2 minute, saaf recording, bina music</string>
+    <string name="choose_file">File chuno</string>
+    <string name="none_chosen">Koi file nahi chuni</string>
+    <string name="saved_voice">Saved awaaz: %1$s</string>
+    <string name="convert">Convert karo</string>
+    <string name="cancel">Cancel</string>
+    <string name="play">Suno</string>
+    <string name="stop">Roko</string>
+    <string name="save">Save</string>
+    <string name="share">Share</string>
+    <string name="result_title">Tayyar hai</string>
+    <string name="st_models">Model tayyar ho raha hai…</string>
+    <string name="st_sample">Aapki awaaz samajh raha hu…</string>
+    <string name="st_decode">Voiceover padh raha hu…</string>
+    <string name="st_analyse">Voiceover ki awaaz samajh raha hu…</string>
+    <string name="st_convert">Convert ho raha hai… %1$d%%\nApp khula rakho.</string>
+    <string name="st_done">Ho gaya! %1$s ka audio %2$s me bana.</string>
+    <string name="st_cancelled">Cancel kar diya.</string>
+    <string name="st_saved">Save ho gaya.</string>
+    <string name="err_generic">Error: %1$s</string>
+    <string name="err_no_audio">Is file me audio nahi mila.</string>
+    <string name="err_short_sample">Sample bahut chhota hai. Kam se kam 10 second ki awaaz do.</string>
+    <string name="err_memory">Phone ki memory kam pad gayi. Baaki apps band karke dobara try karo.</string>
+    <string name="consent">Sirf apni awaaz, ya jiski ijazat ho uski awaaz use karo.</string>
+</resources>

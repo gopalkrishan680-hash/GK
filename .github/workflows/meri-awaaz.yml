@@ -1,0 +1,78 @@
+name: Meri Awaaz APK
+
+on:
+  push:
+    paths:
+      - "meri-awaaz/**"
+      - ".github/workflows/meri-awaaz.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: meri-awaaz
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Restore exported models
+        id: models
+        uses: actions/cache@v4
+        with:
+          path: meri-awaaz/app/src/main/assets/*.onnx
+          key: models-v1-${{ hashFiles('meri-awaaz/tools/export_onnx.py') }}
+
+      - uses: actions/setup-python@v5
+        if: steps.models.outputs.cache-hit != 'true'
+        with:
+          python-version: "3.12"
+
+      # The only download of the whole build: the open (MIT) OpenVoice V2 converter weights.
+      # They end up inside the APK, so the app itself never needs the internet.
+      - name: Export models to ONNX
+        if: steps.models.outputs.cache-hit != 'true'
+        run: |
+          pip install --quiet --index-url https://download.pytorch.org/whl/cpu torch==2.15.0
+          pip install --quiet onnx==1.23.2 onnxruntime==1.31.1 numpy
+          base=https://huggingface.co/myshell-ai/OpenVoiceV2/resolve/main/converter
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/checkpoint.pth" "$base/checkpoint.pth"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/config.json" "$base/config.json"
+          sha256sum "$RUNNER_TEMP/checkpoint.pth"
+          python tools/export_onnx.py --checkpoint "$RUNNER_TEMP/checkpoint.pth" \
+            --config "$RUNNER_TEMP/config.json" --out app/src/main/assets
+
+      - name: Make two test voices
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq espeak-ng
+          mkdir -p "$RUNNER_TEMP/wavs"
+          text="This is a test of the voice changer. The quick brown fox jumps over the lazy dog, and then it runs back home through the quiet green forest before the evening rain begins to fall."
+          espeak-ng -v en-us+m3 -p 30 -s 150 -w "$RUNNER_TEMP/wavs/source.wav" "$text"
+          espeak-ng -v en-us+f3 -p 75 -s 150 -w "$RUNNER_TEMP/wavs/target.wav" "$text Here is some different text for the second speaker, so that both recordings are not the same."
+          file "$RUNNER_TEMP"/wavs/*.wav
+
+      - name: Engine tests (with the real model)
+        run: |
+          MERI_AWAAZ_MODELS="$PWD/app/src/main/assets" MERI_AWAAZ_WAVS="$RUNNER_TEMP/wavs" \
+            ./gradlew --no-daemon :engine:test
+
+      - name: Build APK
+        run: |
+          ./gradlew --no-daemon :app:assembleRelease
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/MeriAwaaz.apk"
+          ls -lh "$RUNNER_TEMP/MeriAwaaz.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MeriAwaaz-apk
+          path: ${{ runner.temp }}/MeriAwaaz.apk
+          compression-level: 0
