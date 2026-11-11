@@ -25,12 +25,14 @@
     <string name="opt_title">Quality options</string>
     <string name="opt_denoise">Voiceover ka shor (noise) hatao</string>
     <string name="opt_pitch">Pitch meri awaaz jaisi karo</string>
+    <string name="opt_tone">Natural tone (voiceover jaisa saaf balance rakho)</string>
+    <string name="q_tip_band">Tip: ye sample compressed lag raha hai (WhatsApp/call recording jaisa), isse awaaz ajeeb ban sakti hai. Phone ke Recorder app se seedha record karke wahi file do.</string>
     <string name="q_summary">Saaf awaaz: %1$d sec · Shor: %2$s</string>
     <string name="q_pitch">Pitch: %1$d Hz</string>
     <string name="q_noise_low">kam (badhiya)</string>
     <string name="q_noise_mid">thoda (hata diya)</string>
     <string name="q_noise_high">zyada</string>
-    <string name="q_tip_longer">Tip: 30 second se lamba sample doge to result aur behtar aayega.</string>
+    <string name="q_tip_longer">Tip: 30 second se zyada bolne wala sample doge to result aur behtar aayega.</string>
     <string name="q_tip_quiet">Tip: sample me shor zyada hai — shaant kamre me dobara record karo.</string>
     <string name="st_decode">Voiceover padh raha hu…</string>
     <string name="st_analyse">Voiceover ki awaaz samajh raha hu…</string>

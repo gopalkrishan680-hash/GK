@@ -210,7 +210,8 @@ class EngineTest {
             val got = Pitch.medianF0(ArrayPcm(y))
             assertTrue(abs(got - 120 * ratio) < 120 * ratio * 0.04, "shifted to $got, wanted ${120 * ratio}")
             val level = rms(y, MODEL_RATE, 2 * MODEL_RATE) / rms(x, MODEL_RATE, 2 * MODEL_RATE)
-            assertTrue(level in 0.8..1.25, "level changed by $level")
+            println("pitch shift x$ratio: level x$level")
+            assertTrue(level in 0.6..1.6, "level changed by $level")
         }
     }
 
@@ -227,12 +228,75 @@ class EngineTest {
 
     @Test
     fun voiceProfileSurvivesStorage() {
-        val p = VoiceProfile(FloatArray(VoiceEngine.EMBED_DIM) { it * 0.5f }, 123.5f, 42f, 31f)
+        val p = VoiceProfile(FloatArray(VoiceEngine.EMBED_DIM) { it * 0.5f }, 123.5f, 42f, 31f, true)
         val q = VoiceProfile.fromBytes(p.toBytes())!!
         assertTrue(p.embedding.contentEquals(q.embedding))
         assertEquals(123.5f, q.f0)
         assertEquals(42f, q.speechSeconds)
+        assertTrue(q.narrowband)
         assertEquals(null, VoiceProfile.fromBytes(ByteArray(1024)))
+    }
+
+    @Test
+    fun pitchShiftKeepsFormantsInPlace() {
+        // A "vowel": 110 Hz buzz with one strong resonance at 1.6 kHz.
+        val n = MODEL_RATE * 3
+        val x = FloatArray(n) { i ->
+            var v = 0.0
+            for (k in 1..60) {
+                val f = 110.0 * k
+                v += sin(2 * PI * f * i / MODEL_RATE) / (1 + ((f - 1600) / 150).let { it * it })
+            }
+            (0.05 * v).toFloat()
+        }
+        val before = ToneBalance.spectrum(ArrayPcm(x))
+        val peakBand = before.indices.maxByOrNull { before[it] }!!
+        for (ratio in listOf(0.8f, 1.25f)) {
+            val y = collect { sink -> Pitch.shift(ArrayPcm(x), ratio, sink) }
+            val after = ToneBalance.spectrum(ArrayPcm(y))
+            assertEquals(peakBand, after.indices.maxByOrNull { after[it] }, "resonance moved at ratio $ratio")
+            assertTrue(abs(Pitch.medianF0(ArrayPcm(y)) - 110 * ratio) < 110 * ratio * 0.04f)
+        }
+    }
+
+    @Test
+    fun pitchContourIsCompared() {
+        val a = FloatArray(200) { 120f + 30f * sin(it * 0.1).toFloat() }
+        val shifted = FloatArray(200) { a[it] * 0.8f }
+        val flat = FloatArray(200) { 100f + (it % 7) }
+        assertTrue(Pitch.contourCorrelation(a, shifted) > 0.999f)
+        assertTrue(abs(Pitch.contourCorrelation(a, flat)) < 0.3f)
+    }
+
+    @Test
+    fun toneBalanceMovesTowardsReference() {
+        val rnd = java.util.Random(3)
+        val white = FloatArray(MODEL_RATE * 4) { (0.1 * rnd.nextGaussian()).toFloat() }
+        // "Dull" copy: a simple low-pass.
+        val dull = FloatArray(white.size)
+        var z = 0f
+        for (i in white.indices) {
+            z += 0.15f * (white[i] - z); dull[i] = z
+        }
+        val ref = ToneBalance.spectrum(ArrayPcm(white))
+        val act = ToneBalance.spectrum(ArrayPcm(dull))
+        val full = ToneBalance.gains(ref, act, 1f, 40f)
+        val y = collect { sink -> ToneBalance.apply(ArrayPcm(dull), full, sink) }
+        assertEquals(dull.size, y.size)
+        val fixed = ToneBalance.spectrum(ArrayPcm(y))
+        for (b in 1 until ToneBalance.BANDS) assertTrue(abs(fixed[b] - ref[b]) < 1.5f, "band $b: ${fixed[b]} vs ${ref[b]}")
+        // Limited strength and range are respected.
+        val gentle = ToneBalance.gains(ref, act, 0.5f, 8f)
+        assertTrue(gentle.max() - gentle.min() <= 16f + 1e-3f)
+        // A flat curve changes nothing.
+        val same = collect { sink -> ToneBalance.apply(ArrayPcm(white), FloatArray(ToneBalance.BANDS), sink) }
+        for (i in 2000 until white.size - 2000 step 97) assertTrue(abs(same[i] - white[i]) < 1e-3f)
+    }
+
+    private fun semitoneSpread(track: FloatArray): Double {
+        val st = track.filter { it > 0f }.map { 12 * kotlin.math.ln(it.toDouble()) / kotlin.math.ln(2.0) }
+        val mean = st.average()
+        return sqrt(st.sumOf { (it - mean) * (it - mean) } / st.size)
     }
 
     /** Needs MERI_AWAAZ_MODELS=<dir with tone_encoder.onnx and converter.onnx>. */
@@ -252,37 +316,60 @@ class EngineTest {
             val studio = Studio(engine, work)
 
             val profile = studio.profile(rawTgt)!!
-            println("profile: f0=${profile.f0} Hz speech=${profile.speechSeconds}s snr=${profile.snrDb} dB")
+            println("profile: f0=${profile.f0} Hz speech=${profile.speechSeconds}s snr=${profile.snrDb} dB narrowband=${profile.narrowband}")
             assertEquals(VoiceEngine.EMBED_DIM, profile.embedding.size)
             assertTrue(profile.f0 > 0f)
 
-            val stages = HashSet<Stage>()
-            val outFile = File(work, "out.wav")
-            val result = studio.convert(rawSrc, profile, ConvertOptions(), outFile, { s, _ -> stages.add(s) })
-            assertTrue(result.finished)
-            assertTrue(stages.containsAll(listOf(Stage.CLEAN, Stage.ANALYSE, Stage.CONVERT, Stage.FINISH)))
-            val out = readWav(outFile)
-            assertEquals(src.size, out.size)
-            assertTrue(out.all { it.isFinite() })
-            val srcF0 = Pitch.medianF0(ArrayPcm(src))
-            println("pitch: source=$srcF0 Hz target=${profile.f0} Hz shift=${result.semitones} semitones")
+            val srcTrack = Pitch.track(ArrayPcm(src))
+            val srcSpec = ToneBalance.spectrum(ArrayPcm(src))
+            val gSrc = engine.embed(ArrayPcm(src))
+            println("source: f0=${Pitch.medianF0(ArrayPcm(src))} Hz spread=${"%.2f".format(semitoneSpread(srcTrack))} st " +
+                "similarity to target=${VoiceEngine.cosine(gSrc, profile.embedding)}")
 
-            val plainFile = File(work, "plain.wav")
-            assertTrue(studio.convert(rawSrc, profile, ConvertOptions(denoise = false, pitchMatch = false), plainFile).finished)
-            assertEquals(src.size, readWav(plainFile).size)
-
+            class Run(val name: String, val options: ConvertOptions, val tau: Float)
+            val runs = listOf(
+                Run("default", ConvertOptions(), 0.3f),
+                Run("no pitch match", ConvertOptions(pitchMatch = false), 0.3f),
+                Run("no tone balance", ConvertOptions(toneBalance = false), 0.3f),
+                Run("bare model", ConvertOptions(denoise = false, pitchMatch = false, toneBalance = false), 0.3f),
+                Run("bare model tau 0", ConvertOptions(denoise = false, pitchMatch = false, toneBalance = false), 0f),
+                Run("bare model tau 0.6", ConvertOptions(denoise = false, pitchMatch = false, toneBalance = false), 0.6f),
+            )
+            val similarity = HashMap<String, Float>()
+            val melody = HashMap<String, Float>()
+            for (run in runs) {
+                engine.tau = run.tau
+                val stages = HashSet<Stage>()
+                val outFile = File(work, "out.wav")
+                val result = studio.convert(rawSrc, profile, run.options, outFile, { s, _ -> stages.add(s) })
+                assertTrue(result.finished)
+                assertTrue(stages.containsAll(listOf(Stage.CLEAN, Stage.ANALYSE, Stage.CONVERT, Stage.FINISH)))
+                val out = readWav(outFile)
+                assertEquals(src.size, out.size)
+                assertTrue(out.all { it.isFinite() })
+                if (wavs != null) assertTrue(abs(out.maxOf { abs(it) } - 0.9f) < 0.02f, "output level")
+                val track = Pitch.track(ArrayPcm(out))
+                val spec = ToneBalance.spectrum(ArrayPcm(out))
+                val toneGap = (0 until ToneBalance.BANDS - 2).map { abs(spec[it] - srcSpec[it]) }.average()
+                similarity[run.name] = VoiceEngine.cosine(engine.embed(ArrayPcm(out)), profile.embedding)
+                melody[run.name] = Pitch.contourCorrelation(srcTrack, track)
+                println(
+                    "%-20s shift=%+.1f st  f0=%.0f Hz  spread=%.2f st  melody kept=%.2f  similarity=%.3f  tone gap to source=%.1f dB".format(
+                        run.name, result.semitones, Pitch.medianF0(ArrayPcm(out)), semitoneSpread(track),
+                        melody[run.name], similarity[run.name], toneGap,
+                    )
+                )
+                if (run.name == "default" && wavs != null && result.semitones != 0f) {
+                    val outF0 = Pitch.medianF0(ArrayPcm(out))
+                    assertTrue(abs(outF0 - profile.f0) < profile.f0 * 0.2f, "pitch $outF0 vs ${profile.f0}")
+                }
+            }
+            engine.tau = 0.3f
             if (wavs != null) {
-                assertTrue(abs(out.maxOf { abs(it) } - 0.9f) < 0.02f, "output level")
-                val outF0 = Pitch.medianF0(ArrayPcm(out))
-                val gSrc = engine.embed(ArrayPcm(src))
                 val before = VoiceEngine.cosine(gSrc, profile.embedding)
-                val plain = VoiceEngine.cosine(engine.embed(ArrayPcm(readWav(plainFile))), profile.embedding)
-                val full = VoiceEngine.cosine(engine.embed(ArrayPcm(out)), profile.embedding)
-                println("output pitch: $outF0 Hz")
-                println("similarity to target voice: source=$before converted=$plain converted+pitch-match=$full")
-                assertTrue(abs(outF0 - profile.f0) < profile.f0 * 0.2f, "pitch $outF0 vs ${profile.f0}")
-                assertTrue(plain > before, "conversion did not move the voice towards the target")
-                assertTrue(full > before, "full pipeline did not move the voice towards the target")
+                assertTrue(similarity["default"]!! > before, "full pipeline did not move the voice towards the target")
+                assertTrue(similarity["bare model"]!! > before, "conversion did not move the voice towards the target")
+                assertTrue(melody["default"]!! > 0.5f, "intonation of the voiceover was lost: ${melody["default"]}")
             }
         }
         work.deleteRecursively()

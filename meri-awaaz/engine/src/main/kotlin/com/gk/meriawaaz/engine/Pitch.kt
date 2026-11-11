@@ -2,6 +2,7 @@ package com.gk.meriawaaz.engine
 
 import kotlin.math.PI
 import kotlin.math.cos
+import kotlin.math.ln
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 import kotlin.math.sqrt
@@ -12,63 +13,89 @@ object Pitch {
     private const val MIN_LAG = RATE / 400
     private const val MAX_LAG = RATE / 60
 
+    /** Seconds between two values of [track]. */
+    const val TRACK_STEP = (WIN / 2).toFloat() / RATE
+
     /**
      * Typical speaking pitch in Hz (median over voiced frames of the first [maxSeconds]),
      * or 0 if no voiced speech was found.
      */
     fun medianF0(src: PcmSource, maxSeconds: Int = 120): Float {
+        val kept = track(src, maxSeconds).filter { it > 0f }.sorted()
+        return if (kept.size < 5) 0f else kept[kept.size / 2]
+    }
+
+    /** Pitch in Hz every [TRACK_STEP] seconds; 0 where the audio is unvoiced or quiet. */
+    fun track(src: PcmSource, maxSeconds: Int = 120): FloatArray {
         val n = minOf(src.length, maxSeconds.toLong() * MODEL_RATE).toInt() and 1.inv()
         val full = FloatArray(n).also { src.read(0, it, 0, n) }
         val x = FloatArray(n / 2) { (full[2 * it] + full[2 * it + 1]) * 0.5f }
         val frame = WIN + MAX_LAG
-        val pitches = ArrayList<Float>()
-        val levels = ArrayList<Float>()
-        var start = 0
-        while (start + frame <= x.size) {
+        val count = if (x.size < frame) 0 else (x.size - frame) / (WIN / 2) + 1
+        val pitches = FloatArray(count)
+        val levels = FloatArray(count)
+        val score = FloatArray(MAX_LAG + 2)
+        for (f in 0 until count) {
+            val start = f * (WIN / 2)
             var e0 = 0.0
             for (i in start until start + WIN) e0 += x[i] * x[i]
-            if (e0 > 1e-7 * WIN) {
-                var best = 0f
-                var bestLag = 0
-                val score = FloatArray(MAX_LAG + 1)
-                // Running energy of the lagged window.
-                var el = 0.0
-                for (i in start + MIN_LAG until start + MIN_LAG + WIN) el += x[i] * x[i]
-                for (lag in MIN_LAG..MAX_LAG) {
-                    var c = 0.0
-                    var i = start
-                    while (i < start + WIN) {
-                        c += x[i] * x[i + lag]
-                        i++
-                    }
-                    val r = (c / (sqrt(e0 * el) + 1e-12)).toFloat()
-                    score[lag] = r
-                    if (r > best) {
-                        best = r; bestLag = lag
-                    }
-                    val drop = x[start + lag]
-                    val add = x[start + lag + WIN]
-                    el += add * add - drop * drop
+            if (e0 <= 1e-7 * WIN) continue
+            var best = 0f
+            var bestLag = 0
+            // Running energy of the lagged window.
+            var el = 0.0
+            for (i in start + MIN_LAG until start + MIN_LAG + WIN) el += x[i] * x[i]
+            for (lag in MIN_LAG..MAX_LAG) {
+                var c = 0.0
+                var i = start
+                while (i < start + WIN) {
+                    c += x[i] * x[i + lag]
+                    i++
                 }
-                if (best >= 0.6f) {
-                    // Prefer the shortest lag that is nearly as good: guards against octave-down errors.
-                    var lag = MIN_LAG
-                    while (lag < bestLag && !(score[lag] >= 0.9f * best && score[lag] >= score[lag - 1] && score[lag] >= score[lag + 1])) lag++
-                    pitches.add(RATE.toFloat() / lag)
-                    levels.add(sqrt(e0 / WIN).toFloat())
+                val r = (c / (sqrt(e0 * el) + 1e-12)).toFloat()
+                score[lag] = r
+                if (r > best) {
+                    best = r; bestLag = lag
                 }
+                val drop = x[start + lag]
+                val add = x[start + lag + WIN]
+                el += add * add - drop * drop
             }
-            start += WIN / 2
+            if (best < 0.6f) continue
+            // Prefer the shortest lag that is nearly as good: guards against octave-down errors.
+            var lag = MIN_LAG
+            while (lag < bestLag && !(score[lag] >= 0.9f * best && score[lag] >= score[lag - 1] && score[lag] >= score[lag + 1])) lag++
+            pitches[f] = RATE.toFloat() / lag
+            levels[f] = sqrt(e0 / WIN).toFloat()
         }
-        if (pitches.size < 5) return 0f
-        val strong = levels.sorted()[(levels.size * 0.95f).toInt().coerceAtMost(levels.size - 1)] * 0.2f
-        val kept = pitches.filterIndexed { i, _ -> levels[i] >= strong }.sorted()
-        return if (kept.isEmpty()) 0f else kept[kept.size / 2]
+        val voiced = levels.filter { it > 0f }.sorted()
+        if (voiced.isEmpty()) return pitches
+        val strong = voiced[(voiced.size * 0.95f).toInt().coerceAtMost(voiced.size - 1)] * 0.2f
+        for (f in 0 until count) if (levels[f] < strong) pitches[f] = 0f
+        return pitches
+    }
+
+    /**
+     * How faithfully [b] keeps the melody of the time-aligned [a]: correlation of the two
+     * pitch tracks (in semitones) over frames where both are voiced. 1 = identical intonation.
+     */
+    fun contourCorrelation(a: FloatArray, b: FloatArray): Float {
+        var n = 0
+        var sa = 0.0; var sb = 0.0; var saa = 0.0; var sbb = 0.0; var sab = 0.0
+        for (i in 0 until minOf(a.size, b.size)) {
+            if (a[i] <= 0f || b[i] <= 0f) continue
+            val x = ln(a[i].toDouble()); val y = ln(b[i].toDouble())
+            n++; sa += x; sb += y; saa += x * x; sbb += y * y; sab += x * y
+        }
+        if (n < 10) return 0f
+        val cov = sab - sa * sb / n
+        return (cov / (sqrt((saa - sa * sa / n) * (sbb - sb * sb / n)) + 1e-12)).toFloat()
     }
 
     /**
      * Raises or lowers the pitch of speech by [ratio] (2 = one octave up) without changing its
-     * duration: WSOLA time-stretch followed by resampling. Returns false if cancelled.
+     * duration or its vowel colour: WSOLA time-stretch, resampling, then [FormantCorrector]
+     * puts the formants back where they were. Returns false if cancelled.
      */
     fun shift(
         src: PcmSource,
@@ -85,10 +112,12 @@ object Pitch {
             written += m
         }
         val inRate = (MODEL_RATE * ratio).roundToInt()
-        val resampler = StreamResampler(inRate, MODEL_RATE, emit)
         val stretch = inRate.toDouble() / MODEL_RATE
+        val formants = FormantCorrector(stretch.toFloat(), emit)
+        val resampler = StreamResampler(inRate, MODEL_RATE) { b, n -> formants.process(b, n) }
         if (!stretch(src, stretch, { b, n -> resampler.process(b, n) }, progress, cancelled)) return false
         resampler.finish()
+        formants.finish()
         val pad = FloatArray(4096)
         while (written < total) emit(pad, pad.size)
         return true

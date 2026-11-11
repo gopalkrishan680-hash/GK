@@ -2,7 +2,7 @@
 """Export the OpenVoice V2 tone-colour converter to two ONNX files for the app.
 
   tone_encoder.onnx : audio[1,N] (22.05 kHz mono, -1..1)          -> g[1,256]
-  converter.onnx    : audio[1,N], g_src[1,256], g_tgt[1,256]      -> audio[1,1,N]
+  converter.onnx    : audio[1,N], g_src[1,256], g_tgt[1,256], tau[1] -> audio[1,1,N]
 
 The STFT is baked into the graphs, so the app only has to feed raw samples.
 
@@ -34,7 +34,7 @@ DEFAULT_CONFIG = {
               "upsample_rates": [8, 8, 2, 2], "upsample_initial_channel": 512,
               "upsample_kernel_sizes": [16, 16, 4, 4], "gin_channels": 256},
 }
-TAU = 0.3  # same default as OpenVoice's ToneColorConverter.convert
+TAU = 0.3  # OpenVoice's default; only used here to trace and test, the app passes its own
 LRELU_SLOPE = 0.1
 
 
@@ -77,9 +77,7 @@ class PosteriorEncoder(nn.Module):
     def forward(self, spec, g, tau):
         stats = self.proj(self.enc(self.pre(spec), g))
         m, logs = torch.split(stats, self.out_channels, dim=1)
-        if tau > 0:
-            return m + torch.randn_like(m) * tau * torch.exp(logs)
-        return m
+        return m + torch.randn_like(m) * tau * torch.exp(logs)
 
 
 class ResidualCouplingLayer(nn.Module):  # mean-only variant
@@ -226,14 +224,14 @@ class ToneEncoder(nn.Module):
 
 
 class Converter(nn.Module):
-    def __init__(self, model, stft, tau):
+    def __init__(self, model, stft):
         super().__init__()
-        self.stft, self.tau, self.model = stft, tau, model
+        self.stft, self.model = stft, model
 
-    def forward(self, audio, g_src, g_tgt):
+    def forward(self, audio, g_src, g_tgt, tau):
         m = self.model
         g_src, g_tgt = g_src.unsqueeze(-1), g_tgt.unsqueeze(-1)
-        z = m.enc_q(self.stft(audio), torch.zeros_like(g_src) if m.zero_g else g_src, self.tau)
+        z = m.enc_q(self.stft(audio), torch.zeros_like(g_src) if m.zero_g else g_src, tau)
         z_hat = m.flow(m.flow(z, g_src), g_tgt, reverse=True)
         return m.dec(z_hat, torch.zeros_like(g_tgt) if m.zero_g else g_tgt)
 
@@ -299,43 +297,39 @@ def main():
             err = float((stft(y) - reference_spectrogram(y, n_fft, hop)).abs().max())
             assert err < 1e-3, f"conv STFT differs from torch.stft by {err}"
         ref_g = [model.ref_enc(reference_spectrogram(y, n_fft, hop).transpose(1, 2)) for y in audios]
-        ref_o = [Converter(model, stft, 0.0)(y, ref_g[i], ref_g[(i + 1) % 3]).numpy()
+        ref_o = [Converter(model, stft)(y, ref_g[i], ref_g[(i + 1) % 3], torch.zeros(1)).numpy()
                  for i, y in enumerate(audios)]
 
     print("weight-norm layers folded:", strip_weight_norm(model))
     os.makedirs(a.out, exist_ok=True)
     enc_path = os.path.join(a.out, "tone_encoder.onnx")
     conv_path = os.path.join(a.out, "converter.onnx")
-    check_path = os.path.join(a.out, "_converter_tau0.onnx")
     g = torch.zeros(1, cfg["model"]["gin_channels"])
     with torch.no_grad():
         export(ToneEncoder(model, stft), (audios[0],), enc_path, ["audio"], "g")
-        export(Converter(model, stft, 0.0), (audios[0], g, g), check_path,
-               ["audio", "g_src", "g_tgt"], "converted")
-        export(Converter(model, stft, TAU), (audios[0], g, g), conv_path,
-               ["audio", "g_src", "g_tgt"], "converted")
+        export(Converter(model, stft), (audios[0], g, g, torch.full((1,), TAU)), conv_path,
+               ["audio", "g_src", "g_tgt", "tau"], "converted")
 
     # Verify the ONNX graphs against PyTorch, at lengths other than the traced one.
     import onnxruntime as ort
     enc = ort.InferenceSession(enc_path, providers=["CPUExecutionProvider"])
-    chk = ort.InferenceSession(check_path, providers=["CPUExecutionProvider"])
-    fin = ort.InferenceSession(conv_path, providers=["CPUExecutionProvider"])
+    conv = ort.InferenceSession(conv_path, providers=["CPUExecutionProvider"])
     for i, y in enumerate(audios):
         g_i = enc.run(None, {"audio": y.numpy()})[0]
         err_g = float(np.abs(g_i - ref_g[i].numpy()).max())
         feed = {"audio": y.numpy(), "g_src": ref_g[i].numpy(),
-                "g_tgt": ref_g[(i + 1) % 3].numpy()}
-        o = chk.run(None, feed)[0]
+                "g_tgt": ref_g[(i + 1) % 3].numpy(), "tau": np.zeros(1, np.float32)}
+        o = conv.run(None, feed)[0]  # tau = 0: no randomness, must equal PyTorch
         err_o = float(np.abs(o - ref_o[i]).max())
-        o2 = fin.run(None, feed)[0]
+        feed["tau"] = np.full(1, TAU, np.float32)
+        o2 = conv.run(None, feed)[0]
         frames = lengths[i] // 256
         print(f"len={lengths[i]} encoder_err={err_g:.2e} converter_err={err_o:.2e} "
-              f"out_shape={o2.shape}")
+              f"out_shape={o2.shape} noise_effect={float(np.abs(o2 - o).max()):.2e}")
         assert err_g < 1e-3, "tone encoder ONNX differs from PyTorch"
         assert err_o < 1e-2, "converter ONNX differs from PyTorch"
         assert o.shape == o2.shape == (1, 1, frames * 256), (o.shape, o2.shape)
-        assert np.isfinite(o2).all()
-    os.remove(check_path)
+        assert np.isfinite(o2).all() and not np.array_equal(o, o2)
     for p in (enc_path, conv_path):
         print(f"{p}: {os.path.getsize(p) / 1e6:.1f} MB")
     print("EXPORT OK")

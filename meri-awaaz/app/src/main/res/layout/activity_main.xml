@@ -154,6 +154,15 @@
                 android:text="@string/opt_pitch"
                 android:textColor="@color/ink"
                 android:textSize="15sp" />
+
+            <CheckBox
+                android:id="@+id/toneBalance"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:text="@string/opt_tone"
+                android:textColor="@color/ink"
+                android:textSize="15sp" />
         </LinearLayout>
 
         <Button

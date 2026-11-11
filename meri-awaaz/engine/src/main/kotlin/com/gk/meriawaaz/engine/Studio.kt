@@ -13,22 +13,27 @@ class VoiceProfile(
     val f0: Float,
     val speechSeconds: Float,
     val snrDb: Float,
+    /** True if the sample has nothing above ~8 kHz: a phone-call or messenger-compressed recording. */
+    val narrowband: Boolean = false,
 ) {
     fun toBytes(): ByteArray {
-        val b = ByteBuffer.allocate((embedding.size + 3) * 4).order(ByteOrder.LITTLE_ENDIAN)
-        b.putFloat(f0).putFloat(speechSeconds).putFloat(snrDb)
+        val b = ByteBuffer.allocate((embedding.size + FIELDS) * 4).order(ByteOrder.LITTLE_ENDIAN)
+        b.putFloat(f0).putFloat(speechSeconds).putFloat(snrDb).putFloat(if (narrowband) 1f else 0f)
         embedding.forEach { b.putFloat(it) }
         return b.array()
     }
 
     companion object {
+        private const val FIELDS = 4
+
         fun fromBytes(bytes: ByteArray): VoiceProfile? {
-            if (bytes.size != (VoiceEngine.EMBED_DIM + 3) * 4) return null
+            if (bytes.size != (VoiceEngine.EMBED_DIM + FIELDS) * 4) return null
             val b = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
             val f0 = b.getFloat()
             val speech = b.getFloat()
             val snr = b.getFloat()
-            return VoiceProfile(FloatArray(VoiceEngine.EMBED_DIM) { b.getFloat() }, f0, speech, snr)
+            val narrow = b.getFloat() != 0f
+            return VoiceProfile(FloatArray(VoiceEngine.EMBED_DIM) { b.getFloat() }, f0, speech, snr, narrow)
         }
     }
 }
@@ -37,7 +42,12 @@ class SampleTooShortException : Exception()
 
 enum class Stage { CLEAN, PITCH, ANALYSE, CONVERT, FINISH }
 
-class ConvertOptions(val denoise: Boolean = true, val pitchMatch: Boolean = true)
+class ConvertOptions(
+    val denoise: Boolean = true,
+    val pitchMatch: Boolean = true,
+    /** Keep the voiceover's natural bass/presence/brightness balance (halfway), see [ToneBalance]. */
+    val toneBalance: Boolean = true,
+)
 
 class ConvertResult(val finished: Boolean, /** Pitch change that was applied, in semitones. */ val semitones: Float)
 
@@ -65,8 +75,9 @@ class Studio(private val engine: VoiceEngine, private val work: File) {
         return RawPcmFile(clean).use { pcm ->
             val g = engine.embed(pcm, 180) { progress(0.4f + it * 0.5f) }
             val f0 = Pitch.medianF0(pcm)
+            val top = ToneBalance.spectrum(pcm)[ToneBalance.BANDS - 1]
             progress(1f)
-            VoiceProfile(g, f0, report.speechSeconds, report.snrDb)
+            VoiceProfile(g, f0, report.speechSeconds, report.snrDb, top < NARROWBAND_DB)
         }
     }
 
@@ -86,6 +97,8 @@ class Studio(private val engine: VoiceEngine, private val work: File) {
                 AudioCleaner.clean(src, w::write, options.denoise, { progress(Stage.CLEAN, it) }, cancelled)
             }
         } ?: return stopped
+
+        val reference = if (options.toneBalance) RawPcmFile(current).use { ToneBalance.spectrum(it) } else null
 
         var semitones = 0f
         if (options.pitchMatch && profile.f0 > 0f) {
@@ -122,10 +135,22 @@ class Studio(private val engine: VoiceEngine, private val work: File) {
         }
         if (!finished) return stopped
 
-        // Bring the result to a full, consistent level (peak just below clipping).
         progress(Stage.FINISH, 0f)
+        var last = converted
+        if (reference != null) {
+            // The model copies the sample's tone balance, including a thin or harsh recording's
+            // faults. Move the result part of the way back to the voiceover's natural balance.
+            val balanced = File(work, "balanced.raw")
+            RawPcmFile(converted).use { src ->
+                val curve = ToneBalance.gains(reference, ToneBalance.spectrum(src), BALANCE_STRENGTH, BALANCE_MAX_DB)
+                peak = PcmWriter(balanced).use { w -> ToneBalance.apply(src, curve, w::write) }
+            }
+            last = balanced
+        }
+
+        // Bring the result to a full, consistent level (peak just below clipping).
         val gain = if (peak > 1e-4f) (PEAK_TARGET / peak).coerceAtMost(4f) else 1f
-        RawPcmFile(converted).use { src ->
+        RawPcmFile(last).use { src ->
             PcmWriter(outWav, MODEL_RATE).use { w ->
                 val buf = FloatArray(16384)
                 var pos = 0L
@@ -145,5 +170,8 @@ class Studio(private val engine: VoiceEngine, private val work: File) {
         const val MIN_SPEECH_SECONDS = 5f
         const val MIN_SHIFT_SEMITONES = 1f
         const val PEAK_TARGET = 0.9f
+        const val BALANCE_STRENGTH = 0.5f
+        const val BALANCE_MAX_DB = 8f
+        const val NARROWBAND_DB = -42f
     }
 }

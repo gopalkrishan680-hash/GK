@@ -37,6 +37,7 @@ class MainActivity : Activity() {
     private lateinit var sampleQuality: TextView
     private lateinit var denoise: CheckBox
     private lateinit var pitchMatch: CheckBox
+    private lateinit var toneBalance: CheckBox
     private lateinit var pickers: List<Button>
 
     private var voiceoverUri: Uri? = null
@@ -66,6 +67,7 @@ class MainActivity : Activity() {
         sampleQuality = findViewById(R.id.sampleQuality)
         denoise = findViewById(R.id.denoise)
         pitchMatch = findViewById(R.id.pitchMatch)
+        toneBalance = findViewById(R.id.toneBalance)
         val pickVoiceover = findViewById<Button>(R.id.pickVoiceover)
         val pickSample = findViewById<Button>(R.id.pickSample)
         pickers = listOf(pickVoiceover, pickSample)
@@ -134,6 +136,7 @@ class MainActivity : Activity() {
         pickers.forEach { it.isEnabled = !running }
         denoise.isEnabled = !running
         pitchMatch.isEnabled = !running
+        toneBalance.isEnabled = !running
         convert.isEnabled = running || (voiceoverUri != null && (sampleUri != null || savedVoice != null))
         convert.setText(if (running) R.string.cancel else R.string.convert)
         progress.visibility = if (running) View.VISIBLE else View.GONE
@@ -145,7 +148,7 @@ class MainActivity : Activity() {
         val voiceover = voiceoverUri ?: return
         val sample = sampleUri
         val label = sampleLabel
-        val options = ConvertOptions(denoise = denoise.isChecked, pitchMatch = pitchMatch.isChecked)
+        val options = ConvertOptions(denoise.isChecked, pitchMatch.isChecked, toneBalance.isChecked)
         stopPlayer()
         cancel = false
         resultBox.visibility = View.GONE
@@ -260,14 +263,15 @@ class MainActivity : Activity() {
         val noise = getString(
             when {
                 p.snrDb >= 35 -> R.string.q_noise_low
-                p.snrDb >= 20 -> R.string.q_noise_mid
+                p.snrDb >= 25 -> R.string.q_noise_mid
                 else -> R.string.q_noise_high
             }
         )
         var text = getString(R.string.q_summary, p.speechSeconds.toInt(), noise)
         if (p.f0 > 0) text += " · " + getString(R.string.q_pitch, p.f0.toInt())
-        if (p.speechSeconds < 20) text += "\n" + getString(R.string.q_tip_longer)
-        if (p.snrDb < 20) text += "\n" + getString(R.string.q_tip_quiet)
+        if (p.speechSeconds < 30) text += "\n" + getString(R.string.q_tip_longer)
+        if (p.snrDb < 25) text += "\n" + getString(R.string.q_tip_quiet)
+        if (p.narrowband) text += "\n" + getString(R.string.q_tip_band)
         return text
     }
 

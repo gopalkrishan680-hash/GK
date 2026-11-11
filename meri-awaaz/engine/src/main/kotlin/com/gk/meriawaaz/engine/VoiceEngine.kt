@@ -16,6 +16,12 @@ class VoiceEngine(encoderPath: String, converterPath: String, threads: Int) : Cl
     private val encoder: OrtSession
     private val converter: OrtSession
 
+    /**
+     * Amount of randomness the model adds while re-voicing (OpenVoice's "tau").
+     * Lower is steadier, higher is livelier; 0.3 is the model's own default.
+     */
+    var tau = 0.3f
+
     init {
         OrtSession.SessionOptions().use { o ->
             o.setIntraOpNumThreads(threads)
@@ -88,7 +94,9 @@ class VoiceEngine(encoderPath: String, converterPath: String, threads: Int) : Cl
         tensor(audio, audio.size).use { a ->
             tensor(gSrc, EMBED_DIM).use { s ->
                 tensor(gTgt, EMBED_DIM).use { t ->
-                    converter.run(mapOf("audio" to a, "g_src" to s, "g_tgt" to t)).use { r -> floats(r) }
+                    OnnxTensor.createTensor(env, FloatBuffer.wrap(floatArrayOf(tau)), longArrayOf(1)).use { noise ->
+                        converter.run(mapOf("audio" to a, "g_src" to s, "g_tgt" to t, "tau" to noise)).use { r -> floats(r) }
+                    }
                 }
             }
         }
