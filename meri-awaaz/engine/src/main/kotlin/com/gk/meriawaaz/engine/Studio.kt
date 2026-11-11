@@ -44,8 +44,12 @@ enum class Stage { CLEAN, PITCH, ANALYSE, CONVERT, FINISH }
 
 class ConvertOptions(
     val denoise: Boolean = true,
-    val pitchMatch: Boolean = true,
-    /** Keep the voiceover's natural bass/presence/brightness balance (halfway), see [ToneBalance]. */
+    /**
+     * Shift the voiceover's pitch to the user's before converting. Off by default: the model
+     * already moves the pitch into the target voice's range, so this only adds artefacts.
+     */
+    val pitchMatch: Boolean = false,
+    /** Repair a thin, harsh or boxy tone the model copied from a poor sample, see [ToneBalance]. */
     val toneBalance: Boolean = true,
 )
 
@@ -139,10 +143,10 @@ class Studio(private val engine: VoiceEngine, private val work: File) {
         var last = converted
         if (reference != null) {
             // The model copies the sample's tone balance, including a thin or harsh recording's
-            // faults. Move the result part of the way back to the voiceover's natural balance.
+            // faults. Where the result strays far from the voiceover's balance, pull it back.
             val balanced = File(work, "balanced.raw")
             RawPcmFile(converted).use { src ->
-                val curve = ToneBalance.gains(reference, ToneBalance.spectrum(src), BALANCE_STRENGTH, BALANCE_MAX_DB)
+                val curve = ToneBalance.gains(reference, ToneBalance.spectrum(src), BALANCE_STRENGTH, BALANCE_MAX_DB, BALANCE_TOLERANCE_DB)
                 peak = PcmWriter(balanced).use { w -> ToneBalance.apply(src, curve, w::write) }
             }
             last = balanced
@@ -170,8 +174,9 @@ class Studio(private val engine: VoiceEngine, private val work: File) {
         const val MIN_SPEECH_SECONDS = 5f
         const val MIN_SHIFT_SEMITONES = 1f
         const val PEAK_TARGET = 0.9f
-        const val BALANCE_STRENGTH = 0.5f
+        const val BALANCE_STRENGTH = 0.6f
         const val BALANCE_MAX_DB = 8f
+        const val BALANCE_TOLERANCE_DB = 4f
         const val NARROWBAND_DB = -42f
     }
 }

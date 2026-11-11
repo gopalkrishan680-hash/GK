@@ -24,8 +24,8 @@
     <string name="st_pitch_done">Pitch %1$s semitone badli.</string>
     <string name="opt_title">Quality options</string>
     <string name="opt_denoise">Voiceover ka shor (noise) hatao</string>
-    <string name="opt_pitch">Pitch meri awaaz jaisi karo</string>
-    <string name="opt_tone">Natural tone (voiceover jaisa saaf balance rakho)</string>
+    <string name="opt_pitch">Extra pitch shift (aam taur par band rakho)</string>
+    <string name="opt_tone">Natural tone (patli/tez/dabi awaaz theek karo)</string>
     <string name="q_tip_band">Tip: ye sample compressed lag raha hai (WhatsApp/call recording jaisa), isse awaaz ajeeb ban sakti hai. Phone ke Recorder app se seedha record karke wahi file do.</string>
     <string name="q_summary">Saaf awaaz: %1$d sec · Shor: %2$s</string>
     <string name="q_pitch">Pitch: %1$d Hz</string>

@@ -23,6 +23,7 @@ object ToneBalance {
         3000f, 3700f, 4600f, 5700f, 7000f, 8500f, 11025f,
     )
     val BANDS = EDGES.size - 1
+    const val FIRST_BAND_HZ = 600f
 
     /** Level of each band in dB relative to the whole, over the speech of the first [maxSeconds]. */
     fun spectrum(src: PcmSource, maxSeconds: Int = 120): FloatArray {
@@ -61,11 +62,18 @@ object ToneBalance {
     }
 
     /**
-     * Equaliser curve (dB per band) that takes [actual] a fraction [strength] of the way to
-     * [reference], never changing a band by more than [maxDb], and loudness-neutral overall.
+     * Equaliser curve (dB per band) that pulls [actual] back towards [reference] only where
+     * it strays unusually far: differences up to [tolerance] dB are normal between two voices
+     * and are left alone; a fraction [strength] of anything beyond is corrected, by at most
+     * [maxDb]. Bands below [FIRST_BAND_HZ] are never touched, because there the level follows
+     * the pitch of the voice, which is meant to differ. Loudness-neutral overall.
      */
-    fun gains(reference: FloatArray, actual: FloatArray, strength: Float, maxDb: Float): FloatArray {
-        val g = FloatArray(BANDS) { ((reference[it] - actual[it]) * strength).coerceIn(-maxDb, maxDb) }
+    fun gains(reference: FloatArray, actual: FloatArray, strength: Float, maxDb: Float, tolerance: Float = 0f): FloatArray {
+        val g = FloatArray(BANDS) { b ->
+            val diff = reference[b] - actual[b]
+            val excess = if (diff > tolerance) diff - tolerance else if (diff < -tolerance) diff + tolerance else 0f
+            if (EDGES[b] < FIRST_BAND_HZ) 0f else (excess * strength).coerceIn(-maxDb, maxDb)
+        }
         // Keep the level of the speech as it is: remove the energy-weighted average change.
         var before = 0.0
         var after = 0.0

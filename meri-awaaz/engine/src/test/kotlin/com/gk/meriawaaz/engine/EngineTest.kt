@@ -284,7 +284,14 @@ class EngineTest {
         val y = collect { sink -> ToneBalance.apply(ArrayPcm(dull), full, sink) }
         assertEquals(dull.size, y.size)
         val fixed = ToneBalance.spectrum(ArrayPcm(y))
-        for (b in 1 until ToneBalance.BANDS) assertTrue(abs(fixed[b] - ref[b]) < 1.5f, "band $b: ${fixed[b]} vs ${ref[b]}")
+        val first = (0 until ToneBalance.BANDS).first { ToneBalance.EDGES[it] >= ToneBalance.FIRST_BAND_HZ }
+        // Shapes must match from the first corrected band up (overall level is free).
+        val offset = fixed[first] - ref[first]
+        for (b in first until ToneBalance.BANDS) assertTrue(abs(fixed[b] - ref[b] - offset) < 1.5f, "band $b: ${fixed[b]} vs ${ref[b]}")
+        assertTrue(full.take(first).all { it == full[0] }, "low bands must share one (loudness-only) gain")
+        // Differences inside the tolerance are left alone.
+        val tolerant = ToneBalance.gains(FloatArray(ToneBalance.BANDS) { 3f * (it % 2) }, FloatArray(ToneBalance.BANDS), 1f, 8f, 4f)
+        assertTrue(tolerant.all { abs(it) < 1e-4f })
         // Limited strength and range are respected.
         val gentle = ToneBalance.gains(ref, act, 0.5f, 8f)
         assertTrue(gentle.max() - gentle.min() <= 16f + 1e-3f)
@@ -306,6 +313,7 @@ class EngineTest {
         assumeTrue(dir != null, "MERI_AWAAZ_MODELS not set")
         val work = java.nio.file.Files.createTempDirectory("meri_awaaz").toFile()
         val wavs = System.getenv("MERI_AWAAZ_WAVS")
+        val problems = ArrayList<String>()
         val pairs = if (wavs == null) listOf("") else listOf("", "2").filter { File(wavs, "source$it.wav").exists() }
         VoiceEngine("$dir/tone_encoder.onnx", "$dir/converter.onnx", 4).use { engine ->
           for (pair in pairs) {
@@ -330,13 +338,15 @@ class EngineTest {
                 "similarity to target=${VoiceEngine.cosine(gSrc, profile.embedding)}")
 
             class Run(val name: String, val options: ConvertOptions, val tau: Float)
+            val bare = ConvertOptions(denoise = false, pitchMatch = false, toneBalance = false)
             val runs = listOf(
                 Run("default", ConvertOptions(), 0.3f),
-                Run("no pitch match", ConvertOptions(pitchMatch = false), 0.3f),
-                Run("no tone balance", ConvertOptions(toneBalance = false), 0.3f),
-                Run("bare model", ConvertOptions(denoise = false, pitchMatch = false, toneBalance = false), 0.3f),
-                Run("bare model tau 0", ConvertOptions(denoise = false, pitchMatch = false, toneBalance = false), 0f),
-                Run("bare model tau 0.6", ConvertOptions(denoise = false, pitchMatch = false, toneBalance = false), 0.6f),
+                Run("bare model", bare, 0.3f),
+                Run("only denoise", ConvertOptions(denoise = true, pitchMatch = false, toneBalance = false), 0.3f),
+                Run("only tone balance", ConvertOptions(denoise = false, pitchMatch = false, toneBalance = true), 0.3f),
+                Run("only pitch match", ConvertOptions(denoise = false, pitchMatch = true, toneBalance = false), 0.3f),
+                Run("bare model tau 0", bare, 0f),
+                Run("bare model tau 0.15", bare, 0.15f),
             )
             val similarity = HashMap<String, Float>()
             val melody = HashMap<String, Float>()
@@ -362,21 +372,21 @@ class EngineTest {
                         melody[run.name], similarity[run.name], toneGap,
                     )
                 )
-                if (run.name == "default" && wavs != null && result.semitones != 0f) {
-                    val outF0 = Pitch.medianF0(ArrayPcm(out))
-                    assertTrue(abs(outF0 - profile.f0) < profile.f0 * 0.2f, "pitch $outF0 vs ${profile.f0}")
-                }
             }
             engine.tau = 0.3f
             if (wavs != null) {
                 val before = VoiceEngine.cosine(gSrc, profile.embedding)
                 assertTrue(similarity["default"]!! > before, "full pipeline did not move the voice towards the target")
                 assertTrue(similarity["bare model"]!! > before, "conversion did not move the voice towards the target")
-                assertTrue(melody["default"]!! > 0.5f, "intonation of the voiceover was lost: ${melody["default"]}")
+                problems += listOfNotNull(
+                    "pair '$pair': intonation lost (${melody["default"]})".takeIf { melody["default"]!! < 0.5f },
+                    "pair '$pair': default much less similar than bare model".takeIf { similarity["default"]!! < similarity["bare model"]!! - 0.03f },
+                )
             }
           }
         }
         work.deleteRecursively()
+        assertTrue(problems.isEmpty(), problems.joinToString("; "))
     }
 
     private fun readWav(file: File): FloatArray {
