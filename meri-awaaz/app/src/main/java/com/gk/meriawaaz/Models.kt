@@ -5,10 +5,12 @@ import java.io.File
 
 /** The ONNX models ship inside the APK; ONNX Runtime needs them as ordinary files. */
 object Models {
-    private val names = listOf("tone_encoder.onnx", "converter.onnx")
+    class Paths(val encoder: String, val converter: String, val tts: String, val ttsTokens: String)
 
-    /** Copies the models out of the APK once per installed version. Returns (encoder, converter) paths. */
-    fun prepare(context: Context): Pair<String, String> {
+    private val names = listOf("tone_encoder.onnx", "converter.onnx", "tts_hi.onnx", "tts_hi_tokens.txt")
+
+    /** Copies the models out of the APK once per installed version. */
+    fun prepare(context: Context): Paths {
         val installed = context.packageManager.getPackageInfo(context.packageName, 0).lastUpdateTime
         val dir = File(context.filesDir, "models-$installed")
         context.filesDir.listFiles { f -> f.name.startsWith("models-") && f != dir }
@@ -21,6 +23,7 @@ object Models {
             context.assets.open(name).use { input -> tmp.outputStream().use { input.copyTo(it, 1 shl 16) } }
             check(tmp.renameTo(target)) { "could not store $name" }
         }
-        return File(dir, names[0]).path to File(dir, names[1]).path
+        val path = names.map { File(dir, it).path }
+        return Paths(path[0], path[1], path[2], path[3])
     }
 }

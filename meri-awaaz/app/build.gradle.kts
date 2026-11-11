@@ -13,8 +13,8 @@ android {
         applicationId = "com.gk.meriawaaz"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
     }
 
@@ -58,11 +58,12 @@ dependencies {
 val checkModels by tasks.registering {
     val assets = layout.projectDirectory.dir("src/main/assets")
     doLast {
-        listOf("tone_encoder.onnx", "converter.onnx").forEach {
+        listOf("tone_encoder.onnx", "converter.onnx", "tts_hi.onnx").forEach {
             check(assets.file(it).asFile.length() > 1_000_000) {
-                "Missing model app/src/main/assets/$it - run tools/export_onnx.py first (see README)."
+                "Missing model app/src/main/assets/$it - run tools/export_onnx.py and tools/fetch_tts.py first (see README)."
             }
         }
+        check(assets.file("tts_hi_tokens.txt").asFile.exists()) { "Missing app/src/main/assets/tts_hi_tokens.txt" }
     }
 }
 tasks.named("preBuild") { dependsOn(checkModels) }

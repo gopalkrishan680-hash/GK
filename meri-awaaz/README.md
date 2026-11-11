@@ -15,6 +15,27 @@ koi doosra app nahi, internet bhi nahi chahiye.** App koi internet permission ma
 Output 22.05 kHz mono WAV hota hai. Speed phone par depend karti hai — lagbhag
 utna hi time lagta hai jitna lamba audio hai (purane phone par zyada).
 
+## Text → My voice (demo)
+
+Script likho, aur app use aapki awaaz me bol dega — ye bhi poora offline.
+
+1. Upar **Text → My voice** chuno.
+2. Script likho — Roman Hinglish ("aaj hum baat karenge") ya seedha Hindi lipi me.
+3. **Convert to Hindi script** dabao. Neeche wale box me wahi dikhega jo bola jayega;
+   koi shabd galat bana ho to wahin theek kar do.
+4. Speed chuno aur **Generate voice** dabao.
+
+Kaise kaam karta hai: `Hinglish.kt` Roman ko Devanagari me badalta hai (aam shabdon ki dictionary +
+spelling ke niyam), phir Meta ka MMS-TTS Hindi model use padhta hai, aur wahi awaaz upar wale
+converter se aapki awaaz me badalti hai.
+
+Abhi ki seemayein:
+- Roman Hindi me "a" chhota hai ya lamba, "t/d" kaun sa hai — ye likha nahi hota, isliye naam aur
+  kam aam shabd galat ban sakte hain (jaise "Gopal" → गोपल; "Gopaal" likho ya Hindi box me theek karo).
+- Padhne ka andaaz seedha-saada hai: feelings/expressions abhi nahi hain, sirf punctuation se pause.
+- **Licence:** MMS-TTS ke weights CC-BY-NC 4.0 hain, yani **non-commercial** use ke liye.
+  Monetized channel ke liye ye model theek nahi — us haalat me doosra model lagana padega.
+
 ## Quality ke liye app khud kya karta hai
 
 **Sample par (hamesha, automatic):**
@@ -59,7 +80,8 @@ repo → **Actions** → **Meri Awaaz APK** → sabse upar wala green run → **
 | --- | --- |
 | `engine/` | Pure Kotlin: cleaner (noise removal), tone balance, pitch tools, resampler, lambi audio ko tukdo me process karna, model runner (+ tests) |
 | `app/` | Android UI, audio decoder (MediaCodec), save/share |
-| `tools/export_onnx.py` | Model → ONNX export aur jaanch |
+| `tools/export_onnx.py` | Voice converter model → ONNX export aur jaanch |
+| `tools/fetch_tts.py` | Hindi text-to-speech model download aur jaanch |
 
 ## Khud build karna
 
@@ -68,6 +90,7 @@ pip install torch onnx onnxruntime numpy
 curl -LO https://huggingface.co/myshell-ai/OpenVoiceV2/resolve/main/converter/checkpoint.pth
 curl -LO https://huggingface.co/myshell-ai/OpenVoiceV2/resolve/main/converter/config.json
 python tools/export_onnx.py --checkpoint checkpoint.pth --config config.json --out app/src/main/assets
+python tools/fetch_tts.py --out app/src/main/assets
 ./gradlew :engine:test :app:assembleRelease
 ```
 

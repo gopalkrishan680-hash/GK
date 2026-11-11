@@ -10,12 +10,19 @@ import android.provider.OpenableColumns
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
+import android.text.Editable
+import android.text.TextWatcher
 import android.widget.CheckBox
+import android.widget.EditText
+import android.widget.SeekBar
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.core.content.FileProvider
 import com.gk.meriawaaz.engine.ConvertOptions
+import com.gk.meriawaaz.engine.Hinglish
+import com.gk.meriawaaz.engine.HindiTts
 import com.gk.meriawaaz.engine.MODEL_RATE
+import com.gk.meriawaaz.engine.NothingToSayException
 import com.gk.meriawaaz.engine.SampleTooShortException
 import com.gk.meriawaaz.engine.Stage
 import com.gk.meriawaaz.engine.Studio
@@ -39,6 +46,15 @@ class MainActivity : Activity() {
     private lateinit var pitchMatch: CheckBox
     private lateinit var toneBalance: CheckBox
     private lateinit var pickers: List<Button>
+    private lateinit var modeVoiceover: Button
+    private lateinit var modeText: Button
+    private lateinit var voiceoverCard: View
+    private lateinit var textCard: View
+    private lateinit var script: EditText
+    private lateinit var hindi: EditText
+    private lateinit var speed: SeekBar
+    private lateinit var speedLabel: TextView
+    private var textMode = false
 
     private var voiceoverUri: Uri? = null
     private var sampleUri: Uri? = null
@@ -70,7 +86,32 @@ class MainActivity : Activity() {
         toneBalance = findViewById(R.id.toneBalance)
         val pickVoiceover = findViewById<Button>(R.id.pickVoiceover)
         val pickSample = findViewById<Button>(R.id.pickSample)
-        pickers = listOf(pickVoiceover, pickSample)
+        val toHindi = findViewById<Button>(R.id.toHindi)
+        pickers = listOf(pickVoiceover, pickSample, toHindi)
+        modeVoiceover = findViewById(R.id.modeVoiceover)
+        modeText = findViewById(R.id.modeText)
+        voiceoverCard = findViewById(R.id.voiceoverCard)
+        textCard = findViewById(R.id.textCard)
+        script = findViewById(R.id.script)
+        hindi = findViewById(R.id.hindi)
+        speed = findViewById(R.id.speed)
+        speedLabel = findViewById(R.id.speedLabel)
+
+        modeVoiceover.setOnClickListener { textMode = false; refresh() }
+        modeText.setOnClickListener { textMode = true; refresh() }
+        toHindi.setOnClickListener { hindi.setText(Hinglish.toDevanagari(script.text.toString())) }
+        val watcher = object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun afterTextChanged(s: Editable?) = refresh()
+        }
+        script.addTextChangedListener(watcher)
+        hindi.addTextChangedListener(watcher)
+        speed.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(bar: SeekBar?, value: Int, fromUser: Boolean) = refresh()
+            override fun onStartTrackingTouch(bar: SeekBar?) {}
+            override fun onStopTrackingTouch(bar: SeekBar?) {}
+        })
 
         pickVoiceover.setOnClickListener { pickAudio(REQ_VOICEOVER) }
         pickSample.setOnClickListener { pickAudio(REQ_SAMPLE) }
@@ -133,19 +174,37 @@ class MainActivity : Activity() {
             savedVoice != null -> getString(R.string.saved_voice, savedVoice)
             else -> getString(R.string.none_chosen)
         }
+        voiceoverCard.visibility = if (textMode) View.GONE else View.VISIBLE
+        textCard.visibility = if (textMode) View.VISIBLE else View.GONE
+        denoise.visibility = if (textMode) View.GONE else View.VISIBLE
+        modeVoiceover.alpha = if (textMode) 0.45f else 1f
+        modeText.alpha = if (textMode) 1f else 0.45f
+        speedLabel.text = getString(R.string.speed, String.format(Locale.US, "%.2f", speedValue()))
+        listOf(modeVoiceover, modeText, script, hindi, speed).forEach { it.isEnabled = !running }
         pickers.forEach { it.isEnabled = !running }
         denoise.isEnabled = !running
         pitchMatch.isEnabled = !running
         toneBalance.isEnabled = !running
-        convert.isEnabled = running || (voiceoverUri != null && (sampleUri != null || savedVoice != null))
-        convert.setText(if (running) R.string.cancel else R.string.convert)
+        val hasInput = if (textMode) script.text.isNotBlank() || hindi.text.isNotBlank() else voiceoverUri != null
+        convert.isEnabled = running || (hasInput && (sampleUri != null || savedVoice != null))
+        convert.setText(if (running) R.string.cancel else if (textMode) R.string.generate else R.string.convert)
         progress.visibility = if (running) View.VISIBLE else View.GONE
         if (running) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
+    /** Speaking rate chosen with the slider: 0.7x to 1.3x. */
+    private fun speedValue() = 0.7f + speed.progress * 0.05f
+
     private fun start() {
-        val voiceover = voiceoverUri ?: return
+        val voiceover = if (textMode) null else voiceoverUri ?: return
+        var text: String? = null
+        if (textMode) {
+            // Use the Hindi box as the user left it; fill it from the script if it is empty.
+            if (hindi.text.isBlank()) hindi.setText(Hinglish.toDevanagari(script.text.toString()))
+            text = hindi.text.toString()
+        }
+        val rate = speedValue()
         val sample = sampleUri
         val label = sampleLabel
         val options = ConvertOptions(denoise.isChecked, pitchMatch.isChecked, toneBalance.isChecked)
@@ -154,11 +213,13 @@ class MainActivity : Activity() {
         resultBox.visibility = View.GONE
         worker = Thread {
             val message = try {
-                runJob(voiceover, sample, label, options)
+                runJob(voiceover, text, rate, sample, label, options)
             } catch (e: NoAudioException) {
                 getString(R.string.err_no_audio)
             } catch (e: SampleTooShortException) {
                 getString(R.string.err_short_sample)
+            } catch (e: NothingToSayException) {
+                getString(R.string.err_no_text)
             } catch (e: OutOfMemoryError) {
                 getString(R.string.err_memory)
             } catch (e: Throwable) {
@@ -193,16 +254,18 @@ class MainActivity : Activity() {
     }
 
     /** Runs on the worker thread; returns the final status message. */
-    private fun runJob(voiceover: Uri, sample: Uri?, sampleLabel: String?, options: ConvertOptions): String {
+    private fun runJob(
+        voiceover: Uri?, text: String?, rate: Float, sample: Uri?, sampleLabel: String?, options: ConvertOptions,
+    ): String {
         val cancelled = { cancel }
         val work = File(cacheDir, "work").apply { deleteRecursively(); mkdirs() }
         val outDir = File(filesDir, "output").apply { deleteRecursively(); mkdirs() }
         output = null
 
         stage(getString(R.string.st_models), null)
-        val (encoderPath, converterPath) = Models.prepare(this)
+        val models = Models.prepare(this)
         val threads = Runtime.getRuntime().availableProcessors().coerceIn(1, 4)
-        VoiceEngine(encoderPath, converterPath, threads).use { engine ->
+        VoiceEngine(models.encoder, models.converter, threads).use { engine ->
             val studio = Studio(engine, work)
             val profile: VoiceProfile
             if (sample != null) {
@@ -223,32 +286,43 @@ class MainActivity : Activity() {
                 profile = VoiceProfile.fromBytes(voiceFile.readBytes()) ?: throw SampleTooShortException()
             }
 
-            val decodeText = getString(R.string.st_decode)
-            stage(decodeText, 0f)
-            val raw = File(work, "voiceover.raw")
-            val samples = AudioDecoder.decode(this, voiceover, raw, 0, { stage(decodeText, it) }, cancelled)
-            if (cancel) return getString(R.string.st_cancelled)
-            if (samples < MODEL_RATE / 2) throw NoAudioException()
-
             val name = "meri_awaaz_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) + ".wav"
             val out = File(outDir, name)
-            val began = SystemClock.elapsedRealtime()
-            val result = studio.convert(raw, profile, options, out, { s, f ->
+            val report = { s: Stage, f: Float ->
                 when (s) {
+                    Stage.SPEAK -> stage(getString(R.string.st_speak), f)
                     Stage.CLEAN -> stage(getString(R.string.st_clean), f)
                     Stage.PITCH -> stage(getString(R.string.st_pitch), f)
                     Stage.ANALYSE -> stage(getString(R.string.st_analyse), f)
                     Stage.CONVERT -> stage(getString(R.string.st_convert, (f * 100).toInt()), f)
                     Stage.FINISH -> stage(getString(R.string.st_finish), null)
                 }
-            }, cancelled)
+            }
+            val began = SystemClock.elapsedRealtime()
+            val result = if (text != null) {
+                stage(getString(R.string.st_speak), 0f)
+                HindiTts(models.tts, models.ttsTokens, threads).use { tts ->
+                    // The synthetic voice is already clean, so noise removal is skipped.
+                    val clean = ConvertOptions(false, options.pitchMatch, options.toneBalance)
+                    studio.speak(tts, text, rate, profile, clean, out, report, cancelled)
+                }
+            } else {
+                val decodeText = getString(R.string.st_decode)
+                stage(decodeText, 0f)
+                val raw = File(work, "voiceover.raw")
+                val samples = AudioDecoder.decode(this, voiceover!!, raw, 0, { stage(decodeText, it) }, cancelled)
+                if (cancel) return getString(R.string.st_cancelled)
+                if (samples < MODEL_RATE / 2) throw NoAudioException()
+                studio.convert(raw, profile, options, out, report, cancelled)
+            }
             if (!result.finished) {
                 out.delete()
                 return getString(R.string.st_cancelled)
             }
             output = out
             val took = (SystemClock.elapsedRealtime() - began) / 1000
-            var message = getString(R.string.st_done, clock(samples / MODEL_RATE), clock(took))
+            val seconds = (out.length() - 44) / 2 / MODEL_RATE
+            var message = getString(R.string.st_done, clock(seconds), clock(took))
             if (result.semitones != 0f) {
                 message += "\n" + getString(R.string.st_pitch_done, String.format(Locale.US, "%+.1f", result.semitones))
             }

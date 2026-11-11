@@ -3,3 +3,4 @@ build/
 local.properties
 *.onnx
 .kotlin/
+app/src/main/assets/*.txt

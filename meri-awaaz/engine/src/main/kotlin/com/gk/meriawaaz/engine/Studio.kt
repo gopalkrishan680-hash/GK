@@ -40,7 +40,9 @@ class VoiceProfile(
 
 class SampleTooShortException : Exception()
 
-enum class Stage { CLEAN, PITCH, ANALYSE, CONVERT, FINISH }
+class NothingToSayException : Exception()
+
+enum class Stage { SPEAK, CLEAN, PITCH, ANALYSE, CONVERT, FINISH }
 
 class ConvertOptions(
     val denoise: Boolean = true,
@@ -83,6 +85,29 @@ class Studio(private val engine: VoiceEngine, private val work: File) {
             progress(1f)
             VoiceProfile(g, f0, report.speechSeconds, report.snrDb, top < NARROWBAND_DB)
         }
+    }
+
+    /**
+     * Text to speech in the profile's voice: [tts] reads the Devanagari [text], then the
+     * result goes through [convert] like any other voiceover.
+     */
+    fun speak(
+        tts: HindiTts,
+        text: String,
+        speed: Float,
+        profile: VoiceProfile,
+        options: ConvertOptions,
+        outWav: File,
+        progress: (Stage, Float) -> Unit = { _, _ -> },
+        cancelled: () -> Boolean = { false },
+    ): ConvertResult {
+        val spoken = File(work, "spoken.raw")
+        val done = PcmWriter(spoken).use { w ->
+            tts.speak(text, speed, w::write, { progress(Stage.SPEAK, it) }, cancelled)
+        }
+        if (!done) return ConvertResult(false, 0f)
+        if (spoken.length() < MODEL_RATE) throw NothingToSayException()
+        return convert(spoken, profile, options, outWav, progress, cancelled)
     }
 
     /** Converts a whole voiceover into the profile's voice and writes a WAV file. */

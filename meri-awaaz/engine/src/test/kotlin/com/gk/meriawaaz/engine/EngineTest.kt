@@ -238,6 +238,82 @@ class EngineTest {
     }
 
     @Test
+    fun hinglishBecomesDevanagari() {
+        val cases = listOf(
+            "aaj hum baat karenge" to "आज हम बात करेंगे",
+            "Namaste doston, mera naam Amit hai." to "नमस्ते दोस्तों, मेरा नाम अमित है.",
+            "kya aap jaante hain?" to "क्या आप जानते हैं?",
+            "yeh video bahut accha hai" to "यह वीडियो बहुत अच्छा है",
+            "mujhe 25 rupaye chahiye" to "मुझे पच्चीस रुपये चाहिए",
+            "2024 me 150 log" to "दो हज़ार चौबीस में एक सौ पचास लोग",
+            "पहले से हिंदी hai" to "पहले से हिंदी है",
+            "AI aur TV" to "एआई और टीवी",
+        )
+        for ((roman, want) in cases) assertEquals(want, Hinglish.toDevanagari(roman))
+        // Words the dictionary does not know go through the spelling rules.
+        val rules = listOf(
+            "pradesh" to "प्रदेश", "bandar" to "बंदर", "kitabon" to "किताबों", "dilli" to "दिल्ली",
+            "vidya" to "विद्या", "mast" to "मस्त", "dabana" to "दबाना", "sikhao" to "सिखाओ", "ghumaya" to "घुमाया", "apne" to "अपने", "kitne" to "कितने", "sharaabi" to "शराबी", "lambai" to "लंबै",
+        )
+        for ((roman, want) in rules) println("rule: $roman -> ${Hinglish.toDevanagari(roman)} (want $want)")
+        for ((roman, want) in rules.dropLast(1)) assertEquals(want, Hinglish.toDevanagari(roman))
+        println(Hinglish.toDevanagari("Ek gaon me ek ladka rehta tha. Uska sapna tha ki wo ek din bada aadmi banega, lekin uske paas paise nahi the. Phir bhi usne himmat nahi haari aur mehnat karta raha!"))
+        println(Hinglish.toDevanagari("Is video ko like karo, channel ko subscribe karo aur bell icon dabana mat bhoolna. Milte hain agle video me, tab tak ke liye dhanyavaad."))
+    }
+
+    @Test
+    fun textIsCutIntoPhrasesWithPauses() {
+        val parts = HindiTts.segments("नमस्ते दोस्तों, आज हम बात करेंगे। क्या आप तैयार हैं?\n\nचलिए शुरू करते हैं")
+        assertEquals(listOf("नमस्ते दोस्तों", "आज हम बात करेंगे", "क्या आप तैयार हैं", "चलिए शुरू करते हैं"), parts.map { it.text })
+        assertEquals(listOf(180, 420, 700, 420), parts.map { it.pauseMs })
+        assertTrue(HindiTts.segments("  ... !!! ").isEmpty())
+        val long = HindiTts.segments("शब्द ".repeat(200))
+        assertTrue(long.size > 3 && long.all { it.text.length <= 190 })
+    }
+
+    /** Needs MERI_AWAAZ_MODELS with the text-to-speech and voice models. */
+    @Test
+    fun textBecomesSpeechInTheTargetVoice() {
+        val dir = System.getenv("MERI_AWAAZ_MODELS")
+        assumeTrue(dir != null && File(dir, "tts_hi.onnx").exists(), "text-to-speech model not available")
+        val wavs = System.getenv("MERI_AWAAZ_WAVS")
+        val work = java.nio.file.Files.createTempDirectory("meri_awaaz_tts").toFile()
+        val script = "Namaste doston, aaj hum ek nayi kahani sunenge. Kya aap taiyar hain? Chaliye shuru karte hain!"
+        val hindi = Hinglish.toDevanagari(script)
+        println("script: $hindi")
+        HindiTts("$dir/tts_hi.onnx", "$dir/tts_hi_tokens.txt", 4).use { tts ->
+            val one = tts.synthesize("नमस्ते दोस्तों", 1f)
+            val slow = tts.synthesize("नमस्ते दोस्तों", 0.7f)
+            println("phrase: ${one.size / 16000f}s, slower: ${slow.size / 16000f}s, peak ${one.maxOf { abs(it) }}")
+            assertTrue(one.size in 8000..48000, "implausible length ${one.size}")
+            assertTrue(slow.size > one.size * 1.15f)
+            assertTrue(tts.synthesize("?? !!", 1f).isEmpty())
+            val plain = collect { sink -> assertTrue(tts.speak(hindi, 1f, sink)) }
+            println("spoken: ${plain.size / MODEL_RATE.toFloat()}s, pitch ${Pitch.medianF0(ArrayPcm(plain))} Hz")
+            assertTrue(plain.size in MODEL_RATE * 4..MODEL_RATE * 20)
+            assertTrue(Pitch.medianF0(ArrayPcm(plain)) > 0f, "no voiced speech")
+
+            VoiceEngine("$dir/tone_encoder.onnx", "$dir/converter.onnx", 4).use { engine ->
+                val studio = Studio(engine, work)
+                val tgt = if (wavs != null) readWav(File(wavs, "target.wav")) else voice(210.0, MODEL_RATE * 12)
+                val rawTgt = File(work, "tgt.raw").also { f -> PcmWriter(f).use { it.write(tgt, 0, tgt.size) } }
+                val profile = studio.profile(rawTgt)!!
+                val outFile = File(work, "tts.wav")
+                val stages = HashSet<Stage>()
+                assertTrue(studio.speak(tts, hindi, 1f, profile, ConvertOptions(denoise = false), outFile, { s, _ -> stages.add(s) }).finished)
+                assertTrue(Stage.SPEAK in stages && Stage.CONVERT in stages)
+                val out = readWav(outFile)
+                assertTrue(abs(out.size - plain.size) < MODEL_RATE * 3, "length ${out.size} vs ${plain.size}")
+                val before = VoiceEngine.cosine(engine.embed(ArrayPcm(plain)), profile.embedding)
+                val after = VoiceEngine.cosine(engine.embed(ArrayPcm(out)), profile.embedding)
+                println("text to speech: similarity to target voice $before -> $after, pitch ${Pitch.medianF0(ArrayPcm(out))} Hz (target ${profile.f0})")
+                if (wavs != null) assertTrue(after > before + 0.1f, "speech was not moved to the target voice")
+            }
+        }
+        work.deleteRecursively()
+    }
+
+    @Test
     fun pitchShiftKeepsFormantsInPlace() {
         // A "vowel": 110 Hz buzz with one strong resonance at 1.6 kHz.
         val n = MODEL_RATE * 3
