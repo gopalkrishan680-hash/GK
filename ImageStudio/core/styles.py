@@ -1,19 +1,19 @@
-"""Style presets, prompt sudharne wala (offline) aur 'Surprise me' ideas."""
+"""Style presets, offline prompt enhancer and 'Surprise me' ideas."""
 import random
 
 NEG_BASE = ("lowres, worst quality, low quality, blurry, jpeg artifacts, deformed, disfigured, "
             "bad anatomy, extra fingers, mutated hands, extra limbs, watermark, signature, text error")
 
-# naam -> (positive template, extra negative)
+# name -> (positive template, extra negative)
 STYLES: dict[str, tuple[str, str]] = {
-    "🚫 Koi style nahi": ("{p}", ""),
+    "🚫 No style": ("{p}", ""),
     "📷 Real Photo": ("{p}, professional photograph, ultra realistic, 35mm photo, natural lighting, "
                      "sharp focus, highly detailed skin texture, 8k", "cartoon, painting, illustration, 3d render, anime"),
     "🎬 Cinematic": ("cinematic film still of {p}, dramatic lighting, shallow depth of field, anamorphic, "
                     "color graded, epic composition, highly detailed", "cartoon, flat, amateur"),
     "🌸 Anime": ("anime artwork of {p}, anime style, key visual, vibrant colors, studio quality, "
                 "detailed eyes, clean lineart", "photo, realistic, 3d"),
-    "🧸 3D Cartoon (Pixar jaisa)": ("3d animated movie still of {p}, cute, pixar style render, soft lighting, "
+    "🧸 3D Cartoon": ("3d animated movie still of {p}, cute, pixar style render, soft lighting, "
                                    "octane render, vibrant, highly detailed", "photo, realistic, 2d, sketch"),
     "🎨 Digital Art": ("digital painting of {p}, concept art, highly detailed, artstation trending, "
                       "sharp focus, illustration", "photo"),
@@ -28,7 +28,7 @@ STYLES: dict[str, tuple[str, str]] = {
                     "highly detailed", "daylight, nature"),
     "🪔 Indian Art (Madhubani/Miniature)": ("traditional indian art of {p}, madhubani and mughal miniature style, "
                                           "intricate patterns, rich colors, gold details", "photo, 3d, modern"),
-    "🌑 Silhouette (glow wala)": ("silhouette of {p}, black silhouette against glowing sunset backlight, "
+    "🌑 Glowing Silhouette": ("silhouette of {p}, black silhouette against glowing sunset backlight, "
                                  "rim light, minimal, cinematic, high contrast", "detailed face, cluttered"),
     "▶️ YouTube Thumbnail": ("{p}, eye catching youtube thumbnail, bold, high contrast, vibrant saturated colors, "
                             "expressive, clean background, dramatic lighting", "dull, muted, cluttered"),
@@ -63,7 +63,7 @@ _CAMERA = ["wide angle shot", "close-up", "low angle view", "aerial view", "medi
 
 
 def enhance_prompt(prompt: str) -> str:
-    """Chhote prompt ko detail wala bana deta hai (offline, bina AI ke)."""
+    """Turns a short prompt into a detailed one (offline, rule-based)."""
     p = prompt.strip().rstrip(",")
     if not p:
         return random_prompt()
@@ -92,7 +92,7 @@ def random_prompt() -> str:
             f"{random.choice(_LIGHT)}, highly detailed")
 
 
-# Aspect ratio presets: naam -> (w, h) ratio
+# Aspect ratio presets: name -> (w, h) ratio
 ASPECTS = {
     "⬛ 1:1 Square (Insta post)": (1, 1),
     "📱 9:16 (Reels/Shorts/Story)": (9, 16),
@@ -101,13 +101,13 @@ ASPECTS = {
     "🏞️ 4:3 Landscape": (4, 3),
     "📄 2:3 Poster": (2, 3),
     "🎞️ 3:2 Photo": (3, 2),
-    "✏️ Custom (khud size do)": None,
+    "✏️ Custom size": None,
 }
 ASPECT_NAMES = list(ASPECTS.keys())
 
 
 def size_for(aspect: str, base: int, scale: float = 1.0) -> tuple[int, int]:
-    """Aspect + model ki base resolution se width/height (64 ke multiple)."""
+    """Width/height (multiples of 64) from aspect ratio + model base resolution."""
     r = ASPECTS.get(aspect) or (1, 1)
     area = (base * scale) ** 2
     w = (area * r[0] / r[1]) ** 0.5

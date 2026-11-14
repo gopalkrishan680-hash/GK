@@ -1,9 +1,9 @@
-"""Installer: venv ke andar chalta hai (install.bat / install.sh ise chalate hain).
+"""Installer: runs inside the venv (started by install.bat / install.sh).
 
-1. Aapke GPU ke hisaab se PyTorch install
-2. Baaki libraries install
-3. Models download (menu)
-4. Windows par Desktop shortcut
+1. Install PyTorch matching your GPU
+2. Install the other libraries
+3. Download models (menu)
+4. Desktop shortcut on Windows
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ def sh(args: list[str], check: bool = True) -> int:
     print("   $", " ".join(args))
     r = subprocess.call(args)
     if check and r != 0:
-        raise SystemExit(f"\n❌ Command fail hua (code {r}). Internet check karke install dobara chalaein.")
+        raise SystemExit(f"\n❌ Command failed (code {r}). Check your internet and run the installer again.")
     return r
 
 
@@ -56,26 +56,26 @@ def torch_ok(want_cuda: bool) -> bool:
 
 
 def install_torch() -> None:
-    print("\n========== 1/3  PyTorch install (AI engine) ==========")
+    print("\n========== 1/3  Installing PyTorch (AI engine) ==========")
     system = platform.system()
     gpu = nvidia_gpu() if system != "Darwin" else None
     if gpu:
         name, vram, cap = gpu
-        print(f"🟢 NVIDIA GPU mila: {name} ({vram:.0f} GB, compute {cap})")
-        # Naye GPU (RTX 20/30/40/50) -> naya CUDA; purane GPU (GTX 10xx etc.) -> cu126/cu118
+        print(f"🟢 NVIDIA GPU found: {name} ({vram:.0f} GB, compute {cap})")
+        # Newer GPUs (RTX 20/30/40/50) -> newer CUDA; older GPUs (GTX 10xx etc.) -> cu126/cu118
         indexes = ["cu128", "cu130", "cu126"] if cap >= 7.5 else ["cu126", "cu118"]
         for idx in indexes:
-            print(f"\n⬇️  PyTorch ({idx}) download ho raha hai (~2.5 GB, thoda time lagega)...")
+            print(f"\n⬇️  PyTorch ({idx}) downloading (~2.5 GB, this takes a while)...")
             if pip("torch", "torchvision", "--index-url", TORCH_URL + idx, check=False) == 0 and torch_ok(True):
-                print("✅ PyTorch GPU ke saath ready")
+                print("✅ PyTorch ready with GPU support")
                 return
-        print("⚠️  GPU wala PyTorch nahi chala. CPU version install kar rahe hain (slow hoga).")
+        print("⚠️  GPU PyTorch did not work. Installing the CPU version (slower).")
     elif system == "Darwin":
-        print("🍎 Mac mila — Apple Silicon (M1/M2/M3/M4) par Metal GPU use hoga.")
+        print("🍎 Mac detected — the Metal GPU will be used on Apple Silicon (M1/M2/M3/M4).")
         pip("torch", "torchvision")
         return
     else:
-        print("🟡 NVIDIA GPU nahi mila — CPU mode. (Turbo mode se image phir bhi ban jayegi.)")
+        print("🟡 No NVIDIA GPU found — CPU mode. (Turbo mode still makes images.)")
     if system == "Linux":
         if pip("torch", "torchvision", "--index-url", TORCH_URL + "cpu", check=False) == 0:
             return
@@ -83,13 +83,13 @@ def install_torch() -> None:
 
 
 def install_requirements() -> None:
-    print("\n========== 2/3  Baaki libraries install ==========")
+    print("\n========== 2/3  Installing libraries ==========")
     pip("-r", str(ROOT / "requirements.txt"))
     print("✅ Libraries ready")
 
 
 def download_models() -> None:
-    print("\n========== 3/3  AI Models download ==========")
+    print("\n========== 3/3  Downloading AI models ==========")
     auto = "--recommended" if os.environ.get("GK_AUTO") == "1" else None
     sh([PY, str(ROOT / "download_models.py")] + ([auto] if auto else []), check=False)
 
@@ -103,13 +103,13 @@ def desktop_shortcut() -> None:
           f"$s.TargetPath='{target}';$s.WorkingDirectory='{ROOT}';"
           "$s.IconLocation='imageres.dll,67';$s.Save()")
     if subprocess.call(["powershell", "-NoProfile", "-Command", ps]) == 0:
-        print("🖥️  Desktop par 'GK Image Studio' shortcut ban gaya.")
+        print("🖥️  'GK Image Studio' shortcut created on the Desktop.")
 
 
 def main() -> None:
     print(f"Python {platform.python_version()} · {platform.system()} {platform.machine()}")
     if sys.version_info < (3, 10):
-        raise SystemExit("❌ Python 3.10 ya naya chahiye (3.12 best).")
+        raise SystemExit("❌ Python 3.10 or newer is required (3.12 recommended).")
     pip("pip", "setuptools", "wheel", check=False)
     if "--skip-torch" not in sys.argv:
         install_torch()
@@ -118,8 +118,8 @@ def main() -> None:
         download_models()
     desktop_shortcut()
     print("\n🎉🎉 Installation complete! 🎉🎉")
-    print("App chalane ke liye: Windows -> run.bat (ya Desktop shortcut) | Mac/Linux -> ./run.sh")
-    print("Ab internet ki zaroorat nahi hai.\n")
+    print("To start the app: Windows -> run.bat (or the Desktop shortcut) | Mac/Linux -> ./run.sh")
+    print("No internet needed from now on.\n")
 
 
 if __name__ == "__main__":

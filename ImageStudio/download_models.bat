@@ -5,7 +5,7 @@ title GK AI Image Studio - Models download
 set PYTHONUTF8=1
 set PYTHONIOENCODING=utf-8
 if not exist "venv\Scripts\python.exe" (
-  echo Pehle install.bat chalaein.
+  echo Please run install.bat first.
   pause
   exit /b 1
 )

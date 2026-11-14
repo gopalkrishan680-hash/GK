@@ -1,7 +1,7 @@
-"""GK AI Image Studio — bina internet ke AI image generator.
+"""GK AI Image Studio — offline AI image generator.
 
-Chalane ke liye: Windows par run.bat, Mac/Linux par ./run.sh
-Ya: python app.py [--listen] [--port 7860] [--inbrowser]
+Start: run.bat on Windows, ./run.sh on Mac/Linux
+Or: python app.py [--listen] [--port 7860] [--inbrowser]
 """
 from __future__ import annotations
 
@@ -51,9 +51,9 @@ def on_model_change(name, turbo):
     steps, cfg = (6, 1.5) if t else (info.steps, info.cfg)
     note = f"**{info.name}** — {info.desc or info.family.upper()}"
     if info.turbo_native:
-        note += "  \n⚡ Ye model khud hi fast hai (Turbo ki zaroorat nahi)."
+        note += "  \n⚡ This model is already fast (no Turbo needed)."
     elif not can_turbo:
-        note += "  \n_(Turbo LoRA download nahi hai — Models tab se 'turbo' download karein)_"
+        note += "  \n_(Turbo LoRA not downloaded — get 'turbo' from the Models tab)_"
     return (gr.update(value=t, interactive=can_turbo), gr.update(value=steps), gr.update(value=cfg), note)
 
 
@@ -70,8 +70,8 @@ def generate(prompt, negative, style, use_base_neg, aspect, width, height, count
              progress=gr.Progress()):
     info = MODELS.get(model_name)
     if not info:
-        raise gr.Error("Koi model select nahi hai. 📦 Models tab se model download karein.")
-    # Band accordion ke andar wale fields kabhi None aa jaate hain -> default values
+        raise gr.Error("No model selected. Download a model from the 📦 Models tab.")
+    # Fields inside a closed accordion can arrive as None -> use defaults
     prompt, negative = prompt or "", negative or ""
     style = style or STYLE_NAMES[0]
     use_base_neg = True if use_base_neg is None else use_base_neg
@@ -86,22 +86,22 @@ def generate(prompt, negative, style, use_base_neg, aspect, width, height, count
     mode = mode or "Text → Image"
     strength = strength or 0.6
     if not prompt.strip() and mode == "Text → Image":
-        raise gr.Error("Prompt khaali hai. Kuch likhiye, jaise: 'a cute cat astronaut on the moon'")
+        raise gr.Error("The prompt is empty. Write something, e.g. 'a cute cat astronaut on the moon'")
 
-    req_mode = {"Text → Image": "txt2img", "Image → Image": "img2img", "Inpaint (hissa badlo)": "inpaint"}[mode]
+    req_mode = {"Text → Image": "txt2img", "Image → Image": "img2img", "Inpaint (change a part)": "inpaint"}[mode]
     base = base_res(info)
     init = mask = None
     if req_mode == "img2img":
         if init_img is None:
-            raise gr.Error("Image → Image ke liye pehle ek photo upload karein.")
+            raise gr.Error("Upload a photo first for Image → Image.")
         init = init_img
         w, h = size_like(init.width, init.height, base)
     elif req_mode == "inpaint":
         init, mask = utils.mask_from_editor(editor)
         if init is None:
-            raise gr.Error("Inpaint ke liye photo upload karein.")
+            raise gr.Error("Upload a photo for Inpaint.")
         if mask is None:
-            raise gr.Error("Brush se us hisse ko paint karein jo badalna hai.")
+            raise gr.Error("Paint over the area you want to change with the brush.")
         w, h = size_like(init.width, init.height, base)
     elif aspect.startswith("✏️"):
         w, h = int(width) // 64 * 64, int(height) // 64 * 64
@@ -116,12 +116,12 @@ def generate(prompt, negative, style, use_base_neg, aspect, width, height, count
         progress(0, desc=msg)
 
     if ENGINE.info is None or ENGINE.info.key != info.key:
-        progress(0, desc=f"⏳ {info.name} load ho raha hai (pehli baar thoda time lagta hai)...")
+        progress(0, desc=f"⏳ Loading {info.name} (the first load takes a while)...")
     with ENGINE.lock:
         try:
             ENGINE.load(info, log=log)
         except Exception as e:
-            raise gr.Error(f"Model load nahi hua: {e}")
+            raise gr.Error(f"Could not load model: {e}")
 
         lora_list = [(f, float(lora_w)) for f in (loras or [])]
         req = GenRequest(prompt=pos, negative=neg, mode=req_mode, width=w, height=h, steps=int(steps),
@@ -142,20 +142,20 @@ def generate(prompt, negative, style, use_base_neg, aspect, width, height, count
                             loras=lora_list, strength=float(strength) if req_mode != "txt2img" else None)
                 out_paths.append(utils.save_image(img, meta))
                 seeds.append(s)
-                status = (f"✅ {len(out_paths)}/{n} ban gayi · {time.time() - t0:.1f}s · {w}×{h} · "
+                status = (f"✅ {len(out_paths)}/{n} done · {time.time() - t0:.1f}s · {w}×{h} · "
                           f"seed: {', '.join(map(str, seeds))}")
                 yield out_paths, status, out_paths[-1]
         except Exception as e:
             if HW.device == "cuda" and "out of memory" in str(e).lower():
-                raise gr.Error("GPU memory kam pad gayi. Chhota size, kam images ya SD1.5 model try karein.")
+                raise gr.Error("Out of GPU memory. Try a smaller size, fewer images or an SD1.5 model.")
             raise gr.Error(f"Error: {e}")
     if ENGINE.cancel:
-        yield out_paths, f"⏹️ Rok diya gaya. {len(out_paths)} image save hui.", (out_paths[-1] if out_paths else None)
+        yield out_paths, f"⏹️ Stopped. {len(out_paths)} image(s) saved.", (out_paths[-1] if out_paths else None)
 
 
 def stop():
     ENGINE.cancel = True
-    return "⏹️ Rok rahe hain..."
+    return "⏹️ Stopping..."
 
 
 def on_gallery_select(evt: gr.SelectData, files):
@@ -175,26 +175,26 @@ def last_seed_from(path):
 
 def to_img2img(path):
     if not path:
-        raise gr.Error("Pehle gallery mein ek image par click karein.")
+        raise gr.Error("Click an image in the gallery first.")
     return gr.update(value="Image → Image"), Image.open(path).convert("RGB"), gr.update(open=True)
 
 
 def to_inpaint(path):
     if not path:
-        raise gr.Error("Pehle gallery mein ek image par click karein.")
+        raise gr.Error("Click an image in the gallery first.")
     img = Image.open(path).convert("RGB")
-    return (gr.update(value="Inpaint (hissa badlo)"), {"background": img, "layers": [], "composite": img},
+    return (gr.update(value="Inpaint (change a part)"), {"background": img, "layers": [], "composite": img},
             gr.update(open=True))
 
 
 def to_extras(path):
     if not path:
-        raise gr.Error("Pehle ek image select karein.")
+        raise gr.Error("Select an image first.")
     return Image.open(path).convert("RGB"), gr.update(selected="extras")
 
 
 def on_mode(mode):
-    return (gr.update(visible=mode == "Image → Image"), gr.update(visible=mode == "Inpaint (hissa badlo)"),
+    return (gr.update(visible=mode == "Image → Image"), gr.update(visible=mode == "Inpaint (change a part)"),
             gr.update(visible=mode != "Text → Image"))
 
 
@@ -206,16 +206,16 @@ def load_history():
 def history_select(evt: gr.SelectData, files):
     path = on_gallery_select(evt, files)
     meta = utils.read_meta(path) if path else {}
-    return path, json.dumps(meta, indent=2, ensure_ascii=False) if meta else "Is image mein settings nahi mili."
+    return path, json.dumps(meta, indent=2, ensure_ascii=False) if meta else "No settings found in this image."
 
 
 def apply_history(path):
     m = utils.read_meta(path) if path else {}
     if "prompt" not in m:
-        raise gr.Error("Is image mein settings nahi hain.")
+        raise gr.Error("This image has no saved settings.")
     upd = [m.get("prompt", ""), m.get("negative", ""), gr.update(value=m.get("style")) if m.get("style") in STYLE_NAMES
            else gr.update(), m.get("steps", 25), m.get("cfg", 7.0), m.get("seed", -1),
-           gr.update(value="✏️ Custom (khud size do)"), m.get("width", 512), m.get("height", 512)]
+           gr.update(value="✏️ Custom size"), m.get("width", 512), m.get("height", 512)]
     model = next((n for n, i in MODELS.items() if i.key == m.get("model_key")), None)
     upd.append(gr.update(value=model) if model else gr.update())
     upd.append(gr.update(value=bool(m.get("turbo"))))
@@ -226,17 +226,17 @@ def apply_history(path):
 # ---------------- extras
 def ex_upscale(img):
     if img is None:
-        raise gr.Error("Image upload karein.")
+        raise gr.Error("Upload an image.")
     out = utils.simple_upscale(img, 2.0)
     return out, utils.save_image(out, {"prompt": "upscale 2x", "seed": 0, "mode": "upscale"})
 
 
 def ex_ai_upscale(img, prompt, strength, model_name, turbo, progress=gr.Progress()):
     if img is None:
-        raise gr.Error("Image upload karein.")
+        raise gr.Error("Upload an image.")
     info = MODELS.get(model_name)
     if not info:
-        raise gr.Error("Model select karein (Banao tab mein).")
+        raise gr.Error("Select a model (in the Generate tab).")
     with ENGINE.lock:
         ENGINE.load(info, log=lambda m: progress(0, desc=m))
         out = ENGINE.ai_upscale(img, prompt, strength=float(strength), turbo=bool(turbo),
@@ -248,7 +248,7 @@ def ex_ai_upscale(img, prompt, strength, model_name, turbo, progress=gr.Progress
 
 def ex_rembg(img):
     if img is None:
-        raise gr.Error("Image upload karein.")
+        raise gr.Error("Upload an image.")
     try:
         out = utils.remove_background(img)
     except Exception as e:
@@ -260,21 +260,21 @@ def png_info(path):
     if not path:
         return ""
     m = utils.read_meta(path)
-    return json.dumps(m, indent=2, ensure_ascii=False) if m else "Is image mein koi AI settings nahi mili."
+    return json.dumps(m, indent=2, ensure_ascii=False) if m else "No AI settings found in this image."
 
 
 # ---------------- models tab
 def models_table():
-    rows = ["| Model | Type | Size | Status | Kiske liye |", "|---|---|---|---|---|"]
+    rows = ["| Model | Type | Size | Status | Best for |", "|---|---|---|---|---|"]
     for m in CATALOG:
-        st = "✅ Ready" if hf_cached(m.source) else "⬇️ Download karein"
+        st = "✅ Ready" if hf_cached(m.source) else "⬇️ Not downloaded"
         rows.append(f"| {m.name} | {m.family.upper()} | ~{m.size_gb:.0f} GB | {st} | {m.desc} |")
     t1 = "✅" if turbo_lora_available("sd15") else "⬇️"
     t2 = "✅" if turbo_lora_available("sdxl") else "⬇️"
     extra = f"\n\n**Turbo LoRA:** SD1.5 {t1} · SDXL {t2}"
     local = [n for n, i in MODELS.items() if i.kind in ("single", "folder") or i.key.startswith("hf:")]
     if local:
-        extra += "\n\n**Aapke apne models:** " + ", ".join(local)
+        extra += "\n\n**Your own models:** " + ", ".join(local)
     return "\n".join(rows) + extra
 
 
@@ -285,8 +285,8 @@ def run_download(keys, repo):
     elif keys:
         args += [k.split(" ")[0] for k in keys]
     else:
-        raise gr.Error("Kuch select karein ya repo naam likhein.")
-    log = "⏳ Download shuru... (internet chahiye)\n"
+        raise gr.Error("Select something or enter a repo id.")
+    log = "⏳ Starting download... (internet required)\n"
     yield log
     proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                             encoding="utf-8", errors="replace", cwd=str(paths.ROOT))
@@ -294,7 +294,7 @@ def run_download(keys, repo):
         log += line
         yield log[-6000:]
     proc.wait()
-    yield log[-6000:] + "\n🔄 Ab '🔄 Model list refresh' dabaein."
+    yield log[-6000:] + "\n🔄 Now press '🔄 Refresh model list'."
 
 
 def do_refresh():
@@ -305,34 +305,34 @@ def do_refresh():
 
 # ============================================================== UI
 HELP_MD = """
-## 🙏 Kaise use karein
+## 🙏 How to use
 
-1. **Prompt likhein (English mein)** — jaise: `a cute baby elephant playing holi, colorful, happy`
-2. **Style chunein** — Real Photo, Anime, 3D Cartoon, Thumbnail… style apne aap prompt ko behtar bana deta hai.
-3. **Size chunein** — Reels/Shorts ke liye 9:16, YouTube ke liye 16:9.
-4. **🎨 Banao** dabaein. Image `outputs/` folder mein apne aap save ho jaati hai (settings ke saath).
+1. **Write a prompt** — e.g. `a cute baby elephant playing holi, colorful, happy`
+2. **Pick a style** — Real Photo, Anime, 3D Cartoon, Thumbnail… the style automatically improves your prompt.
+3. **Pick a size** — 9:16 for Reels/Shorts, 16:9 for YouTube.
+4. Press **🎨 Generate**. Images are saved automatically to the `outputs/` folder (with their settings).
 
 ### ⚡ Speed tips
-- **CPU (bina GPU) par:** *DreamShaper 8* + **⚡ Turbo ON** rakhein → ek image ~10-40 second.
-- **NVIDIA GPU par:** *DreamShaper XL Turbo* ya *SDXL Turbo* → kuch hi second.
-- **Seed** same rakhenge to wahi image dobara banegi. `-1` = har baar nayi.
+- **On CPU (no GPU):** use *DreamShaper 8* with **⚡ Turbo ON** → ~10-40 seconds per image.
+- **On an NVIDIA GPU:** *DreamShaper XL Turbo* or *SDXL Turbo* → a few seconds.
+- Keep the same **seed** to get the same image again. `-1` = new image every time.
 
 ### ✨ Features
-- **✨ Prompt sudharo** — chhote prompt mein lighting, camera aur quality words jod deta hai.
-- **🎲 Surprise me** — random creative idea.
-- **Image → Image** — apni photo ko naye style mein badlo (strength kam = original jaisa, zyada = zyada badlav).
-- **Inpaint** — photo ke kisi hisse par brush chalao aur prompt mein likho wahan kya chahiye.
-- **🛠️ Extras** — 2x Upscale, AI Upscale (detail), Background hatao, PNG Info (purani image ki settings).
-- **🖼️ History** — sab purani images; *Ye settings wapas lao* se same settings dobara.
-- **LoRA** — `models/lora/` mein `.safetensors` LoRA daalo (character/style ke liye).
-- **Apne models** — Civitai etc. se `.safetensors` (SD1.5/SDXL) `models/checkpoints/` mein daalo → *🔄 refresh*.
-- **Mobile se use karna?** `run.bat --listen` chalaein, phir phone (same WiFi) par `http://<PC ka IP>:7860` kholein.
+- **✨ Enhance prompt** — adds lighting, camera and quality words to a short prompt.
+- **🎲 Surprise me** — a random creative idea.
+- **Image → Image** — restyle your own photo (low strength = close to the original, high = bigger changes).
+- **Inpaint** — paint over part of a photo with the brush and describe what should go there.
+- **🛠️ Extras** — 2x Upscale, AI Upscale (adds detail), Remove background, PNG Info (settings of old images).
+- **🖼️ History** — all past images; *Reuse these settings* restores the exact settings.
+- **LoRA** — put `.safetensors` LoRAs in `models/lora/` (for characters/styles).
+- **Your own models** — put SD1.5/SDXL `.safetensors` files (Civitai etc.) in `models/checkpoints/` → *🔄 refresh*.
+- **Use from your phone?** Start with `run.bat --listen`, then open `http://<PC IP>:7860` on a phone on the same WiFi.
 
-### 📝 Achhe prompt ka formula
-`[kya] + [kahan] + [kaisa mood/light] + [style]`
+### 📝 Formula for a good prompt
+`[subject] + [where] + [mood/lighting] + [style]`
 Example: `an old fisherman, sitting on a boat at sunrise, golden light, mist, cinematic`
 
-**Negative prompt** mein wo likhein jo NAHI chahiye: `blurry, extra fingers, text`.
+Put what you do NOT want in the **negative prompt**: `blurry, extra fingers, text`.
 """
 
 CSS = """
@@ -349,43 +349,43 @@ def build_ui():
     cpu = HW.device == "cpu"
 
     with gr.Blocks(title=APP_TITLE) as demo:
-        gr.Markdown(f"# 🎨 {APP_TITLE}\n100% offline · aapke computer par · koi limit nahi", elem_id="title")
+        gr.Markdown(f"# 🎨 {APP_TITLE}\n100% offline · runs on your computer · no limits", elem_id="title")
         gr.Markdown(HW.label, elem_id="hw")
         if not names:
-            gr.Markdown("### ⚠️ Abhi koi model download nahi hai. **📦 Models** tab mein jaake 'dreamshaper8' "
-                        "aur 'turbo' download karein (sirf ek baar internet chahiye), phir 🔄 dabaein.")
+            gr.Markdown("### ⚠️ No model downloaded yet. Go to the **📦 Models** tab and download 'dreamshaper8' "
+                        "and 'turbo' (internet needed only once), then press 🔄.")
         selected = gr.State(None)
 
         with gr.Tabs() as tabs:
             # ------------------------------------------------ CREATE
-            with gr.Tab("🎨 Banao", id="create"):
+            with gr.Tab("🎨 Generate", id="create"):
                 with gr.Row():
                     with gr.Column(scale=5):
-                        prompt = gr.Textbox(label="Prompt (aapko kya chahiye — English mein)", lines=3,
+                        prompt = gr.Textbox(label="Prompt (describe the image you want)", lines=3,
                                             placeholder="a royal bengal tiger walking in a misty jungle at sunrise")
                         with gr.Row():
-                            enhance_btn = gr.Button("✨ Prompt sudharo", size="sm")
+                            enhance_btn = gr.Button("✨ Enhance prompt", size="sm")
                             surprise_btn = gr.Button("🎲 Surprise me", size="sm")
-                            clear_btn = gr.Button("🧹 Saaf karo", size="sm")
-                        with gr.Accordion("🚫 Negative prompt (kya NAHI chahiye)", open=False):
+                            clear_btn = gr.Button("🧹 Clear", size="sm")
+                        with gr.Accordion("🚫 Negative prompt (what you do NOT want)", open=False):
                             negative = gr.Textbox(label="Negative", lines=2, placeholder="text, watermark, blurry")
-                            use_base_neg = gr.Checkbox(True, label="Auto quality negative jodo (recommended)")
+                            use_base_neg = gr.Checkbox(True, label="Add automatic quality negatives (recommended)")
                         style = gr.Dropdown(STYLE_NAMES, value=STYLE_NAMES[0], label="🎭 Style")
-                        aspect = gr.Radio(ASPECT_NAMES, value=ASPECT_NAMES[0], label="📐 Size / Shape")
+                        aspect = gr.Radio(ASPECT_NAMES, value=ASPECT_NAMES[0], label="📐 Size / Aspect ratio")
                         with gr.Row():
                             model = gr.Dropdown(names, value=default_model, label="🧠 Model", scale=3)
                             refresh_btn = gr.Button("🔄", scale=0, min_width=50)
                         model_note = gr.Markdown()
                         with gr.Row():
-                            turbo = gr.Checkbox(cpu, label="⚡ Turbo mode (4-8 steps, bahut fast)")
-                            count = gr.Slider(1, 8, value=1, step=1, label="Kitni images")
-                        gen_btn = gr.Button("🎨 Banao", variant="primary", elem_id="gen-btn")
-                        stop_btn = gr.Button("⏹️ Roko", variant="stop", size="sm")
+                            turbo = gr.Checkbox(cpu, label="⚡ Turbo mode (4-8 steps, very fast)")
+                            count = gr.Slider(1, 8, value=1, step=1, label="Number of images")
+                        gen_btn = gr.Button("🎨 Generate", variant="primary", elem_id="gen-btn")
+                        stop_btn = gr.Button("⏹️ Stop", variant="stop", size="sm")
 
                         with gr.Accordion("⚙️ Advanced settings", open=False):
                             with gr.Row():
-                                steps = gr.Slider(1, 80, value=25, step=1, label="Steps (zyada = detail, slow)")
-                                cfg = gr.Slider(0, 20, value=7, step=0.5, label="CFG (prompt kitna follow kare)")
+                                steps = gr.Slider(1, 80, value=25, step=1, label="Steps (more = more detail, slower)")
+                                cfg = gr.Slider(0, 20, value=7, step=0.5, label="CFG (how closely to follow the prompt)")
                             with gr.Row():
                                 sampler = gr.Dropdown(SAMPLERS, value="Default", label="Sampler")
                                 seed = gr.Number(-1, label="Seed (-1 = random)", precision=0)
@@ -398,27 +398,27 @@ def build_ui():
                                 loras = gr.Dropdown(list_loras(), multiselect=True, label="🎭 LoRA (models/lora)")
                                 lora_w = gr.Slider(0, 1.5, value=0.8, step=0.05, label="LoRA strength")
 
-                        with gr.Accordion("🖌️ Photo se banao / Edit (Image→Image, Inpaint)", open=False) as edit_acc:
-                            mode = gr.Radio(["Text → Image", "Image → Image", "Inpaint (hissa badlo)"],
+                        with gr.Accordion("🖌️ From a photo / Edit (Image→Image, Inpaint)", open=False) as edit_acc:
+                            mode = gr.Radio(["Text → Image", "Image → Image", "Inpaint (change a part)"],
                                             value="Text → Image", label="Mode")
-                            init_img = gr.Image(type="pil", label="Apni photo", visible=False, height=320)
-                            editor = gr.ImageEditor(type="pil", label="Photo upload karke badalne wale hisse par brush chalao",
+                            init_img = gr.Image(type="pil", label="Your photo", visible=False, height=320)
+                            editor = gr.ImageEditor(type="pil", label="Upload a photo and paint over the area to change",
                                                     visible=False, height=420,
                                                     brush=gr.Brush(colors=["#ffffff"], color_mode="fixed",
                                                                    default_size=40))
                             strength = gr.Slider(0.05, 1.0, value=0.6, step=0.05, visible=False,
-                                                 label="Strength (kam = original jaisa, zyada = zyada badlav)")
+                                                 label="Strength (low = close to original, high = bigger changes)")
 
                     with gr.Column(scale=6):
                         gallery = gr.Gallery(label="Result", columns=2, height=620, format="png",
                                              object_fit="contain", buttons=["download", "fullscreen"],
                                              interactive=False)
-                        status = gr.Markdown("Prompt likhiye aur **🎨 Banao** dabaiye.")
+                        status = gr.Markdown("Write a prompt and press **🎨 Generate**.")
                         with gr.Row():
-                            b_i2i = gr.Button("🔁 Isi ko badlo (img2img)", size="sm")
+                            b_i2i = gr.Button("🔁 Vary this (img2img)", size="sm")
                             b_inp = gr.Button("🖌️ Inpaint", size="sm")
                             b_up = gr.Button("🔍 Upscale / Extras", size="sm")
-                            b_folder = gr.Button("📂 Folder kholo", size="sm")
+                            b_folder = gr.Button("📂 Open folder", size="sm")
 
             # ------------------------------------------------ HISTORY
             with gr.Tab("🖼️ History", id="history"):
@@ -428,7 +428,7 @@ def build_ui():
                                            interactive=False)
                     with gr.Column(scale=2):
                         h_meta = gr.Code(label="Settings", language="json")
-                        h_apply = gr.Button("♻️ Ye settings wapas lao", variant="primary")
+                        h_apply = gr.Button("♻️ Reuse these settings", variant="primary")
                 h_sel = gr.State(None)
                 h_files = gr.State([])
 
@@ -439,41 +439,41 @@ def build_ui():
                         ex_in = gr.Image(type="pil", label="Image")
                         with gr.Row():
                             ex_up_btn = gr.Button("🔍 2x Upscale (fast)")
-                            ex_bg_btn = gr.Button("✂️ Background hatao")
-                        with gr.Accordion("✨ AI Upscale 2x (detail badhao — model use hota hai)", open=True):
-                            ex_prompt = gr.Textbox(label="Image kis cheez ki hai (optional)",
+                            ex_bg_btn = gr.Button("✂️ Remove background")
+                        with gr.Accordion("✨ AI Upscale 2x (adds detail — uses the model)", open=True):
+                            ex_prompt = gr.Textbox(label="What is in the image (optional)",
                                                    placeholder="portrait of a woman, detailed skin")
                             ex_strength = gr.Slider(0.1, 0.6, value=0.3, step=0.05,
-                                                    label="Kitna naya detail (0.25-0.35 best)")
+                                                    label="How much new detail (0.25-0.35 works best)")
                             ex_ai_btn = gr.Button("✨ AI Upscale", variant="primary")
                     with gr.Column():
                         ex_out = gr.Image(label="Result", type="pil", format="png")
                         ex_file = gr.Textbox(label="Saved", interactive=False)
-                gr.Markdown("### 🔎 PNG Info — purani image ki settings dekho")
+                gr.Markdown("### 🔎 PNG Info — see the settings of an old image")
                 with gr.Row():
-                    pi_in = gr.Image(type="filepath", label="Image (is app se bani)")
+                    pi_in = gr.Image(type="filepath", label="Image (made with this app)")
                     pi_out = gr.Code(language="json", label="Settings")
 
             # ------------------------------------------------ MODELS
             with gr.Tab("📦 Models", id="models"):
-                gr.Markdown("Models **sirf ek baar** download hote hain (internet chahiye). Uske baad sab offline chalta hai.")
+                gr.Markdown("Models are downloaded **only once** (internet required). After that everything runs offline.")
                 m_table = gr.Markdown(models_table())
                 dl_keys = gr.CheckboxGroup([f"{m.key} — {m.name}" for m in CATALOG]
                                            + ["turbo — ⚡ Turbo LoRA", "configs — 🧩 .safetensors support",
-                                              "rembg — ✂️ Background remover"], label="Download karne ke liye chunein")
-                dl_repo = gr.Textbox(label="Ya koi bhi Hugging Face diffusers model (repo id)",
+                                              "rembg — ✂️ Background remover"], label="Select items to download")
+                dl_repo = gr.Textbox(label="Or any Hugging Face diffusers model (repo id)",
                                      placeholder="username/model-name")
                 with gr.Row():
                     dl_btn = gr.Button("⬇️ Download", variant="primary")
-                    m_refresh = gr.Button("🔄 Model list refresh")
+                    m_refresh = gr.Button("🔄 Refresh model list")
                 dl_log = gr.Textbox(label="Log", lines=12, max_lines=20, autoscroll=True)
                 gr.Markdown(f"""
-**Apne models kaise daalein (offline):**
-- Civitai / kahin se bhi `.safetensors` checkpoint (SD1.5 ya SDXL) → `{paths.CHECKPOINTS}`
+**Adding your own models (offline):**
+- `.safetensors` checkpoint (SD1.5 or SDXL) from Civitai or anywhere → `{paths.CHECKPOINTS}`
 - LoRA files → `{paths.LORA}`
 - Diffusers-format folder → `{paths.DIFFUSERS}`
 
-Phir **🔄 Model list refresh** dabaein.""")
+Then press **🔄 Refresh model list**.""")
 
             with gr.Tab("❓ Help", id="help"):
                 gr.Markdown(HELP_MD)
@@ -522,13 +522,13 @@ Phir **🔄 Model list refresh** dabaein.""")
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--listen", action="store_true", help="Same WiFi ke phone/laptop se bhi kholo")
+    ap.add_argument("--listen", action="store_true", help="Allow phones/laptops on the same WiFi to connect")
     ap.add_argument("--port", type=int, default=7860)
     ap.add_argument("--inbrowser", action="store_true")
     a = ap.parse_args()
     demo = build_ui()
-    print(f"\n🎨 {APP_TITLE} chalu ho raha hai...  {HW.label}")
-    print(f"👉 Browser mein kholein: http://127.0.0.1:{a.port}\n   (band karne ke liye ye window band karein)\n")
+    print(f"\n🎨 Starting {APP_TITLE}...  {HW.label}")
+    print(f"👉 Open in your browser: http://127.0.0.1:{a.port}\n   (close this window to quit)\n")
     demo.queue(default_concurrency_limit=2).launch(
         server_name="0.0.0.0" if a.listen else "127.0.0.1", server_port=a.port, inbrowser=a.inbrowser,
         allowed_paths=[str(paths.OUTPUTS)], theme=gr.themes.Soft(primary_hue="orange", secondary_hue="indigo",

@@ -1,4 +1,4 @@
-"""Image banane wala engine (diffusers). Model load, LoRA, Turbo, txt2img / img2img / inpaint."""
+"""Image generation engine (diffusers): model loading, LoRA, Turbo, txt2img / img2img / inpaint."""
 from __future__ import annotations
 
 import gc
@@ -86,7 +86,7 @@ class Engine:
         from diffusers import (AutoPipelineForText2Image, StableDiffusionPipeline,
                                StableDiffusionXLPipeline)
         dtype = HW.dtype(info.family)
-        log(f"⏳ Model load ho raha hai: {info.name} ({HW.device}, {str(dtype).replace('torch.', '')}) ...")
+        log(f"⏳ Loading model: {info.name} ({HW.device}, {str(dtype).replace('torch.', '')}) ...")
         t = time.time()
         extra = {"safety_checker": None, "requires_safety_checker": False} if info.family == "sd15" else {}
         if info.kind == "single":
@@ -100,10 +100,10 @@ class Engine:
                     pipe = AutoPipelineForText2Image.from_pretrained(info.source, torch_dtype=dtype,
                                                                      variant=variant, **extra)
                     break
-                except Exception as e:  # variant nahi mila -> bina variant try karo
+                except Exception as e:  # variant not found -> retry without it
                     last_err = e
             if pipe is None:
-                raise RuntimeError(f"Model load nahi hua: {last_err}")
+                raise RuntimeError(f"Could not load model: {last_err}")
         self.base = pipe
         self.info = info
         self.sched_config = pipe.scheduler.config
@@ -138,7 +138,7 @@ class Engine:
             cls = AutoPipelineForImage2Image if mode == "img2img" else AutoPipelineForInpainting
             self.pipes[mode] = cls.from_pipe(self.base)
         p = self.pipes[mode]
-        if self.offload and self.offload_owner != mode:  # offload hooks naye pipe par lagao
+        if self.offload and self.offload_owner != mode:  # move offload hooks to the new pipe
             if self.offload == "sequential":
                 p.enable_sequential_cpu_offload()
             else:
@@ -156,12 +156,12 @@ class Engine:
             self.base.unload_lora_weights()
         names, weights = [], []
         if use_turbo:
-            log("⚡ Turbo (LCM-LoRA) load ho raha hai...")
+            log("⚡ Loading Turbo (LCM-LoRA)...")
             self.base.load_lora_weights(LCM_LORA[fam], weight_name="pytorch_lora_weights.safetensors",
                                         adapter_name="lcm")
             names.append("lcm"); weights.append(1.0)
         for i, (fname, w) in enumerate(loras):
-            log(f"🎭 LoRA load: {fname}")
+            log(f"🎭 Loading LoRA: {fname}")
             self.base.load_lora_weights(str(paths.LORA), weight_name=fname, adapter_name=f"user{i}")
             names.append(f"user{i}"); weights.append(float(w))
         if names:
@@ -172,9 +172,9 @@ class Engine:
     # ------------------------------------------------------------------ generation
     def generate(self, req: GenRequest, on_step: Callable[[int, int, int], None] | None = None,
                  log: Callable[[str], None] = print):
-        """Generator: har image ke baad (image, seed) yield karta hai."""
+        """Generator: yields (image, seed) after each image."""
         if self.base is None:
-            raise RuntimeError("Pehle model load karo.")
+            raise RuntimeError("Load a model first.")
         self.cancel = False
         fam = self.info.family
         use_turbo = self._set_loras(req.turbo, req.loras, log)
@@ -189,7 +189,7 @@ class Engine:
             else:
                 pipe.scheduler = self.sched_cls.from_config(self.sched_config)
 
-        # badi image par VAE tiling (memory bachao)
+        # VAE tiling for large images (saves memory)
         try:
             if (req.tile_vae or req.width * req.height > 1024 * 1024
                     or (HW.device == "cpu" and req.width * req.height > 768 * 768)):
@@ -219,7 +219,7 @@ class Engine:
                 if req.mode == "inpaint":
                     kw.update(mask_image=req.mask.convert("L").resize((req.width, req.height)),
                               width=int(req.width), height=int(req.height))
-                # img2img mein steps*strength chalte hain; kam se kam 1 step pakka karo
+                # img2img runs steps*strength steps; make sure at least 1 step runs
                 if int(req.steps) * float(req.strength) < 1:
                     kw["num_inference_steps"] = int(1 / max(0.05, float(req.strength))) + 1
 

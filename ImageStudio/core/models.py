@@ -1,9 +1,9 @@
-"""Model catalog + local models ki khoj.
+"""Model catalog + local model discovery.
 
-Teen tarah ke models chalte hain:
-1. Catalog wale (Hugging Face se ek baar download, phir offline)
-2. models/checkpoints/ mein rakhi .safetensors files (Civitai etc. se)
-3. models/diffusers/ mein rakhe diffusers-format folders
+Three kinds of models are supported:
+1. Catalog models (downloaded once from Hugging Face, then offline)
+2. .safetensors files placed in models/checkpoints/ (from Civitai etc.)
+3. diffusers-format folders placed in models/diffusers/
 """
 from __future__ import annotations
 
@@ -16,15 +16,15 @@ from . import paths
 
 # Base family -> default resolution
 BASE_RES = {"sd15": 512, "sdxl": 1024, "flux": 1024}
-# Bina offload ke aaram se chalne ke liye lagbhag VRAM (GB)
+# Approx. VRAM (GB) needed to run comfortably without offloading
 NEED_VRAM = {"sd15": 4, "sdxl": 9, "flux": 24}
 
-# Turbo (LCM-LoRA): kisi bhi SD1.5 / SDXL model ko 4-8 steps mein chalata hai
+# Turbo (LCM-LoRA): runs any SD1.5 / SDXL model in 4-8 steps
 LCM_LORA = {
     "sd15": "latent-consistency/lcm-lora-sdv1-5",
     "sdxl": "latent-consistency/lcm-lora-sdxl",
 }
-# .safetensors single-file models ko offline load karne ke liye config files
+# Config files needed to load single-file .safetensors models offline
 CONFIG_REPOS = {
     "sd15": "stable-diffusion-v1-5/stable-diffusion-v1-5",
     "sdxl": "stabilityai/stable-diffusion-xl-base-1.0",
@@ -36,11 +36,11 @@ class ModelInfo:
     key: str
     name: str
     family: str                 # sd15 | sdxl | flux
-    source: str                 # HF repo id ya local path
+    source: str                 # HF repo id or local path
     kind: str = "hf"            # hf | single | folder
     steps: int = 25
     cfg: float = 7.0
-    turbo_native: bool = False  # model khud hi fast hai (LCM-LoRA ki zaroorat nahi)
+    turbo_native: bool = False  # model is already fast (no LCM-LoRA needed)
     size_gb: float = 0.0
     desc: str = ""
     license: str = ""
@@ -54,33 +54,33 @@ class ModelInfo:
 CATALOG: list[ModelInfo] = [
     ModelInfo("dreamshaper8", "DreamShaper 8 (All-rounder, SD1.5)", "sd15", "Lykon/dreamshaper-8",
               steps=25, cfg=7.0, size_gb=2.1,
-              desc="Har type ki image: photo, art, fantasy, anime. CPU + Turbo mode par bhi chalta hai.",
+              desc="Any kind of image: photo, art, fantasy, anime. Works on CPU with Turbo mode.",
               license="CreativeML OpenRAIL-M", tags=["recommended", "cpu"]),
     ModelInfo("realvision51", "Realistic Vision 5.1 (Real photo, SD1.5)", "sd15",
               "SG161222/Realistic_Vision_V5.1_noVAE", steps=25, cfg=6.0, size_gb=2.1,
-              desc="Asli jaisi photos, insaan, products. CPU + Turbo par bhi theek.",
+              desc="Lifelike photos of people and products. Works on CPU with Turbo.",
               license="CreativeML OpenRAIL-M", tags=["cpu"]),
     ModelInfo("anything5", "Anything V5 (Anime, SD1.5)", "sd15", "stablediffusionapi/anything-v5",
               steps=25, cfg=7.0, size_gb=2.1,
               desc="Anime / manga / cartoon style.", license="CreativeML OpenRAIL-M", tags=["cpu"]),
     ModelInfo("sdxlturbo", "SDXL Turbo (Super fast, 512px)", "sdxl", "stabilityai/sdxl-turbo",
               steps=2, cfg=0.0, turbo_native=True, size_gb=6.9,
-              desc="1-4 steps mein image. GPU (6GB+) par second mein. Sirf personal / non-commercial use.",
+              desc="Images in 1-4 steps, about a second on a 6GB+ GPU. Personal / non-commercial use only.",
               license="Stability AI Non-Commercial", tags=["gpu"]),
     ModelInfo("dreamshaperxl", "DreamShaper XL Turbo (HD 1024px)", "sdxl", "Lykon/dreamshaper-xl-v2-turbo",
               steps=6, cfg=2.0, turbo_native=True, size_gb=6.9,
-              desc="Badi HD 1024px images, fast. 8GB+ GPU best.", license="OpenRAIL++",
+              desc="Large HD 1024px images, fast. Best on an 8GB+ GPU.", license="OpenRAIL++",
               tags=["recommended-gpu", "gpu"]),
     ModelInfo("sdxlbase", "Stable Diffusion XL 1.0 (HD, original)", "sdxl",
               "stabilityai/stable-diffusion-xl-base-1.0", steps=30, cfg=6.5, size_gb=6.9,
-              desc="Official SDXL. Turbo mode ke saath fast.", license="OpenRAIL++", tags=["gpu"]),
+              desc="Official SDXL. Fast with Turbo mode.", license="OpenRAIL++", tags=["gpu"]),
     ModelInfo("animaginexl", "Animagine XL 3.1 (HD Anime)", "sdxl", "cagliostrolab/animagine-xl-3.1",
               steps=28, cfg=7.0, size_gb=6.9,
-              desc="Best quality anime. Prompt mein tags likhein: '1girl, smile, ...'",
+              desc="Best quality anime. Write tags in the prompt: '1girl, smile, ...'",
               license="Fair AI Public License", tags=["gpu"]),
-    ModelInfo("fluxschnell", "FLUX.1 Schnell (Top quality, text bhi likhta hai)", "flux",
+    ModelInfo("fluxschnell", "FLUX.1 Schnell (Top quality, renders text)", "flux",
               "black-forest-labs/FLUX.1-schnell", steps=4, cfg=0.0, turbo_native=True, size_gb=33.0,
-              desc="Sabse achhi quality + image mein sahi text. 12GB+ GPU aur 32GB RAM chahiye. ~33GB download.",
+              desc="Best quality + accurate text in images. Needs a 12GB+ GPU and 32GB RAM. ~33GB download.",
               license="Apache 2.0", tags=["pro"]),
 ]
 CATALOG_BY_KEY = {m.key: m for m in CATALOG}
@@ -118,7 +118,7 @@ def family_from_class(class_name: str) -> str | None:
 
 
 def family_of_safetensors(path: Path) -> str | None:
-    """safetensors header padh ke pata karo ki SD1.5 hai ya SDXL (poora file load kiye bina)."""
+    """Read the safetensors header to tell SD1.5 from SDXL (without loading the whole file)."""
     try:
         with open(path, "rb") as f:
             n = struct.unpack("<Q", f.read(8))[0]
@@ -138,7 +138,7 @@ def family_of_safetensors(path: Path) -> str | None:
 
 
 def hf_cached(repo: str) -> bool:
-    """Kya ye HF repo already download ho chuka hai?"""
+    """Is this HF repo already downloaded?"""
     from huggingface_hub import try_to_load_from_cache
     try:
         r = try_to_load_from_cache(repo, "model_index.json")

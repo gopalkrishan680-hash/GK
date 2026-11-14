@@ -1,10 +1,10 @@
-"""Models download karo (sirf YAHI step internet maangta hai, ek baar).
+"""Download models (the ONLY step that needs internet, just once).
 
-Use:
-  python download_models.py                  -> menu se chuno
-  python download_models.py --recommended    -> aapke PC ke hisaab se best set
+Usage:
+  python download_models.py                  -> pick from a menu
+  python download_models.py --recommended    -> best set for your PC
   python download_models.py dreamshaper8 turbo configs rembg
-  python download_models.py --repo username/model-name   -> koi bhi HF diffusers model
+  python download_models.py --repo username/model-name   -> any HF diffusers model
 """
 from __future__ import annotations
 
@@ -28,14 +28,14 @@ def _fail(name: str, e: Exception) -> None:
     msg = str(e)
     print(f"❌ {name}: {msg[:300]}")
     if "401" in msg or "403" in msg or "gated" in msg.lower():
-        print("   ↳ Ye model login/permission maang raha hai, ya network block hai. Doosra model try karein.")
+        print("   ↳ This model needs a login/permission, or the network is blocked. Try another model.")
     elif "connect" in msg.lower() or "resolve" in msg.lower() or "timed out" in msg.lower():
-        print("   ↳ Internet connection check karein, phir dobara chalaein (download wahin se resume hoga).")
+        print("   ↳ Check your internet connection and run again (the download will resume).")
 
 
 EXTRAS = {
-    "turbo": "⚡ Turbo LoRA (LCM) — SD1.5/SDXL models ko 4-8 steps mein chalata hai (~0.6 GB)  [zaroori]",
-    "configs": "🧩 Config files — .safetensors (Civitai) models offline chalane ke liye (~5 MB)  [zaroori]",
+    "turbo": "⚡ Turbo LoRA (LCM) — runs SD1.5/SDXL models in 4-8 steps (~0.6 GB)  [required]",
+    "configs": "🧩 Config files — needed to run .safetensors (Civitai) models offline (~5 MB)  [required]",
     "rembg": "✂️ Background remover model (~170 MB)",
 }
 
@@ -51,7 +51,7 @@ def download_pipeline(repo: str) -> bool:
         except Exception as e:
             err = e
             if variant:
-                print("   (fp16 version nahi mila, normal version try kar rahe hain...)")
+                print("   (no fp16 version, trying the regular version...)")
     _fail(repo, err)
     return False
 
@@ -113,7 +113,7 @@ def run(keys: list[str]) -> None:
         elif k in CATALOG_BY_KEY:
             download_pipeline(CATALOG_BY_KEY[k].source)
         else:
-            print(f"⚠️  '{k}' naam ka model nahi mila")
+            print(f"⚠️  No model named '{k}'")
 
 
 def add_repo(repo: str) -> None:
@@ -124,9 +124,9 @@ def add_repo(repo: str) -> None:
         fam = family_from_class(cls)
         if fam:
             add_custom_repo(repo, fam)
-            print(f"✅ '{repo}' app mein add ho gaya ({fam})")
+            print(f"✅ '{repo}' added to the app ({fam})")
         else:
-            print(f"⚠️  '{cls}' type ka model abhi supported nahi hai (sirf SD1.5 / SDXL / FLUX).")
+            print(f"⚠️  Model type '{cls}' is not supported yet (only SD1.5 / SDXL / FLUX).")
 
 
 def menu() -> list[str]:
@@ -134,13 +134,13 @@ def menu() -> list[str]:
     items = [(m.key, f"{m.name} — ~{m.size_gb:.1f} GB\n        {m.desc}") for m in CATALOG]
     items += list(EXTRAS.items())
     print("\n================  MODELS DOWNLOAD  ================")
-    print("Sirf yahi step internet use karta hai. Iske baad app poori tarah OFFLINE chalegi.\n")
+    print("Only this step uses the internet. After this the app runs fully OFFLINE.\n")
     for i, (k, d) in enumerate(items, 1):
-        done = " ✅(already hai)" if (k in CATALOG_BY_KEY and hf_cached(CATALOG_BY_KEY[k].source)) else ""
+        done = " ✅(already downloaded)" if (k in CATALOG_BY_KEY and hf_cached(CATALOG_BY_KEY[k].source)) else ""
         star = " ⭐" if k in rec else ""
         print(f" {i:2d}. {d}{star}{done}")
-    print(f"\n⭐ = aapke computer ke liye recommended: {', '.join(rec)}")
-    ans = input("\nNumbers likhein (jaise: 1 9 10) ya ENTER dabaein recommended ke liye, 0 = skip: ").strip()
+    print(f"\n⭐ = recommended for your computer: {', '.join(rec)}")
+    ans = input("\nType numbers (e.g. 1 9 10), or press ENTER for the recommended set, 0 = skip: ").strip()
     if ans == "0":
         return []
     if not ans:
@@ -171,10 +171,10 @@ def main() -> None:
     keys = a.keys or (recommended() if a.recommended else menu())
     run(keys)
     if FAILED:
-        print(f"\n⚠️  Ye download nahi hue: {', '.join(FAILED)}")
-        print("   Baaki sab ready hai. Baad mein download_models dobara chala sakte hain.")
+        print(f"\n⚠️  These failed to download: {', '.join(FAILED)}")
+        print("   Everything else is ready. You can run download_models again later.")
         sys.exit(1)
-    print("\n🎉 Download complete. Ab app offline chala sakte hain.")
+    print("\n🎉 Download complete. You can now run the app offline.")
 
 
 if __name__ == "__main__":

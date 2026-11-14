@@ -4,7 +4,7 @@ set -e
 cd "$(dirname "$0")"
 echo "=========================================================="
 echo "        GK AI Image Studio - One click installer"
-echo "  Internet sirf is installation ke time chahiye (ek baar)"
+echo "  Internet is needed only during this one-time installation"
 echo "=========================================================="
 if [ ! -x venv/bin/python ]; then
   PY=""
@@ -14,17 +14,17 @@ if [ ! -x venv/bin/python ]; then
     fi
   done
   if [ -z "$PY" ]; then
-    echo "❌ Python 3.10-3.13 nahi mila."
+    echo "❌ Python 3.10-3.13 not found."
     if [ "$(uname)" = "Darwin" ]; then
-      echo "   Install karein:  brew install python@3.12   (ya https://www.python.org/downloads/)"
+      echo "   Install it:  brew install python@3.12   (or https://www.python.org/downloads/)"
     else
-      echo "   Install karein:  sudo apt install python3 python3-venv python3-pip"
+      echo "   Install it:  sudo apt install python3 python3-venv python3-pip"
     fi
     exit 1
   fi
   echo "[*] Python: $PY"
   if ! "$PY" -m venv venv; then
-    echo "❌ venv nahi bana. Ubuntu/Debian par:  sudo apt install python3-venv"
+    echo "❌ Could not create venv. On Ubuntu/Debian:  sudo apt install python3-venv"
     exit 1
   fi
 fi

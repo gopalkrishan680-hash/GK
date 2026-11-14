@@ -1,4 +1,4 @@
-"""Computer ka hardware pehchaano: NVIDIA GPU / Apple Silicon / sirf CPU."""
+"""Detect hardware: NVIDIA GPU / Apple Silicon / CPU only."""
 import os
 import platform
 
@@ -37,8 +37,8 @@ class Hardware:
             return f"🟢 NVIDIA GPU: {self.name} ({self.vram_gb:.0f} GB VRAM)"
         if self.device == "mps":
             return f"🟢 {self.name} · RAM {self.ram_gb:.0f} GB"
-        return (f"🟡 CPU mode ({self.ram_gb:.0f} GB RAM) — GPU nahi mila. "
-                "⚡ Turbo mode ON rakhein aur chhota/fast model use karein.")
+        return (f"🟡 CPU mode ({self.ram_gb:.0f} GB RAM) — no GPU found. "
+                "Keep ⚡ Turbo mode ON and use a small/fast model.")
 
 
 def _ram_gb() -> float:

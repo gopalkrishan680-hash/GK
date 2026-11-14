@@ -1,4 +1,4 @@
-"""Image save (settings ke saath), history, PNG info, upscale, background remove."""
+"""Image saving (with settings), history, PNG info, upscaling, background removal."""
 from __future__ import annotations
 
 import json
@@ -75,16 +75,16 @@ def remove_background(img: Image.Image) -> Image.Image:
     try:
         from rembg import new_session, remove
     except ImportError as e:
-        raise RuntimeError("rembg install nahi hai. install dobara chalaein.") from e
+        raise RuntimeError("rembg is not installed. Please run the installer again.") from e
     have_model = any(paths.REMBG.rglob("u2net.onnx"))
     if not have_model and os.environ.get("HF_HUB_OFFLINE") == "1":
-        raise RuntimeError("Background remover model download nahi hua. Internet ke saath "
-                           "'download_models' chalaein (option: rembg).")
+        raise RuntimeError("Background remover model is not downloaded. Connect to the internet "
+                           "and run 'download_models' (option: rembg).")
     return remove(img, session=new_session("u2net"))
 
 
 def mask_from_editor(value) -> tuple[Image.Image | None, Image.Image | None]:
-    """Gradio ImageEditor value -> (original image, white=badlo mask)."""
+    """Gradio ImageEditor value -> (original image, mask where white = repaint)."""
     if not value:
         return None, None
     bg = value.get("background")
