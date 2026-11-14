@@ -1,0 +1,13 @@
+# torch / torchvision installer.py alag se install karta hai (aapke GPU ke hisaab se)
+diffusers>=0.43,<1.0
+transformers>=5.0,<6.0
+accelerate>=1.10
+huggingface_hub>=1.0
+safetensors>=0.4
+peft>=0.17
+gradio>=6.0,<7.0
+pillow>=10.0
+sentencepiece
+protobuf
+rembg>=2.0.60
+onnxruntime>=1.18

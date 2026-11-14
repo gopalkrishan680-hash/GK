@@ -1,0 +1,14 @@
+venv/
+__pycache__/
+*.pyc
+config.json
+outputs/*
+!outputs/.gitkeep
+models/hf/
+models/rembg/
+models/checkpoints/*
+!models/checkpoints/.gitkeep
+models/lora/*
+!models/lora/.gitkeep
+models/diffusers/*
+!models/diffusers/.gitkeep
