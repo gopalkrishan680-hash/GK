@@ -56,7 +56,7 @@ fun SettingsScreen(vm: StudioViewModel, onBack: () -> Unit) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) }
             Text("Settings", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
         }
-        SectionCard("AI Prompt Writer (optional)", "Free Gemini API key se Hindi/Hinglish script bhi best English prompts me badal jati hai. Bina key ke bhi app offline prompts banata hai.") {
+        SectionCard("AI Prompt Writer (optional)", "With a free Gemini API key, any script (even Hindi/Hinglish) becomes detailed English prompts. Without a key the app still writes offline prompts.") {
             OutlinedTextField(
                 key, { key = it; vm.prefs.geminiKey = it }, label = { Text("Gemini API key") },
                 leadingIcon = { Icon(Icons.Default.Key, null) }, singleLine = true,
@@ -67,11 +67,11 @@ fun SettingsScreen(vm: StudioViewModel, onBack: () -> Unit) {
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(model, { model = it; vm.prefs.geminiModel = it }, label = { Text("Model") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
-            SoftButton("Free key yahan se lo (aistudio.google.com)") {
+            SoftButton("Get a free key (aistudio.google.com)") {
                 ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://aistudio.google.com/apikey")))
             }
         }
-        SectionCard("Default style (naye projects ke liye)") {
+        SectionCard("Default style (for new projects)") {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 VisualStyle.entries.forEach { s -> Pill(s.label, s == style) { style = s; vm.prefs.defaultStyle = s } }
             }
@@ -81,15 +81,15 @@ fun SettingsScreen(vm: StudioViewModel, onBack: () -> Unit) {
             }
         }
         SectionCard("Default watermark / channel name") {
-            OutlinedTextField(wm, { wm = it; vm.prefs.defaultWatermark = it }, label = { Text("e.g. @MeraChannel") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(wm, { wm = it; vm.prefs.defaultWatermark = it }, label = { Text("e.g. @MyChannel") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         }
-        SectionCard("Kaise kaam karta hai?") {
+        SectionCard("How it works") {
             Text(
-                "1. Script likho/paste karo, voiceover (MP3/M4A/WAV) upload karo.\n" +
-                    "2. App har scene ka 3D image prompt banata hai — 'Copy All' karke kisi bhi image generator (Gemini, Ideogram, Leonardo, Bing, Meta AI…) me daalo.\n" +
-                    "3. Images ko 1, 2, 3… naam se save karo aur 'Bulk Upload' se ek saath daalo — order apne aap lag jayega.\n" +
-                    "4. Edit me motion, captions, music, filters set karo.\n" +
-                    "5. Export — MP4 seedha Gallery (Movies/Kahani3D) me save hogi. Sab kuch phone par, bina watermark ke.",
+                "1. Write or paste your script and upload a voiceover (MP3/M4A/WAV).\n" +
+                    "2. The app writes a 3D image prompt for every scene — use 'Copy All' and paste them into any image generator (Gemini, Ideogram, Leonardo, Bing, Meta AI…).\n" +
+                    "3. Save the images as 1, 2, 3… and add them all with 'Bulk Upload' — they are ordered automatically.\n" +
+                    "4. In Edit, set motion, captions, music and filters.\n" +
+                    "5. Export — the MP4 is saved to your Gallery (Movies/Kahani3D). Everything runs on your phone, with no watermark.",
                 color = K.TextDim, fontSize = 13.sp, lineHeight = 19.sp
             )
         }

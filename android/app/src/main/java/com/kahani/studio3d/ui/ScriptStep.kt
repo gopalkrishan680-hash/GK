@@ -75,11 +75,11 @@ fun ScriptStep(vm: StudioViewModel, p: Project) {
     val pickVoice = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> uri?.let { vm.importVoice(it) } }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        SectionCard("1. Script", "Hindi, Hinglish ya English — kisi bhi language me") {
+        SectionCard("1. Script", "Any language — English, Hindi, Hinglish…") {
             OutlinedTextField(
                 text, { text = it },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp, max = 360.dp),
-                placeholder = { Text("Ek gaon me Raju naam ka ek chhota ladka rehta tha…") },
+                placeholder = { Text("Once upon a time, in a small village, lived a boy named Raju…") },
             )
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -89,7 +89,7 @@ fun ScriptStep(vm: StudioViewModel, p: Project) {
                 SoftButton("Paste", Icons.Default.ContentPaste) { clipboard.getText()?.text?.let { text = it } }
             }
             Spacer(Modifier.height(10.dp))
-            Text("Scenes kaise bane?", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Text("How to split scenes?", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(6.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SplitMode.entries.forEach { m ->
@@ -98,9 +98,9 @@ fun ScriptStep(vm: StudioViewModel, p: Project) {
             }
         }
 
-        SectionCard("2. Voiceover", "MP3 / M4A / WAV / OGG. Scenes apne aap voice ke pauses par sync honge.") {
+        SectionCard("2. Voiceover", "MP3 / M4A / WAV / OGG. Scenes auto-sync to the pauses in your voice.") {
             if (p.voicePath == null) {
-                GradientButton("Voiceover upload karo", Modifier.fillMaxWidth(), icon = Icons.Default.UploadFile) { pickVoice.launch("audio/*") }
+                GradientButton("Upload voiceover", Modifier.fillMaxWidth(), icon = Icons.Default.UploadFile) { pickVoice.launch("audio/*") }
             } else {
                 VoiceRow(p) { pickVoice.launch("audio/*") }
             }
@@ -156,7 +156,7 @@ private fun VoiceRow(p: Project, onReplace: () -> Unit) {
 private fun CharactersCard(vm: StudioViewModel, p: Project) {
     var name by remember { mutableStateOf("") }
     var desc by remember { mutableStateOf("") }
-    SectionCard("Character Bible", "Har image me same chehra/kapde rahe. Script me naam aate hi uska description prompt me jud jayega.") {
+    SectionCard("Character Bible", "Keep faces and outfits consistent. Whenever a name appears in the script, its description is added to that prompt.") {
         p.characters.forEachIndexed { i, c ->
             Row(Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp)).background(K.Surface2).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Person, null, tint = K.Cyan)
@@ -170,11 +170,11 @@ private fun CharactersCard(vm: StudioViewModel, p: Project) {
                 }
             }
         }
-        OutlinedTextField(name, { name = it }, label = { Text("Naam (jaise: Raju)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(name, { name = it }, label = { Text("Name (e.g. Raju)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(6.dp))
-        OutlinedTextField(desc, { desc = it }, label = { Text("Look: 8 saal ka ladka, ghungrale baal, peeli t-shirt…") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(desc, { desc = it }, label = { Text("Look: 8-year-old boy, curly hair, yellow t-shirt…") }, modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(8.dp))
-        SoftButton("Character add karo", Icons.Default.Add) {
+        SoftButton("Add character", Icons.Default.Add) {
             if (name.isNotBlank() && desc.isNotBlank()) {
                 vm.setCharacters(p.characters + Character(name.trim(), desc.trim())); name = ""; desc = ""
             }
@@ -192,7 +192,7 @@ private fun AdvancedPromptCard(vm: StudioViewModel, p: Project) {
         }
         if (open) {
             OutlinedTextField(p.extraPrompt, { v -> vm.update { it.copy(extraPrompt = v) } },
-                label = { Text("Har prompt me add karo (jaise: Indian village, 1990s)") }, modifier = Modifier.fillMaxWidth())
+                label = { Text("Add to every prompt (e.g. Indian village, 1990s)") }, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(p.negativePrompt, { v -> vm.update { it.copy(negativePrompt = v) } },
                 label = { Text("Negative prompt") }, modifier = Modifier.fillMaxWidth())

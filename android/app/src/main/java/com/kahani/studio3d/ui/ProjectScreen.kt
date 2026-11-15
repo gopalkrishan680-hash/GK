@@ -92,8 +92,8 @@ fun ProjectScreen(vm: StudioViewModel, onBack: () -> Unit) {
             Row(Modifier.fillMaxWidth().background(K.Bg).navigationBarsPadding().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (step > 0) SoftButton("Back", Icons.AutoMirrored.Filled.ArrowBack, Modifier.weight(0.4f)) { step-- }
                 val nextLabel = when (step) {
-                    0 -> "Prompts banao"
-                    1 -> "Images upload karo"
+                    0 -> "Create prompts"
+                    1 -> "Upload images"
                     2 -> "Edit & Preview"
                     else -> "Export Video"
                 }
@@ -124,7 +124,7 @@ fun ProjectScreen(vm: StudioViewModel, onBack: () -> Unit) {
         var t by remember { mutableStateOf(project.title) }
         AlertDialog(
             onDismissRequest = { rename = false },
-            title = { Text("Naam badlo") },
+            title = { Text("Rename") },
             text = { OutlinedTextField(t, { t = it }, singleLine = true) },
             confirmButton = { TextButton(onClick = { vm.update { it.copy(title = t.ifBlank { it.title }) }; rename = false }) { Text("Save") } },
             dismissButton = { TextButton(onClick = { rename = false }) { Text("Cancel") } }

@@ -39,7 +39,7 @@ object AudioTools {
             val mime = ex.getTrackFormat(i).getString(MediaFormat.KEY_MIME) ?: ""
             if (mime.startsWith("audio/")) { track = i; break }
         }
-        require(track >= 0) { "Is file me audio track nahi mila" }
+        require(track >= 0) { "No audio track found in this file" }
         ex.selectTrack(track)
         val inFormat = ex.getTrackFormat(track)
         val durUs = if (inFormat.containsKey(MediaFormat.KEY_DURATION)) inFormat.getLong(MediaFormat.KEY_DURATION) else 0L

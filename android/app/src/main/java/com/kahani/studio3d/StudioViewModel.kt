@@ -68,7 +68,7 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
     // ------------------------------------------------------------ project CRUD
 
     fun newProject(title: String): String {
-        val p = repo.create(title.ifBlank { "Meri Video" }).copy(
+        val p = repo.create(title.ifBlank { "My Video" }).copy(
             style = prefs.defaultStyle, aspect = prefs.defaultAspect, watermark = prefs.defaultWatermark
         )
         repo.save(p)
@@ -151,13 +151,13 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
 
     fun importVoice(uri: Uri) = viewModelScope.launch {
         val p = _current.value ?: return@launch
-        _busy.value = Busy("Voiceover import ho raha hai…")
+        _busy.value = Busy("Importing voiceover…")
         try {
             val (path, name, dur) = withContext(Dispatchers.IO) {
                 val path = repo.importFile(p.id, uri, "voice")
                 Triple(path, repo.displayName(uri), AudioTools.durationMs(path))
             }
-            if (dur <= 0) { toast("Ye audio file read nahi ho payi. MP3/M4A/WAV try karein."); return@launch }
+            if (dur <= 0) { toast("Couldn't read this audio file. Try MP3/M4A/WAV."); return@launch }
             update { it.copy(voicePath = path, voiceName = name, voiceDurationMs = dur) }
             analyzeVoice(_current.value!!, retime = true)
         } catch (e: Exception) {
@@ -169,17 +169,17 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
     private fun analyzeVoice(p: Project, retime: Boolean) = viewModelScope.launch {
         val path = p.voicePath ?: return@launch
         // only block the screen when the user just imported a voice; on project open it runs silently
-        if (retime) _busy.value = Busy("Voice analyse ho rahi hai (auto-sync)…", 0f)
+        if (retime) _busy.value = Busy("Analysing voice (auto-sync)…", 0f)
         try {
             val found = withContext(Dispatchers.Default) {
                 val pcm = File(getApplication<Application>().cacheDir, "analyze.pcm")
-                AudioTools.decodeToPcm(path, pcm) { if (retime) _busy.value = Busy("Voice analyse ho rahi hai (auto-sync)…", it) }
+                AudioTools.decodeToPcm(path, pcm) { if (retime) _busy.value = Busy("Analysing voice (auto-sync)…", it) }
                 val env = AudioTools.envelope(pcm)
                 pcm.delete()
                 AudioTools.findPauses(env)
             }
             pauses[p.id] = found
-            if (retime) { retime(); toast("Scenes voice ke pauses par auto-sync ho gaye (${found.size} pauses mile)") }
+            if (retime) { retime(); toast("Scenes synced to voice pauses (${found.size} pauses found)") }
         } catch (e: Exception) {
             if (retime) retime()
         } finally { if (retime) _busy.value = null }
@@ -197,16 +197,16 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
 
     fun generatePrompts(useAi: Boolean, overwrite: Boolean) = viewModelScope.launch {
         val p0 = _current.value ?: return@launch
-        if (p0.scenes.isEmpty()) { toast("Pehle script likhiye"); return@launch }
+        if (p0.scenes.isEmpty()) { toast("Write a script first"); return@launch }
         val p = if (overwrite) p0.copy(scenes = p0.scenes.map { it.copy(prompt = "") }) else p0
         val key = prefs.geminiKey
-        if (useAi && key.isBlank()) { toast("AI prompts ke liye Settings me free Gemini API key daaliye"); return@launch }
-        _busy.value = Busy(if (useAi) "AI prompts likh raha hai…" else "Prompts ban rahe hain…", 0f)
+        if (useAi && key.isBlank()) { toast("Add a free Gemini API key in Settings to use AI prompts"); return@launch }
+        _busy.value = Busy(if (useAi) "Writing AI prompts…" else "Creating prompts…", 0f)
         try {
             val scenes = withContext(Dispatchers.IO) {
                 if (useAi) {
                     val todo = p.copy(scenes = p.scenes)
-                    val ai = PromptGenerator.gemini(todo, key, prefs.geminiModel) { d, t -> _busy.value = Busy("AI prompts likh raha hai… $d/$t", d.toFloat() / t) }
+                    val ai = PromptGenerator.gemini(todo, key, prefs.geminiModel) { d, t -> _busy.value = Busy("Writing AI prompts… $d/$t", d.toFloat() / t) }
                     p.scenes.mapIndexed { i, s -> if (!overwrite && s.prompt.isNotBlank()) s else ai[i] }
                 } else {
                     p.scenes.mapIndexed { i, s -> if (s.prompt.isNotBlank()) s else s.copy(prompt = PromptGenerator.offline(p, i, s)) }
@@ -215,7 +215,7 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
             update { it.copy(scenes = it.scenes.mapIndexed { i, s -> s.copy(prompt = scenes.getOrNull(i)?.prompt ?: s.prompt) }) }
             toast("${scenes.size} image prompts ready!")
         } catch (e: Exception) {
-            toast("Prompt error: ${e.message}. Offline prompts use kar rahe hain.")
+            toast("Prompt error: ${e.message}. Using offline prompts instead.")
             update { it.copy(scenes = it.scenes.mapIndexed { i, s -> if (s.prompt.isBlank()) s.copy(prompt = PromptGenerator.offline(it, i, s)) else s }) }
         } finally { _busy.value = null }
     }
@@ -240,7 +240,7 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
     fun bulkImages(uris: List<Uri>, startAt: Int? = null) = viewModelScope.launch {
         val p = _current.value ?: return@launch
         if (uris.isEmpty()) return@launch
-        _busy.value = Busy("${uris.size} images import ho rahi hain…", 0f)
+        _busy.value = Busy("${uris.size} images importing…", 0f)
         try {
             val sorted = withContext(Dispatchers.IO) {
                 uris.map { it to (repo.displayName(it) ?: "") }.sortedWith { a, b -> naturalCompare(a.second, b.second) }.map { it.first }
@@ -254,11 +254,11 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
                     val path = repo.importFile(p.id, uri, "img_${scene.id}")
                     withContext(Dispatchers.Main) { updateScene(idx) { it.copy(imagePath = path) } }
                     n++
-                    _busy.value = Busy("Images import… ${k + 1}/${sorted.size}", (k + 1f) / sorted.size)
+                    _busy.value = Busy("Importing images… ${k + 1}/${sorted.size}", (k + 1f) / sorted.size)
                 }
             }
             val extra = sorted.size - n
-            toast("$n images lag gayi" + if (extra > 0) " ($extra extra images chhod di)" else "")
+            toast("$n images added" + if (extra > 0) " ($extra extra images skipped)" else "")
         } finally { _busy.value = null }
     }
 
@@ -269,19 +269,19 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
         if (_export.value.running) return
         prefs.exportQuality = quality; prefs.exportFps = fps
         val missing = p.scenes.count { it.imagePath == null }
-        if (missing > 0) toast("$missing scenes me image nahi hai — placeholder dikhega")
-        _export.value = ExportState(running = true, label = "Shuru…")
+        if (missing > 0) toast("$missing scene(s) have no image — a placeholder will be shown")
+        _export.value = ExportState(running = true, label = "Starting…")
         viewModelScope.launch(Dispatchers.Default) {
             val out = File(repo.dir(p.id), "export.mp4")
             val ex = VideoExporter(getApplication<Application>(), p, quality, fps)
             exporter = ex
             try {
                 ex.export(out) { pr, label -> _export.value = _export.value.copy(progress = pr, label = label) }
-                _export.value = _export.value.copy(label = "Gallery me save ho raha hai…")
+                _export.value = _export.value.copy(label = "Saving to Gallery…")
                 val uri = withContext(Dispatchers.IO) { VideoExporter.saveToGallery(getApplication<Application>(), out, p.title) }
                 _export.value = ExportState(running = false, progress = 1f, label = "Video ready!", file = out, galleryUri = uri)
             } catch (e: ExportCancelled) {
-                _export.value = ExportState(label = "Cancel ho gaya")
+                _export.value = ExportState(label = "Cancelled")
             } catch (e: Throwable) {
                 _export.value = ExportState(error = e.message ?: e.javaClass.simpleName)
             } finally { exporter = null }

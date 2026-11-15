@@ -123,8 +123,8 @@ enum class CaptionPosition(val label: String) { BOTTOM("Bottom"), CENTER("Center
 
 @Serializable
 enum class SplitMode(val label: String) {
-    SENTENCE("Har sentence = 1 scene"),
-    LINE("Har line = 1 scene"),
+    SENTENCE("1 sentence = 1 scene"),
+    LINE("1 line = 1 scene"),
     SMART("Smart (~8 sec per scene)");
 }
 

@@ -108,7 +108,7 @@ fun HomeScreen(vm: StudioViewModel, onOpen: (String) -> Unit, onSettings: () -> 
         item(span = { GridItemSpan(2) }) { HeroCard { showNew = true } }
         item(span = { GridItemSpan(2) }) {
             Column {
-                Text("Style chuno aur shuru karo", fontWeight = FontWeight.Bold, color = Color.White)
+                Text("Pick a style to start", fontWeight = FontWeight.Bold, color = Color.White)
                 Spacer(Modifier.height(8.dp))
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(VisualStyle.entries) { st -> StyleTile(st, selected = false, width = 120) { askTitle = st } }
@@ -117,7 +117,7 @@ fun HomeScreen(vm: StudioViewModel, onOpen: (String) -> Unit, onSettings: () -> 
         }
         item(span = { GridItemSpan(2) }) {
             Text(
-                if (projects.isEmpty()) "Abhi koi project nahi — upar se naya banaiye ✨" else "Mere Projects (${projects.size})",
+                if (projects.isEmpty()) "No projects yet — create one above ✨" else "My Projects (${projects.size})",
                 fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(top = 6.dp)
             )
         }
@@ -131,9 +131,9 @@ fun HomeScreen(vm: StudioViewModel, onOpen: (String) -> Unit, onSettings: () -> 
         var title by remember { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { showNew = false; askTitle = null },
-            title = { Text("Nayi Video") },
+            title = { Text("New Video") },
             text = {
-                OutlinedTextField(title, { title = it }, label = { Text("Video ka naam") }, singleLine = true)
+                OutlinedTextField(title, { title = it }, label = { Text("Video name") }, singleLine = true)
             },
             confirmButton = {
                 TextButton(onClick = {
@@ -141,7 +141,7 @@ fun HomeScreen(vm: StudioViewModel, onOpen: (String) -> Unit, onSettings: () -> 
                     askTitle?.let { st -> vm.update { it.copy(style = st) } }
                     showNew = false; askTitle = null
                     onOpen(id)
-                }) { Text("Banao") }
+                }) { Text("Create") }
             },
             dismissButton = { TextButton(onClick = { showNew = false; askTitle = null }) { Text("Cancel") } }
         )
@@ -154,8 +154,8 @@ private fun HeroCard(onClick: () -> Unit) {
         Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(K.GradSoft)
             .border(1.dp, K.Stroke, RoundedCornerShape(22.dp)).clickable(onClick = onClick).padding(18.dp)
     ) {
-        Text("Nayi 3D Video banao", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
-        Text("Script aur voiceover do — baaki app karega", fontSize = 13.sp, color = K.TextDim)
+        Text("Create a new 3D video", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+        Text("Add a script and voiceover — the app does the rest", fontSize = 13.sp, color = K.TextDim)
         Spacer(Modifier.height(14.dp))
         Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
             Step(Icons.Default.TextSnippet, "Script")
@@ -230,7 +230,7 @@ private fun ProjectCard(p: Project, onClick: () -> Unit, onDelete: () -> Unit, o
     if (confirm) AlertDialog(
         onDismissRequest = { confirm = false },
         title = { Text("Delete project?") },
-        text = { Text("\"${p.title}\" hamesha ke liye delete ho jayega.") },
+        text = { Text("\"${p.title}\" will be deleted permanently.") },
         confirmButton = { TextButton(onClick = { confirm = false; onDelete() }) { Text("Delete", color = K.Pink) } },
         dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel") } }
     )

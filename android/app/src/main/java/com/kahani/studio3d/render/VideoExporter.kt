@@ -33,7 +33,7 @@ import java.nio.FloatBuffer
 import kotlin.math.max
 import kotlin.math.sqrt
 
-class ExportCancelled : Exception("Export cancel kar diya")
+class ExportCancelled : Exception("Export cancelled")
 
 /**
  * Renders a [Project] into an H.264 + AAC MP4 completely on the phone.
@@ -54,10 +54,10 @@ class VideoExporter(
         val (w, h) = project.aspect.size(shortSide)
         val renderer = FrameRenderer(project, w, h)
         val totalMs = renderer.durationMs
-        require(totalMs > 0) { "Video ki length 0 hai" }
+        require(totalMs > 0) { "Video length is 0" }
 
-        onProgress(0f, "Audio taiyar ho raha hai…")
-        val (audioFormat, audioSamples) = buildAudio(totalMs) { p -> onProgress(p * 0.12f, "Audio mix ho raha hai…") }
+        onProgress(0f, "Preparing audio…")
+        val (audioFormat, audioSamples) = buildAudio(totalMs) { p -> onProgress(p * 0.12f, "Mixing audio…") }
         checkCancel()
 
         out.delete()
@@ -137,7 +137,7 @@ class VideoExporter(
             frame.recycle(); renderer.release()
             runCatching { if (muxStarted) muxer.stop() }; muxer.release()
         }
-        onProgress(1f, "Ho gaya!")
+        onProgress(1f, "Done!")
     }
 
     private fun checkCancel() { if (cancelled) throw ExportCancelled() }

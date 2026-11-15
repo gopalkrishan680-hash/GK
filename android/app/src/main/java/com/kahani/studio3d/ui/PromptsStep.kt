@@ -63,7 +63,7 @@ fun PromptsStep(vm: StudioViewModel, p: Project) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            SectionCard("Image Prompts", "${p.scenes.size} scenes • ${p.style.label}. Copy karke kisi bhi AI image generator me use karo.") {
+            SectionCard("Image Prompts", "${p.scenes.size} scenes • ${p.style.label}. Copy them into any AI image generator.") {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     SoftButton("AI (Gemini)", Icons.Default.AutoAwesome, Modifier.weight(1f)) { vm.generatePrompts(useAi = true, overwrite = true) }
                     SoftButton("Offline", Icons.Default.Bolt, Modifier.weight(1f)) {
@@ -75,7 +75,7 @@ fun PromptsStep(vm: StudioViewModel, p: Project) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     GradientButton("Copy All", Modifier.weight(1f), icon = Icons.Default.ContentCopy) {
                         clip.setText(AnnotatedString(PromptGenerator.exportText(p, true)))
-                        vm.toast("Saare ${p.scenes.size} prompts copy ho gaye")
+                        vm.toast("All ${p.scenes.size} prompts copied")
                     }
                     SoftButton("Share .txt", Icons.Default.Share, Modifier.weight(1f)) {
                         val f = File(ctx.cacheDir, "prompts_${p.id}.txt").apply { writeText(PromptGenerator.exportText(p, true)) }
@@ -84,15 +84,15 @@ fun PromptsStep(vm: StudioViewModel, p: Project) {
                             type = "text/plain"; putExtra(Intent.EXTRA_STREAM, uri)
                             putExtra(Intent.EXTRA_TEXT, PromptGenerator.exportText(p, true))
                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        }, "Prompts share karo"))
+                        }, "Share prompts"))
                     }
                 }
                 if (!hasKey) {
                     Spacer(Modifier.height(8.dp))
-                    Text("Tip: Settings me free Gemini key daalo — Hindi script se bhi detailed, consistent English prompts banenge.", color = K.Yellow, fontSize = 12.sp)
+                    Text("Tip: add a free Gemini key in Settings for detailed, consistent prompts (works even with Hindi scripts).", color = K.Yellow, fontSize = 12.sp)
                 }
                 Spacer(Modifier.height(6.dp))
-                Text("Images ko 1.png, 2.png, 3.png… naam se save karna — bulk upload me order apne aap lagega.", color = K.TextDim, fontSize = 12.sp)
+                Text("Save images as 1.png, 2.png, 3.png… and bulk upload will put them in order automatically.", color = K.TextDim, fontSize = 12.sp)
             }
         }
         itemsIndexed(p.scenes, key = { _, s -> s.id }) { i, s ->

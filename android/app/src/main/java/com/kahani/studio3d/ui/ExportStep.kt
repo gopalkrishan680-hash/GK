@@ -73,7 +73,7 @@ fun ExportStep(vm: StudioViewModel, p: Project) {
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Warning, null, tint = K.Yellow)
-                    Text("  $missing scenes me image nahi hai", color = K.Yellow, fontSize = 13.sp)
+                    Text("  $missing scene(s) have no image", color = K.Yellow, fontSize = 13.sp)
                 }
             }
         }
@@ -88,7 +88,7 @@ fun ExportStep(vm: StudioViewModel, p: Project) {
         }
 
         when {
-            ex.running -> SectionCard("Render ho raha hai…", "Phone par hi video ban rahi hai. App khula rakhiye.") {
+            ex.running -> SectionCard("Rendering…", "The video is being made on your phone. Keep the app open.") {
                 LinearProgressIndicator(progress = { ex.progress }, modifier = Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(8.dp)), color = K.Pink, trackColor = K.Stroke)
                 Spacer(Modifier.height(8.dp))
                 Text("${(ex.progress * 100).toInt()}% • ${ex.label}", color = Color.White)
@@ -109,16 +109,16 @@ fun ExportStep(vm: StudioViewModel, p: Project) {
                     SoftButton("Share", Icons.Default.Share, Modifier.weight(1f)) {
                         ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
                             type = "video/mp4"; putExtra(Intent.EXTRA_STREAM, uri); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        }, "Video share karo"))
+                        }, "Share video"))
                     }
                 }
                 Spacer(Modifier.height(8.dp))
-                SoftButton("Dobara export karo", Icons.Default.Movie, Modifier.fillMaxWidth()) { vm.startExport(quality, fps) }
+                SoftButton("Export again", Icons.Default.Movie, Modifier.fillMaxWidth()) { vm.startExport(quality, fps) }
             }
             else -> {
-                ex.error?.let { Text("Error: $it\n720p ya 30fps try karein.", color = K.Pink) }
+                ex.error?.let { Text("Error: $it\nTry 720p or 30 fps.", color = K.Pink) }
                 GradientButton("Export Video (MP4)", Modifier.fillMaxWidth(), icon = Icons.Default.Movie, enabled = p.scenes.isNotEmpty()) { vm.startExport(quality, fps) }
-                Text("Video bina watermark ke, phone par hi banti hai — internet ki zarurat nahi.", color = K.TextDim, fontSize = 12.sp)
+                Text("No watermark. Rendered entirely on your phone — no internet needed.", color = K.TextDim, fontSize = 12.sp)
             }
         }
     }

@@ -186,10 +186,10 @@ private fun ScenesTab(vm: StudioViewModel, p: Project, ctl: PreviewController) {
     LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SoftButton("Voice se re-sync", Icons.Default.Sync, Modifier.weight(1f)) { vm.resync(); vm.toast("Timing voiceover ke hisaab se reset ho gayi") }
+                SoftButton("Re-sync to voice", Icons.Default.Sync, Modifier.weight(1f)) { vm.resync(); vm.toast("Timing reset to match the voiceover") }
                 var allMotion by remember { mutableStateOf(false) }
                 Box(Modifier.weight(1f)) {
-                    SoftButton("Sabka motion", null, Modifier.fillMaxWidth()) { allMotion = true }
+                    SoftButton("Motion for all", null, Modifier.fillMaxWidth()) { allMotion = true }
                     DropdownMenu(allMotion, { allMotion = false }) {
                         Motion.entries.forEach { m -> DropdownMenuItem(text = { Text(m.label) }, onClick = { allMotion = false; vm.update { it.copy(scenes = it.scenes.map { s -> s.copy(motion = m) }) } }) }
                     }
@@ -216,10 +216,10 @@ private fun ScenesTab(vm: StudioViewModel, p: Project, ctl: PreviewController) {
                     Box {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, null, tint = K.TextDim) }
                         DropdownMenu(menu, { menu = false }) {
-                            DropdownMenuItem(text = { Text("Agle scene se jodo") }, leadingIcon = { Icon(Icons.Default.CallMerge, null) }, onClick = { menu = false; vm.mergeWithNext(i) })
-                            DropdownMenuItem(text = { Text("Do hisso me todo") }, leadingIcon = { Icon(Icons.Default.CallSplit, null) }, onClick = { menu = false; vm.splitScene(i) })
-                            DropdownMenuItem(text = { Text("Upar") }, leadingIcon = { Icon(Icons.Default.ArrowUpward, null) }, onClick = { menu = false; vm.moveScene(i, -1) })
-                            DropdownMenuItem(text = { Text("Neeche") }, leadingIcon = { Icon(Icons.Default.ArrowDownward, null) }, onClick = { menu = false; vm.moveScene(i, 1) })
+                            DropdownMenuItem(text = { Text("Merge with next") }, leadingIcon = { Icon(Icons.Default.CallMerge, null) }, onClick = { menu = false; vm.mergeWithNext(i) })
+                            DropdownMenuItem(text = { Text("Split in two") }, leadingIcon = { Icon(Icons.Default.CallSplit, null) }, onClick = { menu = false; vm.splitScene(i) })
+                            DropdownMenuItem(text = { Text("Move up") }, leadingIcon = { Icon(Icons.Default.ArrowUpward, null) }, onClick = { menu = false; vm.moveScene(i, -1) })
+                            DropdownMenuItem(text = { Text("Move down") }, leadingIcon = { Icon(Icons.Default.ArrowDownward, null) }, onClick = { menu = false; vm.moveScene(i, 1) })
                             DropdownMenuItem(text = { Text("Delete") }, leadingIcon = { Icon(Icons.Default.Delete, null) }, onClick = { menu = false; vm.deleteScene(i) })
                         }
                     }
@@ -260,7 +260,7 @@ private fun <T> EnumMenu(label: String, items: List<T>, name: (T) -> String, onP
 @Composable
 private fun CaptionsTab(vm: StudioViewModel, p: Project) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionCard("Caption style", "Auto captions script se — word-by-word timing ke saath") {
+        SectionCard("Caption style", "Auto captions from your script, timed word by word") {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 CaptionStyle.entries.forEach { c -> Pill(c.label, p.captionStyle == c) { vm.update { it.copy(captionStyle = c) } } }
             }
@@ -297,12 +297,12 @@ private fun EffectsTab(vm: StudioViewModel, p: Project) {
             }
         }
         SectionCard("Cinematic") {
-            ToggleRow("Vignette (kinare dark)", p.vignette) { v -> vm.update { it.copy(vignette = v) } }
+            ToggleRow("Vignette (dark edges)", p.vignette) { v -> vm.update { it.copy(vignette = v) } }
             ToggleRow("Letterbox (movie bars)", p.letterbox) { v -> vm.update { it.copy(letterbox = v) } }
             ToggleRow("Film grain", p.filmGrain) { v -> vm.update { it.copy(filmGrain = v) } }
         }
         SectionCard("Watermark / channel name") {
-            OutlinedTextField(p.watermark, { v -> vm.update { it.copy(watermark = v) } }, singleLine = true, modifier = Modifier.fillMaxWidth(), placeholder = { Text("@MeraChannel") })
+            OutlinedTextField(p.watermark, { v -> vm.update { it.copy(watermark = v) } }, singleLine = true, modifier = Modifier.fillMaxWidth(), placeholder = { Text("@MyChannel") })
         }
     }
 }
@@ -320,23 +320,23 @@ private fun AudioTab(vm: StudioViewModel, p: Project) {
     val pickMusic = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { it?.let(vm::importMusic) }
     val pickVoice = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { it?.let(vm::importVoice) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionCard("Voiceover", p.voiceName?.let { "$it • ${fmtTime(p.voiceDurationMs)}" } ?: "Koi voiceover nahi") {
+        SectionCard("Voiceover", p.voiceName?.let { "$it • ${fmtTime(p.voiceDurationMs)}" } ?: "No voiceover") {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SoftButton(if (p.voicePath == null) "Upload" else "Badlo", null, Modifier.weight(1f)) { pickVoice.launch("audio/*") }
+                SoftButton(if (p.voicePath == null) "Upload" else "Change", null, Modifier.weight(1f)) { pickVoice.launch("audio/*") }
                 SoftButton("Re-sync scenes", Icons.Default.Sync, Modifier.weight(1f)) { vm.resync() }
             }
         }
-        SectionCard("Background music", p.musicName ?: "Optional — voice ke neeche halka music") {
+        SectionCard("Background music", p.musicName ?: "Optional — soft music under the voice") {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SoftButton(if (p.musicPath == null) "Music add karo" else "Badlo", Icons.Default.MusicNote, Modifier.weight(1f)) { pickMusic.launch("audio/*") }
-                if (p.musicPath != null) SoftButton("Hatao", Icons.Default.Delete, Modifier.weight(1f)) { vm.removeMusic() }
+                SoftButton(if (p.musicPath == null) "Add music" else "Change", Icons.Default.MusicNote, Modifier.weight(1f)) { pickMusic.launch("audio/*") }
+                if (p.musicPath != null) SoftButton("Remove", Icons.Default.Delete, Modifier.weight(1f)) { vm.removeMusic() }
             }
             if (p.musicPath != null) {
                 Spacer(Modifier.height(10.dp))
                 Text("Music volume: ${"%.0f".format(p.musicVolume * 100)}%", color = K.TextDim, fontSize = 12.sp)
                 Slider(p.musicVolume, { v -> vm.update { it.copy(musicVolume = v) } }, valueRange = 0f..1f)
-                ToggleRow("Auto-duck (bolte waqt music dheema)", p.duckMusic) { v -> vm.update { it.copy(duckMusic = v) } }
-                Text("Preview me music nahi bajta; export video me mix hoga.", color = K.TextDim, fontSize = 11.sp)
+                ToggleRow("Auto-duck (lower music while speaking)", p.duckMusic) { v -> vm.update { it.copy(duckMusic = v) } }
+                Text("Music doesn't play in preview; it's mixed into the exported video.", color = K.TextDim, fontSize = 11.sp)
             }
         }
     }

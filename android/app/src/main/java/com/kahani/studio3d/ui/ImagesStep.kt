@@ -79,18 +79,18 @@ fun ImagesStep(vm: StudioViewModel, p: Project) {
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) {
-            SectionCard("Images upload karo", "Prompts se bani images yahan daalo. Tap = ek image, long-press = options.") {
+            SectionCard("Upload images", "Add the images you generated from the prompts. Tap = one image, long-press = options.") {
                 val done = p.imagesDone
                 LinearProgressIndicator(
                     progress = { if (p.scenes.isEmpty()) 0f else done.toFloat() / p.scenes.size },
                     modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(6.dp)), color = K.Green, trackColor = K.Stroke
                 )
                 Text("$done / ${p.scenes.size} images ready", color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(vertical = 8.dp))
-                GradientButton("Bulk Upload (sabhi ek saath)", Modifier.fillMaxWidth(), icon = Icons.Default.Collections) {
+                GradientButton("Bulk Upload (all at once)", Modifier.fillMaxWidth(), icon = Icons.Default.Collections) {
                     bulkFrom = null; pickMany.launch("image/*")
                 }
                 Spacer(Modifier.height(6.dp))
-                Text("File names ke number se order lagega (1, 2, 3…). Khali scenes pehle bharenge.", color = K.TextDim, fontSize = 12.sp)
+                Text("Images are ordered by the number in the file name (1, 2, 3…). Empty scenes are filled first.", color = K.TextDim, fontSize = 12.sp)
             }
         }
         itemsIndexed(p.scenes, key = { _, s -> s.id }) { i, s ->
@@ -117,10 +117,10 @@ fun ImagesStep(vm: StudioViewModel, p: Project) {
                         modifier = Modifier.align(Alignment.TopStart).padding(4.dp).clip(RoundedCornerShape(6.dp)).background(Color(0xAA000000)).padding(horizontal = 6.dp, vertical = 1.dp)
                     )
                     DropdownMenu(menu, { menu = false }) {
-                        DropdownMenuItem(text = { Text("Image badlo") }, leadingIcon = { Icon(Icons.Default.SwapHoriz, null) }, onClick = { menu = false; target = i; pickOne.launch("image/*") })
-                        DropdownMenuItem(text = { Text("Yahan se bulk upload") }, leadingIcon = { Icon(Icons.Default.Collections, null) }, onClick = { menu = false; bulkFrom = i; pickMany.launch("image/*") })
-                        DropdownMenuItem(text = { Text("Prompt copy karo") }, leadingIcon = { Icon(Icons.Default.ContentCopy, null) }, onClick = { menu = false; clip.setText(AnnotatedString(s.prompt)); vm.toast("Prompt copied") })
-                        if (s.imagePath != null) DropdownMenuItem(text = { Text("Image hatao") }, leadingIcon = { Icon(Icons.Default.Delete, null) }, onClick = { menu = false; vm.removeImage(i) })
+                        DropdownMenuItem(text = { Text("Replace image") }, leadingIcon = { Icon(Icons.Default.SwapHoriz, null) }, onClick = { menu = false; target = i; pickOne.launch("image/*") })
+                        DropdownMenuItem(text = { Text("Bulk upload from here") }, leadingIcon = { Icon(Icons.Default.Collections, null) }, onClick = { menu = false; bulkFrom = i; pickMany.launch("image/*") })
+                        DropdownMenuItem(text = { Text("Copy prompt") }, leadingIcon = { Icon(Icons.Default.ContentCopy, null) }, onClick = { menu = false; clip.setText(AnnotatedString(s.prompt)); vm.toast("Prompt copied") })
+                        if (s.imagePath != null) DropdownMenuItem(text = { Text("Remove image") }, leadingIcon = { Icon(Icons.Default.Delete, null) }, onClick = { menu = false; vm.removeImage(i) })
                     }
                 }
                 Text(s.text, color = K.TextDim, fontSize = 10.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 12.sp, modifier = Modifier.padding(top = 3.dp))
