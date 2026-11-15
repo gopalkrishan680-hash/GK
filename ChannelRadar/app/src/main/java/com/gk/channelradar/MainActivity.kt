@@ -12,6 +12,7 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
@@ -33,6 +34,7 @@ import com.gk.channelradar.ui.RadarTheme
 import com.gk.channelradar.ui.ResultsScreen
 import com.gk.channelradar.ui.SettingsScreen
 import com.gk.channelradar.ui.Tab
+import com.gk.channelradar.ui.TrendsScreen
 import com.gk.channelradar.ui.WatchlistScreen
 
 class MainActivity : ComponentActivity() {
@@ -67,6 +69,11 @@ fun App(vm: AppViewModel = viewModel()) {
                     icon = { Icon(Icons.Filled.Search, null) }, label = { Text("Discover") }
                 )
                 NavigationBarItem(
+                    selected = vm.tab == Tab.TRENDS && detail == null,
+                    onClick = { vm.closeDetail(); vm.tab = Tab.TRENDS },
+                    icon = { Icon(Icons.Filled.Star, null) }, label = { Text("Trends") }
+                )
+                NavigationBarItem(
                     selected = vm.tab == Tab.RESULTS && detail == null,
                     onClick = { vm.closeDetail(); vm.tab = Tab.RESULTS },
                     icon = {
@@ -80,7 +87,7 @@ fun App(vm: AppViewModel = viewModel()) {
                 NavigationBarItem(
                     selected = vm.tab == Tab.WATCHLIST && detail == null,
                     onClick = { vm.closeDetail(); vm.tab = Tab.WATCHLIST },
-                    icon = { Icon(Icons.Filled.Favorite, null) }, label = { Text("Watchlist") }
+                    icon = { Icon(Icons.Filled.Favorite, null) }, label = { Text("Saved") }
                 )
                 NavigationBarItem(
                     selected = vm.tab == Tab.SETTINGS && detail == null,
@@ -94,6 +101,7 @@ fun App(vm: AppViewModel = viewModel()) {
             if (detail != null) ChannelScreen(vm, detail)
             else when (vm.tab) {
                 Tab.DISCOVER -> DiscoverScreen(vm)
+                Tab.TRENDS -> TrendsScreen(vm)
                 Tab.RESULTS -> ResultsScreen(vm)
                 Tab.WATCHLIST -> WatchlistScreen(vm)
                 Tab.SETTINGS -> SettingsScreen(vm)

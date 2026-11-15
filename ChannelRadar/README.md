@@ -19,6 +19,12 @@ Koi vidIQ / credit-based tool nahi: app seedha YouTube ke official **free** Data
    - *Outlier ×* – channel ke last 15 videos ke median views se kitna guna (deep analysis)
 5. **Breakout Score (0-100)** = 35% ratio + 25% outlier + 25% speed + 15% engagement, + bonus for multiple hits & consistency.
 
+## Trends tab (search demand, free – no quota)
+- **YouTube**: explores YouTube's live search autocomplete (topic + a–z variations). Phrases that appear in many suggestion lists near the top = high search demand right now. One tap "Hot across all niches".
+- **Google**: today's fastest-rising Google searches for your country (Google Trends RSS) with approx. search volume and the news behind it.
+- **Demand check** (~102 units): top videos of the last 30 days for a keyword → typical views, freshness, how often small channels beat their subscriber count → Opportunity score (0–100) + verdict + examples.
+- Any idea can be sent to the scanner with ➕ "Use in scan".
+
 ## Features
 - 28 niches (Hindi + English keywords) ya apne custom keywords, "All" = random mix of niches
 - Presets: Quick, Balanced, Deep dive, Shorts hunter, Tiny (<1K subs), Long-form gems

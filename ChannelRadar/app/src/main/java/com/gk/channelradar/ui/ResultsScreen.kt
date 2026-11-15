@@ -66,8 +66,11 @@ fun ResultsScreen(vm: AppViewModel) {
     val res = vm.result
     val ctx = LocalContext.current
     if (res == null) {
-        Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-            Text("Abhi koi result nahi hai.\nDiscover tab se scan chalao.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.fillMaxSize().padding(16.dp)) {
+            PageHeader("Results", "Rising small channels from your scans will appear here.", "📊")
+            EmptyState("🔍", "No results yet", "Run a scan from the Discover tab to find small channels whose new videos are taking off.") {
+                androidx.compose.material3.Button(onClick = { vm.tab = Tab.DISCOVER }) { Text("Go to Discover") }
+            }
         }
         return
     }
@@ -135,16 +138,13 @@ fun ResultsScreen(vm: AppViewModel) {
         modifier = Modifier.fillMaxSize()
     ) {
         item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Results", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Text(
-                        "${channels.size} channels · ${res.videosScanned} videos scanned · ${res.quotaUsed} units · ${ago(res.time)}",
-                        fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+            PageHeader(
+                "Results",
+                "${channels.size} rising channels · ${res.videosScanned} videos scanned · ${ago(res.time)}",
+                "📊"
+            ) {
                 IconButton(onClick = { exporter.launch("small_channels_${System.currentTimeMillis() / 1000}.csv") }) {
-                    Icon(Icons.Filled.Share, "Export CSV")
+                    Icon(Icons.Filled.Share, "Export CSV", tint = androidx.compose.ui.graphics.Color.White)
                 }
             }
         }
@@ -193,7 +193,7 @@ fun ResultsScreen(vm: AppViewModel) {
             Spacer(Modifier.height(6.dp))
             OutlinedTextField(
                 value = query, onValueChange = { query = it }, singleLine = true,
-                placeholder = { Text("Channel ya title me search…") },
+                placeholder = { Text("Search channels or titles…") },
                 leadingIcon = { Icon(Icons.Filled.Search, null) },
                 trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Clear, null) } },
                 modifier = Modifier.fillMaxWidth()
@@ -206,9 +206,9 @@ fun ResultsScreen(vm: AppViewModel) {
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
             ) {
                 Column(Modifier.padding(12.dp).fillMaxWidth()) {
-                    Text("🔥 Breakout titles me common words " + if (showWords) "▲" else "▼", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Text("🔥 Words trending in breakout titles " + if (showWords) "▲" else "▼", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                     if (showWords) {
-                        Text("Ye words kai chote channels ke viral titles me baar-baar aa rahe hain. Tap karke filter karo.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("These words keep showing up in viral titles of several small channels. Tap one to filter.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(8.dp))
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             res.trendingWords.forEach { w ->
@@ -223,7 +223,7 @@ fun ResultsScreen(vm: AppViewModel) {
         if (!videoMode) {
             if (channels.isEmpty()) item {
                 Text(
-                    "Is filter me koi channel nahi. Filters badlo, ya Discover me 'Max subs' badhao / 'Min views' kam karo.",
+                    "No channels match these filters. Clear the filters, or raise 'Max subscribers' / lower 'Min views' in Discover.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 24.dp)
                 )
             }

@@ -50,6 +50,15 @@ class Store(context: Context) {
     var seen: Set<String> = read("seen.json", SetSerializer(String.serializer()), emptySet())
         set(value) { field = value; write("seen.json", SetSerializer(String.serializer()), value) }
 
+    var keywordReports: List<KeywordReport> = read("keyword_reports.json", ListSerializer(KeywordReport.serializer()), emptyList())
+        set(value) { field = value; write("keyword_reports.json", ListSerializer(KeywordReport.serializer()), value) }
+
+    var ideas: List<SearchIdea> = read("ideas.json", ListSerializer(SearchIdea.serializer()), emptyList())
+        set(value) { field = value; write("ideas.json", ListSerializer(SearchIdea.serializer()), value) }
+
+    var trends: List<TrendItem> = read("trends.json", ListSerializer(TrendItem.serializer()), emptyList())
+        set(value) { field = value; write("trends.json", ListSerializer(TrendItem.serializer()), value) }
+
     // ---------------- quota tracking (YouTube resets quota at midnight Pacific time) -------------
 
     private var quota: QuotaState = read("quota.json", QuotaState.serializer(), QuotaState())

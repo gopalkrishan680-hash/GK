@@ -15,9 +15,11 @@ import com.gk.channelradar.data.ScanResult
 import com.gk.channelradar.data.Settings
 import com.gk.channelradar.data.Snapshot
 import com.gk.channelradar.data.Store
+import com.gk.channelradar.data.TrendsApi
 import com.gk.channelradar.data.WatchItem
 import com.gk.channelradar.data.YouTubeApi
 import com.gk.channelradar.engine.DiscoveryEngine
+import com.gk.channelradar.engine.Niches
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -25,12 +27,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.max
 
-enum class Tab { DISCOVER, RESULTS, WATCHLIST, SETTINGS }
+enum class Tab { DISCOVER, TRENDS, RESULTS, WATCHLIST, SETTINGS }
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val store = Store(app)
     private val api = YouTubeApi(store)
     private val engine = DiscoveryEngine(api, store)
+    private val trendsApi = TrendsApi()
 
     var tab by mutableStateOf(if (store.settings.apiKeys.isEmpty()) Tab.SETTINGS else Tab.DISCOVER)
     var settings by mutableStateOf(store.settings); private set
@@ -51,6 +54,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private var scanJob: Job? = null
 
+    // trends / demand
+    var ideas by mutableStateOf(store.ideas); private set
+    var ideasTitle by mutableStateOf(if (store.ideas.isEmpty()) "" else "Last exploration"); private set
+    var ideasLoading by mutableStateOf(false); private set
+    var ideasProgress by mutableStateOf(0f); private set
+    var googleTrends by mutableStateOf(store.trends); private set
+    var trendsLoading by mutableStateOf(false); private set
+    var reports by mutableStateOf(store.keywordReports); private set
+    var analyzing by mutableStateOf(setOf<String>()); private set
+
     // ------------------------------------------------------------------ config / settings
 
     fun updateConfig(c: ScanConfig) { config = c; store.scanConfig = c }
@@ -59,15 +72,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val keys = text.split('\n', ',', ' ').map { it.trim() }.filter { it.length > 10 }.distinct()
         settings = Settings(apiKeys = keys)
         store.settings = settings
-        message = if (keys.isEmpty()) "Koi valid key nahi mili" else "${keys.size} API key save ho gayi ✔"
+        message = if (keys.isEmpty()) "No valid key found" else "${keys.size} API key(s) saved ✔"
         refreshQuota()
     }
 
     fun refreshQuota() { quota = store.quotaSnapshot() }
 
-    fun clearCache() { store.clearCache(); result = null; message = "Cache clear ho gaya" }
+    fun clearCache() { store.clearCache(); result = null; message = "Results cleared" }
 
-    fun clearHidden() { store.hidden = emptySet(); hidden = emptySet(); message = "Hidden channels wapas dikhenge" }
+    fun clearHidden() { store.hidden = emptySet(); hidden = emptySet(); message = "Hidden channels restored" }
 
     // ------------------------------------------------------------------ scanning
 
@@ -83,10 +96,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 result = r
                 store.lastResult = r
-                message = "${r.channels.size} chote channels mile · ${r.quotaUsed} quota units use hue"
+                message = "Found ${r.channels.size} small channels · used ${r.quotaUsed} quota units"
                 tab = Tab.RESULTS
             } catch (e: CancellationException) {
-                message = "Scan cancel kiya"
+                message = "Scan cancelled"
             } catch (e: Exception) {
                 message = e.message ?: e.toString()
             } finally {
@@ -97,6 +110,81 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun cancelScan() { scanJob?.cancel() }
+
+    // ------------------------------------------------------------------ trends & demand
+
+    /** Explore YouTube autocomplete. Empty seed = sample the hottest searches across all niches. */
+    fun exploreIdeas(seed: String, deep: Boolean) {
+        if (ideasLoading) return
+        val seeds = if (seed.isBlank()) Niches.all.flatMap { it.keywords.take(2) } else listOf(seed.trim())
+        viewModelScope.launch {
+            ideasLoading = true
+            ideasProgress = 0f
+            try {
+                val list = withContext(Dispatchers.IO) {
+                    trendsApi.explore(seeds, config.region, config.language, deep && seed.isNotBlank()) { ideasProgress = it }
+                }
+                ideas = list
+                store.ideas = list
+                ideasTitle = if (seed.isBlank()) "Hot searches across all niches" else "Searches around \"${seed.trim()}\""
+                if (list.isEmpty()) message = "No suggestions found. Try a broader word."
+            } catch (e: Exception) {
+                message = e.message ?: "Could not load suggestions"
+            } finally {
+                ideasLoading = false
+            }
+        }
+    }
+
+    fun loadGoogleTrends() {
+        if (trendsLoading) return
+        viewModelScope.launch {
+            trendsLoading = true
+            try {
+                val list = withContext(Dispatchers.IO) { trendsApi.googleTrends(config.region) }
+                googleTrends = list
+                store.trends = list
+                if (list.isEmpty()) message = "Google Trends returned nothing for ${config.region}"
+            } catch (e: Exception) {
+                message = "Could not load Google Trends: ${e.message}"
+            } finally {
+                trendsLoading = false
+            }
+        }
+    }
+
+    fun analyzeKeyword(k: String) {
+        val kw = k.trim()
+        if (kw.isBlank() || kw in analyzing) return
+        viewModelScope.launch {
+            analyzing = analyzing + kw
+            try {
+                val r = withContext(Dispatchers.IO) { engine.analyzeKeyword(kw, config.region, config.language) }
+                reports = listOf(r) + reports.filter { !it.keyword.equals(kw, true) }.take(60)
+                store.keywordReports = reports
+                message = "\"$kw\": opportunity ${r.opportunity.toInt()}/100"
+            } catch (e: Exception) {
+                message = e.message
+            } finally {
+                analyzing = analyzing - kw
+                refreshQuota()
+            }
+        }
+    }
+
+    fun deleteReport(k: String) {
+        reports = reports.filter { it.keyword != k }
+        store.keywordReports = reports
+    }
+
+    /** Adds a keyword to the scan's custom keywords so the next scan hunts small channels on it. */
+    fun useInScan(k: String) {
+        val existing = config.customKeywords.split(',', '\n').map { it.trim() }.filter { it.isNotBlank() }
+        if (existing.none { it.equals(k, true) }) updateConfig(config.copy(customKeywords = (existing + k).joinToString(", ")))
+        message = "\"$k\" added to scan keywords"
+    }
+
+    fun clearScanKeywords() = updateConfig(config.copy(customKeywords = ""))
 
     // ------------------------------------------------------------------ channel detail
 
@@ -143,7 +231,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             result = nr; store.lastResult = nr
         }
         detail = null
-        message = "Channel hide kar diya – ab results me nahi aayega"
+        message = "Channel hidden – it won't appear in results again"
     }
 
     // ------------------------------------------------------------------ watchlist
@@ -152,10 +240,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun toggleWatch(c: Channel) {
         watchlist = if (isWatched(c.id)) {
-            message = "Watchlist se hata diya"
+            message = "Removed from watchlist"
             watchlist.filter { it.channel.id != c.id }
         } else {
-            message = "Watchlist me add ho gaya ⭐ – Refresh karke growth track karo"
+            message = "Added to watchlist ⭐ – refresh later to track growth"
             val now = System.currentTimeMillis()
             watchlist + WatchItem(c, now, listOf(Snapshot(now, c.subs, c.totalViews, c.videoCount)))
         }
@@ -176,7 +264,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     w.copy(channel = c, snapshots = snaps)
                 }
                 store.watchlist = watchlist
-                message = "Watchlist update ho gayi (${fresh.size} channels)"
+                message = "Watchlist updated (${fresh.size} channels)"
             } catch (e: Exception) {
                 message = e.message
             } finally {
@@ -207,9 +295,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     it.write(byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte())) // UTF-8 BOM for Excel
                     it.write(sb.toString().toByteArray())
                 }
-                message = "${rows.size} channels export ho gaye ✔"
+                message = "Exported ${rows.size} channels ✔"
             } catch (e: Exception) {
-                message = "Export fail: ${e.message}"
+                message = "Export failed: ${e.message}"
             }
         }
     }

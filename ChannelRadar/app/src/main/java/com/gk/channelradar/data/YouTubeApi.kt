@@ -125,10 +125,10 @@ class YouTubeApi(private val store: Store) {
 
     private fun call(endpoint: String, params: Map<String, String?>, cost: Int): JSONObject {
         val keys = store.settings.apiKeys.map { it.trim() }.filter { it.isNotBlank() }
-        if (keys.isEmpty()) throw ApiException(0, "noKey", "API key nahi mili. Settings me jaake apni free YouTube Data API key daalo.")
+        if (keys.isEmpty()) throw ApiException(0, "noKey", "No API key found. Add your free YouTube Data API key in Settings.")
         val usable = keys.filter { !store.isExhausted(it) }
         if (usable.isEmpty()) throw QuotaExhaustedException(
-            "Aaj ka quota sab keys par khatam ho gaya. Quota roz Pacific midnight (lagbhag 1:30 PM IST) par reset hota hai, ya Settings me ek aur key add karo."
+            "Today's quota is used up on all keys. It resets daily at midnight Pacific time (about 1:30 PM IST), or add another key in Settings."
         )
         var last: Exception? = null
         for (key in usable) {
@@ -146,7 +146,7 @@ class YouTubeApi(private val store: Store) {
             }
         }
         throw QuotaExhaustedException(
-            "Aaj ka quota khatam ho gaya (${last?.message ?: "quotaExceeded"}). Kal reset hoga ya Settings me nayi key add karo."
+            "Today's quota is used up (${last?.message ?: "quotaExceeded"}). It resets tomorrow, or add a new key in Settings."
         )
     }
 
@@ -157,7 +157,7 @@ class YouTubeApi(private val store: Store) {
                 return block()
             } catch (e: IOException) {
                 attempt++
-                if (attempt >= 3) throw IOException("Network error: ${e.message}. Internet check karo.", e)
+                if (attempt >= 3) throw IOException("Network error: ${e.message}. Please check your internet connection.", e)
                 Thread.sleep(800L * attempt)
             }
         }
@@ -185,9 +185,9 @@ class YouTubeApi(private val store: Store) {
                     reason = err.optJSONArray("errors")?.optJSONObject(0)?.optString("reason") ?: reason
                 } catch (_: Exception) {
                 }
-                if (msg.contains("API key not valid", true)) msg = "API key galat hai (${Store.keyLabel(key)}). Settings me sahi key daalo."
+                if (msg.contains("API key not valid", true)) msg = "Invalid API key (${Store.keyLabel(key)}). Please enter a correct key in Settings."
                 if (reason == "accessNotConfigured" || msg.contains("has not been used", true) || msg.contains("is disabled", true))
-                    msg = "Google Cloud project me 'YouTube Data API v3' enable nahi hai. Settings me di gayi steps follow karo."
+                    msg = "'YouTube Data API v3' is not enabled in your Google Cloud project. Follow the steps in Settings."
                 throw ApiException(code, reason, msg)
             }
             return JSONObject(body)

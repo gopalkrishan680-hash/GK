@@ -127,3 +127,47 @@ data class QuotaState(
     val used: Map<String, Int> = emptyMap(),
     val exhausted: Set<String> = emptySet(),
 )
+
+// ---------------------------------------------------------------------- trends / demand
+
+@Serializable
+data class SearchIdea(
+    val phrase: String,
+    /** relative demand 1..100 inside this exploration */
+    val demand: Double,
+    /** how many autocomplete lists contained it */
+    val appearances: Int,
+    val seed: String,
+)
+
+@Serializable
+data class TrendItem(
+    val title: String,
+    val traffic: String,
+    val time: Long,
+    val picture: String,
+    val newsTitle: String,
+    val newsUrl: String,
+    val newsSource: String,
+)
+
+@Serializable
+data class KeywordReport(
+    val keyword: String,
+    val time: Long,
+    val region: String,
+    val videosChecked: Int,
+    /** median views of the top recent videos for this keyword */
+    val medianViews: Long,
+    val topViews: Long,
+    /** share of top videos uploaded in the last 7 days */
+    val freshShare: Double,
+    /** share of top videos that come from small channels (< 100K subs) */
+    val smallChannelShare: Double,
+    /** share of small-channel videos that beat their own subscriber count */
+    val smallWinRate: Double,
+    val opportunity: Double,
+    val verdict: String,
+    val examples: List<ScoredVideo> = emptyList(),
+    val exampleChannels: Map<String, Long> = emptyMap(),
+)

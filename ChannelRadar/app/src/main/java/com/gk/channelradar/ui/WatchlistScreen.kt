@@ -51,25 +51,15 @@ fun WatchlistScreen(vm: AppViewModel) {
         modifier = Modifier.fillMaxSize()
     ) {
         item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Watchlist", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Text(
-                        "Saved channels ki growth track karo. Roz ek baar Refresh karo (sirf ~1 unit / 50 channels).",
-                        fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                if (vm.watchRefreshing) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
-                else FilledTonalButton(onClick = { vm.refreshWatchlist() }, enabled = list.isNotEmpty()) {
-                    Icon(Icons.Filled.Refresh, null); Spacer(Modifier.width(4.dp)); Text("Refresh")
+            PageHeader("Watchlist", "Track how your saved channels grow. Refresh once a day (costs ~1 unit).", "⭐") {
+                if (vm.watchRefreshing) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp, color = androidx.compose.ui.graphics.Color.White)
+                else IconButton(onClick = { vm.refreshWatchlist() }, enabled = list.isNotEmpty()) {
+                    Icon(Icons.Filled.Refresh, "Refresh", tint = androidx.compose.ui.graphics.Color.White)
                 }
             }
         }
         if (list.isEmpty()) item {
-            Text(
-                "Abhi khaali hai. Results me kisi channel par ♥ dabao to woh yahan aa jayega.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 24.dp)
-            )
+            EmptyState("💫", "Your watchlist is empty", "Tap ♥ on any channel in Results to save it here and track its growth.")
         }
         items(list, key = { it.channel.id }) { w ->
             val c = w.channel
@@ -79,10 +69,7 @@ fun WatchlistScreen(vm: AppViewModel) {
             val dSubs = last.subs - first.subs
             val dViews = last.views - first.views
             val dVideos = last.videos - first.videos
-            Card(
-                onClick = { vm.openWatchItem(w) },
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
-            ) {
+            SoftCard(onClick = { vm.openWatchItem(w) }) {
                 Column(Modifier.padding(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         AsyncImage(
@@ -111,7 +98,7 @@ fun WatchlistScreen(vm: AppViewModel) {
                                 val perDay = if (days >= 0.04) dSubs / days else 0.0
                                 val pct = if (first.subs > 0) dSubs * 100.0 / first.subs else 0.0
                                 Text(
-                                    "pichhle ${"%.1f".format(days)} din me · ${fmtCount(perDay)}/day · ${"%+.1f".format(pct)}%",
+                                    "in the last ${"%.1f".format(days)} days · ${fmtCount(perDay)}/day · ${"%+.1f".format(pct)}%",
                                     fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -120,7 +107,7 @@ fun WatchlistScreen(vm: AppViewModel) {
                             }
                         }
                     } else {
-                        Text("Growth dikhane ke liye baad me Refresh karo.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
+                        Text("Refresh later to see growth.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
                     }
                 }
             }

@@ -3,6 +3,7 @@ package com.gk.channelradar.engine
 import com.gk.channelradar.data.ApiException
 import com.gk.channelradar.data.Channel
 import com.gk.channelradar.data.ChannelResult
+import com.gk.channelradar.data.KeywordReport
 import com.gk.channelradar.data.QuotaExhaustedException
 import com.gk.channelradar.data.ScanConfig
 import com.gk.channelradar.data.ScanResult
@@ -56,7 +57,7 @@ class DiscoveryEngine(private val api: YouTubeApi, private val store: Store) {
             for (page in 0 until cfg.pagesPerKeyword) {
                 ctx.ensureActive()
                 if (store.totalUsedToday() + 100 + 60 > dailyBudget) {
-                    warnings += "Quota bachane ke liye kuch keywords skip kiye (aaj ka quota lagbhag khatam)."
+                    warnings += "Some keywords were skipped to save quota (today's quota is almost used up)."
                     break@loop
                 }
                 progress("Searching: \"$kw\"" + if (page > 0) " (page ${page + 1})" else "", step / totalSteps)
@@ -66,7 +67,7 @@ class DiscoveryEngine(private val api: YouTubeApi, private val store: Store) {
                     token = next
                 } catch (e: QuotaExhaustedException) {
                     if (origin.isEmpty()) throw e
-                    warnings += e.message ?: "Quota khatam"
+                    warnings += e.message ?: "Quota used up"
                     break@loop
                 } catch (e: ApiException) {
                     if (e.reason == "noKey" || e.code == 400 && e.message?.contains("key", true) == true) throw e
@@ -92,7 +93,7 @@ class DiscoveryEngine(private val api: YouTubeApi, private val store: Store) {
                     token = next ?: break
                 }
             } catch (e: QuotaExhaustedException) {
-                warnings += e.message ?: "Quota khatam"
+                warnings += e.message ?: "Quota used up"
                 break
             } catch (e: Exception) {
                 // some categories have no chart in some regions – that's fine
@@ -101,7 +102,7 @@ class DiscoveryEngine(private val api: YouTubeApi, private val store: Store) {
         }
 
         if (origin.isEmpty()) {
-            return emptyResult(cfg, keywords.map { it.first }, warnings + "Koi video nahi mila. Filters dheele karo ya doosre keywords try karo.", startUsed)
+            return emptyResult(cfg, keywords.map { it.first }, warnings + "No videos found. Try looser filters or different keywords.", startUsed)
         }
 
         // ---------------------------------------------------------------- 2. video stats
@@ -144,7 +145,7 @@ class DiscoveryEngine(private val api: YouTubeApi, private val store: Store) {
                 try {
                     idsByChannel[e.key] = api.uploadIds(small.getValue(e.key).uploads, 15)
                 } catch (ex: QuotaExhaustedException) {
-                    warnings += "Deep analysis beech me ruka: ${ex.message}"
+                    warnings += "Deep analysis stopped early: ${ex.message}"
                     return@forEachIndexed
                 } catch (_: Exception) {
                 }
@@ -223,6 +224,45 @@ class DiscoveryEngine(private val api: YouTubeApi, private val store: Store) {
     }
 
     fun refreshChannels(ids: List<String>): List<Channel> = api.channels(ids)
+
+    /**
+     * Keyword demand check (~102 units): top videos of the last 30 days for the keyword.
+     * Demand = how many views those videos get; Opportunity = demand + whether SMALL
+     * channels are also winning on it + how fresh the results are.
+     */
+    fun analyzeKeyword(keyword: String, region: String, language: String): KeywordReport {
+        val now = System.currentTimeMillis()
+        val (ids, _) = api.searchVideos(keyword, now - 30 * 86_400_000L, region, language, VideoFormat.ANY, null)
+        val vids = api.videos(ids).filter { it.views > 0 }
+        if (vids.isEmpty()) return KeywordReport(keyword, now, region, 0, 0, 0, 0.0, 0.0, 0.0, 0.0, "🧊 No recent videos found for this keyword")
+        val chans = api.channels(vids.map { it.channelId }).associateBy { it.id }
+        val median = median(vids.map { it.views })
+        val fresh = vids.count { now - it.publishedAt < 7 * 86_400_000L }.toDouble() / vids.size
+        val small = vids.filter { (chans[it.channelId]?.subs ?: Long.MAX_VALUE) < 100_000 && chans[it.channelId]?.hiddenSubs == false }
+        val smallShare = small.size.toDouble() / vids.size
+        val smallWins = small.filter { it.views >= max(chans.getValue(it.channelId).subs, 1) }
+        val smallWinRate = if (small.isEmpty()) 0.0 else smallWins.size.toDouble() / small.size
+        val successShare = smallWins.size.toDouble() / vids.size
+
+        val demandNorm = ((log10(max(median, 1L).toDouble()) - 3) / 3).coerceIn(0.0, 1.0)  // 1K→0, 1M→1
+        val opp = 100 * (0.35 * demandNorm + 0.40 * min(1.0, successShare * 2.5) + 0.25 * fresh)
+        val verdict = when {
+            opp >= 65 -> "🔥 Hot opportunity: strong demand and small channels are winning"
+            demandNorm >= 0.5 && successShare < 0.1 -> "🏰 High demand, but big channels dominate"
+            demandNorm < 0.2 -> "🧊 Low demand right now"
+            opp >= 45 -> "👍 Good: worth making a video on this"
+            else -> "😐 Average: needs a unique angle"
+        }
+        val examples = smallWins.map { v -> score(v, chans.getValue(v.channelId), null, now) }
+            .sortedByDescending { it.ratio }.take(5)
+        return KeywordReport(
+            keyword = keyword, time = now, region = region, videosChecked = vids.size,
+            medianViews = median, topViews = vids.maxOf { it.views }, freshShare = fresh,
+            smallChannelShare = smallShare, smallWinRate = smallWinRate, opportunity = opp.coerceIn(0.0, 100.0),
+            verdict = verdict, examples = examples,
+            exampleChannels = examples.associate { it.video.channelId to (chans[it.video.channelId]?.subs ?: 0L) },
+        )
+    }
 
     // ====================================================================== scoring
 

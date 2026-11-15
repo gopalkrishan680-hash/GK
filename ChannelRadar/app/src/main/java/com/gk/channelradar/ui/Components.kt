@@ -113,6 +113,7 @@ fun ChannelCard(
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(Modifier.padding(12.dp)) {
@@ -257,5 +258,80 @@ fun Sparkline(values: List<Long>, modifier: Modifier = Modifier, color: Color = 
             if (i == 0) p.moveTo(x, y) else p.lineTo(x, y)
         }
         drawPath(p, color, style = Stroke(width = 4f))
+    }
+}
+
+// ====================================================================== shared look
+
+val BrandGradient = androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFFFF4E50), Color(0xFFF9A23B)))
+
+/** Colourful page header used at the top of every tab. */
+@Composable
+fun PageHeader(title: String, subtitle: String, emoji: String, trailing: (@Composable () -> Unit)? = null) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(BrandGradient)
+            .padding(18.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("$emoji  $title", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+                Spacer(Modifier.height(4.dp))
+                Text(subtitle, color = Color.White.copy(alpha = 0.9f), fontSize = 13.sp, lineHeight = 17.sp)
+            }
+            trailing?.invoke()
+        }
+    }
+}
+
+@Composable
+fun SoftCard(
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    selected: Boolean = false,
+    content: @Composable () -> Unit,
+) {
+    val colors = CardDefaults.cardColors(
+        containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceContainer
+    )
+    val shape = RoundedCornerShape(20.dp)
+    val border = if (selected) androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null
+    if (onClick != null) Card(onClick = onClick, modifier = modifier, colors = colors, shape = shape, border = border) { content() }
+    else Card(modifier = modifier, colors = colors, shape = shape, border = border) { content() }
+}
+
+/** Horizontal 0..100 meter. */
+@Composable
+fun Meter(value: Double, modifier: Modifier = Modifier, color: Color = scoreColor(value)) {
+    Box(
+        modifier
+            .height(8.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth((value / 100).toFloat().coerceIn(0.03f, 1f))
+                .height(8.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(color)
+        )
+    }
+}
+
+@Composable
+fun EmptyState(emoji: String, title: String, body: String, action: (@Composable () -> Unit)? = null) {
+    Column(
+        Modifier.fillMaxWidth().padding(vertical = 36.dp, horizontal = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(emoji, fontSize = 44.sp)
+        Spacer(Modifier.height(8.dp))
+        Text(title, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+        Spacer(Modifier.height(4.dp))
+        Text(body, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        if (action != null) { Spacer(Modifier.height(14.dp)); action() }
     }
 }

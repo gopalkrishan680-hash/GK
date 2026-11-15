@@ -190,7 +190,7 @@ fun ChannelScreen(vm: AppViewModel, r: ChannelResult) {
                 }
             }
         } else if (!vm.detailLoading) item {
-            Text("Uploads load nahi hue. Refresh dabao (~2 quota units).", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Uploads not loaded yet. Tap refresh (~2 quota units).", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         item { Spacer(Modifier.height(24.dp)) }
     }
