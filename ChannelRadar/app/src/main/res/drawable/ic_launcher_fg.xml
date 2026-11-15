@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- radar rings -->
+    <path android:strokeColor="#55FF5252" android:strokeWidth="2.5" android:fillColor="#00000000"
+        android:pathData="M54,24 A30,30 0 1,1 53.99,24 Z" />
+    <path android:strokeColor="#99FF5252" android:strokeWidth="2.5" android:fillColor="#00000000"
+        android:pathData="M54,35 A19,19 0 1,1 53.99,35 Z" />
+    <!-- sweep -->
+    <path android:fillColor="#40FF5252" android:pathData="M54,54 L54,24 A30,30 0 0,1 80,39 Z" />
+    <!-- play button -->
+    <path android:fillColor="#FF5252" android:pathData="M42,44 Q42,40 46,40 L64,40 Q68,40 68,44 L68,64 Q68,68 64,68 L46,68 Q42,68 42,64 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M51,47 L61,54 L51,61 Z" />
+    <!-- blip -->
+    <path android:fillColor="#69F0AE" android:pathData="M74,32 A3.5,3.5 0 1,1 73.99,32 Z" />
+</vector>
