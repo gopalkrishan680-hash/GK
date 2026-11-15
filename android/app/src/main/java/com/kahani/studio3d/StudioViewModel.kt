@@ -168,11 +168,12 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
     /** Decodes the voiceover once to find breathing pauses, then syncs scene cuts to them. */
     private fun analyzeVoice(p: Project, retime: Boolean) = viewModelScope.launch {
         val path = p.voicePath ?: return@launch
-        _busy.value = Busy("Voice analyse ho rahi hai (auto-sync)…", 0f)
+        // only block the screen when the user just imported a voice; on project open it runs silently
+        if (retime) _busy.value = Busy("Voice analyse ho rahi hai (auto-sync)…", 0f)
         try {
             val found = withContext(Dispatchers.Default) {
                 val pcm = File(getApplication<Application>().cacheDir, "analyze.pcm")
-                AudioTools.decodeToPcm(path, pcm) { _busy.value = Busy("Voice analyse ho rahi hai (auto-sync)…", it) }
+                AudioTools.decodeToPcm(path, pcm) { if (retime) _busy.value = Busy("Voice analyse ho rahi hai (auto-sync)…", it) }
                 val env = AudioTools.envelope(pcm)
                 pcm.delete()
                 AudioTools.findPauses(env)
@@ -181,7 +182,7 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
             if (retime) { retime(); toast("Scenes voice ke pauses par auto-sync ho gaye (${found.size} pauses mile)") }
         } catch (e: Exception) {
             if (retime) retime()
-        } finally { _busy.value = null }
+        } finally { if (retime) _busy.value = null }
     }
 
     fun importMusic(uri: Uri) = viewModelScope.launch {

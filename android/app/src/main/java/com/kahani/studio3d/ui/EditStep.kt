@@ -104,7 +104,7 @@ fun EditStep(vm: StudioViewModel, p: Project) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     val tabs = listOf("Scenes", "Captions", "Effects", "Audio")
     Column(Modifier.fillMaxSize()) {
-        PreviewPlayer(p, ctl, Modifier.fillMaxWidth().heightIn(max = 340.dp).padding(horizontal = 16.dp, vertical = 6.dp))
+        PreviewPlayer(p, ctl, Modifier.fillMaxWidth().heightIn(max = 270.dp).padding(horizontal = 16.dp, vertical = 6.dp))
         TabRow(
             selectedTabIndex = tab, containerColor = K.Bg, contentColor = Color.White,
             indicator = { pos -> TabRowDefaults.SecondaryIndicator(Modifier.tabIndicatorOffset(pos[tab]), color = K.Pink) }
