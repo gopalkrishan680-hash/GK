@@ -3,6 +3,7 @@ package com.gk.channelradar.data
 import android.content.Context
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.SetSerializer
 import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.builtins.serializer
@@ -67,6 +68,9 @@ class Store(context: Context) {
 
     var trends: List<TrendItem> = read("trends.json", ListSerializer(TrendItem.serializer()), emptyList())
         set(value) { field = value; write("trends.json", ListSerializer(TrendItem.serializer()), value) }
+
+    var keywordStats: Map<String, KeywordStats> = read("keyword_stats.json", MapSerializer(String.serializer(), KeywordStats.serializer()), emptyMap())
+        set(value) { field = value; write("keyword_stats.json", MapSerializer(String.serializer(), KeywordStats.serializer()), value) }
 
     // ---------------- quota tracking (YouTube resets quota at midnight Pacific time) -------------
 

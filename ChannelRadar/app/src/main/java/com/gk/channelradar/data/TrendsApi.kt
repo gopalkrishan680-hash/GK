@@ -2,6 +2,9 @@ package com.gk.channelradar.data
 
 import android.util.Xml
 import org.json.JSONArray
+import org.json.JSONObject
+import kotlin.math.log10
+import kotlin.math.max
 import org.xmlpull.v1.XmlPullParser
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -18,6 +21,8 @@ import java.util.concurrent.Future
  *  - Google Trends daily trending searches RSS
  * No credits, no third-party services.
  */
+private const val UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+
 class TrendsApi {
 
     // ------------------------------------------------------------------ YouTube autocomplete
@@ -144,6 +149,126 @@ class TrendsApi {
         }
     }
 
+    // ------------------------------------------------------------------ free keyword numbers
+
+    private data class WebVideo(val views: Long, val ageDays: Double, val verified: Boolean)
+
+    /**
+     * Measures a keyword for free from YouTube's own public search (what anyone sees on youtube.com):
+     * total number of results, the views the top results get per month and how many come from verified
+     * channels. From that we estimate searches/month, demand and competition. No API key, no quota.
+     * [autocompleteHint] (0..100, optional) = how strongly YouTube autocomplete pushes the phrase.
+     */
+    fun keywordStats(keyword: String, region: String, language: String, autocompleteHint: Double?): KeywordStats {
+        val data = searchData(keyword, region, language)
+        val total = data.optString("estimatedResults").toLongOrNull() ?: 0L
+        val vids = mutableListOf<WebVideo>()
+        collectVideos(data, vids, 0)
+        if (vids.isEmpty()) throw IOException("No search results for \"$keyword\"")
+        val top = vids.take(20)
+
+        // views flowing to the top results per month: Σ views / age(days) × 30
+        val monthlyViews = top.sumOf { it.views / max(it.ageDays, 1.0) * 30.0 }.toLong()
+        val ac = autocompleteHint?.coerceIn(0.0, 100.0) ?: 50.0
+        // ~8% of a topic's views come from search, adjusted by autocomplete strength
+        val est = (monthlyViews * 0.08 * (0.5 + ac / 100)).toLong()
+        val demand = ((log10(max(est, 1L).toDouble()) - 2) / 5 * 100).coerceIn(0.0, 100.0)        // 100→0, 10M→100
+
+        val sortedViews = top.map { it.views }.sorted()
+        val medianViews = sortedViews[sortedViews.size / 2]
+        val verified = top.count { it.verified }.toDouble() / top.size
+        val recent = top.count { it.ageDays <= 30 }.toDouble() / top.size
+        val supply = ((log10(total + 1.0) - 3) / 4).coerceIn(0.0, 1.0)                                // 1K→0, 10M→1
+        val strength = ((log10(max(medianViews, 1L).toDouble()) - 3) / 4).coerceIn(0.0, 1.0)          // 1K→0, 10M→1
+        val competition = (100 * (0.35 * supply + 0.35 * verified + 0.30 * strength)).coerceIn(0.0, 100.0)
+        // fresh results = YouTube is still rewarding new uploads on this topic
+        val opportunity = (0.5 * demand + 0.35 * (100 - competition) + 15 * recent).coerceIn(0.0, 100.0)
+        return KeywordStats(
+            phrase = keyword, time = System.currentTimeMillis(), totalResults = total, estSearches = est,
+            monthlyViews = monthlyViews, demand = demand, competition = competition, opportunity = opportunity,
+            medianViews = medianViews, recentShare = recent, verifiedShare = verified, resultsChecked = top.size,
+        )
+    }
+
+    private fun searchData(keyword: String, region: String, language: String): JSONObject {
+        val hl = if (language.isBlank()) "en" else language
+        // 1) the JSON endpoint youtube.com itself uses
+        try {
+            val body = JSONObject()
+                .put("context", JSONObject().put("client", JSONObject()
+                    .put("clientName", "WEB").put("clientVersion", WEB_VERSION).put("hl", hl).put("gl", region)))
+                .put("query", keyword)
+            val res = JSONObject(post("https://www.youtube.com/youtubei/v1/search?prettyPrint=false", body.toString()))
+            if (res.has("contents")) return res
+        } catch (_: Exception) {
+        }
+        // 2) fallback: the normal search page, which embeds the same data as ytInitialData
+        val html = get("https://www.youtube.com/results?hl=$hl&gl=$region&search_query=" + URLEncoder.encode(keyword, "UTF-8"))
+        val marker = html.indexOf("ytInitialData")
+        if (marker < 0) throw IOException("YouTube search page format changed")
+        val start = html.indexOf('{', marker)
+        val end = html.indexOf(";</script>", start)
+        if (start < 0 || end < 0) throw IOException("YouTube search page format changed")
+        return JSONObject(html.substring(start, end))
+    }
+
+    private fun collectVideos(node: Any?, out: MutableList<WebVideo>, depth: Int) {
+        if (depth > 40 || out.size >= 30) return
+        when (node) {
+            is JSONObject -> {
+                val vr = node.optJSONObject("videoRenderer")
+                if (vr != null) {
+                    parseWebVideo(vr)?.let(out::add)
+                    return
+                }
+                val keys = node.keys()
+                while (keys.hasNext()) collectVideos(node.opt(keys.next()), out, depth + 1)
+            }
+            is JSONArray -> for (i in 0 until node.length()) collectVideos(node.opt(i), out, depth + 1)
+        }
+    }
+
+    private fun text(o: JSONObject?): String {
+        if (o == null) return ""
+        o.optString("simpleText").takeIf { it.isNotBlank() }?.let { return it }
+        val runs = o.optJSONArray("runs") ?: return ""
+        return (0 until runs.length()).joinToString("") { runs.optJSONObject(it)?.optString("text") ?: "" }
+    }
+
+    private fun parseWebVideo(vr: JSONObject): WebVideo? {
+        val viewsText = text(vr.optJSONObject("viewCountText"))
+        if (viewsText.contains("watching", true)) return null // live right now
+        val views = parseCount(viewsText) ?: return null
+        val age = parseAgeDays(text(vr.optJSONObject("publishedTimeText"))) ?: 365.0
+        val badges = vr.optJSONArray("ownerBadges")?.toString() ?: ""
+        val verified = badges.contains("VERIFIED", true)
+        return WebVideo(views, age, verified)
+    }
+
+    companion object {
+        private const val WEB_VERSION = "2.20251101.00.00"
+
+        /** "1,234,567 views", "1.2M views", "No views" → number */
+        fun parseCount(t: String): Long? {
+            val s = t.lowercase().replace(",", "").trim()
+            if (s.startsWith("no ")) return 0
+            val m = Regex("""([\d.]+)\s*([kmb])?""").find(s) ?: return null
+            val n = m.groupValues[1].toDoubleOrNull() ?: return null
+            val mult = when (m.groupValues[2]) { "k" -> 1e3; "m" -> 1e6; "b" -> 1e9; else -> 1.0 }
+            return (n * mult).toLong()
+        }
+
+        /** "3 days ago", "Streamed 2 weeks ago" → days */
+        fun parseAgeDays(t: String): Double? {
+            val m = Regex("""(\d+)\s*(second|minute|hour|day|week|month|year)""").find(t.lowercase()) ?: return null
+            val n = m.groupValues[1].toDouble()
+            return when (m.groupValues[2]) {
+                "second" -> n / 86400; "minute" -> n / 1440; "hour" -> n / 24; "day" -> n
+                "week" -> n * 7; "month" -> n * 30; else -> n * 365
+            }
+        }
+    }
+
     // ------------------------------------------------------------------ Google Trends
 
     fun googleTrends(region: String): List<TrendItem> {
@@ -194,12 +319,35 @@ class TrendsApi {
 
     // ------------------------------------------------------------------ http
 
+    private fun post(url: String, json: String): String {
+        val c = URL(url).openConnection() as HttpURLConnection
+        try {
+            c.connectTimeout = 12_000
+            c.readTimeout = 15_000
+            c.requestMethod = "POST"
+            c.doOutput = true
+            c.setRequestProperty("Content-Type", "application/json")
+            c.setRequestProperty("User-Agent", UA)
+            c.setRequestProperty("X-YouTube-Client-Name", "1")
+            c.setRequestProperty("X-YouTube-Client-Version", WEB_VERSION)
+            c.setRequestProperty("Cookie", "SOCS=CAI; CONSENT=YES+1")
+            c.outputStream.use { it.write(json.toByteArray()) }
+            val code = c.responseCode
+            if (code !in 200..299) throw IOException("HTTP $code")
+            return c.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+        } finally {
+            c.disconnect()
+        }
+    }
+
     private fun get(url: String): String {
         val c = URL(url).openConnection() as HttpURLConnection
         try {
             c.connectTimeout = 12_000
             c.readTimeout = 15_000
-            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) ChannelRadar/1.1")
+            c.setRequestProperty("User-Agent", UA)
+            c.setRequestProperty("Accept-Language", "en-US,en;q=0.9")
+            c.setRequestProperty("Cookie", "SOCS=CAI; CONSENT=YES+1")
             val code = c.responseCode
             if (code !in 200..299) throw IOException("HTTP $code")
             return c.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }

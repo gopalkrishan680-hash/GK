@@ -48,6 +48,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -105,7 +106,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.youTubeSection(
         var deep by rememberSaveable { mutableStateOf(true) }
         Column {
             Text(
-                "Live YouTube search suggestions. A phrase that pops up in many suggestion lists, near the top, is being searched a lot right now. Free, uses no quota.",
+                "What people are typing into YouTube right now. Every topic shows its estimated monthly searches, demand and competition. Free – no API quota.",
                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(10.dp))
@@ -141,31 +142,43 @@ private fun androidx.compose.foundation.lazy.LazyListScope.youTubeSection(
         EmptyState("💡", "Discover search demand", "Type a topic, or tap \"Hot across all niches\" to see what people are searching on YouTube right now.")
     } else if (vm.ideas.isNotEmpty()) {
         item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                SectionTitle(vm.ideasTitle, Modifier.weight(1f))
-                TextButton(
-                    onClick = { analyzeTop(vm.ideas.take(5).map { it.phrase }) },
-                    enabled = vm.settings.apiKeys.isNotEmpty()
-                ) { Text("Check top 5 (~510 units)", fontSize = 12.sp) }
+            LaunchedEffect(vm.ideas) { vm.measureIdeas() }
+            var sortMenu by remember { mutableStateOf(false) }
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SectionTitle(vm.ideasTitle, Modifier.weight(1f))
+                    Box {
+                        AssistChip(onClick = { sortMenu = true }, label = { Text("Sort: ${vm.ideaSort.label}", fontSize = 12.sp) })
+                        androidx.compose.material3.DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
+                            IdeaSort.entries.forEach { o ->
+                                androidx.compose.material3.DropdownMenuItem(text = { Text(o.label) }, onClick = { vm.ideaSort = o; sortMenu = false })
+                            }
+                        }
+                    }
+                }
+                MeasureStatus(vm, vm.ideas.take(40).map { it.phrase })
             }
         }
-        itemsIndexed(vm.ideas, key = { _, it -> "idea_" + it.phrase }) { i, idea ->
+        val sorted = sortIdeas(vm)
+        itemsIndexed(sorted, key = { _, it -> "idea_" + it.phrase }) { i, idea ->
             SoftCard(modifier = Modifier.fillMaxWidth()) {
-                Row(Modifier.padding(start = 12.dp, top = 8.dp, bottom = 8.dp, end = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("${i + 1}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.width(28.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(idea.phrase, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        Spacer(Modifier.height(4.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Meter(idea.demand, Modifier.width(90.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("${idea.demand.toInt()} · in ${idea.appearances} lists", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        vm.reports.firstOrNull { it.keyword.equals(idea.phrase, true) }?.let { r -> MiniMetrics(r) }
+                Column(Modifier.padding(start = 12.dp, top = 10.dp, bottom = 10.dp, end = 2.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("${i + 1}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.width(26.dp))
+                        Text(idea.phrase, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        KeywordActions(idea.phrase, vm, analyze) { open(idea.phrase) }
                     }
-                    KeywordActions(idea.phrase, vm, analyze) { open(idea.phrase) }
+                    Box(Modifier.padding(start = 26.dp, end = 10.dp, top = 4.dp)) {
+                        StatsBlock(vm.statsFor(idea.phrase), idea.phrase.lowercase() in vm.measuring)
+                    }
                 }
             }
+        }
+        item {
+            TextButton(
+                onClick = { analyzeTop(sorted.take(5).map { it.phrase }) },
+                enabled = vm.settings.apiKeys.isNotEmpty()
+            ) { Text("Deep-check top 5 with YouTube API (~510 units) →", fontSize = 12.sp) }
         }
     }
 }
@@ -188,6 +201,9 @@ private fun androidx.compose.foundation.lazy.LazyListScope.googleSection(
     }
     if (vm.googleTrends.isEmpty() && !vm.trendsLoading) item {
         EmptyState("📈", "No trends loaded", "Tap refresh to load today's trending searches.")
+    } else if (vm.googleTrends.isNotEmpty()) item {
+        LaunchedEffect(vm.googleTrends) { vm.measure(vm.googleTrends.map { it.title }) }
+        MeasureStatus(vm, vm.googleTrends.map { it.title })
     }
     items(vm.googleTrends, key = { "gt_" + it.title }) { t ->
         SoftCard(modifier = Modifier.fillMaxWidth()) {
@@ -196,11 +212,14 @@ private fun androidx.compose.foundation.lazy.LazyListScope.googleSection(
                     Column(Modifier.weight(1f)) {
                         Text(t.title, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
-                            if (t.traffic.isNotBlank()) Tag("🔎 ${t.traffic} searches", color = GoodGreen, bg = GoodGreen.copy(alpha = 0.14f))
+                            if (t.traffic.isNotBlank()) Tag("🔎 ${t.traffic} Google searches today", color = GoodGreen, bg = GoodGreen.copy(alpha = 0.14f))
                             if (t.time > 0) Tag(ago(t.time))
                         }
                     }
                     KeywordActions(t.title, vm, analyze) { open(ytSearchUrl(t.title)) }
+                }
+                Box(Modifier.padding(end = 12.dp, top = 8.dp)) {
+                    StatsBlock(vm.statsFor(t.title), t.title.lowercase() in vm.measuring, youtubeLabel = true)
                 }
                 if (t.newsTitle.isNotBlank()) {
                     TextButton(onClick = { if (t.newsUrl.isNotBlank()) open(t.newsUrl) }, contentPadding = PaddingValues(0.dp)) {
@@ -223,7 +242,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.demandSection(vm: App
         var kw by rememberSaveable { mutableStateOf("") }
         Column {
             Text(
-                "Keyword research: estimated monthly searches, demand, competition and opportunity for any keyword. Costs ~102 units per keyword.",
+                "Type any keyword. \"Measure\" shows its estimated searches, demand and competition for free. \"Deep check\" adds a full report with the YouTube API (~102 units).",
                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(10.dp))
@@ -237,10 +256,27 @@ private fun androidx.compose.foundation.lazy.LazyListScope.demandSection(vm: App
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(Modifier.width(8.dp))
-                Button(onClick = { vm.analyzeKeyword(kw) }, enabled = kw.isNotBlank() && vm.settings.apiKeys.isNotEmpty()) { Text("Check") }
+                Button(onClick = { vm.quickMeasure(kw) }, enabled = kw.isNotBlank()) { Text("Measure") }
+            }
+            Row {
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = { vm.analyzeKeyword(kw) }, enabled = kw.isNotBlank() && vm.settings.apiKeys.isNotEmpty()) { Text("Deep check (~102 units)") }
             }
         }
     }
+    if (vm.quick.isNotEmpty()) item { SectionTitle("Measured keywords") }
+    items(vm.quick, key = { "q_" + it }) { k ->
+        SoftCard(modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(start = 14.dp, top = 10.dp, bottom = 10.dp, end = 2.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(k, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                    KeywordActions(k, vm, { vm.analyzeKeyword(it) }) { open(ytSearchUrl(k)) }
+                }
+                Box(Modifier.padding(end = 12.dp, top = 4.dp)) { StatsBlock(vm.statsFor(k), k.lowercase() in vm.measuring) }
+            }
+        }
+    }
+    if (vm.reports.isNotEmpty() || vm.analyzing.isNotEmpty()) item { SectionTitle("Deep reports") }
     vm.analyzing.forEach { k ->
         item(key = "an_$k") {
             SoftCard(modifier = Modifier.fillMaxWidth()) {
@@ -253,7 +289,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.demandSection(vm: App
         }
     }
     if (vm.reports.isEmpty() && vm.analyzing.isEmpty()) item {
-        EmptyState("🎯", "No keywords checked yet", "Type a keyword above, or tap 🔍 next to any idea in the YouTube or Google tabs.")
+        if (vm.quick.isEmpty()) EmptyState("🎯", "No keywords checked yet", "Type a keyword above and tap Measure, or tap 🔍 next to any topic in the YouTube or Google tabs.")
     }
     if (vm.reports.size >= 2) item { CompareTable(vm) }
     items(vm.reports, key = { "rep_" + it.keyword }) { r -> ReportCard(r, vm, open) }
@@ -452,5 +488,82 @@ private fun KeywordActions(k: String, vm: AppViewModel, analyze: (String) -> Uni
         }
         IconButton(onClick = { vm.useInScan(k) }, modifier = Modifier.size(40.dp)) { Icon(Icons.Filled.Add, "Add to scan", modifier = Modifier.size(20.dp)) }
         IconButton(onClick = onOpen, modifier = Modifier.size(40.dp)) { Icon(Icons.Filled.PlayArrow, "Open on YouTube", modifier = Modifier.size(20.dp)) }
+    }
+}
+
+
+// ============================================================================ numbers block
+
+enum class IdeaSort(val label: String) {
+    RELEVANCE("Trending"), SEARCHES("Most searched"), DEMAND("Highest demand"),
+    COMPETITION("Lowest competition"), OPPORTUNITY("Best opportunity")
+}
+
+private fun sortIdeas(vm: AppViewModel): List<com.gk.channelradar.data.SearchIdea> {
+    fun st(p: String) = vm.statsFor(p)
+    return when (vm.ideaSort) {
+        IdeaSort.RELEVANCE -> vm.ideas
+        IdeaSort.SEARCHES -> vm.ideas.sortedByDescending { st(it.phrase)?.estSearches ?: -1 }
+        IdeaSort.DEMAND -> vm.ideas.sortedByDescending { st(it.phrase)?.demand ?: -1.0 }
+        IdeaSort.COMPETITION -> vm.ideas.sortedBy { st(it.phrase)?.competition ?: 999.0 }
+        IdeaSort.OPPORTUNITY -> vm.ideas.sortedByDescending { st(it.phrase)?.opportunity ?: -1.0 }
+    }
+}
+
+@Composable
+private fun MeasureStatus(vm: AppViewModel, phrases: List<String>) {
+    val done = phrases.count { vm.statsFor(it) != null }
+    val busy = phrases.any { it.lowercase() in vm.measuring }
+    Column(Modifier.padding(bottom = 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (busy) { CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp); Spacer(Modifier.width(6.dp)) }
+            Text(
+                if (busy) "Measuring searches & competition… $done/${phrases.size}" else "📊 Numbers for $done/${phrases.size} topics · free, no quota",
+                fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f)
+            )
+            if (!busy && done < phrases.size) TextButton(onClick = { vm.measure(phrases) }) { Text("Retry", fontSize = 12.sp) }
+        }
+        vm.measureError?.let { Text("⚠ $it", fontSize = 11.sp, color = WarnAmber) }
+    }
+}
+
+/** Searches / Demand / Competition shown under every topic. */
+@Composable
+fun StatsBlock(s: com.gk.channelradar.data.KeywordStats?, loading: Boolean, youtubeLabel: Boolean = false) {
+    if (s == null) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (loading) {
+                CircularProgressIndicator(Modifier.size(12.dp), strokeWidth = 1.5.dp)
+                Spacer(Modifier.width(6.dp))
+                Text("Measuring searches & competition…", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else Text("Numbers not available yet", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        return
+    }
+    Column {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            NumberBox(if (youtubeLabel) "YouTube searches/mo" else "Searches / month", "~" + fmtCount(s.estSearches), MaterialTheme.colorScheme.primary, Modifier.weight(1.15f))
+            NumberBox("Demand", demandLabel(s.demand), highGoodColor(s.demand), Modifier.weight(1f), s.demand)
+            NumberBox("Competition", competitionLabel(s.competition), lowGoodColor(s.competition), Modifier.weight(1f), s.competition)
+        }
+        Spacer(Modifier.height(5.dp))
+        Text(
+            "🎬 ${fmtCount(s.totalResults)} videos · 👁 ${fmtCount(s.monthlyViews)} views/mo on top results · ⭐ opportunity ${s.opportunity.toInt()}/100",
+            fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2
+        )
+    }
+}
+
+@Composable
+private fun NumberBox(label: String, value: String, color: androidx.compose.ui.graphics.Color, modifier: Modifier, meter: Double? = null) {
+    Column(
+        modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(color.copy(alpha = 0.12f))
+            .padding(horizontal = 8.dp, vertical = 6.dp)
+    ) {
+        Text(label, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        Text(value, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = color, maxLines = 1)
+        if (meter != null) { Spacer(Modifier.height(3.dp)); Meter(meter, Modifier.fillMaxWidth(), color) }
     }
 }

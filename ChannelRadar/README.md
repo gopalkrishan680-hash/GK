@@ -20,6 +20,9 @@ Koi vidIQ / credit-based tool nahi: app seedha YouTube ke official **free** Data
 5. **Breakout Score (0-100)** = 35% ratio + 25% outlier + 25% speed + 15% engagement, + bonus for multiple hits & consistency.
 
 ## Trends tab (search demand, free – no quota)
+Every topic in the YouTube and Google lists automatically shows **Searches / month (est.)**, **Demand** and **Competition**,
+measured for free from YouTube's public search results (total videos, views per month on the top results, share of verified channels)
+plus autocomplete strength. Lists can be sorted by most searched, highest demand, lowest competition or best opportunity.
 - **YouTube**: explores YouTube's live search autocomplete (topic + a–z variations). Phrases that appear in many suggestion lists near the top = high search demand right now. One tap "Hot across all niches".
 - **Google**: today's fastest-rising Google searches for your country (Google Trends RSS) with approx. search volume and the news behind it.
 - **Keywords** (~102 units per keyword): for any keyword shows

@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.gk.channelradar.data.Channel
+import com.gk.channelradar.data.KeywordStats
 import com.gk.channelradar.data.ChannelResult
 import com.gk.channelradar.data.QuotaState
 import com.gk.channelradar.data.ScanConfig
@@ -23,6 +24,8 @@ import com.gk.channelradar.engine.Niches
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.max
@@ -64,6 +67,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var trendsLoading by mutableStateOf(false); private set
     var reports by mutableStateOf(store.keywordReports); private set
     var analyzing by mutableStateOf(setOf<String>()); private set
+    var stats by mutableStateOf(store.keywordStats); private set
+    var measuring by mutableStateOf(setOf<String>()); private set
+    var measureError by mutableStateOf<String?>(null); private set
 
     // ------------------------------------------------------------------ config / settings
 
@@ -147,6 +153,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 ideas = list
                 store.ideas = list
+                measureIdeas()
                 ideasTitle = if (seed.isBlank()) "Hot searches across all niches" else "Searches around \"${seed.trim()}\""
                 if (list.isEmpty()) message = "No suggestions found. Try a broader word."
             } catch (e: Exception) {
@@ -165,6 +172,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 val list = withContext(Dispatchers.IO) { trendsApi.googleTrends(config.region) }
                 googleTrends = list
                 store.trends = list
+                measure(list.map { it.title })
                 if (list.isEmpty()) message = "Google Trends returned nothing for ${config.region}"
             } catch (e: Exception) {
                 message = "Could not load Google Trends: ${e.message}"
@@ -174,6 +182,57 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun statsFor(phrase: String): KeywordStats? = stats[phrase.lowercase()]
+
+    fun measureIdeas() = measure(ideas.take(40).map { it.phrase }, ideas.associate { it.phrase.lowercase() to it.demand })
+
+    /**
+     * Free numbers for each phrase (searches / demand / competition) from YouTube's public search.
+     * Cached for 12 hours. Runs 4 at a time and fills the list as results arrive.
+     */
+    fun measure(phrases: List<String>, hints: Map<String, Double> = emptyMap()) {
+        val now = System.currentTimeMillis()
+        val todo = phrases.map { it.trim() }.filter { it.isNotBlank() }.distinctBy { it.lowercase() }.filter { p ->
+            val k = p.lowercase()
+            k !in measuring && (stats[k]?.let { now - it.time > 12 * 3_600_000L } ?: true)
+        }
+        if (todo.isEmpty()) return
+        measuring = measuring + todo.map { it.lowercase() }
+        measureError = null
+        viewModelScope.launch {
+            var failures = 0
+            var lastError: String? = null
+            todo.chunked(4).forEach { chunk ->
+                val results = chunk.map { p ->
+                    async(Dispatchers.IO) {
+                        p to try { trendsApi.keywordStats(p, config.region, config.language, hints[p.lowercase()]) } catch (e: Exception) { lastError = e.message; null }
+                    }
+                }.awaitAll()
+                val ok = results.mapNotNull { (_, r) -> r }
+                failures += results.size - ok.size
+                if (ok.isNotEmpty()) {
+                    stats = stats + ok.associateBy { it.phrase.lowercase() }
+                }
+                measuring = measuring - chunk.map { it.lowercase() }.toSet()
+            }
+            // keep the cache small
+            if (stats.size > 600) stats = stats.values.sortedByDescending { it.time }.take(400).associateBy { it.phrase.lowercase() }
+            store.keywordStats = stats
+            if (failures == todo.size) measureError = "Could not measure searches right now (${lastError ?: "network error"}). Pull refresh or try again."
+        }
+    }
+
+    var quick by mutableStateOf(listOf<String>()); private set
+    var ideaSort by mutableStateOf(IdeaSort.RELEVANCE)
+
+    /** Free measurement of a typed keyword (shown in the Keywords tab). */
+    fun quickMeasure(k: String) {
+        val kw = k.trim()
+        if (kw.isBlank()) return
+        quick = (listOf(kw) + quick.filter { !it.equals(kw, true) }).take(30)
+        measure(listOf(kw))
+    }
+
     fun analyzeKeyword(k: String) = analyzeMany(listOf(k))
 
     /** Checks several keywords one after another (each ~102 units). */
@@ -181,6 +240,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val kws = list.map { it.trim() }.filter { it.isNotBlank() && it !in analyzing }.distinct()
         if (kws.isEmpty()) return
         analyzing = analyzing + kws
+        measure(kws)
         viewModelScope.launch {
             for (kw in kws) {
                 try {

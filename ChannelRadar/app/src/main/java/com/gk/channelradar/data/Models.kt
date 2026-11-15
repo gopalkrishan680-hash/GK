@@ -195,3 +195,28 @@ data class KeywordReport(
     val related: List<String> = emptyList(),
     val titleWords: List<String> = emptyList(),
 )
+
+/** Free per-keyword numbers measured from YouTube's public search page (no API quota). */
+@Serializable
+data class KeywordStats(
+    val phrase: String,
+    val time: Long,
+    /** YouTube's own "about N results" for the search */
+    val totalResults: Long,
+    /** estimated monthly searches (Channel Radar model) */
+    val estSearches: Long,
+    /** views per month flowing to the top search results */
+    val monthlyViews: Long,
+    /** 0..100 */
+    val demand: Double,
+    /** 0..100 (higher = harder) */
+    val competition: Double,
+    /** 0..100 */
+    val opportunity: Double,
+    val medianViews: Long,
+    /** share of top results uploaded within 30 days */
+    val recentShare: Double,
+    /** share of top results from verified (usually big) channels */
+    val verifiedShare: Double,
+    val resultsChecked: Int,
+)
