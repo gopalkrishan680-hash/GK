@@ -6,7 +6,7 @@ import java.net.URL
 import java.net.URLEncoder
 import java.time.Instant
 
-class ApiException(message: String) : Exception(message)
+class ApiException(message: String, val code: Int = 0) : Exception(message)
 
 /** Thin client over the official YouTube Data API v3 (free key, 10,000 units/day). */
 object YouTubeApi {
@@ -24,7 +24,7 @@ object YouTubeApi {
             val code = conn.responseCode
             val body = (if (code in 200..299) conn.inputStream else conn.errorStream)
                 ?.bufferedReader()?.use { it.readText() } ?: ""
-            if (code !in 200..299) throw ApiException(friendlyError(code, body))
+            if (code !in 200..299) throw ApiException(friendlyError(code, body), code)
             JSONObject(body)
         } catch (e: java.io.IOException) {
             throw ApiException("Network error: internet check karo (${e.message})")
@@ -51,6 +51,10 @@ object YouTubeApi {
         val sn = item.optJSONObject("snippet") ?: return null
         val st = item.optJSONObject("statistics") ?: JSONObject()
         val cd = item.optJSONObject("contentDetails") ?: JSONObject()
+        val live = item.optJSONObject("liveStreamingDetails")
+        val liveNow = sn.optString("liveBroadcastContent") == "live"
+        // For streams, age should count from when the stream actually started.
+        val start = live?.optString("actualStartTime")?.takeIf { it.isNotBlank() } ?: sn.optString("publishedAt")
         val th = sn.optJSONObject("thumbnails")
         val thumb = th?.let {
             (it.optJSONObject("high") ?: it.optJSONObject("medium") ?: it.optJSONObject("default"))?.optString("url")
@@ -61,7 +65,7 @@ object YouTubeApi {
             title = sn.optString("title"),
             channelId = sn.optString("channelId"),
             channelTitle = sn.optString("channelTitle"),
-            publishedAt = runCatching { Instant.parse(sn.optString("publishedAt")).toEpochMilli() }
+            publishedAt = runCatching { Instant.parse(start).toEpochMilli() }
                 .getOrDefault(System.currentTimeMillis()),
             thumbnail = thumb,
             views = st.optString("viewCount", "0").toLongOrNull() ?: 0,
@@ -71,6 +75,9 @@ object YouTubeApi {
             tags = tags,
             categoryId = sn.optString("categoryId"),
             description = sn.optString("description").take(500),
+            liveNow = liveNow,
+            wasLive = live != null,
+            concurrentViewers = live?.optString("concurrentViewers")?.toLongOrNull(),
         )
     }
 
@@ -90,7 +97,7 @@ object YouTubeApi {
         var token: String? = null
         repeat(pages) {
             val p = mutableMapOf(
-                "part" to "snippet,statistics,contentDetails", "chart" to "mostPopular",
+                "part" to "snippet,statistics,contentDetails,liveStreamingDetails", "chart" to "mostPopular",
                 "regionCode" to region, "maxResults" to "50",
             )
             if (!categoryId.isNullOrBlank()) p["videoCategoryId"] = categoryId
@@ -106,21 +113,22 @@ object YouTubeApi {
     /** Cost: 1 unit per 50 ids. */
     fun videosByIds(key: String, ids: List<String>): List<Video> =
         ids.distinct().chunked(50).flatMap { chunk ->
-            items(get("videos", mapOf("part" to "snippet,statistics,contentDetails", "id" to chunk.joinToString(",")), key))
+            items(get("videos", mapOf("part" to "snippet,statistics,contentDetails,liveStreamingDetails", "id" to chunk.joinToString(",")), key))
                 .mapNotNull(::parseVideo)
         }
 
     /** Search recent uploads for a niche. Cost: 100 units + 1-2. */
     fun search(
         key: String, query: String, hoursBack: Int, region: String,
-        order: String = "viewCount", duration: String? = null,
+        order: String = "viewCount", duration: String? = null, categoryId: String? = null,
     ): List<Video> {
         val after = Instant.ofEpochMilli(System.currentTimeMillis() - hoursBack * 3_600_000L).toString()
         val p = mutableMapOf(
             "part" to "id", "type" to "video", "q" to query, "order" to order,
             "publishedAfter" to after, "maxResults" to "50", "regionCode" to region,
-        )
+        ).apply { if (query.isNotBlank()) put("q", query) else remove("q") }
         duration?.let { p["videoDuration"] = it }
+        categoryId?.let { p["videoCategoryId"] = it }
         val ids = items(get("search", p, key)).mapNotNull { it.optJSONObject("id")?.optString("videoId") }
             .filter { it.isNotBlank() }
         if (ids.isEmpty()) return emptyList()

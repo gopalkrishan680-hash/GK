@@ -61,9 +61,15 @@ fun VideoCard(item: Scored, rank: Int?, tracked: Boolean, onClick: () -> Unit, o
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                 )
                 Text(
-                    if (v.isShort) "SHORT" else Fmt.duration(v.durationSec), color = Color.White, fontSize = 10.sp,
+                    when {
+                        v.liveNow -> "🔴 LIVE"
+                        v.wasLive -> "STREAM ${Fmt.duration(v.durationSec)}"
+                        v.isShort -> "SHORT"
+                        else -> Fmt.duration(v.durationSec)
+                    },
+                    color = Color.White, fontSize = 10.sp, fontWeight = if (v.liveNow) FontWeight.Bold else null,
                     modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp)
-                        .background(Color(0xCC000000), RoundedCornerShape(4.dp)).padding(horizontal = 4.dp),
+                        .background(if (v.liveNow) Hot else Color(0xCC000000), RoundedCornerShape(4.dp)).padding(horizontal = 4.dp),
                 )
                 rank?.let {
                     Text("#$it", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold,
@@ -80,7 +86,8 @@ fun VideoCard(item: Scored, rank: Int?, tracked: Boolean, onClick: () -> Unit, o
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Chip("👁 ${Fmt.count(v.views)}")
-                    Chip("⚡ ${Fmt.count(s.viewsPerHour.toLong())}/h")
+                    if (v.liveNow && v.concurrentViewers != null) Chip("🔴 ${Fmt.count(v.concurrentViewers)} live", Hot.copy(alpha = .18f), Hot)
+                    else Chip("⚡ ${Fmt.count(s.viewsPerHour.toLong())}/h")
                     s.outlier?.let { if (it >= 1) Chip("${"%.1f".format(it)}x", Hot.copy(alpha = .18f), Hot) }
                 }
                 Spacer(Modifier.height(2.dp))

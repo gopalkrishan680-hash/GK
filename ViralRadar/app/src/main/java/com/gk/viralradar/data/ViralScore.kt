@@ -66,6 +66,10 @@ object ViralScore {
             else if (eS < 0.2) add("Low engagement ${"%.1f".format(eng * 100)}%")
             if (ageH < 24) add("Fresh: sirf ${Fmt.age(ageH)} purani")
             if (v.isShort) add("Short format (algorithm Shorts feed me push karta hai)")
+            if (v.liveNow) add("Abhi LIVE hai${v.concurrentViewers?.let { " — ${Fmt.count(it)} log dekh rahe hain" } ?: ""}. Live views stream ke baad bhi badhte hain")
+            else if (v.wasLive) add("Ye live stream thi — stream ke views normal video se alag tarah badhte hain")
+            if (v.subs != null && v.views > 0 && v.views / v.subs.coerceAtLeast(1) > 200 && eng < 0.005)
+                add("⚠️ Bahut zyada views par bahut kam likes/comments — views ads/bots se ho sakte hain, organic viral nahi")
         }
 
         return ScoreResult(

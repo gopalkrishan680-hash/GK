@@ -58,7 +58,9 @@ fun TrendingScreen(vm: AppViewModel) {
     // Live auto-refresh: re-fetch every 10 minutes while this screen is open.
     LaunchedEffect(Unit) {
         while (true) {
-            if (System.currentTimeMillis() - vm.trending.value.updatedAt > 10 * 60_000) vm.refreshTrending()
+            val s = vm.trending.value
+            val every = if (s.expensive) 60 * 60_000 else 10 * 60_000
+            if (s.error == null && System.currentTimeMillis() - s.updatedAt > every) vm.refreshTrending()
             delay(60_000)
         }
     }
@@ -79,6 +81,10 @@ fun TrendingScreen(vm: AppViewModel) {
             )
         }
         ErrorBanner(st.error)
+        st.note?.let {
+            Text("ℹ️ $it", fontSize = 12.sp, modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
+                .clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(10.dp))
+        }
         PullToRefreshBox(isRefreshing = st.loading, onRefresh = { vm.refreshTrending() }, modifier = Modifier.fillMaxSize()) {
             val list = remember(st.items, fmt, sort) { vm.sorted(st.items, fmt, sort) }
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
@@ -208,7 +214,9 @@ fun VideoDetailScreen(vm: AppViewModel, item: Scored) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 StatBox("Views/hour", Fmt.count(s.viewsPerHour.toLong()), Modifier.weight(1f), Gold)
                 StatBox("Age", Fmt.age(s.ageHours), Modifier.weight(1f))
-                StatBox("Length", if (v.isShort) "Short" else Fmt.duration(v.durationSec), Modifier.weight(1f))
+                StatBox(if (v.liveNow) "Live dekh rahe" else "Length",
+                    when { v.liveNow -> v.concurrentViewers?.let { Fmt.count(it) } ?: "LIVE"; v.isShort -> "Short"; else -> Fmt.duration(v.durationSec) },
+                    Modifier.weight(1f), if (v.liveNow) Hot else MaterialTheme.colorScheme.onSurface)
             }
 
             SectionTitle("📊 Score breakdown")

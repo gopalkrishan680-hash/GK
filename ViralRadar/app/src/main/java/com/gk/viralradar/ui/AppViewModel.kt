@@ -3,6 +3,7 @@ package com.gk.viralradar.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.gk.viralradar.data.ApiException
 import com.gk.viralradar.data.FormatFilter
 import com.gk.viralradar.data.InsightReport
 import com.gk.viralradar.data.Insights
@@ -26,6 +27,9 @@ data class ListState(
     val error: String? = null,
     val items: List<Scored> = emptyList(),
     val updatedAt: Long = 0,
+    val note: String? = null,
+    /** True when the list comes from search (costs ~100 units), so auto-refresh slows down. */
+    val expensive: Boolean = false,
 )
 
 enum class SortBy(val label: String) { SCORE("Viral score"), VELOCITY("Views/hour"), OUTLIER("Outlier x"), ENGAGEMENT("Engagement"), NEWEST("Newest") }
@@ -65,7 +69,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val filtered = when (f) {
             FormatFilter.ALL -> items
             FormatFilter.SHORTS -> items.filter { it.video.isShort }
-            FormatFilter.LONG -> items.filter { !it.video.isShort }
+            FormatFilter.LONG -> items.filter { !it.video.isShort && !it.video.wasLive }
+            FormatFilter.LIVE -> items.filter { it.video.wasLive }
+            FormatFilter.NO_LIVE -> items.filter { !it.video.wasLive }
         }
         return when (s) {
             SortBy.SCORE -> filtered.sortedByDescending { it.score.score }
@@ -80,13 +86,28 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (trending.value.loading) return
         trending.update { it.copy(loading = true, error = null) }
         viewModelScope.launch {
+            val cat = category.value
+            var note: String? = null
+            var expensive = false
             val r = withContext(Dispatchers.IO) {
-                runCatching { YouTubeApi.trending(prefs.apiKey, region.value, category.value) }
+                runCatching {
+                    try {
+                        YouTubeApi.trending(prefs.apiKey, region.value, cat)
+                    } catch (e: ApiException) {
+                        if (cat == null || e.code != 404) throw e
+                        // YouTube has no trending chart for this category: fall back to the
+                        // most-viewed uploads of the last 7 days in that category.
+                        val name = categories.value.firstOrNull { it.first == cat }?.second ?: "Is category"
+                        note = "$name ka official trending chart YouTube nahi deta, isliye pichhle 7 din ke sabse zyada dekhe gaye videos dikha rahe hain (har ghante refresh)."
+                        expensive = true
+                        YouTubeApi.search(prefs.apiKey, "", 168, region.value, categoryId = cat)
+                    }
+                }
             }
             r.onSuccess { v ->
                 val scored = scoreAll(v)
-                trending.value = ListState(items = scored, updatedAt = System.currentTimeMillis())
-                insights.value = Insights.build(scored)
+                trending.value = ListState(items = scored, updatedAt = System.currentTimeMillis(), note = note, expensive = expensive)
+                if (cat == null) insights.value = Insights.build(scored)
             }.onFailure { e -> trending.update { it.copy(loading = false, error = e.message) } }
         }
     }
@@ -98,10 +119,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setRegion(r: String) {
         region.value = r; prefs.region = r; category.value = null
+        trending.value = ListState()
         refreshTrending(); loadCategories()
     }
 
-    fun setCategory(c: String?) { category.value = c; refreshTrending() }
+    fun setCategory(c: String?) { category.value = c; trending.value = ListState(); refreshTrending() }
 
     /** Keyword search OR, if the input is a YouTube link, analyse that single video. */
     fun discover(query: String, hours: Int, shortsOnly: Boolean) {

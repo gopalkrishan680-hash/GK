@@ -15,8 +15,11 @@ data class Video(
     val categoryId: String,
     val description: String,
     val subs: Long? = null,
+    val liveNow: Boolean = false,
+    val wasLive: Boolean = false,
+    val concurrentViewers: Long? = null,
 ) {
-    val isShort: Boolean get() = durationSec in 1..180
+    val isShort: Boolean get() = !wasLive && durationSec in 1..180
     val url: String get() = if (isShort) "https://youtube.com/shorts/$id" else "https://youtu.be/$id"
 }
 
@@ -33,7 +36,7 @@ data class TrackedVideo(
     val snapshots: List<Snapshot>,
 )
 
-enum class FormatFilter(val label: String) { ALL("All"), SHORTS("Shorts"), LONG("Long videos") }
+enum class FormatFilter(val label: String) { ALL("All"), SHORTS("Shorts"), LONG("Long videos"), LIVE("Live streams"), NO_LIVE("No live") }
 
 data class Scored(val video: Video, val score: ScoreResult)
 
