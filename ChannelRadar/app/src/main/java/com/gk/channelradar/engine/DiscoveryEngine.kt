@@ -13,6 +13,7 @@ import com.gk.channelradar.data.Video
 import com.gk.channelradar.data.VideoFormat
 import com.gk.channelradar.data.WordCount
 import com.gk.channelradar.data.YouTubeApi
+import com.gk.channelradar.data.TrendsApi
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlin.math.log10
@@ -33,7 +34,7 @@ import kotlin.math.min
  *     channel's normal (median) views → "outlier ×". Also finds extra hits and consistency.
  *  6. Rank channels by a 0-100 Breakout Score.
  */
-class DiscoveryEngine(private val api: YouTubeApi, private val store: Store) {
+class DiscoveryEngine(private val api: YouTubeApi, private val store: Store, private val trends: TrendsApi) {
 
     suspend fun scan(cfg: ScanConfig, progress: (String, Float) -> Unit): ScanResult {
         val ctx = currentCoroutineContext()
@@ -226,41 +227,90 @@ class DiscoveryEngine(private val api: YouTubeApi, private val store: Store) {
     fun refreshChannels(ids: List<String>): List<Channel> = api.channels(ids)
 
     /**
-     * Keyword demand check (~102 units): top videos of the last 30 days for the keyword.
-     * Demand = how many views those videos get; Opportunity = demand + whether SMALL
-     * channels are also winning on it + how fresh the results are.
+     * Keyword research (~102 units + free autocomplete calls):
+     *  • Search volume  – estimated from YouTube autocomplete depth (how early YouTube suggests it)
+     *                     + total views that recent videos on the keyword are getting.
+     *  • Competition    – how many videos were uploaded on it in 30 days, how big the ranking
+     *                     channels are, and how many top results belong to big channels.
+     *  • Opportunity    – demand high, competition beatable, small channels winning, fresh results.
      */
     fun analyzeKeyword(keyword: String, region: String, language: String): KeywordReport {
         val now = System.currentTimeMillis()
-        val (ids, _) = api.searchVideos(keyword, now - 30 * 86_400_000L, region, language, VideoFormat.ANY, null)
-        val vids = api.videos(ids).filter { it.views > 0 }
-        if (vids.isEmpty()) return KeywordReport(keyword, now, region, 0, 0, 0, 0.0, 0.0, 0.0, 0.0, "🧊 No recent videos found for this keyword")
+        val auto = try { trends.searchPopularity(keyword, region, language) } catch (_: Exception) { TrendsApi.AutoSignal(0.0, -1, emptyList()) }
+        val page = api.searchPage(keyword, now - 30 * 86_400_000L, region, language, VideoFormat.ANY, null)
+        val vids = api.videos(page.ids).filter { it.views > 0 }
+        if (vids.isEmpty()) return KeywordReport(
+            keyword, now, region, 0, 0, 0, 0.0, 0.0, 0.0, 0.0, "🧊 No recent videos found for this keyword",
+            autocompleteScore = auto.score, prefixLength = auto.prefixLength, related = auto.related,
+            searchIndex = auto.score * 0.5, recentUploads = page.totalResults,
+        )
         val chans = api.channels(vids.map { it.channelId }).associateBy { it.id }
+        fun subsOf(v: Video) = chans[v.channelId]?.takeIf { !it.hiddenSubs }?.subs
+
+        // ---- demand / search volume
         val median = median(vids.map { it.views })
+        val monthlyViews = vids.sumOf { it.views }
+        val viewNorm = ((log10(max(monthlyViews, 1L).toDouble()) - 4) / 4).coerceIn(0.0, 1.0)   // 10K→0, 100M→1
+        val searchIndex = (0.5 * auto.score + 50 * viewNorm).coerceIn(0.0, 100.0)
+        // Rough model: ~8% of a topic's views come from search, scaled by how strongly autocomplete pushes it.
+        val estSearches = (monthlyViews * 0.08 * (0.4 + 1.2 * auto.score / 100)).toLong()
+
+        // ---- competition
+        val subsList = vids.mapNotNull { subsOf(it) }
+        val medianSubs = if (subsList.isEmpty()) 0L else median(subsList)
+        val bigShare = vids.count { (subsOf(it) ?: 0L) >= 100_000 }.toDouble() / vids.size
+        val supply = ((log10(page.totalResults + 1.0) - 2) / 3).coerceIn(0.0, 1.0)              // 100→0, 100K→1
+        val subsNorm = ((log10(max(medianSubs, 1L).toDouble()) - 3) / 4).coerceIn(0.0, 1.0)     // 1K→0, 10M→1
+        val competition = 100 * (0.35 * supply + 0.35 * bigShare + 0.30 * subsNorm)
+
+        // ---- small-channel success & freshness
         val fresh = vids.count { now - it.publishedAt < 7 * 86_400_000L }.toDouble() / vids.size
-        val small = vids.filter { (chans[it.channelId]?.subs ?: Long.MAX_VALUE) < 100_000 && chans[it.channelId]?.hiddenSubs == false }
-        val smallShare = small.size.toDouble() / vids.size
-        val smallWins = small.filter { it.views >= max(chans.getValue(it.channelId).subs, 1) }
+        val small = vids.filter { (subsOf(it) ?: Long.MAX_VALUE) < 100_000 }
+        val smallWins = small.filter { it.views >= max(subsOf(it) ?: 1L, 1L) }
         val smallWinRate = if (small.isEmpty()) 0.0 else smallWins.size.toDouble() / small.size
         val successShare = smallWins.size.toDouble() / vids.size
 
-        val demandNorm = ((log10(max(median, 1L).toDouble()) - 3) / 3).coerceIn(0.0, 1.0)  // 1K→0, 1M→1
-        val opp = 100 * (0.35 * demandNorm + 0.40 * min(1.0, successShare * 2.5) + 0.25 * fresh)
+        val demand = searchIndex / 100
+        val opp = (100 * (0.35 * demand + 0.30 * (1 - competition / 100) + 0.20 * min(1.0, successShare * 2.5) + 0.15 * fresh)).coerceIn(0.0, 100.0)
         val verdict = when {
-            opp >= 65 -> "🔥 Hot opportunity: strong demand and small channels are winning"
-            demandNorm >= 0.5 && successShare < 0.1 -> "🏰 High demand, but big channels dominate"
-            demandNorm < 0.2 -> "🧊 Low demand right now"
+            opp >= 65 -> "🔥 Hot opportunity: high demand and beatable competition"
+            demand >= 0.55 && competition >= 65 -> "🏰 High demand, but very competitive"
+            demand < 0.25 -> "🧊 Low search demand right now"
+            competition < 35 && demand >= 0.35 -> "💎 Hidden gem: decent demand, low competition"
             opp >= 45 -> "👍 Good: worth making a video on this"
             else -> "😐 Average: needs a unique angle"
         }
+
+        // ---- content insights from the top videos
+        val shortsShare = vids.count { it.isShort }.toDouble() / vids.size
+        val longs = vids.filter { !it.isShort && it.durationSec > 0 }
+        val typicalLen = if (longs.isEmpty()) 0 else median(longs.map { it.durationSec.toLong() }).toInt()
+        val zone = java.time.ZoneId.systemDefault()
+        val topHalf = vids.sortedByDescending { it.views }.take(max(5, vids.size / 2))
+        val times = topHalf.map { java.time.Instant.ofEpochMilli(it.publishedAt).atZone(zone) }
+        val bestDay = times.groupingBy { it.dayOfWeek }.eachCount().maxByOrNull { it.value }?.key
+            ?.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH) ?: ""
+        val bestHour = times.groupingBy { it.hour }.eachCount().maxByOrNull { it.value }?.key ?: -1
+        val kwWords = keyword.lowercase().split(' ').toSet()
+        val splitter = Regex("[^\\p{L}\\p{M}\\p{N}#]+")
+        val titleWords = vids.flatMap { v -> splitter.split(v.title.lowercase()).filter { it.length >= 3 }.toSet() }
+            .filter { it !in stop && it !in kwWords && it.toIntOrNull() == null }
+            .groupingBy { it }.eachCount().filter { it.value >= 3 }
+            .entries.sortedByDescending { it.value }.take(10).map { it.key }
+
         val examples = smallWins.map { v -> score(v, chans.getValue(v.channelId), null, now) }
             .sortedByDescending { it.ratio }.take(5)
         return KeywordReport(
             keyword = keyword, time = now, region = region, videosChecked = vids.size,
             medianViews = median, topViews = vids.maxOf { it.views }, freshShare = fresh,
-            smallChannelShare = smallShare, smallWinRate = smallWinRate, opportunity = opp.coerceIn(0.0, 100.0),
+            smallChannelShare = small.size.toDouble() / vids.size, smallWinRate = smallWinRate, opportunity = opp,
             verdict = verdict, examples = examples,
             exampleChannels = examples.associate { it.video.channelId to (chans[it.video.channelId]?.subs ?: 0L) },
+            estSearches = estSearches, searchIndex = searchIndex, autocompleteScore = auto.score,
+            prefixLength = auto.prefixLength, monthlyViews = monthlyViews, recentUploads = page.totalResults,
+            competition = competition, bigChannelShare = bigShare, medianTopSubs = medianSubs,
+            shortsShare = shortsShare, typicalLengthSec = typicalLen, bestDay = bestDay, bestHour = bestHour,
+            related = auto.related, titleWords = titleWords,
         )
     }
 

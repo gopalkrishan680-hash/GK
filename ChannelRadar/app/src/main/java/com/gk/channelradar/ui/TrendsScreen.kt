@@ -68,6 +68,7 @@ fun TrendsScreen(vm: AppViewModel) {
     var section by rememberSaveable { mutableStateOf(0) }
     val ctx = LocalContext.current
     val analyze: (String) -> Unit = { k -> vm.analyzeKeyword(k); section = 2 }
+    val analyzeTop: (List<String>) -> Unit = { ks -> vm.analyzeMany(ks); section = 2 }
 
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
@@ -78,7 +79,7 @@ fun TrendsScreen(vm: AppViewModel) {
             PageHeader("Trends", "What people are searching for right now, and which topics have demand.", "🔥")
             Spacer(Modifier.height(12.dp))
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                listOf("YouTube", "Google", "Demand").forEachIndexed { i, label ->
+                listOf("YouTube", "Google", "Keywords").forEachIndexed { i, label ->
                     SegmentedButton(selected = section == i, onClick = { section = i }, shape = SegmentedButtonDefaults.itemShape(i, 3)) {
                         Text(label, fontSize = 13.sp)
                     }
@@ -86,7 +87,7 @@ fun TrendsScreen(vm: AppViewModel) {
             }
         }
         when (section) {
-            0 -> youTubeSection(vm, analyze, open = { openUrl(ctx, ytSearchUrl(it)) })
+            0 -> youTubeSection(vm, analyze, open = { openUrl(ctx, ytSearchUrl(it)) }, analyzeTop = analyzeTop)
             1 -> googleSection(vm, analyze, open = { openUrl(ctx, it) })
             else -> demandSection(vm, open = { openUrl(ctx, it) })
         }
@@ -97,7 +98,7 @@ fun TrendsScreen(vm: AppViewModel) {
 // ============================================================================ YouTube searches
 
 private fun androidx.compose.foundation.lazy.LazyListScope.youTubeSection(
-    vm: AppViewModel, analyze: (String) -> Unit, open: (String) -> Unit,
+    vm: AppViewModel, analyze: (String) -> Unit, open: (String) -> Unit, analyzeTop: (List<String>) -> Unit,
 ) {
     item {
         var seed by rememberSaveable { mutableStateOf("") }
@@ -139,7 +140,15 @@ private fun androidx.compose.foundation.lazy.LazyListScope.youTubeSection(
     if (vm.ideas.isEmpty() && !vm.ideasLoading) item {
         EmptyState("💡", "Discover search demand", "Type a topic, or tap \"Hot across all niches\" to see what people are searching on YouTube right now.")
     } else if (vm.ideas.isNotEmpty()) {
-        item { SectionTitle(vm.ideasTitle) }
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SectionTitle(vm.ideasTitle, Modifier.weight(1f))
+                TextButton(
+                    onClick = { analyzeTop(vm.ideas.take(5).map { it.phrase }) },
+                    enabled = vm.settings.apiKeys.isNotEmpty()
+                ) { Text("Check top 5 (~510 units)", fontSize = 12.sp) }
+            }
+        }
         itemsIndexed(vm.ideas, key = { _, it -> "idea_" + it.phrase }) { i, idea ->
             SoftCard(modifier = Modifier.fillMaxWidth()) {
                 Row(Modifier.padding(start = 12.dp, top = 8.dp, bottom = 8.dp, end = 2.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -152,6 +161,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.youTubeSection(
                             Spacer(Modifier.width(8.dp))
                             Text("${idea.demand.toInt()} · in ${idea.appearances} lists", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
+                        vm.reports.firstOrNull { it.keyword.equals(idea.phrase, true) }?.let { r -> MiniMetrics(r) }
                     }
                     KeywordActions(idea.phrase, vm, analyze) { open(idea.phrase) }
                 }
@@ -213,7 +223,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.demandSection(vm: App
         var kw by rememberSaveable { mutableStateOf("") }
         Column {
             Text(
-                "Check any keyword: how many views its recent videos get (demand), and whether SMALL channels are winning on it (opportunity). Costs ~102 units.",
+                "Keyword research: estimated monthly searches, demand, competition and opportunity for any keyword. Costs ~102 units per keyword.",
                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(10.dp))
@@ -245,51 +255,186 @@ private fun androidx.compose.foundation.lazy.LazyListScope.demandSection(vm: App
     if (vm.reports.isEmpty() && vm.analyzing.isEmpty()) item {
         EmptyState("🎯", "No keywords checked yet", "Type a keyword above, or tap 🔍 next to any idea in the YouTube or Google tabs.")
     }
+    if (vm.reports.size >= 2) item { CompareTable(vm) }
     items(vm.reports, key = { "rep_" + it.keyword }) { r -> ReportCard(r, vm, open) }
 }
 
+fun competitionLabel(c: Double) = when {
+    c < 35 -> "Low"; c < 60 -> "Medium"; c < 80 -> "High"; else -> "Very high"
+}
+
+fun demandLabel(d: Double) = when {
+    d < 25 -> "Low"; d < 50 -> "Medium"; d < 75 -> "High"; else -> "Very high"
+}
+
+/** colour where LOW is good (competition) */
+fun lowGoodColor(c: Double) = when {
+    c < 35 -> GoodGreen; c < 60 -> WarnAmber; c < 80 -> androidx.compose.ui.graphics.Color(0xFFFF7A45); else -> androidx.compose.ui.graphics.Color(0xFFFF4D4F)
+}
+
+/** colour where HIGH is good (demand) */
+fun highGoodColor(d: Double) = lowGoodColor(100 - d)
+
+fun searchRange(n: Long): String = if (n <= 0) "–" else "${fmtCount(n / 2)}–${fmtCount(n * 2)}"
+
+@Composable
+private fun MiniMetrics(r: KeywordReport) {
+    Row(horizontalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.padding(top = 5.dp)) {
+        Tag("🔎 ~${fmtCount(r.estSearches)}/mo")
+        Tag("Comp ${competitionLabel(r.competition)}", color = lowGoodColor(r.competition), bg = lowGoodColor(r.competition).copy(alpha = 0.14f))
+        Tag("Opp ${r.opportunity.toInt()}", color = scoreColor(r.opportunity), bg = scoreColor(r.opportunity).copy(alpha = 0.14f))
+    }
+}
+
+@Composable
+private fun BigMetric(label: String, value: String, sub: String, color: androidx.compose.ui.graphics.Color, modifier: Modifier) {
+    Column(
+        modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(color.copy(alpha = 0.12f))
+            .padding(horizontal = 10.dp, vertical = 8.dp)
+    ) {
+        Text(label, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        Text(value, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = color, maxLines = 1)
+        Text(sub, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+    }
+}
+
+private enum class CmpSort(val label: String) { OPP("Opportunity"), SEARCH("Searches"), COMP("Low competition") }
+
+@Composable
+private fun CompareTable(vm: AppViewModel) {
+    var sort by rememberSaveable { mutableStateOf(CmpSort.OPP) }
+    val rows = when (sort) {
+        CmpSort.OPP -> vm.reports.sortedByDescending { it.opportunity }
+        CmpSort.SEARCH -> vm.reports.sortedByDescending { it.estSearches }
+        CmpSort.COMP -> vm.reports.sortedBy { it.competition }
+    }
+    SoftCard(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp)) {
+            Text("📋 Compare keywords", fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(6.dp))
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                CmpSort.entries.forEach { c ->
+                    androidx.compose.material3.FilterChip(selected = sort == c, onClick = { sort = c }, label = { Text(c.label, fontSize = 12.sp) })
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Row {
+                Text("Keyword", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                Text("Searches", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(62.dp))
+                Text("Comp.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(62.dp))
+                Text("Opp.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(36.dp))
+            }
+            rows.take(25).forEach { r ->
+                Row(Modifier.padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(r.keyword, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Text("~" + fmtCount(r.estSearches), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(62.dp))
+                    Text(competitionLabel(r.competition), fontSize = 12.sp, color = lowGoodColor(r.competition), fontWeight = FontWeight.SemiBold, modifier = Modifier.width(62.dp))
+                    Text("${r.opportunity.toInt()}", fontSize = 13.sp, color = scoreColor(r.opportunity), fontWeight = FontWeight.Bold, modifier = Modifier.width(36.dp))
+                }
+            }
+            Text("Searches are estimates (see the ⓘ note on each card).", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun ReportCard(r: KeywordReport, vm: AppViewModel, open: (String) -> Unit) {
-    SoftCard(modifier = Modifier.fillMaxWidth()) {
+    var expanded by rememberSaveable(r.keyword) { mutableStateOf(false) }
+    SoftCard(modifier = Modifier.fillMaxWidth(), onClick = { expanded = !expanded }) {
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(r.keyword, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    Text("${r.region} · checked ${ago(r.time)} · ${r.videosChecked} videos", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("${r.region} · checked ${ago(r.time)} · ${r.videosChecked} top videos", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                ScoreBadge(r.opportunity)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    ScoreBadge(r.opportunity)
+                    Text("opportunity", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
-            Spacer(Modifier.height(8.dp))
-            Meter(r.opportunity, Modifier.fillMaxWidth())
-            Spacer(Modifier.height(8.dp))
-            Text(r.verdict, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
             Spacer(Modifier.height(10.dp))
-            Row {
-                Stat("Typical views", fmtCount(r.medianViews), Modifier.weight(1f))
-                Stat("Top video", fmtCount(r.topViews), Modifier.weight(1f))
-                Stat("Fresh (7d)", "${(r.freshShare * 100).toInt()}%", Modifier.weight(1f))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                BigMetric("Est. searches / month", "~" + fmtCount(r.estSearches), searchRange(r.estSearches), MaterialTheme.colorScheme.primary, Modifier.weight(1.2f))
+                BigMetric("Demand", demandLabel(r.searchIndex), "${r.searchIndex.toInt()}/100", highGoodColor(r.searchIndex), Modifier.weight(1f))
+                BigMetric("Competition", competitionLabel(r.competition), "${r.competition.toInt()}/100", lowGoodColor(r.competition), Modifier.weight(1f))
             }
+            Spacer(Modifier.height(10.dp))
+            Text(r.verdict, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
             Spacer(Modifier.height(8.dp))
             Row {
-                Stat("From small ch.", "${(r.smallChannelShare * 100).toInt()}%", Modifier.weight(1f))
-                Stat("Small ch. win rate", "${(r.smallWinRate * 100).toInt()}%", Modifier.weight(1f), if (r.smallWinRate >= 0.5) GoodGreen else MaterialTheme.colorScheme.onSurface)
-                Spacer(Modifier.weight(1f))
+                Stat("Views (30d)", fmtCount(r.monthlyViews), Modifier.weight(1f))
+                Stat("New videos (30d)", if (r.recentUploads > 0) "~" + fmtCount(r.recentUploads) else "–", Modifier.weight(1f))
+                Stat("Typical views", fmtCount(r.medianViews), Modifier.weight(1f))
             }
-            if (r.examples.isNotEmpty()) {
-                SectionTitle("Small channels winning on it")
-                r.examples.forEach { sv ->
-                    VideoRow(sv) { open(sv.video.url) }
-                    Text(
-                        "${sv.video.channelTitle} · ${fmtCount(r.exampleChannels[sv.video.channelId] ?: 0)} subs",
-                        fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp)
+            Text(
+                if (expanded) "▲ Less" else "▼ Details, best time to post, related keywords",
+                fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 10.dp)
+            )
+            if (expanded) {
+                SectionTitle("Competition breakdown")
+                Row {
+                    Stat("Big channels in top", "${(r.bigChannelShare * 100).toInt()}%", Modifier.weight(1f), lowGoodColor(r.bigChannelShare * 100))
+                    Stat("Typical channel size", fmtCount(r.medianTopSubs) + " subs", Modifier.weight(1f))
+                    Stat("Small ch. win rate", "${(r.smallWinRate * 100).toInt()}%", Modifier.weight(1f), if (r.smallWinRate >= 0.5) GoodGreen else MaterialTheme.colorScheme.onSurface)
+                }
+                SectionTitle("Search popularity")
+                Text(
+                    when {
+                        r.prefixLength in 1..3 -> "🔥 YouTube suggests it after typing just ${r.prefixLength} letter${if (r.prefixLength > 1) "s" else ""} – very heavily searched."
+                        r.prefixLength > 3 -> "YouTube suggests it after typing ${r.prefixLength} letters."
+                        else -> "YouTube doesn't autocomplete this exact phrase – searches are low or it's very new."
+                    } + " Top results uploaded in the last 7 days: ${(r.freshShare * 100).toInt()}%.",
+                    fontSize = 12.sp
+                )
+                SectionTitle("What works")
+                Row {
+                    Stat("Shorts in top", "${(r.shortsShare * 100).toInt()}%", Modifier.weight(1f))
+                    Stat("Typical length", if (r.typicalLengthSec > 0) fmtDuration(r.typicalLengthSec) else "–", Modifier.weight(1f))
+                    Stat(
+                        "Best time to post",
+                        if (r.bestHour >= 0) "${r.bestDay.take(3)} ${"%d %s".format(if (r.bestHour % 12 == 0) 12 else r.bestHour % 12, if (r.bestHour < 12) "AM" else "PM")}" else "–",
+                        Modifier.weight(1f)
                     )
                 }
+                if (r.titleWords.isNotEmpty()) {
+                    SectionTitle("Words used in top titles")
+                    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        r.titleWords.forEach { Tag(it) }
+                    }
+                }
+                if (r.related.isNotEmpty()) {
+                    SectionTitle("Related searches (tap to check)")
+                    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        r.related.forEach { k ->
+                            AssistChip(onClick = { vm.analyzeKeyword(k) }, label = { Text(k, fontSize = 12.sp) })
+                        }
+                    }
+                }
+                if (r.examples.isNotEmpty()) {
+                    SectionTitle("Small channels winning on it")
+                    r.examples.forEach { sv ->
+                        VideoRow(sv) { open(sv.video.url) }
+                        Text(
+                            "${sv.video.channelTitle} · ${fmtCount(r.exampleChannels[sv.video.channelId] ?: 0)} subs",
+                            fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                    }
+                }
+                Text(
+                    "ⓘ YouTube doesn't publish exact search numbers. \"Est. searches\" is Channel Radar's own estimate from YouTube autocomplete and the views recent videos get, so treat it as a range. Demand, competition and opportunity are best used to compare keywords.",
+                    fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp)
+                )
             }
-            Row {
+            Spacer(Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 FilledTonalButton(onClick = { vm.useInScan(r.keyword) }) {
-                    Icon(Icons.Filled.Add, null); Spacer(Modifier.width(4.dp)); Text("Use in scan")
+                    Icon(Icons.Filled.Add, null); Spacer(Modifier.width(4.dp)); Text("Find channels")
                 }
                 Spacer(Modifier.weight(1f))
+                IconButton(onClick = { open(ytSearchUrl(r.keyword)) }) { Icon(Icons.Filled.PlayArrow, "Open on YouTube") }
                 IconButton(onClick = { vm.analyzeKeyword(r.keyword) }) { Icon(Icons.Filled.Refresh, "Re-check") }
                 IconButton(onClick = { vm.deleteReport(r.keyword) }) { Icon(Icons.Filled.Delete, "Delete") }
             }

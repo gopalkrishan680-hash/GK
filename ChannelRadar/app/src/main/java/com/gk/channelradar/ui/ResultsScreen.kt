@@ -85,6 +85,7 @@ fun ResultsScreen(vm: AppViewModel) {
     var nicheMenu by remember { mutableStateOf(false) }
     var showWords by rememberSaveable { mutableStateOf(false) }
     var showInfo by rememberSaveable { mutableStateOf(false) }
+    var historyMenu by remember { mutableStateOf(false) }
 
     fun fmtOk(sv: ScoredVideo) = when (fmt) {
         Fmt.ALL -> true; Fmt.SHORTS -> sv.video.isShort; Fmt.LONG -> !sv.video.isShort
@@ -189,6 +190,18 @@ fun ResultsScreen(vm: AppViewModel) {
                 FilterChip(selected = fmt == Fmt.SHORTS, onClick = { fmt = if (fmt == Fmt.SHORTS) Fmt.ALL else Fmt.SHORTS }, label = { Text("📱 Shorts") })
                 FilterChip(selected = fmt == Fmt.LONG, onClick = { fmt = if (fmt == Fmt.LONG) Fmt.ALL else Fmt.LONG }, label = { Text("🎬 Long") })
                 FilterChip(selected = onlyNew, onClick = { onlyNew = !onlyNew }, label = { Text("🆕 Only new") })
+                if (vm.history.size > 1) Box {
+                    FilterChip(selected = false, onClick = { historyMenu = true }, label = { Text("🕘 Past scans") },
+                        trailingIcon = { Icon(Icons.Filled.ArrowDropDown, null) })
+                    DropdownMenu(expanded = historyMenu, onDismissRequest = { historyMenu = false }) {
+                        vm.history.forEach { h ->
+                            DropdownMenuItem(
+                                text = { Text((if (h.time == res.time) "✓ " else "") + "${fmtDate(h.time)} · ${ago(h.time)} · ${h.channels.size} channels") },
+                                onClick = { vm.openHistory(h); historyMenu = false }
+                            )
+                        }
+                    }
+                }
             }
             Spacer(Modifier.height(6.dp))
             OutlinedTextField(

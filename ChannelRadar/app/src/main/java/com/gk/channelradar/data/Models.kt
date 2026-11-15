@@ -119,6 +119,7 @@ data class WatchItem(
 @Serializable
 data class Settings(
     val apiKeys: List<String> = emptyList(),
+    val autoScan: Boolean = false,
 )
 
 @Serializable
@@ -170,4 +171,27 @@ data class KeywordReport(
     val verdict: String,
     val examples: List<ScoredVideo> = emptyList(),
     val exampleChannels: Map<String, Long> = emptyMap(),
+    // ---- search volume & competition (v1.2)
+    /** estimated monthly searches on YouTube (model, not an official number) */
+    val estSearches: Long = 0,
+    /** 0..100 search popularity (autocomplete depth + views) */
+    val searchIndex: Double = 0.0,
+    /** autocomplete signal 0..100 */
+    val autocompleteScore: Double = 0.0,
+    /** letters typed before YouTube suggested it, -1 = not suggested */
+    val prefixLength: Int = -1,
+    /** total views of the top recent videos (≈ monthly attention on the topic) */
+    val monthlyViews: Long = 0,
+    /** approx number of videos uploaded on this keyword in the last 30 days (YouTube totalResults) */
+    val recentUploads: Long = 0,
+    /** 0..100 – how hard it is to rank */
+    val competition: Double = 0.0,
+    val bigChannelShare: Double = 0.0,
+    val medianTopSubs: Long = 0,
+    val shortsShare: Double = 0.0,
+    val typicalLengthSec: Int = 0,
+    val bestDay: String = "",
+    val bestHour: Int = -1,
+    val related: List<String> = emptyList(),
+    val titleWords: List<String> = emptyList(),
 )

@@ -32,13 +32,14 @@ enum class Tab { DISCOVER, TRENDS, RESULTS, WATCHLIST, SETTINGS }
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val store = Store(app)
     private val api = YouTubeApi(store)
-    private val engine = DiscoveryEngine(api, store)
     private val trendsApi = TrendsApi()
+    private val engine = DiscoveryEngine(api, store, trendsApi)
 
     var tab by mutableStateOf(if (store.settings.apiKeys.isEmpty()) Tab.SETTINGS else Tab.DISCOVER)
     var settings by mutableStateOf(store.settings); private set
     var config by mutableStateOf(store.scanConfig); private set
     var result by mutableStateOf(store.lastResult); private set
+    var history by mutableStateOf(store.history); private set
     var watchlist by mutableStateOf(store.watchlist); private set
     var hidden by mutableStateOf(store.hidden); private set
     var quota by mutableStateOf(store.quotaSnapshot()); private set
@@ -70,7 +71,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun saveKeys(text: String) {
         val keys = text.split('\n', ',', ' ').map { it.trim() }.filter { it.length > 10 }.distinct()
-        settings = Settings(apiKeys = keys)
+        settings = settings.copy(apiKeys = keys)
         store.settings = settings
         message = if (keys.isEmpty()) "No valid key found" else "${keys.size} API key(s) saved ✔"
         refreshQuota()
@@ -78,7 +79,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun refreshQuota() { quota = store.quotaSnapshot() }
 
-    fun clearCache() { store.clearCache(); result = null; message = "Results cleared" }
+    fun clearCache() { store.clearCache(); result = null; history = emptyList(); message = "Results cleared" }
+
+    fun openHistory(r: ScanResult) { result = r; store.lastResult = r }
+
+    fun setAutoScan(on: Boolean) {
+        settings = settings.copy(autoScan = on)
+        store.settings = settings
+        com.gk.channelradar.AutoScanWorker.schedule(getApplication(), on)
+        message = if (on) "Daily auto-scan on – you'll get a notification when new rising channels show up" else "Daily auto-scan off"
+    }
+
+    /** Reloads data a background auto-scan may have written. */
+    fun reloadFromDisk() {
+        val fresh = Store(getApplication())
+        if (fresh.lastResult?.time != result?.time && !scanning) {
+            result = fresh.lastResult
+            history = fresh.history
+        }
+        refreshQuota()
+    }
 
     fun clearHidden() { store.hidden = emptySet(); hidden = emptySet(); message = "Hidden channels restored" }
 
@@ -95,7 +115,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     engine.scan(config) { text, p -> progressText = text; progress = p }
                 }
                 result = r
-                store.lastResult = r
+                store.saveScan(r)
+                history = store.history
                 message = "Found ${r.channels.size} small channels · used ${r.quotaUsed} quota units"
                 tab = Tab.RESULTS
             } catch (e: CancellationException) {
@@ -153,22 +174,29 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun analyzeKeyword(k: String) {
-        val kw = k.trim()
-        if (kw.isBlank() || kw in analyzing) return
+    fun analyzeKeyword(k: String) = analyzeMany(listOf(k))
+
+    /** Checks several keywords one after another (each ~102 units). */
+    fun analyzeMany(list: List<String>) {
+        val kws = list.map { it.trim() }.filter { it.isNotBlank() && it !in analyzing }.distinct()
+        if (kws.isEmpty()) return
+        analyzing = analyzing + kws
         viewModelScope.launch {
-            analyzing = analyzing + kw
-            try {
-                val r = withContext(Dispatchers.IO) { engine.analyzeKeyword(kw, config.region, config.language) }
-                reports = listOf(r) + reports.filter { !it.keyword.equals(kw, true) }.take(60)
-                store.keywordReports = reports
-                message = "\"$kw\": opportunity ${r.opportunity.toInt()}/100"
-            } catch (e: Exception) {
-                message = e.message
-            } finally {
-                analyzing = analyzing - kw
-                refreshQuota()
+            for (kw in kws) {
+                try {
+                    val r = withContext(Dispatchers.IO) { engine.analyzeKeyword(kw, config.region, config.language) }
+                    reports = listOf(r) + reports.filter { !it.keyword.equals(kw, true) }.take(80)
+                    store.keywordReports = reports
+                    if (kws.size == 1) message = "\"$kw\": ~${fmtCount(r.estSearches)} searches/mo · competition ${r.competition.toInt()} · opportunity ${r.opportunity.toInt()}"
+                } catch (e: Exception) {
+                    message = e.message
+                    if (e is com.gk.channelradar.data.QuotaExhaustedException) { analyzing = emptySet(); break }
+                } finally {
+                    analyzing = analyzing - kw
+                    refreshQuota()
+                }
             }
+            if (kws.size > 1) message = "Checked ${kws.size} keywords"
         }
     }
 

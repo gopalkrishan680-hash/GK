@@ -97,6 +97,53 @@ class TrendsApi {
         }
     }
 
+    data class AutoSignal(
+        /** 0..100 – how early YouTube autocompletes this phrase while typing (earlier = more searched) */
+        val score: Double,
+        /** characters typed before it was suggested, or -1 if never suggested */
+        val prefixLength: Int,
+        val related: List<String>,
+    )
+
+    /**
+     * Free search-popularity signal from YouTube autocomplete. YouTube suggests the most searched
+     * phrases first, so a phrase that already appears after typing 2-3 letters is searched a lot.
+     */
+    fun searchPopularity(keyword: String, region: String, language: String): AutoSignal {
+        val k = keyword.trim().lowercase()
+        val lengths = listOf(1, 2, 3, 4, 5, 6, 8, 10, 13, 16).filter { it < k.length } + k.length
+        val pool = Executors.newFixedThreadPool(6)
+        try {
+            val prefixFutures = lengths.distinct().map { n -> n to pool.submit<List<String>> { suggestions(k.take(n), region, language) } }
+            val relatedFuture = pool.submit<List<String>> { suggestions("$k ", region, language) }
+            var found = -1
+            var position = 9
+            for ((n, f) in prefixFutures) {
+                val list = try { f.get().map { it.lowercase() } } catch (_: Exception) { emptyList() }
+                val idx = list.indexOfFirst { it == k || it.startsWith("$k ") }
+                if (idx >= 0) { found = n; position = idx; break }
+            }
+            val related = try { relatedFuture.get() } catch (_: Exception) { emptyList() }
+                .filter { !it.equals(k, true) }.distinct().take(10)
+            val score = if (found < 0) {
+                if (related.isEmpty()) 5.0 else 15.0 + related.size
+            } else {
+                val typedShare = found.toDouble() / k.length.coerceAtLeast(1)
+                // 2 letters → ~95, full phrase needed → ~35; small bonus for top position
+                val base = when {
+                    found <= 2 -> 95.0
+                    found <= 3 -> 85.0
+                    found <= 4 -> 75.0
+                    else -> 35.0 + (1 - typedShare) * 50
+                }
+                (base + (9 - position) * 0.6).coerceIn(10.0, 100.0)
+            }
+            return AutoSignal(score, found, related)
+        } finally {
+            pool.shutdownNow()
+        }
+    }
+
     // ------------------------------------------------------------------ Google Trends
 
     fun googleTrends(region: String): List<TrendItem> {

@@ -22,6 +22,8 @@ class YouTubeApi(private val store: Store) {
 
     // ------------------------------------------------------------------ public calls
 
+    data class SearchPage(val ids: List<String>, val next: String?, val totalResults: Long)
+
     /** search.list – costs 100 units. Returns video ids sorted by views + next page token. */
     fun searchVideos(
         query: String,
@@ -31,6 +33,19 @@ class YouTubeApi(private val store: Store) {
         format: VideoFormat,
         pageToken: String?,
     ): Pair<List<String>, String?> {
+        val p = searchPage(query, publishedAfter, region, language, format, pageToken)
+        return p.ids to p.next
+    }
+
+    /** Same as [searchVideos] but also returns YouTube's (approximate) total number of matching videos. */
+    fun searchPage(
+        query: String,
+        publishedAfter: Long,
+        region: String,
+        language: String,
+        format: VideoFormat,
+        pageToken: String?,
+    ): SearchPage {
         val res = call(
             "search", mapOf(
                 "part" to "snippet",
@@ -50,7 +65,8 @@ class YouTubeApi(private val store: Store) {
         if (items != null) for (i in 0 until items.length()) {
             items.getJSONObject(i).optJSONObject("id")?.optString("videoId")?.takeIf { it.isNotBlank() }?.let(ids::add)
         }
-        return ids to res.optString("nextPageToken").ifBlank { null }
+        val total = res.optJSONObject("pageInfo")?.optLong("totalResults") ?: ids.size.toLong()
+        return SearchPage(ids, res.optString("nextPageToken").ifBlank { null }, total)
     }
 
     /** videos.list chart=mostPopular – costs 1 unit per page of 50. */

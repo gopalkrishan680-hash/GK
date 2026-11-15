@@ -113,13 +113,30 @@ fun SettingsScreen(vm: AppViewModel) {
             }
         }
 
+        SectionTitle("Daily auto-scan")
+        val notifLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+            androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+        ) { vm.setAutoScan(true) }
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
+            Column(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
+                ToggleRow(
+                    "Scan automatically every day",
+                    "Runs your current Discover settings once a day (same quota as a manual scan) and notifies you about NEW rising channels.",
+                    vm.settings.autoScan
+                ) { on ->
+                    if (on && android.os.Build.VERSION.SDK_INT >= 33) notifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                    else vm.setAutoScan(on)
+                }
+            }
+        }
+
         SectionTitle("Trends & demand")
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
             Column(Modifier.padding(12.dp)) {
                 listOf(
                     "🔎 YouTube tab: explores YouTube's live search suggestions. Phrases that appear in many suggestion lists, near the top, are what people search most right now. Free.",
                     "📈 Google tab: today's fastest-rising Google searches for your country, with approximate search volume. Free.",
-                    "🎯 Demand check: looks at the top videos of the last 30 days for a keyword. Opportunity = 35% demand (typical views) + 40% how often small channels beat their subscriber count + 25% freshness.",
+                    "🎯 Keyword research: Est. searches/month is our own estimate from how early YouTube autocompletes the phrase and how many views recent videos get (YouTube doesn't publish exact numbers). Competition = how many videos were uploaded in 30 days + how big the ranking channels are. Opportunity = 35% demand + 30% low competition + 20% small channels winning + 15% freshness.",
                 ).forEach { Text(it, fontSize = 13.sp, modifier = Modifier.padding(vertical = 3.dp)) }
             }
         }

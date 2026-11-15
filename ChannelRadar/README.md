@@ -22,7 +22,11 @@ Koi vidIQ / credit-based tool nahi: app seedha YouTube ke official **free** Data
 ## Trends tab (search demand, free – no quota)
 - **YouTube**: explores YouTube's live search autocomplete (topic + a–z variations). Phrases that appear in many suggestion lists near the top = high search demand right now. One tap "Hot across all niches".
 - **Google**: today's fastest-rising Google searches for your country (Google Trends RSS) with approx. search volume and the news behind it.
-- **Demand check** (~102 units): top videos of the last 30 days for a keyword → typical views, freshness, how often small channels beat their subscriber count → Opportunity score (0–100) + verdict + examples.
+- **Keywords** (~102 units per keyword): for any keyword shows
+  - **Est. searches / month** – own model: YouTube autocomplete depth (how few letters you type before YouTube suggests it) × views recent videos get. YouTube publishes no exact numbers, so it's shown as a range.
+  - **Demand** (0–100), **Competition** (0–100: videos uploaded in 30 days, size of ranking channels, share of big channels) and **Opportunity** (0–100) + verdict
+  - Compare table (sort by opportunity / searches / low competition), "Check top 5" bulk research
+  - Best day & time to post, Shorts share, typical video length, words used in top titles, related searches, small channels winning on it
 - Any idea can be sent to the scanner with ➕ "Use in scan".
 
 ## Features
@@ -35,6 +39,7 @@ Koi vidIQ / credit-based tool nahi: app seedha YouTube ke official **free** Data
 - Channel page: stats, upload frequency, bar chart of recent uploads vs normal views & subscriber line
 - Watchlist with growth tracking (subs/day, % growth, sparkline)
 - Multiple API keys with auto-rotation + quota meter
+- Scan history (last 8 scans) and optional daily auto-scan with notification for NEW rising channels
 - Hide channels, CSV export (Excel me khulta hai), share
 
 ## Quota

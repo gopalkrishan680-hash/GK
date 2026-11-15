@@ -41,6 +41,15 @@ class Store(context: Context) {
     var lastResult: ScanResult? = read("last_result.json", ScanResult.serializer().nullable, null)
         set(value) { field = value; if (value != null) write("last_result.json", ScanResult.serializer(), value) }
 
+    /** Last few full scans so earlier results can be reopened. */
+    var history: List<ScanResult> = read("history.json", ListSerializer(ScanResult.serializer()), emptyList())
+        set(value) { field = value; write("history.json", ListSerializer(ScanResult.serializer()), value) }
+
+    fun saveScan(r: ScanResult) {
+        lastResult = r
+        history = (listOf(r) + history.filter { it.time != r.time }).take(8)
+    }
+
     var watchlist: List<WatchItem> = read("watchlist.json", ListSerializer(WatchItem.serializer()), emptyList())
         set(value) { field = value; write("watchlist.json", ListSerializer(WatchItem.serializer()), value) }
 
@@ -101,6 +110,7 @@ class Store(context: Context) {
         File(dir, "last_result.json").delete()
         lastResult = null
         seen = emptySet()
+        history = emptyList()
     }
 
     companion object {
