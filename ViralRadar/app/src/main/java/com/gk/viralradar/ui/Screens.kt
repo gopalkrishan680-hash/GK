@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -54,6 +55,7 @@ fun TrendingScreen(vm: AppViewModel) {
     val fmt by vm.format.collectAsStateWithLifecycle()
     val sort by vm.sortBy.collectAsStateWithLifecycle()
     val watch by vm.watchlist.collectAsStateWithLifecycle()
+    var tier by rememberSaveable { mutableStateOf<Tier?>(null) }
 
     // Live auto-refresh: re-fetch every 10 minutes while this screen is open.
     LaunchedEffect(Unit) {
@@ -86,9 +88,11 @@ fun TrendingScreen(vm: AppViewModel) {
                 .clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(10.dp))
         }
         PullToRefreshBox(isRefreshing = st.loading, onRefresh = { vm.refreshTrending() }, modifier = Modifier.fillMaxSize()) {
-            val list = remember(st.items, fmt, sort) { vm.sorted(st.items, fmt, sort) }
+            val base = remember(st.items, fmt, sort) { vm.sorted(st.items, fmt, sort) }
+            val list = remember(base, tier) { base.filter { tier?.matches(it) ?: true } }
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
-                if (list.isNotEmpty()) item { TopPicksHeader(list) }
+                if (base.isNotEmpty()) item { TopPicksHeader(base, tier) { tier = if (tier == it) null else it } }
+                if (base.isNotEmpty() && list.isEmpty()) item { EmptyTier(tier) { tier = null } }
                 itemsIndexed(list, key = { _, it -> it.video.id }) { i, item ->
                     VideoCard(item, i + 1, watch.any { it.id == item.video.id },
                         onClick = { vm.selected.value = item },
@@ -99,15 +103,50 @@ fun TrendingScreen(vm: AppViewModel) {
     }
 }
 
+enum class Tier(val title: String, val hint: String) {
+    VIRAL("🔥 Viral", "Score 75+"),
+    RISING("🚀 Rising", "Score 58-74"),
+    BREAKOUT("💥 Breakout 5x+", "Subs se 5x+ views");
+
+    fun matches(s: Scored) = when (this) {
+        VIRAL -> s.score.score >= 75
+        RISING -> s.score.score in 58..74
+        BREAKOUT -> (s.score.outlier ?: 0.0) >= 5
+    }
+
+    val color get() = when (this) { VIRAL -> Hot; RISING -> Gold; BREAKOUT -> Sky }
+}
+
 @Composable
-private fun TopPicksHeader(list: List<Scored>) {
-    val viral = list.count { it.score.score >= 75 }
-    val rising = list.count { it.score.score in 58..74 }
-    val breakout = list.count { (it.score.outlier ?: 0.0) >= 5 }
-    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        StatBox("🔥 Viral", "$viral", Modifier.weight(1f), Hot)
-        StatBox("🚀 Rising", "$rising", Modifier.weight(1f), Gold)
-        StatBox("💥 Breakout 5x+", "$breakout", Modifier.weight(1f), Sky)
+private fun TopPicksHeader(list: List<Scored>, selected: Tier?, onPick: (Tier) -> Unit) {
+    Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Tier.entries.forEach { t ->
+                val on = selected == t
+                Column(
+                    Modifier.weight(1f).clip(RoundedCornerShape(10.dp))
+                        .background(if (on) t.color.copy(alpha = .22f) else MaterialTheme.colorScheme.surfaceVariant)
+                        .border(2.dp, if (on) t.color else Color.Transparent, RoundedCornerShape(10.dp))
+                        .clickable { onPick(t) }.padding(10.dp),
+                ) {
+                    Text(t.title, fontSize = 11.sp, color = if (on) t.color else Muted, maxLines = 1)
+                    Text("${list.count(t::matches)}", fontSize = 20.sp, fontWeight = FontWeight.Black, color = t.color)
+                    Text(if (on) "✕ hatao" else "Tap karo ›", fontSize = 10.sp, color = Muted)
+                }
+            }
+        }
+        selected?.let { t ->
+            Text("${t.title} videos (${t.hint}) • ${list.count(t::matches)} mile", fontSize = 13.sp,
+                fontWeight = FontWeight.Bold, color = t.color, modifier = Modifier.padding(top = 8.dp))
+        }
+    }
+}
+
+@Composable
+private fun EmptyTier(t: Tier?, onClear: () -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text("Abhi is list me koi ${t?.title ?: ""} video nahi hai.", color = Muted)
+        TextButton(onClear) { Text("Saare videos dikhao") }
     }
 }
 
@@ -141,6 +180,7 @@ fun DiscoverScreen(vm: AppViewModel) {
     var q by rememberSaveable { mutableStateOf("") }
     var hours by rememberSaveable { mutableIntStateOf(48) }
     var shortsOnly by rememberSaveable { mutableStateOf(false) }
+    var tier by rememberSaveable { mutableStateOf<Tier?>(null) }
 
     Column(Modifier.fillMaxSize()) {
         OutlinedTextField(
@@ -164,8 +204,11 @@ fun DiscoverScreen(vm: AppViewModel) {
         )
         ErrorBanner(st.error)
         if (st.loading) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 12.dp))
-        val list = remember(st.items, sort) { vm.sorted(st.items, FormatFilter.ALL, sort) }
+        val base = remember(st.items, sort) { vm.sorted(st.items, FormatFilter.ALL, sort) }
+        val list = remember(base, tier) { base.filter { tier?.matches(it) ?: true } }
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+            if (base.isNotEmpty()) item { TopPicksHeader(base, tier) { tier = if (tier == it) null else it } }
+            if (base.isNotEmpty() && list.isEmpty()) item { EmptyTier(tier) { tier = null } }
             itemsIndexed(list, key = { _, it -> it.video.id }) { i, item ->
                 VideoCard(item, i + 1, watch.any { it.id == item.video.id },
                     onClick = { vm.selected.value = item },
