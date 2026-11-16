@@ -117,6 +117,40 @@ object YouTubeApi {
                 .mapNotNull(::parseVideo)
         }
 
+    /**
+     * YouTube search autocomplete = what people are actually typing right now (demand signal).
+     * Public endpoint, no API key, no quota.
+     */
+    fun suggestions(query: String, region: String): List<String> {
+        val conn = URL("https://suggestqueries.google.com/complete/search?client=firefox&ds=yt&ie=utf-8&oe=utf-8" +
+            "&hl=en&gl=${enc(region)}&q=${enc(query)}").openConnection() as HttpURLConnection
+        conn.connectTimeout = 10000; conn.readTimeout = 10000
+        return try {
+            if (conn.responseCode !in 200..299) return emptyList()
+            val cs = Regex("charset=([\\w-]+)").find(conn.contentType ?: "")?.groupValues?.get(1) ?: "UTF-8"
+            val body = conn.inputStream.readBytes().toString(charset(cs))
+            val arr = org.json.JSONArray(body).getJSONArray(1)
+            (0 until arr.length()).map { arr.get(it).let { x -> if (x is org.json.JSONArray) x.getString(0) else x.toString() } }
+        } catch (e: Exception) {
+            emptyList()
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    /** Like [search] but also returns YouTube's estimate of how many matching videos exist (supply). */
+    fun searchWithTotal(key: String, query: String, hoursBack: Int, region: String): Pair<List<Video>, Long> {
+        val after = Instant.ofEpochMilli(System.currentTimeMillis() - hoursBack * 3_600_000L).toString()
+        val r = get("search", mapOf(
+            "part" to "id", "type" to "video", "q" to query, "order" to "viewCount",
+            "publishedAfter" to after, "maxResults" to "50", "regionCode" to region,
+        ), key)
+        val total = r.optJSONObject("pageInfo")?.optLong("totalResults") ?: 0
+        val ids = items(r).mapNotNull { it.optJSONObject("id")?.optString("videoId") }.filter { it.isNotBlank() }
+        if (ids.isEmpty()) return emptyList<Video>() to total
+        return withSubs(key, videosByIds(key, ids)) to total
+    }
+
     /** Search recent uploads for a niche. Cost: 100 units + 1-2. */
     fun search(
         key: String, query: String, hoursBack: Int, region: String,

@@ -43,7 +43,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Tab(val label: String) { TRENDING("Trending"), DISCOVER("Discover"), TRACKER("Tracker"), INSIGHTS("Insights"), SETTINGS("Settings") }
+private enum class Tab(val label: String) { TRENDING("Trending"), DISCOVER("Discover"), IDEAS("Ideas"), TRACKER("Tracker"), INSIGHTS("Insights"), SETTINGS("Settings") }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,11 +64,18 @@ private fun App(vm: AppViewModel, shared: String?, consumeShared: () -> Unit) {
 
     Scaffold(
         topBar = {
-            if (selected == null && selectedTrack == null) TopAppBar(title = { Text("📡 Viral Radar", fontWeight = FontWeight.Black) })
+            if (selected == null && selectedTrack == null) TopAppBar(
+                title = { Text("📡 Viral Radar", fontWeight = FontWeight.Black) },
+                actions = {
+                    IconButton({ tab = Tab.SETTINGS; vm.selected.value = null; vm.selectedTrack.value = null }) {
+                        Icon(Icons.Default.Settings, "Settings", tint = if (tab == Tab.SETTINGS) MaterialTheme.colorScheme.primary else LocalContentColor.current)
+                    }
+                },
+            )
         },
         bottomBar = {
             NavigationBar {
-                Tab.entries.forEach { t ->
+                Tab.entries.filter { it != Tab.SETTINGS }.forEach { t ->
                     NavigationBarItem(
                         selected = tab == t,
                         onClick = { tab = t; vm.selected.value = null; vm.selectedTrack.value = null },
@@ -76,12 +83,13 @@ private fun App(vm: AppViewModel, shared: String?, consumeShared: () -> Unit) {
                             Icon(when (t) {
                                 Tab.TRENDING -> Icons.Default.Whatshot
                                 Tab.DISCOVER -> Icons.Default.TravelExplore
+                                Tab.IDEAS -> Icons.Default.Lightbulb
                                 Tab.TRACKER -> Icons.Default.Timeline
                                 Tab.INSIGHTS -> Icons.Default.Insights
                                 Tab.SETTINGS -> Icons.Default.Settings
                             }, null)
                         },
-                        label = { Text(t.label) },
+                        label = { Text(t.label, maxLines = 1) },
                     )
                 }
             }
@@ -96,6 +104,7 @@ private fun App(vm: AppViewModel, shared: String?, consumeShared: () -> Unit) {
                 else -> when (tab) {
                     Tab.TRENDING -> TrendingScreen(vm)
                     Tab.DISCOVER -> DiscoverScreen(vm)
+                    Tab.IDEAS -> OpportunityScreen(vm)
                     Tab.TRACKER -> TrackerScreen(vm)
                     Tab.INSIGHTS -> InsightsScreen(vm)
                     Tab.SETTINGS -> SettingsScreen(vm)

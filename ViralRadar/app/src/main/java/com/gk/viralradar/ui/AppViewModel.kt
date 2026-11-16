@@ -5,6 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.gk.viralradar.data.ApiException
 import com.gk.viralradar.data.FormatFilter
+import com.gk.viralradar.data.KeywordReport
+import com.gk.viralradar.data.Opportunity
 import com.gk.viralradar.data.InsightReport
 import com.gk.viralradar.data.Insights
 import com.gk.viralradar.data.Prefs
@@ -146,6 +148,64 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }.onFailure { e -> discover.update { it.copy(loading = false, error = e.message) } }
         }
     }
+
+    // ---------- Opportunity / keyword gap ----------
+    val oppSuggestions = MutableStateFlow<List<String>>(emptyList())
+    val oppReports = MutableStateFlow<List<KeywordReport>>(emptyList())
+    val oppProgress = MutableStateFlow<Pair<Int, Int>?>(null)   // done / total
+    val oppError = MutableStateFlow<String?>(null)
+    val oppSuggestBusy = MutableStateFlow(false)
+    private val oppCache = mutableMapOf<String, KeywordReport>()
+
+    /** Free: asks YouTube autocomplete what people search around this seed. */
+    fun loadSuggestions(seed: String) {
+        val q = seed.trim()
+        if (q.isEmpty()) return
+        oppSuggestBusy.value = true
+        viewModelScope.launch {
+            val list = withContext(Dispatchers.IO) {
+                val r = region.value
+                val base = YouTubeApi.suggestions(q, r)
+                val more = listOf("$q kaise", "$q in hindi", "how to $q", "$q ideas").flatMap { YouTubeApi.suggestions(it, r).take(4) }
+                (listOf(q) + base + more).map { it.trim().lowercase() }.filter { it.isNotBlank() }.distinct().take(25)
+            }
+            oppSuggestions.value = list
+            if (list.size <= 1) oppError.value = "Autocomplete se suggestions nahi mile — seed keyword khud analyze kar sakte ho ya apne keywords comma se likho."
+            else oppError.value = null
+            oppSuggestBusy.value = false
+        }
+    }
+
+    /** ~102 quota units per keyword. Results cached for 6 hours. */
+    fun analyzeKeywords(keywords: List<String>, hoursBack: Int) {
+        val kws = keywords.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+        if (kws.isEmpty() || oppProgress.value != null) return
+        oppError.value = null
+        oppProgress.value = 0 to kws.size
+        val autocomplete = oppSuggestions.value.toSet()
+        viewModelScope.launch {
+            kws.forEachIndexed { i, kw ->
+                val ck = "$kw|$hoursBack|${region.value}"
+                val cached = oppCache[ck]?.takeIf { System.currentTimeMillis() - it.updatedAt < 6 * 3_600_000L }
+                val rep = cached ?: withContext(Dispatchers.IO) {
+                    runCatching {
+                        val (v, total) = YouTubeApi.searchWithTotal(prefs.apiKey, kw, hoursBack, region.value)
+                        Opportunity.build(kw, v, total, kw.lowercase() in autocomplete, hoursBack)
+                    }
+                }.onFailure { oppError.value = it.message }.getOrNull()
+                if (rep != null) {
+                    oppCache[ck] = rep
+                    oppReports.update { old -> (old.filterNot { it.keyword == kw } + rep).sortedByDescending { it.score } }
+                } else if (oppError.value?.contains("quota", true) == true) {
+                    oppProgress.value = null; return@launch
+                }
+                oppProgress.value = (i + 1) to kws.size
+            }
+            oppProgress.value = null
+        }
+    }
+
+    fun clearReports() { oppReports.value = emptyList() }
 
     // ---------- Tracker ----------
     fun isTracked(id: String) = watchlist.value.any { it.id == id }

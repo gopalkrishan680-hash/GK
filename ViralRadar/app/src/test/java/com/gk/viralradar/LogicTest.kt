@@ -46,4 +46,19 @@ class LogicTest {
         val (score, tips) = Insights.checkTitle("5 SHOCKING Secrets Nobody Tells You About Money 💰", null)
         assertTrue(score >= 70); assertTrue(tips.isNotEmpty())
     }
+
+    @Test fun opportunity() {
+        // High views, small channels winning, few uploads -> golden
+        val gap = (1..20).map { vid(300_000L + it * 10_000, 200.0, 20_000L + it * 1000) }
+        val g = Opportunity.build("desi prank", gap, 800, true, 720)
+        // Mediocre views, mega channels, huge supply -> saturated
+        val sat = (1..20).map { vid(20_000L, 200.0, 5_000_000L) }
+        val x = Opportunity.build("gta 5", sat, 1_000_000, false, 720)
+        println("gap=${g.score} ${g.label}  sat=${x.score} ${x.label}")
+        g.verdict.forEach(::println)
+        assertTrue(g.score >= 70)
+        assertTrue(x.score < 40)
+        assertNotNull(g.bestSmall)
+        assertEquals(0, Opportunity.build("none", emptyList(), 0, false, 720).score)
+    }
 }
