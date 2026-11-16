@@ -61,4 +61,26 @@ class LogicTest {
         assertNotNull(g.bestSmall)
         assertEquals(0, Opportunity.build("none", emptyList(), 0, false, 720).score)
     }
+
+    @Test fun autoTopics() {
+        val now = System.currentTimeMillis()
+        fun v(id: String, ch: String, title: String, tags: List<String>, subs: Long, views: Long) =
+            Video(id, title, ch, "Channel $ch", now - 10 * 3_600_000L, "", views, views / 20, views / 300, 600, tags, "24", "", subs)
+        val vids = listOf(
+            v("a1", "c1", "Papa Beta Comedy | desi prank on papa", listOf("desi prank", "papa beta"), 20_000, 900_000),
+            v("a2", "c2", "Desi prank gone wrong 😂 papa ka gussa", listOf("desi prank", "family comedy"), 45_000, 600_000),
+            v("a3", "c3", "Family comedy: papa beta ki ladai", listOf("family comedy", "papa beta"), 60_000, 400_000),
+            v("a4", "c4", "Channel c4 exclusive vlog", listOf("my vlog"), 5_000_000, 50_000),
+            v("a5", "c5", "रसोई में नया तरीका आलू पराठा", listOf("आलू पराठा"), 30_000, 300_000),
+            v("a6", "c6", "आलू पराठा बनाने का आसान तरीका", listOf("आलू पराठा", "recipe"), 80_000, 200_000),
+        )
+        val r = AutoScan.rankTopics(vids, listOf("ind vs aus" to 200_000L), now)
+        val names = r.map { it.phrase }
+        println("topics=" + names.take(10))
+        assertTrue("desi prank" in names)
+        assertTrue("आलू पराठा" in names)            // Hindi phrase kept whole
+        assertTrue("ind vs aus" in names)           // Google Trends merged
+        assertFalse(names.any { "my vlog" in it })  // single-channel tag ignored
+        assertTrue(r.first { it.phrase == "desi prank" }.sources.contains(AutoScan.SRC_SMALL))
+    }
 }

@@ -23,7 +23,7 @@ data class InsightReport(
 )
 
 object Insights {
-    private val STOP = setOf(
+    val STOP = setOf(
         "the", "a", "an", "and", "or", "of", "to", "in", "on", "for", "with", "is", "are", "my", "me", "you",
         "your", "this", "that", "it", "at", "by", "from", "be", "i", "we", "our", "new", "official", "video",
         "full", "ka", "ki", "ke", "ko", "se", "hai", "me", "mein", "aur", "ye", "vs", "x", "ft", "feat", "|", "-",
@@ -35,7 +35,7 @@ object Insights {
         val vids = items.map { it.video }
         val n = vids.size.coerceAtLeast(1)
         val words = vids.flatMap { v ->
-            v.title.lowercase().split(Regex("[^\\p{L}\\p{N}#]+")).filter { it.length > 2 && it !in STOP && !it.startsWith("#") }.distinct()
+            v.title.lowercase().split(Regex("[^\\p{L}\\p{M}\\p{N}#]+")).filter { it.length > 2 && it !in STOP && !it.startsWith("#") }.distinct()
         }
         val tags = vids.flatMap { it.tags.map(String::lowercase).distinct() }
         val hours = IntArray(24)

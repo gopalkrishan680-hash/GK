@@ -22,6 +22,8 @@ data class KeywordReport(
     val verdict: List<String>,
     val hoursBack: Int,
     val updatedAt: Long,
+    val totalFetched: Int = 0,
+    val sources: Set<String> = emptySet(),
 )
 
 /**
@@ -82,7 +84,7 @@ object Opportunity {
 
         return KeywordReport(
             keyword, score, label(score), demand, competition, supply, smallWin, medViews, avgVph, medSubs, big,
-            total, inAutocomplete, bestSmall(scored), top, verdict, hoursBack, now,
+            total, inAutocomplete, bestSmall(scored), top, verdict, hoursBack, now, videos.size,
         )
     }
 

@@ -27,6 +27,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.gk.viralradar.data.AutoScan
 import com.gk.viralradar.data.Fmt
 import com.gk.viralradar.data.KeywordReport
 import com.gk.viralradar.data.Opportunity
@@ -35,6 +36,112 @@ private enum class OppSort(val label: String) { SCORE("Best opportunity"), DEMAN
 
 @Composable
 fun OpportunityScreen(vm: AppViewModel) {
+    var mode by rememberSaveable { mutableIntStateOf(0) }
+    Column(Modifier.fillMaxSize()) {
+        TabRow(mode) {
+            Tab(mode == 0, { mode = 0 }, text = { Text("🤖 Auto: abhi kya chalega") })
+            Tab(mode == 1, { mode = 1 }, text = { Text("✍️ Apna topic") })
+        }
+        if (mode == 0) AutoIdeas(vm) else ManualIdeas(vm)
+    }
+}
+
+@Composable
+private fun AutoIdeas(vm: AppViewModel) {
+    val reports by vm.autoReports.collectAsStateWithLifecycle()
+    val updated by vm.autoUpdatedAt.collectAsStateWithLifecycle()
+    val stage by vm.autoStage.collectAsStateWithLifecycle()
+    val err by vm.autoError.collectAsStateWithLifecycle()
+    val region by vm.region.collectAsStateWithLifecycle()
+    val watch by vm.watchlist.collectAsStateWithLifecycle()
+    var size by remember { mutableIntStateOf(vm.prefs.autoScanSize) }
+    var hours by remember { mutableIntStateOf(vm.prefs.autoScanHours) }
+    var sort by remember { mutableStateOf(OppSort.SCORE) }
+    var expanded by remember { mutableStateOf<String?>(null) }
+    var onlyGolden by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) { vm.maybeAutoScan() }
+
+    val sorted = remember(reports, sort, onlyGolden) {
+        val base = if (onlyGolden) reports.filter { it.score >= 55 } else reports
+        when (sort) {
+            OppSort.SCORE -> base.sortedByDescending { it.score }
+            OppSort.DEMAND -> base.sortedByDescending { it.demand }
+            OppSort.LOW_COMP -> base.sortedBy { it.competition }
+            OppSort.LOW_SUPPLY -> base.sortedBy { it.supply }
+        }
+    }
+
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
+        item {
+            Column(Modifier.padding(14.dp)) {
+                Text("💎 Abhi kin topics ki demand hai + competition kam", fontWeight = FontWeight.Black, fontSize = 18.sp)
+                Text(
+                    "App khud $region ke har category ke trending videos, Google Trends aur YouTube search se topics nikaalti hai, " +
+                        "phir har topic ka live demand vs competition check karti hai. Kuch likhne ki zarurat nahi.",
+                    fontSize = 12.sp, color = Muted,
+                )
+                if (updated > 0) {
+                    val ago = (System.currentTimeMillis() - updated) / 3_600_000.0
+                    Text("Last scan: ${Fmt.age(ago)} pehle • har 12 ghante me apne aap update",
+                        fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 6.dp))
+                }
+                Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(5, 8, 12).forEach { n ->
+                        FilterChip(size == n, { size = n; vm.prefs.autoScanSize = n }, label = { Text("$n topics") })
+                    }
+                    listOf(168 to "7 din ka data", 720 to "30 din ka data").forEach { (h, l) ->
+                        FilterChip(hours == h, { hours = h; vm.prefs.autoScanHours = h }, label = { Text(l) })
+                    }
+                }
+                Button({ vm.runAutoScan() }, Modifier.fillMaxWidth().padding(top = 6.dp), enabled = stage == null) {
+                    Text(if (stage != null) "Scan chal raha hai…" else if (reports.isEmpty()) "🤖 Auto scan chalao" else "🔄 Abhi dobara scan karo")
+                }
+                Text("Ek scan ≈ ${AutoScan.quotaEstimate(size)} quota units (free limit 10,000/day).", fontSize = 11.sp, color = Muted)
+            }
+        }
+        item {
+            stage?.let { (st, d, t) ->
+                Column(Modifier.padding(horizontal = 14.dp, vertical = 6.dp)) {
+                    Text(st, fontSize = 13.sp)
+                    if (t > 0) LinearProgressIndicator({ d.toFloat() / t }, Modifier.fillMaxWidth())
+                    else LinearProgressIndicator(Modifier.fillMaxWidth())
+                    Text("1-2 minute lag sakte hain. Is tab se bahar jaa sakte ho, scan chalta rahega.", fontSize = 11.sp, color = Muted)
+                }
+            }
+            ErrorBanner(err)
+        }
+        if (reports.isNotEmpty()) item {
+            val golden = reports.count { it.score >= 70 }
+            val good = reports.count { it.score in 55..69 }
+            Row(Modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatBox("💎 Golden", "$golden", Modifier.weight(1f), Sky)
+                StatBox("✅ Good", "$good", Modifier.weight(1f), Mint)
+                StatBox("Topics checked", "${reports.size}", Modifier.weight(1f))
+            }
+            Row(Modifier.padding(horizontal = 14.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                FilterChip(onlyGolden, { onlyGolden = !onlyGolden }, label = { Text("Sirf Golden + Good") })
+                Spacer(Modifier.weight(1f))
+                DropdownChip("↕ ${sort.label}", OppSort.entries.map { it.name to it.label }) { sort = OppSort.valueOf(it) }
+            }
+        }
+        items(sorted, key = { it.keyword }) { r ->
+            KeywordCard(r, expanded == r.keyword, onToggle = { expanded = if (expanded == r.keyword) null else r.keyword }) {
+                r.top.take(6).forEachIndexed { i, item ->
+                    VideoCard(item, i + 1, watch.any { it.id == item.video.id },
+                        onClick = { vm.selected.value = item },
+                        onTrack = { if (vm.isTracked(item.video.id)) vm.untrack(item.video.id) else vm.track(item.video) })
+                }
+            }
+        }
+        if (reports.isEmpty() && stage == null && err == null) item {
+            Text("Abhi tak koi scan nahi hua. Upar button dabao.", color = Muted, modifier = Modifier.padding(14.dp))
+        }
+    }
+}
+
+@Composable
+private fun ManualIdeas(vm: AppViewModel) {
     val suggestions by vm.oppSuggestions.collectAsStateWithLifecycle()
     val reports by vm.oppReports.collectAsStateWithLifecycle()
     val progress by vm.oppProgress.collectAsStateWithLifecycle()
@@ -175,6 +282,11 @@ private fun KeywordCard(r: KeywordReport, open: Boolean, onToggle: () -> Unit, v
             Meter("Demand", r.demand, Mint, "median ${Fmt.count(r.medianViews)} views")
             Meter("Competition", r.competition, Hot, "median ${Fmt.count(r.medianSubs)} subs")
             Meter("Videos already", r.supply, Gold, "≈${Fmt.count(r.totalVideos)} in ${Opportunity.windowLabel(r.hoursBack)}")
+            if (r.sources.isNotEmpty()) {
+                FlowRow(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    r.sources.forEach { Chip(it, Sky.copy(alpha = .15f), Sky) }
+                }
+            }
             Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 Chip("⚡ ${Fmt.count(r.avgViewsPerHour.toLong())}/h avg")
                 Chip("🐣 small wins ${(r.smallWin * 100).toInt()}%")

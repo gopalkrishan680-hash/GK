@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.gk.viralradar.data.ApiException
+import com.gk.viralradar.data.AutoScan
 import com.gk.viralradar.data.FormatFilter
 import com.gk.viralradar.data.KeywordReport
 import com.gk.viralradar.data.Opportunity
@@ -146,6 +147,40 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 if (id != null && scored.size == 1) selected.value = scored.first()
                 if (scored.isEmpty()) discover.update { it.copy(error = "Kuch nahi mila. Doosra keyword ya bada time window try karo.") }
             }.onFailure { e -> discover.update { it.copy(loading = false, error = e.message) } }
+        }
+    }
+
+    // ---------- Automatic opportunity scan ----------
+    val autoReports = MutableStateFlow<List<KeywordReport>>(emptyList())
+    val autoUpdatedAt = MutableStateFlow(0L)
+    val autoStage = MutableStateFlow<Triple<String, Int, Int>?>(null)
+    val autoError = MutableStateFlow<String?>(null)
+
+    init {
+        viewModelScope.launch {
+            val (t, reps) = withContext(Dispatchers.IO) { AutoScan.load(app) }
+            if (autoReports.value.isEmpty()) { autoReports.value = reps; autoUpdatedAt.value = t }
+        }
+    }
+
+    /** Runs automatically when the Ideas tab opens and the last scan is older than 12 hours. */
+    fun maybeAutoScan() {
+        if (hasKey.value && autoStage.value == null && autoError.value == null &&
+            System.currentTimeMillis() - prefs.lastAutoScan > 12 * 3_600_000L) runAutoScan()
+    }
+
+    fun runAutoScan() {
+        if (autoStage.value != null || !hasKey.value) return
+        autoError.value = null
+        autoStage.value = Triple("Shuru ho raha hai…", 0, 0)
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                runCatching { AutoScan.run(getApplication(), prefs) { st, d, t -> autoStage.value = Triple(st, d, t) } }
+            }.onSuccess {
+                if (it.isEmpty()) autoError.value = "Is baar koi topic analyze nahi ho paya. Thodi der baad dobara try karo."
+                else { autoReports.value = it; autoUpdatedAt.value = prefs.lastAutoScan }
+            }.onFailure { autoError.value = it.message }
+            autoStage.value = null
         }
     }
 

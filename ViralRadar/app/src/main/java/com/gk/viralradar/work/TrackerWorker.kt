@@ -19,6 +19,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.gk.viralradar.MainActivity
+import com.gk.viralradar.data.AutoScan
 import com.gk.viralradar.data.Fmt
 import com.gk.viralradar.data.Prefs
 import com.gk.viralradar.data.Tracker
@@ -57,6 +58,15 @@ class TrackerWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ct
                 }
                 prefs.alertedIds = alerted
                 prefs.lastNicheCheck = System.currentTimeMillis()
+            }
+            // Automatic opportunity scan (~850 units) at most every 12 hours.
+            if (prefs.autoScanBg && System.currentTimeMillis() - prefs.lastAutoScan > 12 * 3_600_000L) {
+                val golden = AutoScan.run(applicationContext, prefs) { _, _, _ -> }.filter { it.score >= 65 }
+                if (golden.isNotEmpty()) {
+                    notify(applicationContext, "💎 ${golden.size} low-competition topics mile",
+                        golden.take(5).joinToString("\n") { "${it.keyword} — score ${it.score}" } +
+                            "\nIdeas tab kholo poori detail ke liye.")
+                }
             }
             Result.success()
         } catch (e: Exception) {

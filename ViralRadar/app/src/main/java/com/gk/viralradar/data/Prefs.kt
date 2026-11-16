@@ -31,6 +31,20 @@ class Prefs(context: Context) {
         get() = sp.getLong("last_niche", 0)
         set(v) = sp.edit().putLong("last_niche", v).apply()
 
+    var autoScanBg: Boolean
+        get() = sp.getBoolean("auto_bg", true)
+        set(v) = sp.edit().putBoolean("auto_bg", v).apply()
+    /** How many topics the auto scan deep-analyses (~102 quota units each). */
+    var autoScanSize: Int
+        get() = sp.getInt("auto_size", 8)
+        set(v) = sp.edit().putInt("auto_size", v).apply()
+    var autoScanHours: Int
+        get() = sp.getInt("auto_hours", 168)
+        set(v) = sp.edit().putInt("auto_hours", v).apply()
+    var lastAutoScan: Long
+        get() = sp.getLong("auto_last", 0)
+        set(v) = sp.edit().putLong("auto_last", v).apply()
+
     var alertedIds: Set<String>
         get() = sp.getStringSet("alerted", emptySet()) ?: emptySet()
         set(v) = sp.edit().putStringSet("alerted", v.toList().takeLast(500).toSet()).apply()

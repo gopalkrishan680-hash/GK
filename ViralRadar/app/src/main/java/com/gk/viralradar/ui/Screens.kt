@@ -519,6 +519,14 @@ fun SettingsScreen(vm: AppViewModel) {
         }
         Text("Tracked videos ke stats is interval pe save hote hain (1 unit har baar).", fontSize = 11.sp, color = Muted)
 
+        SectionTitle("🤖 Auto topic scan (background)")
+        var autoBg by remember { mutableStateOf(p.autoScanBg) }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Har 12 ghante me khud low-competition topics dhoondo aur notification bhejo (≈${com.gk.viralradar.data.AutoScan.quotaEstimate(p.autoScanSize)} units/scan)",
+                fontSize = 13.sp, modifier = Modifier.weight(1f))
+            Switch(autoBg, { autoBg = it; p.autoScanBg = it })
+        }
+
         SectionTitle("🔔 Niche alerts")
         OutlinedTextField(niche, { niche = it; saved = false }, modifier = Modifier.fillMaxWidth(),
             label = { Text("Keywords (comma se alag, max 5)") }, placeholder = { Text("prank, comedy shorts, family vlog") })
