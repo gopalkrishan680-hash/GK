@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - claude/stickman-video-voiceover-sync-ivss4s
+      - ccr-cf402e99-zfb3al
     paths:
       - 'stickman-studio/**'
       - 'stickman-android/**'

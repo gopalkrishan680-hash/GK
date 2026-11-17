@@ -32,6 +32,13 @@ by one on the word where they are spoken. The screen clears at every new **board
 4. **Preview + Export:** the same exact-frame MP4 export. Sound effects (pop, whoosh, swish, ding, buzz) are made
    in the app and placed on every entrance; background music gets quieter under the voice and fades in/out.
 
+## YouTube Kit tab
+The last tab makes the upload package from the script: **3 thumbnail prompts** (in the video's own art style and
+main character), **5 titles**, a **description** with chapters (timestamps from the voice sync), **tags** and
+**hashtags**. **A:** *Copy the request* → paste into ChatGPT / Gemini / Claude → paste the JSON answer → *Apply*.
+**B:** *Make with Gemini* (same free API key as the Layers tab). **C:** *Make quick kit* works offline without AI.
+Everything can be edited and copied one by one, and is saved with the project.
+
 Plan format (what the AI returns):
 ```json
 {"assets": [{"id": "hero_explain", "type": "character", "prompt": "the stickman explaining with one open hand"}],

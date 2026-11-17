@@ -407,11 +407,14 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        /** Opens the ChatGPT or Gemini app (or its website when the app is not installed). */
+        /** Opens the ChatGPT, Gemini or Claude app (or its website when the app is not installed). */
         @JavascriptInterface
         fun openApp(which: String) {
-            val (pkg, url) = if (which == "gemini") "com.google.android.apps.bard" to "https://gemini.google.com/app"
-            else "com.openai.chatgpt" to "https://chatgpt.com/"
+            val (pkg, url) = when (which) {
+                "gemini" -> "com.google.android.apps.bard" to "https://gemini.google.com/app"
+                "claude" -> "com.anthropic.claude" to "https://claude.ai/new"
+                else -> "com.openai.chatgpt" to "https://chatgpt.com/"
+            }
             runOnUiThread {
                 val launch = packageManager.getLaunchIntentForPackage(pkg)
                 if (launch != null) {
