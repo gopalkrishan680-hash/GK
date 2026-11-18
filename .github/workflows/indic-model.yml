@@ -1,0 +1,55 @@
+name: Indic-TTS Hindi model
+
+# Makes the AI4Bharat Indic-TTS Hindi voice (FastPitch + HiFiGAN, CC-BY-4.0) into one ONNX file and publishes it
+# as the "indic-tts-hi-v1" release, where the Stickman Studio app downloads it from (once, about 270 MB).
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - ccr-cf402e99-zfb3al
+    paths:
+      - 'tools/indic-tts/**'
+      - '.github/workflows/indic-model.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: indic-model
+  cancel-in-progress: false
+
+jobs:
+  model:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install (CPU PyTorch, Coqui TTS, onnxruntime)
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
+          pip install -q torch==2.15.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install -q torchaudio torchcodec==0.17.0 --index-url https://download.pytorch.org/whl/cpu || pip install -q torchaudio torchcodec==0.17.0
+          pip install -q coqui-tts==0.28.0 six onnx==1.23.2 onnxruntime==1.32.0
+          python -c "import torch, TTS; print('torch', torch.__version__, 'cuda', torch.cuda.is_available())"
+      - name: Download the AI4Bharat Hindi checkpoints
+        run: |
+          curl -sSL --retry 4 -o hi.zip https://github.com/AI4Bharat/Indic-TTS/releases/download/v1-checkpoints-release/hi.zip
+          unzip -q hi.zip -d model && rm hi.zip
+      - name: Make the ONNX file (checks it against PyTorch)
+        run: |
+          mkdir -p out
+          python tools/indic-tts/export.py model/hi out
+          ls -la out
+      - name: Publish as the "indic-tts-hi-v1" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete indic-tts-hi-v1 --repo "$GITHUB_REPOSITORY" --cleanup-tag -y || true
+          gh release create indic-tts-hi-v1 out/indic-hi.onnx out/indic-hi.json \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+            --title "Indic-TTS Hindi voice for Stickman Studio" \
+            --notes "AI4Bharat Indic-TTS v1 Hindi (FastPitch + HiFiGAN, CC-BY-4.0, https://github.com/AI4Bharat/Indic-TTS) in one ONNX file. The Stickman Studio app downloads it once and then speaks offline."
