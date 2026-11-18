@@ -67,6 +67,8 @@ class MainActivity : ComponentActivity() {
     private val kokoro by lazy { KokoroVoice(this) }
     private val kokoroJobs = Executors.newSingleThreadExecutor()
     @Volatile private var kokoroLoading = false
+    private val indic by lazy { IndicVoice(this) }
+    @Volatile private var indicLoading = false
 
     private var saveStream: OutputStream? = null
     private var saveUri: Uri? = null
@@ -498,6 +500,50 @@ class MainActivity : ComponentActivity() {
                     js("ssTtsDone(${JSONObject.quote(id)}, true, '$b64')")
                 } catch (e: Throwable) {
                     js("ssTtsDone(${JSONObject.quote(id)}, false, ${JSONObject.quote("AI voice: " + (e.message ?: e.javaClass.simpleName))})")
+                }
+            }
+            return true
+        }
+
+
+        // ---------- Indic-TTS Hindi voice ----------
+
+        @JavascriptInterface
+        fun indicStatus(): String = JSONObject().apply {
+            put("ready", indic.ready); put("bytes", indic.sizeOnDisk()); put("downloading", indicLoading)
+        }.toString()
+
+        /** Downloads the Hindi voice (once); the page gets ssIndic('progress'|'ready'|'error', a, b). */
+        @JavascriptInterface
+        fun indicDownload(): Boolean {
+            if (indicLoading) return false
+            indicLoading = true
+            kokoroJobs.execute {
+                try {
+                    indic.download { done, total -> js("window.ssIndic && ssIndic('progress', $done, $total)") }
+                    js("window.ssIndic && ssIndic('ready', 0, 0)")
+                } catch (e: Exception) {
+                    js("window.ssIndic && ssIndic('error', ${JSONObject.quote(e.message ?: "download failed")}, 0)")
+                } finally { indicLoading = false }
+            }
+            return true
+        }
+
+        @JavascriptInterface
+        fun indicDelete() { kokoroJobs.execute { indic.delete() } }
+
+        /** Speaks character ids ("12,55,3,...") as speaker 0 (female) or 1 (male); the page gets ssTtsDone(id, ok, base64 WAV or error). */
+        @JavascriptInterface
+        fun indicSynth(id: String, tokens: String, speaker: Int, speed: Float): Boolean {
+            if (!indic.ready) return false
+            kokoroJobs.execute {
+                try {
+                    val t = tokens.split(',').filter { it.isNotBlank() }.map { it.trim().toLong() }.toLongArray()
+                    val audio = indic.speak(t, speaker.toLong(), speed.coerceIn(0.5f, 2f))
+                    val b64 = Base64.encodeToString(KokoroVoice.wav(audio, IndicVoice.RATE), Base64.NO_WRAP)
+                    js("ssTtsDone(${JSONObject.quote(id)}, true, '$b64')")
+                } catch (e: Throwable) {
+                    js("ssTtsDone(${JSONObject.quote(id)}, false, ${JSONObject.quote("Hindi voice: " + (e.message ?: e.javaClass.simpleName))})")
                 }
             }
             return true

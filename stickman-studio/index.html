@@ -61,7 +61,7 @@ header.top { background: var(--surface); }
   .top-row > .row { order: 5; }
 }
 .touch-only { display: none; }
-#ovBox[data-kind="kokoro"] .ov-phone, #ovBox[data-kind="phone"] .ov-kk { display: none !important; }
+#ovBox[data-kind="kokoro"] .ov-phone, #ovBox[data-kind="indic"] .ov-phone, #ovBox[data-kind="phone"] .ov-kk { display: none !important; }
 .idealist { display: grid; gap: 8px; max-height: 560px; overflow: auto; }
 .ideacard { text-align: left; display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: inherit; font: inherit; cursor: pointer; }
 .ideacard .chip { width: fit-content; }
@@ -350,14 +350,14 @@ html:not(.mode-layers) .layers-only { display: none !important; }
       <details class="ovbox" id="ovBox" open>
         <summary><b>🎙 Make the voiceover from the script</b> <span class="hint">offline · free · no API key</span></summary>
         <div style="display:grid;gap:8px;margin-top:8px">
-          <label class="f">Voice type <select id="ovKind"><option value="kokoro">AI voice (Kokoro): natural, offline after a one-time download</option><option value="phone">Phone voice (Google / Samsung speech engine)</option></select></label>
+          <label class="f">Voice type <select id="ovKind"><option value="indic">Hindi AI voice (Indic-TTS): most natural Hindi, offline after a one-time download</option><option value="kokoro">AI voice (Kokoro): offline after a one-time download</option><option value="phone">Phone voice (Google / Samsung speech engine)</option></select></label>
           <div class="ov-kk" style="display:grid;gap:8px">
-            <div class="row"><label class="f" style="flex:1 1 220px">AI voice <select id="kkVoice"><option value="hm_omega">Omega · male (default)</option><option value="hm_psi">Psi · male</option><option value="hf_alpha">Alpha · female</option><option value="hf_beta">Beta · female</option></select></label></div>
+            <div class="row"><label class="f" style="flex:1 1 220px">AI voice <select id="kkVoice"></select></label></div>
             <div class="row">
               <label class="f">Speaking speed <span class="tc" id="kkSpeedV"></span><input type="range" id="kkSpeed" min="0.7" max="1.6" step="0.05"></label>
               <label class="f">Pause after a sentence <span class="tc" id="kkPauseV"></span><input type="range" id="kkPause" min="0.1" max="1" step="0.05"></label>
             </div>
-            <div class="row"><button class="btn small" id="kkGet">⬇ Download AI voice (120 MB, once)</button><button class="btn small" id="kkDel" hidden>Remove AI voice</button></div>
+            <div class="row"><button class="btn small" id="kkGet">⬇ Download AI voice</button><button class="btn small" id="kkDel" hidden>Remove AI voice</button></div>
             <progress id="kkProg" value="0" max="1" hidden></progress>
             <p class="hint" style="margin:0" id="kkState"></p>
           </div>
@@ -889,7 +889,7 @@ He looked at Papa. Papa smiled, and said, "I am proud of you."`;
 /* ============ state ============ */
 const DEFAULTS = { title: '', aspect: '16:9', grid: 3, style: 'stickman', styleText: STYLES.stickman.text, characters: '', gutter: 'auto',
   splitLevel: 'all', minWords: 2, maxWords: 14, captions: 'bar', fit: 'auto', enhance: 'on', v: 3, capSize: 1, motion: 6, transition: 'fade', transDur: 0.15, res: 1080, fps: 30, musicVol: 0.12, anim: 'on', animAmt: 1, capWords: 'on', pics: 'images', skStyle: 'chibi', lPer: 9, lLib: 'on',
-  fx: 'on', fxAmt: 1, fxDoodle: 'on', fxSfx: 'on', fxVol: 0.6, ovKind: 'kokoro', kkVoice: 'hm_omega', ovVoice: '', ovEngine: '', ovHi: 'auto', ovPolish: 'on', ovBreath2: 'off', kkSpeed: 1.1, kkPause: 0.35, ovRate: 0.95, ovPitch: 1, ovPause: 0.45, ovExpr: 'on', mode: 'layers', lBg: 'parchment', lEnter: 'auto', lTrans: 'cut', lIdle: 'subtle', lCam: 'on', lCaps: 'off', sfx: 'on', sfxVol: 0.5, duck: 'on' };
+  fx: 'on', fxAmt: 1, fxDoodle: 'on', fxSfx: 'on', fxVol: 0.6, ovKind2: 'indic', kkVoice: 'hm_omega', inVoice: 'male', inSpeed: 1, ovVoice: '', ovEngine: '', ovHi: 'auto', ovPolish: 'on', ovBreath2: 'off', kkSpeed: 1.1, kkPause: 0.35, ovRate: 0.95, ovPitch: 1, ovPause: 0.45, ovExpr: 'on', mode: 'layers', lBg: 'parchment', lEnter: 'auto', lTrans: 'cut', lIdle: 'subtle', lCam: 'on', lCaps: 'off', sfx: 'on', sfxVol: 0.5, duck: 'on' };
 try { if (matchMedia('(pointer: coarse)').matches) DEFAULTS.res = 720; } catch (_) {}   // phones: smaller, faster export
 const S = { settings: { ...DEFAULTS }, script: '', segments: [], starts: [], grids: [], overrides: {}, audioBlob: null, audioName: '', musicBlob: null, musicName: '' };
 let uid = 1;
@@ -4992,7 +4992,7 @@ async function ovDecode(b64) {
 // a little expression per sentence, from its punctuation and words
 function ovExpr(text, idx = 0) {
   const hum = k => 1 + 0.022 * Math.sin(idx * 2.399 + k);   // a tiny natural change from line to line
-  const R = (kkOn() ? (S.settings.kkSpeed || 1.1) : (S.settings.ovRate || 0.95)) * hum(0.7), P = (S.settings.ovPitch || 1) * hum(2.1);
+  const R = (kkOn() ? aiSpeed() : (S.settings.ovRate || 0.95)) * hum(0.7), P = (S.settings.ovPitch || 1) * hum(2.1);
   if (S.settings.ovExpr === 'off') return { rate: R, pitch: P, pause: 0 };
   const t = text.trim(), sc = amScore(t); let rate = R, pitch = P, pause = 0;
   if (/\?["'”’)]*$/.test(t)) { pitch *= 1.05; pause += 0.1; }
@@ -5069,15 +5069,15 @@ $('#ovTest').onclick = async () => {
 $('#ovSettings').onclick = () => { try { AndroidBridge.ttsSettings(); } catch (_) { toast('Open phone Settings → Text-to-speech output'); } };
 $('#ovVoice').onchange = e => { S.settings.ovVoice = e.target.value; save(); };
 document.addEventListener('visibilitychange', () => { if (!document.hidden && OV.state === 'ready') ovLoadVoices(); });   // back from voice settings: new voices
-function ovToUI() { $('#ovKind').value = kkOn() ? 'kokoro' : 'phone'; $('#kkVoice').value = S.settings.kkVoice || 'hm_omega'; kkShow(); $('#ovBreathSel').value = S.settings.ovBreath2 || 'off'; $('#kkSpeed').value = S.settings.kkSpeed || 1.1; $('#kkPause').value = S.settings.kkPause ?? 0.35; kkShowVals(); $('#ovHi').value = S.settings.ovHi || 'auto'; $('#ovPolish').value = S.settings.ovPolish || 'on'; $('#ovRate').value = S.settings.ovRate; $('#ovPitch').value = S.settings.ovPitch; $('#ovPause').value = S.settings.ovPause; $('#ovExprSel').value = S.settings.ovExpr; ovShowVals(); }
+function ovToUI() { $('#ovKind').value = aiKind() || 'phone'; kkShow(); $('#ovBreathSel').value = S.settings.ovBreath2 || 'off'; $('#kkSpeed').value = aiSpeed(); $('#kkPause').value = S.settings.kkPause ?? 0.35; kkShowVals(); $('#ovHi').value = S.settings.ovHi || 'auto'; $('#ovPolish').value = S.settings.ovPolish || 'on'; $('#ovRate').value = S.settings.ovRate; $('#ovPitch').value = S.settings.ovPitch; $('#ovPause').value = S.settings.ovPause; $('#ovExprSel').value = S.settings.ovExpr; ovShowVals(); }
 function ovShowVals() { $('#ovRateV').textContent = (+S.settings.ovRate).toFixed(2) + '×'; $('#ovPitchV').textContent = (+S.settings.ovPitch).toFixed(2); $('#ovPauseV').textContent = (+S.settings.ovPause).toFixed(2) + ' s'; }
 [['ovRate', 'ovRate'], ['ovPitch', 'ovPitch'], ['ovPause', 'ovPause']].forEach(([id, k]) => $('#' + id).addEventListener('input', e => { S.settings[k] = +e.target.value; ovShowVals(); save(); }));
 $('#ovExprSel').onchange = e => { S.settings.ovExpr = e.target.value; save(); };
 $('#ovHi').onchange = e => { S.settings.ovHi = e.target.value; save(); };
 $('#ovPolish').onchange = e => { S.settings.ovPolish = e.target.value; save(); };
 $('#ovBreathSel').onchange = e => { S.settings.ovBreath2 = e.target.value; save(); };
-function kkShowVals() { $('#kkSpeedV').textContent = (+(S.settings.kkSpeed || 1.1)).toFixed(2) + '×'; $('#kkPauseV').textContent = (+(S.settings.kkPause ?? 0.35)).toFixed(2) + ' s'; }
-$('#kkSpeed').addEventListener('input', e => { S.settings.kkSpeed = +e.target.value; kkShowVals(); save(); });
+function kkShowVals() { $('#kkSpeedV').textContent = (+aiSpeed()).toFixed(2) + '×'; $('#kkPauseV').textContent = (+(S.settings.kkPause ?? 0.35)).toFixed(2) + ' s'; }
+$('#kkSpeed').addEventListener('input', e => { S.settings[aiKind() === 'indic' ? 'inSpeed' : 'kkSpeed'] = +e.target.value; kkShowVals(); save(); });
 $('#kkPause').addEventListener('input', e => { S.settings.kkPause = +e.target.value; kkShowVals(); save(); });
 $('#ovEngine').onchange = e => { S.settings.ovEngine = e.target.value; S.settings.ovVoice = ''; save(); try { OV.state = AndroidBridge.ttsUseEngine(e.target.value); } catch (_) { OV.state = 'failed'; } OV.voices = []; ovRefresh(); };
 // pauses like a narrator: short between joined thoughts, longer after a question, a paragraph or "…", never all the same
@@ -5457,9 +5457,9 @@ const R2D_EN = new Set(('phone mobile call exam result school college office doc
 const R2D_C = [['chh', 'छ'], ['ch', 'च'], ['kh', 'ख'], ['gh', 'घ'], ['jh', 'झ'], ['th', 'थ'], ['dh', 'ध'], ['ph', 'फ'], ['bh', 'भ'], ['sh', 'श'], ['rh', 'ढ़'],
   ['k', 'क'], ['g', 'ग'], ['c', 'क'], ['j', 'ज'], ['t', 'त'], ['d', 'द'], ['n', 'न'], ['p', 'प'], ['f', 'फ़'], ['b', 'ब'], ['m', 'म'], ['y', 'य'], ['r', 'र'], ['l', 'ल'], ['v', 'व'], ['w', 'व'], ['s', 'स'], ['h', 'ह'], ['z', 'ज़'], ['q', 'क़'], ['x', 'क्स']];
 const R2D_V = [['aa', 'आ', 'ा'], ['ai', 'ऐ', 'ै'], ['au', 'औ', 'ौ'], ['ee', 'ई', 'ी'], ['oo', 'ऊ', 'ू'], ['ii', 'ई', 'ी'], ['a', 'अ', ''], ['i', 'इ', 'ि'], ['u', 'उ', 'ु'], ['e', 'ए', 'े'], ['o', 'ओ', 'ो']];
-function r2dWord(w) {
+function r2dWord(w, force) {   // force: spell English words in Hindi letters too
   const lw = w.toLowerCase(); if (R2D_WORDS.has(lw)) return R2D_WORDS.get(lw);
-  if (R2D_EN.has(lw) || !/^[a-z]+$/.test(lw)) return w;
+  if ((!force && R2D_EN.has(lw)) || !/^[a-z]+$/.test(lw)) return w;
   const parts = []; let i = 0;   // C or V pieces
   while (i < lw.length) {
     const c = R2D_C.find(([r]) => lw.startsWith(r, i)); if (c) { parts.push({ c: c[1], r: c[0] }); i += c[0].length; continue; }
@@ -5578,56 +5578,142 @@ async function kgLoad() {
   KG.lex = await r.json(); return KG.lex;
 }
 
-/* ---- Kokoro AI voice: tokens made here (kgPhonemes), speech made natively by the app (onnxruntime) ---- */
+/* ---- Indic-TTS Hindi voice: the model reads Hindi letters, so the text is made all-Hindi first ----
+   Numbers become Hindi number words, Hinglish (Roman) words become Hindi letters, English words are spelled in Hindi
+   letters from their pronunciation (the word list of the Kokoro voice), then the same clean-up as the model's training
+   (Coqui "multilingual_cleaners") and one id per character. */
+const IN_C2I = {"!":15,"¡":2,"'":3,"(":4,")":5,",":16,"-":17,".":18,":":21,";":22,"¿":11,"?":23," ":14,"2":19,"8":20," ":24,"ँ":25,"ं":26,"ः":27,"अ":28,"आ":29,"इ":30,"ई":31,"उ":32,"ऊ":33,"ऋ":34,"ए":35,"ऐ":36,"ऑ":37,"ओ":38,"औ":39,"क":40,"ख":41,"ग":42,"घ":43,"ङ":44,"च":45,"छ":46,"ज":47,"झ":48,"ञ":49,"ट":50,"ठ":51,"ड":52,"ढ":53,"ण":54,"त":55,"थ":56,"द":57,"ध":58,"न":59,"प":60,"फ":61,"ब":62,"भ":63,"म":64,"य":65,"र":66,"ऱ":67,"ल":68,"ळ":69,"व":70,"श":71,"ष":72,"स":73,"ह":74,"़":75,"ा":76,"ि":77,"ी":78,"ु":79,"ू":80,"ृ":81,"ॅ":82,"े":83,"ै":84,"ॉ":85,"ो":86,"ौ":87,"्":88,"क़":89,"ख़":90,"ग़":91,"ज़":92,"ड़":93,"ढ़":94,"फ़":95,"ॠ":96,"‍":97,"‎":98,"–":99};
+const IN_NUM = ('शून्य एक दो तीन चार पाँच छह सात आठ नौ दस ग्यारह बारह तेरह चौदह पंद्रह सोलह सत्रह अठारह उन्नीस बीस इक्कीस बाईस तेईस चौबीस पच्चीस छब्बीस सत्ताईस अट्ठाईस उनतीस तीस ' +
+  'इकतीस बत्तीस तैंतीस चौंतीस पैंतीस छत्तीस सैंतीस अड़तीस उनतालीस चालीस इकतालीस बयालीस तैंतालीस चवालीस पैंतालीस छियालीस सैंतालीस अड़तालीस उनचास पचास इक्यावन बावन तिरपन चौवन पचपन छप्पन ' +
+  'सत्तावन अट्ठावन उनसठ साठ इकसठ बासठ तिरसठ चौंसठ पैंसठ छियासठ सड़सठ अड़सठ उनहत्तर सत्तर इकहत्तर बहत्तर तिहत्तर चौहत्तर पचहत्तर छिहत्तर सतहत्तर अठहत्तर उनासी अस्सी इक्यासी बयासी तिरासी ' +
+  'चौरासी पचासी छियासी सत्तासी अट्ठासी नवासी नब्बे इक्यानवे बानवे तिरानवे चौरानवे पचानवे छियानवे सत्तानवे अट्ठानवे निन्यानवे').split(' ');
+function inNumber(n) {
+  n = Math.floor(+n); if (!isFinite(n) || n < 0) return ''; if (n < 100) return IN_NUM[n];
+  const p = [], cr = Math.floor(n / 1e7), lk = Math.floor(n % 1e7 / 1e5), th = Math.floor(n % 1e5 / 1000), hu = Math.floor(n % 1000 / 100), r = n % 100;
+  if (cr) p.push(inNumber(cr), 'करोड़'); if (lk) p.push(IN_NUM[lk], 'लाख'); if (th) p.push(IN_NUM[th], 'हज़ार'); if (hu) p.push(IN_NUM[hu], 'सौ'); if (r) p.push(IN_NUM[r]);
+  return p.join(' ');
+}
+// English pronunciation (espeak IPA from the word list) -> Hindi letters, the way Indians say English words
+const IN_IPA_C = [['tʃ', 'च'], ['dʒ', 'ज'], ['ŋɡ', 'ंग'], ['ŋk', 'ंक'], ['ŋ', 'ंग'], ['θ', 'थ'], ['ð', 'द'], ['ʃ', 'श'], ['ʒ', 'ज़'], ['p', 'प'], ['b', 'ब'], ['t', 'ट'], ['ɾ', 'ट'], ['d', 'ड'], ['k', 'क'], ['ɡ', 'ग'], ['f', 'फ़'], ['v', 'व'], ['s', 'स'], ['z', 'ज़'], ['h', 'ह'], ['m', 'म'], ['n', 'न'], ['l', 'ल'], ['ɹ', 'र'], ['r', 'र'], ['w', 'व'], ['j', 'य'], ['ʔ', '']];
+const IN_IPA_V = [['aɪ', 'आ', 'ा', 'इ'], ['aʊ', 'आ', 'ा', 'उ'], ['ɔɪ', 'ऑ', 'ॉ', 'य'], ['eɪ', 'ए', 'े', ''], ['oʊ', 'ओ', 'ो', ''], ['iː', 'ई', 'ी', ''], ['uː', 'ऊ', 'ू', ''], ['ɑː', 'आ', 'ा', ''], ['ɔː', 'ऑ', 'ॉ', ''], ['ɜː', 'अ', '', 'र'], ['ɚ', 'अ', '', 'र'],
+  ['i', 'इ', 'ि', ''], ['ɪ', 'इ', 'ि', ''], ['ᵻ', 'इ', 'ि', ''], ['e', 'ए', 'े', ''], ['ɛ', 'ए', 'े', ''], ['æ', 'ऐ', 'ै', ''], ['a', 'आ', 'ा', ''], ['ɑ', 'आ', 'ा', ''], ['ɒ', 'ऑ', 'ॉ', ''], ['ɔ', 'ऑ', 'ॉ', ''], ['o', 'ओ', 'ो', ''], ['ʊ', 'उ', 'ु', ''], ['u', 'ऊ', 'ू', ''], ['ʌ', 'अ', '', ''], ['ə', 'अ', '', ''], ['ɐ', 'अ', '', '']];
+function inFromIpa(ipa) {
+  const s = ipa.replace(/[ˈˌ]/g, ''); let out = '', i = 0, prevC = false;
+  while (i < s.length) {
+    const v = IN_IPA_V.find(([r]) => s.startsWith(r, i));
+    if (v) {
+      out += prevC ? v[2] : v[1]; prevC = false;
+      if (v[3] === 'र') { out += 'र'; prevC = true; } else if (v[3]) out += v[3];   // ɚ -> "र", aɪ -> "आइ"
+      i += v[0].length; continue;
+    }
+    const c = IN_IPA_C.find(([r]) => s.startsWith(r, i));
+    if (c) {
+      if (c[1] && !c[1].startsWith('ं') && prevC) out += '्';   // two consonants: join them (स्कूल)
+      out += c[1]; if (c[1]) prevC = true; i += c[0].length; continue;
+    }
+    i++;
+  }
+  return out;
+}
+const IN_EN = { subscribe: 'सब्सक्राइब', subscribers: 'सब्सक्राइबर्स', youtube: 'यूट्यूब', instagram: 'इंस्टाग्राम', whatsapp: 'व्हाट्सऐप', google: 'गूगल', facebook: 'फ़ेसबुक', mobile: 'मोबाइल', online: 'ऑनलाइन', offline: 'ऑफ़लाइन', ok: 'ओके', okay: 'ओके', bye: 'बाय', hello: 'हैलो', hi: 'हाय', sorry: 'सॉरी', thanks: 'थैंक्स', video: 'वीडियो', videos: 'वीडियोज़', share: 'शेयर', like: 'लाइक', comment: 'कमेंट', channel: 'चैनल', notification: 'नोटिफ़िकेशन', bell: 'बेल', icon: 'आइकन', link: 'लिंक', app: 'ऐप', internet: 'इंटरनेट', police: 'पुलिस', college: 'कॉलेज', exam: 'एग्ज़ाम', result: 'रिज़ल्ट' };
+function inLatinWord(w) {
+  const lw = w.toLowerCase();
+  if (IN_EN[lw]) return IN_EN[lw];
+  if (typeof R2D_WORDS !== 'undefined' && R2D_WORDS.has(lw)) return R2D_WORDS.get(lw);   // Hinglish
+  const L = (typeof KG !== 'undefined' && KG.lex) || null;
+  if (L && L.en[lw]) {                                                                      // English
+    let d = inFromIpa(L.en[lw]);
+    if (/o/.test(lw) && /ɑ/.test(L.en[lw])) d = d.replace(/आ/, 'ऑ').replace(/ा/, 'ॉ');      // doctor डॉक्टर, office ऑफ़िस: the Indian way
+    return d;
+  }
+  if (typeof r2dWord === 'function') { const d = r2dWord(lw, true); if (/[ऀ-ॿ]/.test(d)) return d; }
+  return lw;
+}
+function inPrepare(text) {
+  let t = String(text).normalize('NFC').replace(/\*/g, '').replace(/।|॥/g, '.').replace(/…|\.\.\./g, '.').replace(/[“”"«»]/g, '').replace(/[‘’]/g, "'");
+  t = t.replace(/(\d)[,](?=\d{3}\b)/g, '$1').replace(/(\d+)\s*%/g, '$1 प्रतिशत').replace(/₹\s*(\d+)/g, '$1 रुपये');
+  t = t.replace(/\d+/g, d => ' ' + inNumber(d) + ' ').replace(/[A-Za-z]+/g, inLatinWord);
+  // the model's own clean-up: NFC, lower case, ; and : to commas, - to a space, no brackets or quotes, single spaces
+  t = t.normalize('NFC').toLowerCase().replace(/;/g, ',').replace(/-/g, ' ').replace(/:/g, ',').replace(/[<>()[\]"]+/g, '').replace(/\s+/g, ' ').trim();
+  return t;
+}
+function inTokens(prepared) { const out = []; for (const ch of prepared) { const id = IN_C2I[ch]; if (id != null) out.push(id); } return out; }
+
+/* ---- AI voices (Indic-TTS Hindi, Kokoro): the text is prepared here, the speech is made natively by the app (onnxruntime) ---- */
+const AI = {
+  indic: { name: 'Hindi AI voice', size: '270 MB', bridge: 'indic', voices: [['male', 'Male (default)'], ['female', 'Female']], key: 'inVoice', def: 'male', speed: 'inSpeed', defSpeed: 1 },
+  kokoro: { name: 'Kokoro AI voice', size: '120 MB', bridge: 'kokoro', voices: [['hm_omega', 'Omega · male'], ['hm_psi', 'Psi · male'], ['hf_alpha', 'Alpha · female'], ['hf_beta', 'Beta · female']], key: 'kkVoice', def: 'hm_omega', speed: 'kkSpeed', defSpeed: 1.1 }
+};
 const kkAvail = () => APP && window.AndroidBridge && !!AndroidBridge.kokoroSynth;
-const kkOn = () => kkAvail() && S.settings.ovKind !== 'phone';
+const aiKind = () => { if (!kkAvail()) return null; const k = S.settings.ovKind2 || 'indic'; if (k === 'indic' && !AndroidBridge.indicSynth) return 'kokoro'; return AI[k] ? k : null; };
+const kkOn = () => !!aiKind();
+const aiSpeed = () => { const k = aiKind() || 'kokoro'; return S.settings[AI[k].speed] || AI[k].defSpeed; };
 const KK = { ready: false, busy: false };
-function kkStatus() { try { const j = JSON.parse(AndroidBridge.kokoroStatus()); KK.ready = j.ready; KK.busy = j.downloading; } catch (_) { KK.ready = false; } return KK; }
+function kkStatus() { const k = aiKind(); try { const j = JSON.parse(AndroidBridge[AI[k].bridge + 'Status']()); KK.ready = j.ready; KK.busy = j.downloading; } catch (_) { KK.ready = false; KK.busy = false; } return KK; }
 function kkShow() {
-  $('#ovBox').dataset.kind = kkOn() ? 'kokoro' : 'phone';
-  if (!kkAvail()) { $('#ovKind').value = 'phone'; $('#ovKind').disabled = true; $('#ovKind').title = 'The AI voice works in the Android app'; return; }
-  if (!kkOn()) return;
+  const k = aiKind(); $('#ovBox').dataset.kind = k || 'phone';
+  if (!kkAvail()) { $('#ovKind').value = 'phone'; $('#ovKind').disabled = true; $('#ovKind').title = 'The AI voices work in the Android app'; return; }
+  if (!k) return;
+  const A = AI[k], sel = $('#kkVoice');
+  sel.innerHTML = A.voices.map(([v, l]) => `<option value="${v}">${l}</option>`).join(''); sel.value = S.settings[A.key] || A.def;
+  $('#kkSpeed').value = aiSpeed(); kkShowVals();
   kkStatus();
+  $('#kkGet').textContent = `⬇ Download ${A.name} (${A.size}, once)`; $('#kkDel').textContent = `Remove ${A.name}`;
   $('#kkGet').hidden = KK.ready; $('#kkDel').hidden = !KK.ready; $('#kkGet').disabled = KK.busy;
-  $('#kkState').textContent = KK.ready ? 'AI voice ready: works without internet. Best in Hindi script (देवनागरी); Hinglish works too.' : KK.busy ? 'Downloading the AI voice…' : 'Download the AI voice once (about 120 MB, Wi-Fi recommended). After that it works offline.';
+  $('#kkState').textContent = KK.ready ? `${A.name} ready: works without internet. Best in Hindi script (देवनागरी); Hinglish and English words work too.` : KK.busy ? `Downloading the ${A.name}…` : `Download the ${A.name} once (about ${A.size}, Wi-Fi recommended). After that it works offline.`;
   if (KK.ready) { $('#ovGo').disabled = false; $('#ovTest').disabled = false; }
 }
-window.ssKokoro = (what, a, b) => {
-  const p = $('#kkProg');
-  if (what === 'progress') { p.hidden = false; p.value = b ? a / b : 0; $('#kkState').textContent = `Downloading the AI voice… ${Math.round(a / 1048576)} / ${Math.round(b / 1048576)} MB`; return; }
-  p.hidden = true;
-  if (what === 'ready') { toast('AI voice downloaded: it now works offline'); kkShow(); }
-  else { $('#kkState').textContent = 'Download failed: ' + a + '. Check the internet and try again.'; $('#kkGet').disabled = false; }
-};
-$('#kkGet').onclick = () => { if (!AndroidBridge.kokoroDownload()) return toast('Already downloading'); $('#kkGet').disabled = true; $('#kkProg').hidden = false; $('#kkProg').value = 0; $('#kkState').textContent = 'Starting the download…'; };
-$('#kkDel').onclick = () => { if (!confirm('Remove the AI voice from this phone? (120 MB; you can download it again)')) return; AndroidBridge.kokoroDelete(); setTimeout(kkShow, 800); };
-$('#ovKind').onchange = e => { S.settings.ovKind = e.target.value; save(); kkShow(); if (!kkOn()) ovStart(); };
-$('#kkVoice').onchange = e => { S.settings.kkVoice = e.target.value; save(); };
+function aiProgress(kind) {
+  return (what, a, b) => {
+    if (aiKind() !== kind) { if (what === 'ready') toast(AI[kind].name + ' downloaded'); return; }
+    const p = $('#kkProg');
+    if (what === 'progress') { p.hidden = false; p.value = b ? a / b : 0; $('#kkState').textContent = `Downloading the ${AI[kind].name}… ${Math.round(a / 1048576)} / ${Math.round(b / 1048576)} MB`; return; }
+    p.hidden = true;
+    if (what === 'ready') { toast(AI[kind].name + ' downloaded: it now works offline'); kkShow(); }
+    else { $('#kkState').textContent = 'Download failed: ' + a + '. Check the internet and try again.'; $('#kkGet').disabled = false; }
+  };
+}
+window.ssKokoro = aiProgress('kokoro'); window.ssIndic = aiProgress('indic');
+$('#kkGet').onclick = () => { const A = AI[aiKind()]; if (!AndroidBridge[A.bridge + 'Download']()) return toast('Already downloading'); $('#kkGet').disabled = true; $('#kkProg').hidden = false; $('#kkProg').value = 0; $('#kkState').textContent = 'Starting the download…'; };
+$('#kkDel').onclick = () => { const A = AI[aiKind()]; if (!confirm(`Remove the ${A.name} from this phone? (${A.size}; you can download it again)`)) return; AndroidBridge[A.bridge + 'Delete'](); setTimeout(kkShow, 800); };
+$('#ovKind').onchange = e => { S.settings.ovKind2 = e.target.value; save(); kkShow(); if (!kkOn()) ovStart(); };
+$('#kkVoice').onchange = e => { S.settings[AI[aiKind()].key] = e.target.value; save(); };
 async function ovCanSpeak() {
-  if (kkOn()) {
-    if (!kkStatus().ready) { toast(KK.busy ? 'The AI voice is still downloading' : 'First download the AI voice (button above), or choose Phone voice'); return false; }
-    try { await kgLoad(); } catch (e) { toast('AI voice: ' + e.message); return false; }
+  const k = aiKind();
+  if (k) {
+    if (!kkStatus().ready) { toast(KK.busy ? `The ${AI[k].name} is still downloading` : `First download the ${AI[k].name} (button above), or choose another voice type`); return false; }
+    try { await kgLoad(); } catch (e) { if (k === 'kokoro') { toast('AI voice: ' + e.message); return false; } }   // the word list also gives English words their sound
     return true;
   }
   if (OV.state !== 'ready') { ovStart(); toast('The speech engine is starting, try again in a moment'); return false; }
   return true;
 }
-function kkSynth(tokens, speed) {
+function aiSynth(tokens, speed) {
   return new Promise((res, rej) => {
-    const id = 'kk' + (++OV.seq) + '_' + Date.now();
+    const k = aiKind(), id = 'ai' + (++OV.seq) + '_' + Date.now();
     const timer = setTimeout(() => { OV.pending.delete(id); rej(new Error('The AI voice did not answer')); }, 180000);
     OV.pending.set(id, { res, rej, timer });
-    let ok = false; try { ok = AndroidBridge.kokoroSynth(id, tokens.join(','), S.settings.kkVoice || 'hm_omega', speed); } catch (_) {}
+    let ok = false;
+    try { ok = k === 'indic' ? AndroidBridge.indicSynth(id, tokens.join(','), (S.settings.inVoice || 'male') === 'female' ? 0 : 1, speed) : AndroidBridge.kokoroSynth(id, tokens.join(','), S.settings.kkVoice || 'hm_omega', speed); } catch (_) {}
     if (!ok) { clearTimeout(timer); OV.pending.delete(id); rej(new Error('The AI voice is not downloaded')); }
   });
 }
-// one sentence -> samples; a very long sentence is spoken in comma pieces (the model takes up to 510 sounds)
+// split a long line at commas (and, if needed, at spaces) so each piece stays a comfortable size for the model
+function aiPieces(text, size, max) {
+  if (size(text) <= max) return [text];
+  const out = []; let cur = '';
+  for (const bit of text.split(/(?<=[,;:])\s+/)) { if (cur && size(cur + ' ' + bit) > max) { out.push(cur); cur = bit; } else cur = cur ? cur + ' ' + bit : bit; }
+  if (cur) out.push(cur);
+  return out.flatMap(x => { if (size(x) <= max) return [x]; const w = x.split(' '), r = []; let c = ''; for (const y of w) { if (c && size(c + ' ' + y) > max) { r.push(c); c = y; } else c = c ? c + ' ' + y : y; } if (c) r.push(c); return r; });
+}
+// one sentence -> samples
 async function ovSpeak(text, e) {
-  if (!kkOn()) return ovDecode(await ovSynth(text, e.rate, e.pitch));
-  const ph = kgPhonemes(text); let pieces = [ph];
-  if (kgTokens(ph).length > 480) { pieces = []; let cur = ''; for (const bit of ph.split(/(?<=[,;:])\s+/)) { if (cur && kgTokens(cur + ' ' + bit).length > 480) { pieces.push(cur); cur = bit; } else cur = cur ? cur + ' ' + bit : bit; } if (cur) pieces.push(cur); pieces = pieces.flatMap(x => { const t = []; for (let k = 0; k < x.length; k += 400) t.push(x.slice(k, k + 400)); return t; }); }
+  const k = aiKind();
+  if (!k) return ovDecode(await ovSynth(text, e.rate, e.pitch));
+  const pieces = k === 'indic' ? aiPieces(inPrepare(text), x => x.length, 300).map(inTokens) : aiPieces(kgPhonemes(text), x => kgTokens(x).length, 480).map(kgTokens);
   const out = [];
-  for (const p of pieces) { const tk = kgTokens(p); if (!tk.length) continue; out.push(await ovDecode(await kkSynth(tk, clamp(e.rate, 0.5, 2)))); }
+  for (const tk of pieces) { if (!tk.length) continue; out.push(await ovDecode(await aiSynth(tk, clamp(e.rate, 0.5, 2)))); }
+  if (!out.length) return new Float32Array(0);
   if (out.length === 1) return out[0];
   const gap = Math.round(24000 * 0.15), all = new Float32Array(out.reduce((a, x) => a + x.length + gap, 0)); let t = 0; for (const x of out) { all.set(x, t); t += x.length + gap; }
   return all;

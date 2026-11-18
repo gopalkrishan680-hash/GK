@@ -40,7 +40,16 @@ a longer video, **Copy script prompt** into ChatGPT / Gemini / Claude (free, no 
 **Use this script**: it goes into the Script tab and the scenes are made. Facts topics always use the prompt, so
 nothing is made up.
 
-## AI voice: Kokoro (Android app, default)
+## Hindi AI voice: Indic-TTS (Android app, default)
+**Script + Voice → 🎙 Make the voiceover → Voice type: Hindi AI voice (Indic-TTS).** AI4Bharat's Indic-TTS Hindi
+(FastPitch + HiFiGAN, trained only on native Hindi speech, CC-BY-4.0) runs on the phone with onnxruntime. Male is
+the default, female is the other voice. Download it once (about 270 MB, from this repository's `indic-tts-hi-v1`
+release, made by `tools/indic-tts/export.py` through the "Indic-TTS Hindi model" workflow); after that it works
+with no internet and no API key. The model reads Hindi letters, so the app turns numbers into Hindi number words,
+Hinglish into Hindi letters and English words into Hindi letters from their pronunciation. Speed and pause can be
+set; pauses, polish and the scene sync are the same as for the other voices.
+
+## AI voice: Kokoro (Android app)
 **Script + Voice → 🎙 Make the voiceover → Voice type: AI voice (Kokoro).** Kokoro is a small open AI voice model
 (Apache-2.0) that runs on the phone with onnxruntime: four Hindi voices (Omega and Psi male, Alpha and Beta female;
 Omega is the default). Download it once (about 120 MB, from the kokoro-onnx GitHub release); after that it works with
