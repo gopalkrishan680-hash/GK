@@ -318,6 +318,20 @@ pre.mono { background: #faf6ec; border: 1px solid var(--line); border-radius: 8p
       <div class="card"><h3>C · Quick (offline, no AI)</h3><p class="muted">Keywords, chapters and tags straight from the script. Simple, but instant.</p><button class="btn" id="ytQuick">Make quick kit</button></div>
       <p id="ytInfo" class="info"></p>
       <div id="ytOut"></div>
+      <div class="card">
+        <h3>Thumbnail maker</h3>
+        <p class="muted">Big text + your picture, the person cut out with a white border (when 2.5D depth is on), red circle and arrow. 1280×720 PNG.</p>
+        <div class="form">
+          <label>Picture <select id="thPic"></select></label>
+          <label>Text <input id="thText" placeholder="Big text, 2–6 words"></label>
+          <label>Highlight word <input id="thHl" placeholder="One word in colour (empty = last word)"></label>
+          <label>Person on <select id="thSide"><option value="right">Right side</option><option value="left">Left side</option></select></label>
+          <label>Colours <select id="thCol"><option value="yellow">Yellow highlight</option><option value="red">Red highlight</option><option value="accent">Accent colour</option></select></label>
+          <label>Extras <select id="thExtra"><option value="circle">Red circle</option><option value="arrow">Red arrow</option><option value="both">Circle + arrow</option><option value="none">None</option></select></label>
+        </div>
+        <canvas id="thCv" width="1280" height="720" style="width:100%;height:auto;border-radius:10px;background:#222;margin-top:10px"></canvas>
+        <div class="row"><button class="btn primary" id="thSave">Save thumbnail (PNG)</button><button class="btn ghost small" id="thFromFrame">Use the preview frame as picture</button></div>
+      </div>
     </div>
 
     <div class="pane" data-pane="export" hidden>
@@ -338,6 +352,9 @@ pre.mono { background: #faf6ec; border: 1px solid var(--line); border-radius: 8p
           <label>Dust specks <select id="dust"><option value="on">On</option><option value="off">Off</option></select></label>
           <label>Stop-motion feel <select id="stopmo"><option value="on">On (12 fps steps + paper jitter)</option><option value="off">Off (smooth)</option></select></label>
           <label>Channel name (corner) <input id="watermark" placeholder="e.g. Kissa-e-Kyun"></label>
+          <label>Hook intro (first 4 s) <select id="hook"><option value="on">On: fast cuts + big question + boom</option><option value="off">Off</option></select></label>
+          <label>Hook question <input id="hookText" placeholder="Empty = first YouTube title or first line"></label>
+          <label>2.5D depth on pictures <select id="depth"><option value="on">On: the person lifts off the picture (needs internet once)</option><option value="off">Off (flat pictures)</option></select></label>
         </div>
       </div>
       <div class="card">
@@ -361,6 +378,15 @@ pre.mono { background: #faf6ec; border: 1px solid var(--line); border-radius: 8p
         <div class="row"><button class="btn primary big" id="exportBtn">Export MP4</button><button class="btn ghost" id="exportCancel" hidden>Cancel</button></div>
         <progress id="exportProg" max="1" value="0" hidden></progress>
         <p id="exportInfo" class="info"></p>
+        <div class="row"><button class="btn small" id="checkBtn">Check the video for problems</button></div>
+        <div id="checkOut"></div>
+      </div>
+      <div class="card">
+        <h3>Shorts from this video</h3>
+        <p class="muted">Finds the 3–4 strongest 30–60 s parts (numbers, questions, surprises) and makes each a 9:16 Short with a title at the start and a "full video" end card. Your long video settings are not changed.</p>
+        <label>End card text <input id="shortEnd" placeholder="Poori kahani channel par"></label>
+        <div class="row"><button class="btn" id="shortFind">Find the best parts</button></div>
+        <div id="shortList"></div>
       </div>
       <div class="card">
         <h3>Extras for YouTube</h3>
@@ -463,7 +489,8 @@ const DEFAULTS = {
   title: '', aspect: '16:9', res: TOUCH ? 720 : 1080, fps: 30,
   mode: 'collage', split: 'sentence', pace: 'normal', textLang: 'auto', look: 'sepia', perImage: 6, animVar: 'mixed', decor: 'on', dust: 'on', stopmo: 'off', safe: 'on', gemMark: 'auto', capPos: 'mid', capColor: '#a6ff1a',
   theme: 'parchment', photo: 'warm', grain: 0.05, vignette: 'on', captions: 'words', watermark: '', accent: '#f5d327',
-  trans: 'auto', motion: 1, sfx: 'on', sfxVol: 0.55, musicVol: 0.14, duck: 'on'
+  trans: 'auto', motion: 1, sfx: 'on', sfxVol: 0.55, musicVol: 0.14, duck: 'on',
+  hook: 'on', hookText: '', depth: 'on', shortEnd: ''
 };
 const S = { v: 1, settings: { ...DEFAULTS }, script: '', segments: [], starts: [], timing: 'auto', shots: [], assets: [], images: {}, audioBlob: null, audioName: '', musicBlob: null, musicName: '', uid: 1 };
 const R = { img: {}, filt: new Map(), ver: 1, res: null, paper: new Map(), grain: null, models: null };   // runtime caches
@@ -1267,6 +1294,7 @@ function drawFrame(ctx, W, H, t) {
     } else drawShot(ctx, o, lt, W, H);
   }
   ctx.restore();
+  if (hookOn() && t < HOOK_D) drawHook(ctx, W, H, t);
   overlays(ctx, W, H, t);
 }
 function emptyCard(ctx, W, H) {
@@ -1277,8 +1305,9 @@ function emptyCard(ctx, W, H) {
 function overlays(ctx, W, H, t) {
   const s = Math.min(W, H) / 1080;
   dust(ctx, W, H, t);
-  if (S.settings.captions === 'words' && S.segments.length) drawWordCaptions(ctx, W, H, t);
-  if (S.settings.captions === 'on' && S.segments.length) {
+  const inHook = (hookOn() && t < HOOK_D - 0.3) || R.capOff;
+  if (S.settings.captions === 'words' && S.segments.length && !inHook) drawWordCaptions(ctx, W, H, t);
+  if (S.settings.captions === 'on' && S.segments.length && !inHook) {
     const i = segAt(t); const seg = S.segments[i];
     if (seg && t < segEnd(i) + 0.05) {
       const words = richWords(plain(seg.text)); const L = fitWords(ctx, words, z => sansF(z, 700), W * 0.82, H * 0.17, 1.22, 46 * s, 24 * s, 3);
@@ -1294,9 +1323,10 @@ function overlays(ctx, W, H, t) {
 /* ============ sound effects (made in the app, no files) ============ */
 let sfxCache = null;
 function sfxEvents() {
-  const key = resolve().key + S.settings.sfx; if (sfxCache && sfxCache.key === key) return sfxCache.ev;
+  const key = resolve().key + S.settings.sfx + (hookOn() ? 'H' + hookPics().length : '') + (R.noHook ? 'n' : ''); if (sfxCache && sfxCache.key === key) return sfxCache.ev;
   const ev = []; sfxCache = { key, ev }; if (S.settings.sfx === 'off') return ev;
   const add = (t, s, v = 1) => ev.push({ t, s, v });
+  hookSfx(add);
   for (const o of resolve().shots) {
     const b = o.b, t0 = o.t0, sh = o.sh;
     if (o.k > 0) add(t0, { slide: 'paper', drop: 'paper', whip: 'whoosh', zoom: 'soft', fade: 'soft', peel: 'rip', tear: 'rip', push: 'whoosh', scatter: 'whoosh', zoomthrough: 'whoosh' }[o.enter] || 'thump', o.enter === 'cut' ? 0.5 : 1);
@@ -1331,7 +1361,11 @@ function sfxBank(actx) {
     type: buf(0.06, (t) => { const n = noise(); const v = (n - prevN) * 0.5; prevN = n; return (v * Math.exp(-t * 120) + Math.sin(2 * Math.PI * 1900 * t) * Math.exp(-t * 200) * 0.3) * 0.9; }),
     rip: buf(0.5, (t) => { const n = noise(); hp += (n - hp) * 0.45; const cr = rnd2() < 0.08 ? 1.6 : 0.6; return (n - hp) * cr * 0.5 * Math.pow(Math.sin(Math.PI * Math.min(1, t / 0.5)), 0.6) * (1 - t * 1.2); }),
     thump: buf(0.18, (t) => Math.sin(2 * Math.PI * (110 - 200 * t) * t) * Math.exp(-t * 22) * 0.55),
-    marker: buf(0.55, (t) => { const n = noise(); hp += (n - hp) * 0.6; const f = Math.sin(2 * Math.PI * 7 * t) * 0.5 + 0.5; return (n - hp) * 0.35 * Math.sin(Math.PI * t / 0.55) * (0.6 + 0.4 * f); })
+    marker: buf(0.55, (t) => { const n = noise(); hp += (n - hp) * 0.6; const f = Math.sin(2 * Math.PI * 7 * t) * 0.5 + 0.5; return (n - hp) * 0.35 * Math.sin(Math.PI * t / 0.55) * (0.6 + 0.4 * f); }),
+    // rising whoosh + tone that builds up to a reveal (0.9 s, loudest at the end)
+    riser: (() => { let lpR = 0, ph = 0; return buf(0.9, (t) => { const q = t / 0.9, n = noise(); lpR += (n - lpR) * (0.02 + 0.5 * q * q); ph += 2 * Math.PI * (180 + 900 * q * q) / sr; return (lpR * 1.4 + Math.sin(ph) * 0.18) * Math.pow(q, 2.2) * (q > 0.97 ? (1 - q) / 0.03 : 1) * 0.8; }); })(),
+    // deep cinematic hit
+    boom: (() => { let lpB = 0; return buf(1.4, (t) => { const n = noise(); lpB += (n - lpB) * 0.03; const f = 58 - 26 * Math.min(1, t / 0.5); return (Math.sin(2 * Math.PI * f * t) * 0.9 + Math.sin(2 * Math.PI * f * 2.01 * t) * 0.2) * Math.exp(-t * 3.2) * 0.75 + lpB * 3 * Math.exp(-t * 6) + noise() * 0.25 * Math.exp(-t * 40); }); })()
   };
   return bank;
 }
@@ -1508,6 +1542,10 @@ function collagePrompt() {
   "stamp": 1–3 words in the red-orange accent colour, for the one word that matters most ("Passive income").
   "arrow": an asset id, with "to": another asset id on the same board — a thin black arrow from one to the other.
   "circle": an asset id — a hand-drawn circle around it.
+  "timeline": a list of 2–6 dated steps, each "YEAR short text" (["1968 Marries Rajiv", "1991 Rajiv killed", "2004 Wins the election"]); optional "title". Use it when the narration walks through years.
+  "chart": a list of 2–6 [label, number] pairs ([["2004", 145], ["2009", 206]]) with a "title" ("Lok Sabha seats") — an animated bar chart. Use it when the narration compares numbers. Only real numbers from the narration.
+  "route": {"from": "Italy", "to": "New Delhi"} — a dotted travel line with a little plane between two places; optional "title". Use it when someone moves or travels.
+  "number": a big number that counts up ("145"), with an optional short "label" ("seats").
 - Optional on a board: "exit" (how this board leaves): whip, push, slide, scatter, zoomthrough. Mostly whip.`
     : `  "pic": an asset id. Optional "anim" (how it enters): slide, drop, pop, spin, toss, zoomin, flip, wipe, unroll, tearin, develop, rise. Optional "shape" for scenes: torn, tape, band. Optional "full": true.
   "tag": a 1–3 word label on a torn paper tag (UPPERCASE where the language has capitals). Optional "on": the asset id it sticks to. Optional "count": true when it holds a number that should count up. Optional "anim": pop, stamp, swing, type, wipe, drop, rise.
@@ -1515,6 +1553,10 @@ function collagePrompt() {
   "note": a short handwritten note on a yellow sticky note (2–5 words).
   "arrow": an asset id, with "to": another asset id on the same board — a red hand-drawn arrow from one to the other.
   "circle": an asset id — a red hand-drawn circle around it.
+  "timeline": a list of 2–6 dated steps, each "YEAR short text" (["1968 Marries Rajiv", "1991 Rajiv killed", "2004 Wins the election"]); optional "title". Use it when the narration walks through years.
+  "chart": a list of 2–6 [label, number] pairs ([["2004", 145], ["2009", 206]]) with a "title" ("Lok Sabha seats") — an animated bar chart. Use it when the narration compares numbers. Only real numbers from the narration.
+  "route": {"from": "Italy", "to": "New Delhi"} — a dotted travel line with a little plane between two places; optional "title". Use it when someone moves or travels.
+  "number": a big number that counts up ("145"), with an optional short "label" ("seats").
 - Optional on a board: "exit" (how this board leaves): peel, slide, push, tear, scatter, zoomthrough, whip, fade, drop. Vary them.`;
   return `${intro}
 
@@ -1555,7 +1597,7 @@ ${assetRule}
 
 BOARDS
 - A new board about every ${sec} seconds (about ${boards} boards), at the start of a sentence or a new idea. Board "scene" numbers go up; the first board is scene 1; every scene belongs to a board.
-- Each board: ${M ? '1–3 pictures + 0–2 other items (keep it clean, lots of empty paper)' : '2–4 pictures + 1–3 other items'}. The FIRST item of every board is a picture with no "word". Never a board without a picture.
+- Each board: ${M ? '1–3 pictures + 0–2 other items (keep it clean, lots of empty paper)' : '2–4 pictures + 1–3 other items'}. The FIRST item of every board is a picture (or a timeline / chart / route) with no "word". Never a board without a picture or graphic. Use timeline, chart and route boards where they fit (about one in every 8–10 boards), each on its own board with at most one picture.
 - Every item appears at its "scene"; with "word" it appears exactly on that word (copy ONE word exactly as written in that scene).
 - Item kinds (one key per item):
 ${kinds}
@@ -1583,13 +1625,15 @@ function applyCollagePlan(p) {
       if (!it || typeof it !== 'object') continue;
       const si = Math.max(s, sn(it.scene ?? s)); const base = { seg: S.segments[si - 1].id, word: str(it.word) }; if (it.anim) base.anim = str(it.anim);
       if (it.pic || it.show || it.asset || it.image) { const id = use(it.pic || it.show || it.asset || it.image, it.kind, it.prompt); if (items.some(x => x.pic === id)) continue; items.push({ ...base, pic: id, ...(it.shape ? { shape: str(it.shape) } : {}), ...(it.full ? { full: true } : {}) }); }
+      else if (it.timeline || it.chart || it.bars || it.route) { const g = gfxFromPlan(it); if (g) items.push({ ...base, ...g }); }
+      else if (it.number != null) items.push({ ...base, tag: str(it.number) + (it.label ? ' ' + str(it.label) : ''), style: 'number', count: true });
       else if (it.tag || it.text || it.label || it.title) items.push({ ...base, tag: str(it.tag || it.text || it.label || it.title), style: it.title ? 'title' : 'paper', ...(it.on ? { on: lidOf(it.on) } : {}), ...(it.count ? { count: true } : {}) });
       else if (it.stamp) items.push({ ...base, tag: str(it.stamp), style: 'stamp', ...(it.on ? { on: lidOf(it.on) } : {}) });
       else if (it.note) items.push({ ...base, tag: str(it.note), style: 'note', ...(it.on ? { on: lidOf(it.on) } : {}) });
       else if (it.arrow && it.to) items.push({ ...base, arrow: lidOf(it.arrow), to: lidOf(it.to) });
       else if (it.circle) items.push({ ...base, circle: lidOf(it.circle) });
     }
-    if (!items.some(x => x.pic)) continue;
+    if (!items.some(x => x.pic || x.gfx)) continue;
     if (shots.length && segIndex(shots[shots.length - 1].seg) === s - 1) { shots[shots.length - 1].items.push(...items); continue; }
     shots.push({ id: nid(), seg: S.segments[s - 1].id, type: 'collage', items, exit: str(b.exit || b.enter || 'auto'), enter: 'auto', off: 0 });
   }
@@ -1647,7 +1691,7 @@ const TPL = {
     [{ x: .0, y: .05, w: .36, h: .56 }, { x: .32, y: .08, w: .36, h: .5 }, { x: .64, y: .04, w: .36, h: .56 }, { x: .2, y: .52, w: .56, h: .46 }]
   ]
 };
-function picAspect(it) { const a = assetById(it.pic); if (!a) return 1.3; const key = assetKey(a.id); if (a.kind === 'scene' || it.full) { const i = R.img[key]; return i ? i.width / i.height : 1.33; } const st = sticker(key, assetMode(a, it)); return st ? st.width / st.height : 0.82; }
+function picAspect(it) { if (it.gfx) return GFX_ASPECT[it.gfx] || 2; const a = assetById(it.pic); if (!a) return 1.3; const key = assetKey(a.id); if (a.kind === 'scene' || it.full) { const i = R.img[key]; return i ? i.width / i.height : 1.33; } const st = sticker(key, assetMode(a, it)); return st ? st.width / st.height : 0.82; }
 /* ============ text never sits on a picture ============
    Each tag is measured the way it is drawn, then put in the nearest free spot (away from every picture,
    the other tags and the caption line). If the board has no free room, the pictures shrink a little. */
@@ -1655,7 +1699,7 @@ function tagBox(tg, W, H, s, port) {
   const c = (R.mctx = R.mctx || cv(8, 8).getContext('2d')), it = tg.it, style = tg.style;
   let w, h;
   if (tg.bold) {
-    const size = 64 * s * (port ? 1.3 : 1) * (style === 'title' ? 1.3 : style === 'note' ? 0.9 : 1), maxW = W * (port ? 0.84 : 0.4);
+    const size = 64 * s * (port ? 1.3 : 1) * (style === 'number' ? 2.4 : style === 'title' ? 1.3 : style === 'note' ? 0.9 : 1), maxW = W * (port ? 0.84 : 0.4);
     c.font = sansF(size, 800); const lines = []; let cur = '';
     String(it.tag || '').split(/\s+/).filter(Boolean).forEach(wd => { const t = cur ? cur + ' ' + wd : wd; if (cur && c.measureText(t).width > maxW) { lines.push(cur); cur = wd; } else cur = t; }); if (cur) lines.push(cur);
     w = Math.max(1, ...lines.map(l => c.measureText(l).width)) + size * 0.4; h = size * 1.08 * Math.max(1, lines.length) + size * 0.2;
@@ -1668,7 +1712,7 @@ function tagBox(tg, W, H, s, port) {
   return { w, h };
 }
 function placeTags(pieces, tags, W, H, s, port) {
-  if (!tags.length) return;
+  if (!tags.length) return 0;
   const mo = +S.settings.motion || 0, z = 1 + 0.05 * mo, pad = (12 + 30 * mo) * s, gap = 14 * s;
   const ov = (a, b) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
   const fixed = [];
@@ -1703,21 +1747,24 @@ function placeTags(pieces, tags, W, H, s, port) {
     const r = run(k, ax, ay); if (!pick || r.bad < pick.bad - 0.01) pick = { ...r, k, ax, ay }; if (r.bad < 0.01) break outer; }
   if (pick.k < 1) { const nr = scaled(pick.k, pick.ax, pick.ay); pieces.forEach((pc, q) => { pc.rect = nr[q]; pc.dist *= pick.k; if (pc.shape === 'band') pc.shape = isMod() ? 'tape' : 'torn'; }); }
   tags.forEach((t, i) => { t.x = pick.pos[i].x; t.y = pick.pos[i].y; t.align = 'center'; delete t._p; });
+  return pick.bad;
 }
 function collageLayout(o, W, H) {
   const ck = o.sh.id + ':' + W + 'x' + H + ':' + R.ver; R.lay = R.lay || new Map(); let L = R.lay.get(ck); if (L) return L;
   if (R.lay.size > 400) R.lay.clear();
   const sh = o.sh, port = H > W * 1.05, s = Math.min(W, H) / 1080, rnd0 = mulberry32(hashStr(String(sh.id)) ^ 0x9e37), mirror = rnd0() < 0.5;
-  const pics = sh.items.map((it, j) => ({ it, j })).filter(x => x.it.pic && !x.it.full), n = Math.min(4, pics.length);
+  const pics = sh.items.map((it, j) => ({ it, j })).filter(x => (x.it.pic && !x.it.full) || x.it.gfx), n = Math.min(4, pics.length);
   const tpl = (port ? TPL.port : TPL.land)[Math.max(0, n - 1)] || [];
   const usedA = new Set(), pieces = [];
   pics.forEach(({ it, j }, q) => {
-    const a = assetById(it.pic), r = mulberry32(hashStr(sh.id + ':' + j));
+    const a = it.gfx ? null : assetById(it.pic), r = mulberry32(hashStr(sh.id + ':' + j));
     let reg = tpl[q] || { x: .25 + r() * .3, y: .25 + r() * .3, w: .4, h: .35 };
     reg = { x: (mirror ? 1 - reg.x - reg.w : reg.x) * W, y: reg.y * H, w: reg.w * W, h: reg.h * H };
-    const kind = a && a.kind === 'scene' ? 'scene' : 'cutout', asp = picAspect(it);
+    const kind = it.gfx ? 'gfx' : a && a.kind === 'scene' ? 'scene' : 'cutout', asp = picAspect(it);
     let rect, shape = 'sticker';
-    if (kind === 'scene') {
+    if (kind === 'gfx') { const k = 0.94; rect = fitRect(asp, { x: reg.x + reg.w * (1 - k) / 2, y: reg.y + reg.h * (1 - k) / 2, w: reg.w * k, h: reg.h * k }); const minW = W * (port ? 0.86 : 0.5); if (rect.w < minW) { const c = rect.x + rect.w / 2, cy0 = rect.y + rect.h / 2, w2 = Math.min(minW, W * 0.94), h2 = w2 / asp; rect = { x: clamp(c - w2 / 2, W * 0.03, W * 0.97 - w2), y: clamp(cy0 - h2 / 2, H * 0.03, H * 0.97 - h2), w: w2, h: h2 }; }
+      if (S.settings.captions === 'words') { const capTop = H * (S.settings.capPos === 'low' ? (port ? 0.8 : 0.86) : (port ? 0.42 : 0.82)) - (port ? 80 : 62) * s * 0.9; if (capTop > H * 0.6 && rect.y + rect.h > capTop) { const room = capTop - H * 0.04; if (rect.h > room) { const k2 = room / rect.h; rect = { x: rect.x + rect.w * (1 - k2) / 2, y: rect.y, w: rect.w * k2, h: room }; } rect.y = Math.max(H * 0.04, capTop - rect.h); } } }
+    else if (kind === 'scene') {
       shape = it.shape || (isMod() ? (reg.w >= W * 0.8 && r() < 0.5 ? 'band' : r() < 0.5 ? 'plain' : r() < 0.6 ? 'tape' : 'torn') : (reg.w >= W * 0.8 && r() < 0.6 ? 'band' : r() < 0.55 ? 'torn' : 'tape'));
       // the whole picture must show: the frame on screen has the picture's own shape (no cropping).
       // A full-width band only works for wide pictures; a square / tall picture becomes a normal print.
@@ -1729,7 +1776,7 @@ function collageLayout(o, W, H) {
     const fx = m === dl ? -1 : m === dr ? 1 : 0, fy = fx ? 0 : (m === dt * 1.3 ? -1 : 1);
     const dist = fx ? (fx < 0 ? cx + rect.w : W - cx + rect.w) : (fy < 0 ? cy + rect.h : H - cy + rect.h);
     pieces.push({ it, j, a, key: a ? assetKey(a.id) : '', kind, shape, rect, rot: (r() - 0.5) * (shape === 'band' ? 0.025 : 0.08), depth: 0.8 + r() * 0.45, fx, fy, dist: dist * 1.05,
-      anim: animFor(it, kind === 'scene' ? (shape === 'band' ? 's' : 'p') : 'c', usedA, hashStr(sh.id + 'a' + j)), phase: r() * 6.28, seed: hashStr(sh.id + 'p' + j) });
+      anim: kind === 'gfx' ? (it.anim && ANIMS[it.anim] ? it.anim : 'pop') : animFor(it, kind === 'scene' ? (shape === 'band' ? 's' : 'p') : 'c', usedA, hashStr(sh.id + 'a' + j)), phase: r() * 6.28, seed: hashStr(sh.id + 'p' + j) });
   });
   const fulls = sh.items.map((it, j) => ({ it, j })).filter(x => x.it.pic && x.it.full).map(({ it, j }) => { const a = assetById(it.pic); return { it, j, a, key: a ? assetKey(a.id) : '', kind: 'full', anim: it.anim && ANIMS[it.anim] ? it.anim : 'develop', rect: { x: 0, y: 0, w: W, h: H }, rot: 0, depth: 1, fx: 0, fy: 1, dist: H, phase: 0, seed: hashStr(sh.id + 'f' + j) }; });
   // tags, stamps, notes
@@ -1737,7 +1784,7 @@ function collageLayout(o, W, H) {
   let freeTop = 0, corner = 0; const tags = [];
   sh.items.forEach((it, j) => {
     if (it.tag == null) return; const style = it.style || 'paper', r = mulberry32(hashStr(sh.id + 't' + j));
-    const size = (style === 'title' ? 88 : style === 'stamp' ? 74 : style === 'note' ? 54 : 62) * s * (port ? 1.35 : 1);
+    const size = (style === 'number' ? 150 : style === 'title' ? 88 : style === 'stamp' ? 74 : style === 'note' ? 54 : 62) * s * (port ? 1.35 : 1);
     let anchor = it.on ? byId(it.on) : null; if (!anchor && style !== 'title' && freeTop > 0) anchor = [...pieces].reverse().find(p => p.j < j) || null;
     let x, y, align = 'center';
     if (anchor) { const R0 = anchor.rect, c = (corner++ + (mirror ? 1 : 0)) % 4; const ix = c === 0 || c === 3 ? R0.x + R0.w * 0.92 : R0.x + R0.w * 0.08, iy = c < 2 ? R0.y + R0.h * 0.12 : R0.y + R0.h * 0.86; x = ix; y = iy; align = c === 0 || c === 3 ? 'right' : 'left'; }
@@ -1750,7 +1797,7 @@ function collageLayout(o, W, H) {
     if (tags.length && !tags[0].it.anim && tags[0].style === 'stamp') tags[0].anim = 'stamp';
     tags.forEach(t => { if (t.style === 'stamp' && !t.it.anim) t.anim = 'stamp'; });
   }
-  placeTags(pieces, tags, W, H, s, port);
+  const textBad = placeTags(pieces, tags, W, H, s, port) || 0;
   // decor behind (only if those pictures exist)
   const decor = []; const dl = (S.assets || []).filter(a => a.kind === 'decor' && R.img[assetKey(a.id)]);
   if (dl.length && S.settings.decor !== 'off' && n <= 3 && !isMod()) {
@@ -1758,7 +1805,7 @@ function collageLayout(o, W, H) {
     for (let q = 0; q < k; q++) { const a = dl[(hashStr(sh.id + 'd' + q)) % dl.length]; const sp = spots[(q + (mirror ? 1 : 0)) % 2]; const reg = { x: sp.x * W, y: sp.y * H, w: sp.w * W, h: sp.h * H }; const key = assetKey(a.id); const st = sticker(key, assetMode(a)); const rect = fitRect(st ? st.width / st.height : 1, reg);
       decor.push({ a, key, rect, rot: (rnd0() - 0.5) * 0.4, depth: 0.6, kind: 'decor', fx: rect.x + rect.w / 2 < W / 2 ? -1 : 1, fy: 0, dist: W * 0.6, anim: 'slide', phase: rnd0() * 6, seed: q }); }
   }
-  L = { pieces, fulls, tags, decor, port, s, mod: isMod() ? modLayout(sh, pieces, W, H, s, port, mirror) : null }; R.lay.set(ck, L); return L;
+  L = { textBad, pieces, fulls, tags, decor, port, s, mod: isMod() ? modLayout(sh, pieces, W, H, s, port, mirror) : null }; R.lay.set(ck, L); return L;
 }
 
 /* ============ drawing a board ============ */
@@ -1783,7 +1830,7 @@ function drawScenePiece(ctx, pc, x, y, w, h, s, lt, tr) {
   else { const b = pc.shape === 'plain' ? 0 : 7 * s; shadowOn(ctx, s, M ? 0.45 : 0.7); ctx.fillStyle = M ? '#ffffff' : '#f3ead6'; ctx.fillRect(x - b, y - b, w + b * 2, h + b * 2); shadowOff(ctx); }
   ctx.save();
   if (inner) { polyPath(ctx, inner, x, y); ctx.clip(); } else { ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip(); }
-  if (src) { const kb = 1.01 + 0.02 * clamp(lt / 8, 0, 1), sa = src.width / src.height; let iw = w * kb, ih = iw / sa; if (ih < h * kb) { ih = h * kb; iw = ih * sa; } const px = Math.sin(pc.phase) * (iw - w) * 0.3 * clamp(lt / 6, 0, 1); ctx.drawImage(src, x + (w - iw) / 2 + px, y + (h - ih) / 2, iw, ih); }
+  if (src) { const kb = 1.01 + 0.02 * clamp(lt / 8, 0, 1), sa = src.width / src.height; let iw = w * kb, ih = iw / sa; if (ih < h * kb) { ih = h * kb; iw = ih * sa; } const px = Math.sin(pc.phase) * (iw - w) * 0.3 * clamp(lt / 6, 0, 1); drawDepth(ctx, pc.key, src, x + (w - iw) / 2 + px, y + (h - ih) / 2, iw, ih, clamp((lt - (tr.t0p || 0)) / 5, 0, 1), px, s); }
   else drawMissing(ctx, x, y, w, h, s, (R.slotN || {})[pc.key]);
   if (tr.develop > 0) { ctx.fillStyle = M ? `rgba(250,250,248,${tr.develop})` : `rgba(232,214,176,${tr.develop})`; ctx.fillRect(x, y, w, h); }
   if (tr.shade > 0) { ctx.fillStyle = `rgba(0,0,0,${tr.shade * 0.5})`; ctx.fillRect(x, y, w, h); }
@@ -1796,6 +1843,90 @@ function shine(ctx, x, y, w, h, t) {   // a light sweep over a picture right aft
   if (t < 0 || t > 0.7) return; const p = t / 0.7, cx = x - w * 0.3 + (w * 1.6) * p;
   const g = ctx.createLinearGradient(cx - w * 0.15, y, cx + w * 0.15, y + h * 0.3); g.addColorStop(0, 'rgba(255,250,235,0)'); g.addColorStop(0.5, 'rgba(255,250,235,0.28)'); g.addColorStop(1, 'rgba(255,250,235,0)');
   ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+}
+/* ============ graphics on a board: timeline, bar chart, travel route ============
+   it.gfx = 'timeline' | 'chart' | 'route', it.data holds the content (made from the plan or the Edit text). */
+const GFX_ASPECT = { timeline: 2.3, chart: 1.35, route: 2.0 };
+function gfxStep(it) { return it.gfx === 'timeline' ? 0.75 : it.gfx === 'chart' ? 0.3 : 0; }
+function gfxDur(it) { const d = it.data || {}; if (it.gfx === 'timeline') return 0.5 + (d.items || []).length * 0.75; if (it.gfx === 'chart') return 0.6 + (d.bars || []).length * 0.3 + 0.8; return 2; }
+function fitFont(ctx, text, fontFn, size, maxW, min) { let z = size; ctx.font = fontFn(z); while (z > min && ctx.measureText(text).width > maxW) { z *= 0.92; ctx.font = fontFn(z); } return z; }
+function wrap2(ctx, text, maxW) {   // at most two lines
+  const words = String(text || '').split(/\s+/).filter(Boolean), out = []; let cur = '';
+  for (const w of words) { const t = cur ? cur + ' ' + w : w; if (cur && ctx.measureText(t).width > maxW) { out.push(cur); cur = w; if (out.length === 2) break; } else cur = t; }
+  if (out.length < 2 && cur) out.push(cur); else if (out.length === 2 && cur && !out.includes(cur)) out[1] = out[1] + '…';
+  return out;
+}
+function drawGfx(ctx, pc, x, y, w, h, s, u) {   // u = seconds since the graphic appeared
+  const it = pc.it, d = it.data || {}, M = isMod(), ink = M ? MOD.ink : '#141210', acc = M ? accent() : RED, sub = M ? '#6b6b6b' : '#6a5c44';
+  ctx.save(); shadowOn(ctx, s, M ? 0.45 : 0.6); ctx.fillStyle = M ? '#ffffff' : '#f3ead6'; ctx.fillRect(x, y, w, h); shadowOff(ctx);
+  if (!M) { ctx.fillStyle = 'rgba(120,90,40,0.06)'; ctx.fillRect(x, y, w, h * 0.12); }
+  ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+  const pad = Math.min(w, h) * 0.08, U = qT(u);
+  if (it.gfx === 'timeline') {
+    const items = (d.items || []).slice(0, 7), n = Math.max(1, items.length), ly = y + h * 0.5, x0 = x + pad * 1.4, x1 = x + w - pad * 1.4;
+    if (d.title) { const z = fitFont(ctx, d.title, q => sansF(q, 800), h * 0.12, w - pad * 2, 14 * s); ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText(d.title, x + pad, y + pad * 0.7); }
+    const lp = easeInOut(clamp(U / 0.6, 0, 1)); ctx.strokeStyle = ink; ctx.lineWidth = Math.max(2, h * 0.012); ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x0, ly); ctx.lineTo(lerp(x0, x1, lp), ly); ctx.stroke();
+    const cell = (x1 - x0) / n; let last = -1;
+    items.forEach((e, i) => { if (U >= 0.4 + i * 0.75) last = i; });
+    items.forEach((e, i) => {
+      const t = U - (0.4 + i * 0.75); if (t < 0) return; const k = easeOutBack(clamp(t / 0.35, 0, 1)), cx = x0 + cell * (i + 0.5), on = i === last;
+      ctx.save(); ctx.globalAlpha = clamp(t * 4, 0, 1);
+      ctx.fillStyle = on ? acc : ink; ctx.beginPath(); ctx.arc(cx, ly, h * 0.035 * k * (on ? 1.3 : 1), 0, 6.283); ctx.fill();
+      const yz = fitFont(ctx, e.y, q => condF(q, 700), h * 0.17, cell * 0.92, 12 * s); ctx.fillStyle = on ? acc : ink; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(e.y, cx, ly - h * 0.07 - (1 - k) * 12 * s);
+      const lz = Math.min(h * 0.085, cell * 0.16); ctx.font = sansF(lz, 700); ctx.fillStyle = on ? ink : sub; ctx.textBaseline = 'top';
+      wrap2(ctx, e.t, cell * 0.92).forEach((l, j) => ctx.fillText(l, cx, ly + h * 0.07 + j * lz * 1.15 + (1 - k) * 12 * s));
+      ctx.restore();
+    });
+  } else if (it.gfx === 'chart') {
+    const bars = (d.bars || []).slice(0, 6), n = Math.max(1, bars.length), max = Math.max(1e-9, ...bars.map(b => +b.v || 0));
+    let top = y + pad; if (d.title) { const z = fitFont(ctx, d.title, q => sansF(q, 800), h * 0.09, w - pad * 2, 12 * s); ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText(d.title, x + pad, top); top += z * 1.4; }
+    const base = y + h - pad - h * 0.1, avail = base - top - h * 0.1, cell = (w - pad * 2) / n, bw = cell * 0.62, big = bars.reduce((m, b, i) => (+b.v || 0) > (+bars[m].v || 0) ? i : m, 0);
+    ctx.strokeStyle = sub; ctx.lineWidth = Math.max(1.5, s * 2); ctx.beginPath(); ctx.moveTo(x + pad, base); ctx.lineTo(x + w - pad, base); ctx.stroke();
+    bars.forEach((b, i) => {
+      const t = U - (0.3 + i * 0.3); const p = easeOutCubic(clamp(t / 0.8, 0, 1)), bx = x + pad + cell * i + (cell - bw) / 2, bh = avail * (+b.v || 0) / max * p;
+      ctx.fillStyle = i === big ? acc : (M ? '#2b2b2b' : '#5b4a32'); if (p > 0) ctx.fillRect(bx, base - bh, bw, bh);
+      if (M && p > 0 && i !== big) { ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(bx, base - bh, bw * 0.3, bh); }
+      const lz = fitFont(ctx, b.l, q => sansF(q, 700), Math.min(h * 0.07, cell * 0.22), cell * 0.95, 10 * s); ctx.fillStyle = ink; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(b.l, bx + bw / 2, base + h * 0.025);
+      if (t > 0) { const raw = String(b.raw || b.v); const vz = fitFont(ctx, raw, q => condF(q, 700), Math.min(h * 0.11, cell * 0.36), cell * 0.98, 10 * s); ctx.fillStyle = i === big ? acc : ink; ctx.textBaseline = 'bottom'; ctx.fillText(countText(raw, clamp(t / 0.8, 0, 1)), bx + bw / 2, base - bh - h * 0.015); }
+    });
+  } else {   // route
+    const ax = x + w * 0.16, bx = x + w * 0.84, py = y + h * 0.62, cy = y + h * 0.12, lp = easeInOut(clamp((U - 0.45) / 1.3, 0, 1));
+    const P = q => ({ x: (1 - q) * (1 - q) * ax + 2 * (1 - q) * q * (x + w / 2) + q * q * bx, y: (1 - q) * (1 - q) * py + 2 * (1 - q) * q * cy + q * q * py });
+    ctx.save(); ctx.strokeStyle = acc; ctx.lineWidth = Math.max(2.5, h * 0.018); ctx.setLineDash([h * 0.04, h * 0.03]); ctx.beginPath(); const N = 40;
+    for (let k = 0; k <= N * lp; k++) { const p = P(k / N); k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); } if (lp > 0) { const p = P(lp); ctx.lineTo(p.x, p.y); } ctx.stroke(); ctx.restore();
+    const pin = (px, label, t) => { if (t < 0) return; const k = easeOutBack(clamp(t / 0.35, 0, 1)), z = h * 0.075 * k; ctx.save(); ctx.translate(px, py); ctx.fillStyle = ink; ctx.beginPath(); ctx.arc(0, -z * 1.6, z, Math.PI * 0.85, Math.PI * 2.15); ctx.lineTo(0, 0); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0, -z * 1.6, z * 0.42, 0, 6.283); ctx.fill();
+      const lz = fitFont(ctx, label, q => sansF(q, 800), h * 0.1, w * 0.32, 10 * s); ctx.fillStyle = ink; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.globalAlpha = clamp(t * 3, 0, 1); ctx.fillText(label, 0, h * 0.05); ctx.restore(); };
+    pin(ax, d.from || '', U); pin(bx, d.to || '', U - 1.6);
+    if (lp > 0 && lp < 1 || (lp >= 1 && U < 2.2)) { const p = P(lp), q = P(Math.min(1, lp + 0.02)), ang = Math.atan2(q.y - p.y, q.x - p.x + 1e-6), z = h * 0.07;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(ang); ctx.fillStyle = ink; ctx.beginPath();   // a little plane
+      ctx.moveTo(z * 1.2, 0); ctx.lineTo(-z, -z * 0.18); ctx.lineTo(-z, z * 0.18); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(z * 0.25, 0); ctx.lineTo(-z * 0.35, -z * 0.95); ctx.lineTo(-z * 0.6, -z * 0.95); ctx.lineTo(-z * 0.3, 0); ctx.lineTo(-z * 0.6, z * 0.95); ctx.lineTo(-z * 0.35, z * 0.95); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-z * 0.75, 0); ctx.lineTo(-z * 1.05, -z * 0.4); ctx.lineTo(-z * 1.15, -z * 0.4); ctx.lineTo(-z * 1.0, 0); ctx.lineTo(-z * 1.15, z * 0.4); ctx.lineTo(-z * 1.05, z * 0.4); ctx.closePath(); ctx.fill(); ctx.restore(); }
+    if (d.title) { fitFont(ctx, d.title, q => sansF(q, 800), h * 0.09, w - pad * 2, 12 * s); ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText(d.title, x + pad, y + pad * 0.6); }
+  }
+  ctx.restore();
+}
+// "1968 Married Rajiv; 1991 Rajiv killed" → items · "Seats: 2004 145; 2009 206" → bars · "Italy > Delhi" → route
+function parseGfx(kind, main) {
+  const txt = String(main || '').trim(); let title = '', body = txt; const ci = txt.indexOf(':');
+  if (kind !== 'route' && ci > 0 && ci < txt.length - 1 && !/^\d/.test(txt)) { title = txt.slice(0, ci).trim(); body = txt.slice(ci + 1).trim(); }
+  if (kind === 'timeline') return { title, items: body.split(/;|\n/).map(e => e.trim()).filter(Boolean).map(e => { const m = e.match(/^(\S+)\s+(.*)$/); return m ? { y: m[1], t: m[2] } : { y: e, t: '' }; }) };
+  if (kind === 'chart') return { title, bars: body.split(/;|\n/).map(e => e.trim()).filter(Boolean).map(e => { const m = e.match(/^(.*?)\s+([-+]?[\d.,]+\s*[%A-Za-z₹$]*)$/); const raw = m ? m[2].trim() : '0'; return { l: m ? m[1].trim() : e, raw, v: parseFloat(raw.replace(/,/g, '')) || 0 }; }) };
+  const ttl = txt.match(/^(.*?):\s*(.*)$/); const r = (ttl ? ttl[2] : txt).split(/>|→|->/).map(e => e.trim()); return { title: ttl ? ttl[1].trim() : '', from: r[0] || '', to: r[1] || '' };
+}
+function gfxToText(it) {
+  const d = it.data || {}, t = d.title ? d.title + ': ' : '';
+  if (it.gfx === 'timeline') return t + (d.items || []).map(e => `${e.y} ${e.t}`.trim()).join('; ');
+  if (it.gfx === 'chart') return t + (d.bars || []).map(b => `${b.l} ${b.raw ?? b.v}`).join('; ');
+  return t + `${d.from || ''} > ${d.to || ''}`;
+}
+function gfxFromPlan(it) {   // the AI's JSON for a graphic item
+  const str = v => v == null ? '' : String(v).trim();
+  if (it.timeline) { const L = Array.isArray(it.timeline) ? it.timeline : String(it.timeline).split(';'); return { gfx: 'timeline', data: { title: str(it.title), items: L.map(e => typeof e === 'object' && e ? { y: str(e.year ?? e.y ?? e.date), t: str(e.text ?? e.t ?? e.label) } : (m => m ? { y: m[1], t: m[2] } : { y: str(e), t: '' })(String(e).trim().match(/^(\S+)\s*[|:–-]?\s*(.*)$/))).filter(e => e.y).slice(0, 7) } }; }
+  if (it.chart || it.bars) { const L = it.chart || it.bars; const bars = (Array.isArray(L) ? L : []).map(e => Array.isArray(e) ? { l: str(e[0]), raw: str(e[1]) } : { l: str(e.label ?? e.l ?? e.name), raw: str(e.value ?? e.v) }).map(b => ({ ...b, v: parseFloat(b.raw.replace(/,/g, '')) || 0 })).filter(b => b.l).slice(0, 6); return bars.length ? { gfx: 'chart', data: { title: str(it.title), bars } } : null; }
+  if (it.route) { const r = it.route; const from = str(typeof r === 'object' ? r.from : String(r).split('>')[0]), to = str(typeof r === 'object' ? r.to : String(r).split('>')[1] || it.to); return from && to ? { gfx: 'route', data: { title: str(it.title), from, to } } : null; }
+  return null;
 }
 function drawPiece(ctx, pc, lt, t0p, W, H, s, cam, exitE) {
   if (lt < t0p) return;
@@ -1812,12 +1943,13 @@ function drawPiece(ctx, pc, lt, t0p, W, H, s, cam, exitE) {
     else if (tr.clip === 'unroll') ctx.rect(x - 40 * s, y - 40 * s, r.w + 80 * s, (r.h + 80 * s) * e);
     else { const ex = x - 40 * s + (r.w + 80 * s) * e, rr = mulberry32(pc.seed); ctx.moveTo(x - 50 * s, y - 50 * s); for (let k = 0; k <= 16; k++) ctx.lineTo(ex + (rr() - 0.5) * 30 * s, y - 50 * s + (r.h + 100 * s) * k / 16); ctx.lineTo(x - 50 * s, y + r.h + 50 * s); ctx.closePath(); }
     ctx.clip(); }
-  if (pc.kind === 'scene' || pc.kind === 'full') {
+  if (pc.kind === 'gfx') drawGfx(ctx, pc, x, y, r.w, r.h, s, lt - t0p);
+  else if (pc.kind === 'scene' || pc.kind === 'full') {
     if (pc.kind === 'full') { const src = toned(pc.key, assetMode(pc.a, pc.it)); if (src) { const sa = src.width / src.height, ra = r.w / r.h, kb = 1 + 0.03 * clamp((lt - t0p) / 8, 0, 1);
-      if (Math.abs(sa / ra - 1) < 0.08) { const c = coverRect(src, r.w, r.h); ctx.scale(kb, kb); ctx.drawImage(src, x + c.x, y + c.y, c.w, c.h); }
+      if (Math.abs(sa / ra - 1) < 0.08) { const c = coverRect(src, r.w, r.h); ctx.scale(kb, kb); drawDepth(ctx, pc.key, src, x + c.x, y + c.y, c.w, c.h, clamp((lt - t0p) / 5, 0, 1), 0, s); }
       else {   // picture shape differs from the video: soft blurred copy fills the frame, the whole picture sits on top
         const c = coverRect(src, r.w, r.h); ctx.save(); ctx.filter = `blur(${Math.round(28 * s)}px) brightness(0.8)`; ctx.drawImage(src, x + c.x - 40 * s, y + c.y - 40 * s, c.w + 80 * s, c.h + 80 * s); ctx.restore();
-        const f = fitRect(sa, { x, y, w: r.w, h: r.h }); ctx.scale(kb, kb); shadowOn(ctx, s, 0.6); ctx.drawImage(src, f.x, f.y, f.w, f.h); shadowOff(ctx); } if (tr.develop > 0) { ctx.fillStyle = `rgba(232,214,176,${tr.develop})`; ctx.fillRect(x, y, r.w, r.h); } } else drawMissing(ctx, x + r.w * 0.1, y + r.h * 0.1, r.w * 0.8, r.h * 0.8, s, (R.slotN || {})[pc.key]); }
+        const f = fitRect(sa, { x, y, w: r.w, h: r.h }); ctx.scale(kb, kb); shadowOn(ctx, s, 0.6); ctx.drawImage(src, f.x, f.y, f.w, f.h); shadowOff(ctx); drawDepth(ctx, pc.key, src, f.x, f.y, f.w, f.h, clamp((lt - t0p) / 5, 0, 1), 0, s); } if (tr.develop > 0) { ctx.fillStyle = `rgba(232,214,176,${tr.develop})`; ctx.fillRect(x, y, r.w, r.h); } } else drawMissing(ctx, x + r.w * 0.1, y + r.h * 0.1, r.w * 0.8, r.h * 0.8, s, (R.slotN || {})[pc.key]); }
     else drawScenePiece(ctx, pc, x, y, r.w, r.h, s, lt, tr);
   } else {
     const st = pc.key && R.img[pc.key] ? sticker(pc.key, assetMode(pc.a, pc.it)) : null;
@@ -1882,7 +2014,12 @@ function collageSfx(o, add) {
   const pS = { slide: 'paper', drop: 'paper', toss: 'whoosh', pop: 'pop', spin: 'whoosh', zoomin: 'soft', flip: 'paper', wipe: 'paper', unroll: 'paper', tearin: 'rip', develop: 'soft', rise: 'soft' };
   [...L.pieces, ...L.fulls].forEach(pc => add(t0 + Math.max(0, b.items[pc.j]), pS[pc.anim] || 'paper', 0.9));
   L.tags.forEach(tg => { const t = t0 + Math.max(0, b.items[tg.j]); if (tg.anim === 'type') { for (let k = 0; k < 5; k++) add(t + k * 0.1, 'type', 0.45); } else add(t, tg.anim === 'stamp' ? 'thump' : 'pop', tg.anim === 'stamp' ? 1 : 0.7); });
-  o.sh.items.forEach((it, j) => { if (it.arrow || it.circle) add(t0 + b.items[j], 'marker', 0.9); });
+  o.sh.items.forEach((it, j) => { if (it.arrow || it.circle) add(t0 + b.items[j], 'marker', 0.9);
+    if (it.gfx) { const t = t0 + Math.max(0, b.items[j]), d = it.data || {};
+      if (it.gfx === 'timeline') (d.items || []).slice(0, 7).forEach((e, i) => add(t + 0.4 + i * 0.75, 'pop', 0.8));
+      else if (it.gfx === 'chart') { add(t + 0.1, 'riser', 0.7); (d.bars || []).slice(0, 6).forEach((e, i) => add(t + 0.3 + i * 0.3, 'tick', 0.7)); }
+      else { add(t + 0.45, 'whoosh', 0.8); add(t + 1.6, 'pop', 0.9); } }
+    if (it.count && it.tag != null && (it.style === 'title' || it.style === 'number')) add(t0 + Math.max(0, b.items[j]) - 0.9, 'riser', 0.6); });
 }
 
 /* ============ board exits (page peel, tear, push, scatter, zoom through) ============ */
@@ -2112,7 +2249,7 @@ function drawModLayer(ctx, L, which, lt, s, W, H, cam, b, exitE) {
 /* ============ bold sans-serif text (types on, with a "_" cursor) ============ */
 function drawBoldTag(ctx, tg, lt, t0p, s, exitE, W, H, tr) {
   const it = tg.it, style = tg.style; let full = String(it.tag || '');
-  const port = H > W * 1.05, size = 64 * s * (port ? 1.3 : 1) * (style === 'title' ? 1.3 : style === 'note' ? 0.9 : 1), maxW = W * (port ? 0.84 : 0.4);
+  const port = H > W * 1.05, size = 64 * s * (port ? 1.3 : 1) * (style === 'number' ? 2.4 : style === 'title' ? 1.3 : style === 'note' ? 0.9 : 1), maxW = W * (port ? 0.84 : 0.4);
   ctx.font = sansF(size, 800);
   const lines = []; let cur = ''; full.split(/\s+/).filter(Boolean).forEach(w => { const t = cur ? cur + ' ' + w : w; if (cur && ctx.measureText(t).width > maxW) { lines.push(cur); cur = w; } else cur = t; }); if (cur) lines.push(cur);
   let shown = lines.map(l => l);
@@ -2126,7 +2263,7 @@ function drawBoldTag(ctx, tg, lt, t0p, s, exitE, W, H, tr) {
   const bo = boil(tg.seed, lt, s);
   ctx.globalAlpha *= tr.alpha; ctx.translate(x + bo.dx + tr.dx * s, y + bo.dy + tr.dy * s); ctx.scale(tr.sx, tr.sy);
   ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.shadowColor = 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 16 * s;
-  ctx.fillStyle = style === 'stamp' ? accent() : MOD.ink;
+  ctx.fillStyle = style === 'stamp' || style === 'number' ? accent() : MOD.ink;
   let lastX = 0, lastY = 0; shown.forEach((l, i) => { if (!l && i) return; ctx.fillText(l, 0, i * lh); lastX = ctx.measureText(l).width; lastY = i * lh; });
   const after = lt - t0p - (ANIMS.type.d || 0.6);
   if (typing || (tr.typeP != null && after < 1 && Math.floor(after * 4) % 2 === 0)) ctx.fillText('_', lastX + size * 0.04, lastY);
@@ -2583,8 +2720,8 @@ function exportBegin(ui) {
   if (APP) try { AndroidBridge.keepAwake(true); } catch (_) {}
 }
 function exportEnd(ui) { if (APP) try { AndroidBridge.keepAwake(false); } catch (_) {} const c = exporting.cancelled; exporting = null; ui.btn.disabled = false; ui.cancel.hidden = true; ui.prog.hidden = true; drawPreview(); return c; }
-async function exportOffline() {
-  const [W, H] = exportDims(), fps = +S.settings.fps, sr = 48000;
+async function exportOffline(opt = {}) {
+  const [W, H] = opt.dims || exportDims(), fps = +S.settings.fps, sr = 48000, from = opt.from || 0, to = opt.to || audioBuf.duration, len = to - from, outName = opt.name || safeName();
   const vc = await pickVideoCodec(W, H, fps, W * H >= 1900 * 1000 ? 8e6 : 4.5e6), ac = await pickAudioCodec(sr);
   if (!vc || !ac) return false;
   const ui = exportUI(); vo.pause(); await loadFonts(); exportBegin(ui);
@@ -2593,10 +2730,12 @@ async function exportOffline() {
   try {
     ui.info.textContent = 'Mixing the audio…';
     const mixed = await mixAudio(sr);
+    if (depthOn()) { const keys = (S.assets || []).filter(a => a.kind === 'scene').map(a => assetKey(a.id)).filter(k => R.img[k]); ui.info.textContent = 'Preparing 2.5D depth…'; await depthPrepare(keys, (n, m) => { ui.info.textContent = `Preparing 2.5D depth… ${n} / ${m}`; }); }
     const muxer = new Mp4Muxer.Muxer({ target: new Mp4Muxer.ArrayBufferTarget(), video: { codec: vc.mux, width: W, height: H, frameRate: fps }, audio: { codec: ac.mux, numberOfChannels: 2, sampleRate: sr }, fastStart: 'in-memory', firstTimestampBehavior: 'offset' });
     let encErr = null;
     const aenc = new AudioEncoder({ output: (c, m) => muxer.addAudioChunk(c, m), error: e => encErr = e }); aenc.configure(ac.cfg);
-    const A0 = mixed.getChannelData(0), A1 = mixed.getChannelData(1), N = mixed.length, CH = 4096;
+    const i0 = Math.round(from * sr), i1 = Math.min(mixed.length, Math.round(to * sr)), A0 = mixed.getChannelData(0).slice(i0, i1), A1 = mixed.getChannelData(1).slice(i0, i1), N = A0.length, CH = 4096;
+    if (opt.from != null || opt.to != null) { const fo = Math.min(N, Math.round(sr * 0.5)); for (let i = 0; i < fo; i++) { const g = i / fo; A0[N - 1 - i] *= g; A1[N - 1 - i] *= g; } const fi = Math.min(N, Math.round(sr * 0.04)); for (let i = 0; i < fi; i++) { const g = i / fi; A0[i] *= g; A1[i] *= g; } }
     for (let o = 0; o < N; o += CH) {
       const len = Math.min(CH, N - o), buf = new Float32Array(len * 2); buf.set(A0.subarray(o, o + len), 0); buf.set(A1.subarray(o, o + len), len);
       const ad = new AudioData({ format: 'f32-planar', sampleRate: sr, numberOfFrames: len, numberOfChannels: 2, timestamp: Math.round(o / sr * 1e6), data: buf });
@@ -2605,17 +2744,17 @@ async function exportOffline() {
     await aenc.flush(); aenc.close(); if (encErr) throw encErr;
     const venc = new VideoEncoder({ output: (c, m) => muxer.addVideoChunk(c, m), error: e => encErr = e }); venc.configure({ ...vc.cfg, latencyMode: 'quality' });
     const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const ctx = cv.getContext('2d');
-    const total = Math.ceil(audioBuf.duration * fps), fd = 1e6 / fps;
+    const total = Math.ceil(len * fps), fd = 1e6 / fps;
     for (let k = 0; k < total; k++) {
       if (exporting.cancelled) break; if (encErr) throw encErr;
-      drawFrame(ctx, W, H, k / fps);
+      R.capOff = !!R.short && k / fps > len - 2.6; drawFrame(ctx, W, H, from + k / fps); if (R.short) drawShortOverlay(ctx, W, H, k / fps, len);
       const vf = new VideoFrame(cv, { timestamp: Math.round(k * fd), duration: Math.round(fd) });
       venc.encode(vf, { keyFrame: k % (fps * 2) === 0 }); vf.close();
       while (venc.encodeQueueSize > 6) await yieldNow();
       if (k % 15 === 0) {
         pctx.drawImage(cv, 0, 0, pv.width, pv.height); ui.prog.value = k / total;
         const el = (performance.now() - t0) / 1000, eta = k > 30 ? el / k * (total - k) : 0;
-        ui.info.textContent = `Rendering ${fmt(k / fps, 0)} / ${fmt(audioBuf.duration, 0)}${eta ? ` · about ${Math.ceil(eta)} s left` : ''}`;
+        ui.info.textContent = `${opt.label || 'Rendering'} ${fmt(k / fps, 0)} / ${fmt(len, 0)}${eta ? ` · about ${Math.ceil(eta)} s left` : ''}`;
         await yieldNow();
       }
     }
@@ -2626,8 +2765,8 @@ async function exportOffline() {
   const cancelled = exportEnd(ui);
   if (cancelled) { ui.info.textContent = 'Export cancelled.'; return true; }
   if (!result) { ui.info.textContent = 'Fast export failed (' + errMsg + '). Trying live recording…'; return false; }
-  await download(result, `${safeName()}.mp4`);
-  ui.info.innerHTML = `Video ready: <b>${esc(safeName())}.mp4</b> (${(result.size / 1048576).toFixed(1)} MB, ${W}×${H}) ${APP ? 'saved in Movies/Vox Studio' : 'downloaded'} in ${Math.round((performance.now() - t0) / 1000)} s.${APP ? ' <button class="btn small" id="shareLast">Share video</button>' : ''}`;
+  await download(result, `${outName}.mp4`);
+  ui.info.innerHTML = `Video ready: <b>${esc(outName)}.mp4</b> (${(result.size / 1048576).toFixed(1)} MB, ${W}×${H}) ${APP ? 'saved in Movies/Vox Studio' : 'downloaded'} in ${Math.round((performance.now() - t0) / 1000)} s.${APP ? ' <button class="btn small" id="shareLast">Share video</button>' : ''}`;
   const sl = $('#shareLast'); if (sl) sl.onclick = () => { try { AndroidBridge.shareLast(); } catch (_) {} };
   return true;
 }
@@ -2663,6 +2802,166 @@ async function exportVideo() {
   await exportLive();
 }
 
+</script>
+<script>
+/* Vox Studio — EXTRAS: hook intro, 2.5D depth on pictures, Shorts title / end card. */
+'use strict';
+
+/* ============ hook intro: the first seconds sell the video ============
+   Fast cuts of the strongest pictures from later in the video, a big question on top,
+   a riser and a boom. It plays over the first seconds of the voiceover. */
+const HOOK_D = 4.2;
+const hookOn = () => S.settings.hook === 'on' && !R.noHook && S.shots.length > 0 && duration() > HOOK_D * 3;
+function hookText() {
+  const own = String(S.settings.hookText || '').trim(); if (own) return own;
+  const yt = S.yt && S.yt.titles && S.yt.titles[0]; if (yt) return yt.replace(/\s*[|–-]\s*.*$/, '');
+  const first = plain((S.segments[0] || {}).text || S.settings.title || ''); const w = first.split(/\s+/).slice(0, 9).join(' ');
+  return w ? w.replace(/[.,;:!]+$/, '') + (/[?？]$/.test(w) ? '' : '?') : '';
+}
+function hookPics() {   // up to 5 picture keys from across the video (not the first board), pictures that are really there
+  const key = R.ver + '|' + Object.keys(R.img || {}).length; if (R.hookPics && R.hookPics.key === key) return R.hookPics.list;
+  const cand = [];
+  S.shots.forEach((sh, si) => {
+    if (si === 0) return;
+    if (sh.type === 'collage') (sh.items || []).forEach(it => { const a = it.pic && assetById(it.pic); if (a && R.img[assetKey(a.id)]) cand.push({ key: assetKey(a.id), a, it, scene: a.kind === 'scene' || it.full }); });
+    else { const k = imgKey(sh); if (R.img[k]) cand.push({ key: k, sh, scene: true }); }
+  });
+  const seen = new Set(), uniq = cand.filter(c => !seen.has(c.key) && seen.add(c.key));
+  const scenes = uniq.filter(c => c.scene), pool = scenes.length >= 4 ? scenes : uniq, n = Math.min(5, pool.length), list = [];
+  for (let i = 0; i < n; i++) list.push(pool[Math.floor((i + 0.5) * pool.length / n)]);
+  R.hookPics = { key, list }; return list;
+}
+function hookSrc(c) { return c.a ? toned(c.key, assetMode(c.a, c.it)) : filtered(c.key, photoMode(c.sh)); }
+function drawHook(ctx, W, H, t) {
+  const pics = hookPics(), s = Math.min(W, H) / 1080, port = H > W * 1.05, n = Math.max(1, pics.length), cutD = 3.1 / n;
+  const fadeOut = clamp((t - (HOOK_D - 0.35)) / 0.35, 0, 1); if (fadeOut >= 1) return;
+  ctx.save(); ctx.globalAlpha = 1 - fadeOut;
+  const boomT = HOOK_D - 0.65, shake = t > boomT && t < boomT + 0.35 ? (1 - (t - boomT) / 0.35) * 14 * s : 0;
+  if (shake) ctx.translate(Math.sin(t * 90) * shake, Math.cos(t * 70) * shake);
+  ctx.fillStyle = '#0d0d0d'; ctx.fillRect(-20 * s, -20 * s, W + 40 * s, H + 40 * s);
+  const ci = Math.min(n - 1, Math.floor(t / cutD)), c = pics[ci], src = c && hookSrc(c), lc = t - ci * cutD;
+  if (src) {
+    const cr = coverRect(src, W, H); ctx.save(); ctx.filter = `blur(${Math.round(24 * s)}px) brightness(0.45)`; ctx.drawImage(src, cr.x - 30 * s, cr.y - 30 * s, cr.w + 60 * s, cr.h + 60 * s); ctx.restore();
+    const z = (ci === n - 1 ? 1 + 0.06 * clamp((t - ci * cutD) / 2, 0, 1) : 1.1 - 0.1 * easeOutCubic(clamp(lc / cutD, 0, 1))), f = fitRect(src.width / src.height, { x: W * 0.05, y: H * 0.05, w: W * 0.9, h: H * 0.9 });
+    ctx.save(); ctx.translate(W / 2, H / 2); ctx.scale(z, z); ctx.rotate((ci % 2 ? 1 : -1) * 0.012); shadowOn(ctx, s, 1.2); ctx.drawImage(src, f.x - W / 2, f.y - H / 2, f.w, f.h); shadowOff(ctx); ctx.restore();
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(0, 0, W, H);
+  }
+  if (lc < 0.07 && t > 0.05) { ctx.fillStyle = `rgba(255,255,255,${0.55 * (1 - lc / 0.07)})`; ctx.fillRect(0, 0, W, H); }   // flash on each cut
+  if (t > boomT && t < boomT + 0.12) { ctx.fillStyle = `rgba(255,255,255,${0.8 * (1 - (t - boomT) / 0.12)})`; ctx.fillRect(0, 0, W, H); }
+  const txt = hookText();
+  if (txt && t > 0.25) {
+    const p = easeOutBack(clamp((t - 0.25) / 0.4, 0, 1)), maxW = W * (port ? 0.88 : 0.78); let size = (port ? 118 : 104) * s, lines;
+    for (;;) { ctx.font = sansF(size, 900); lines = []; let cur = ''; upper(txt).split(/\s+/).forEach(w => { const tt = cur ? cur + ' ' + w : w; if (cur && ctx.measureText(tt).width > maxW) { lines.push(cur); cur = w; } else cur = tt; }); if (cur) lines.push(cur); if (lines.length <= 3 || size < 40 * s) break; size *= 0.9; }
+    const lh = size * 1.12, th = lh * lines.length, y0 = H / 2 - th / 2 + (port ? -H * 0.05 : 0), big = t > boomT ? 1 + 0.06 * Math.max(0, 1 - (t - boomT) / 0.4) : 1;
+    ctx.save(); ctx.translate(W / 2, H / 2); ctx.scale(p * big, p * big); ctx.translate(-W / 2, -H / 2);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+    lines.forEach((l, i) => { const y = y0 + lh * (i + 0.5), lw = ctx.measureText(l).width;
+      if (i === lines.length - 1) { ctx.fillStyle = accent(); ctx.globalAlpha = 0.95; ctx.fillRect(W / 2 - lw / 2 - size * 0.25, y - size * 0.55, lw + size * 0.5, size * 1.08); ctx.globalAlpha = 1; }
+      ctx.lineWidth = size * 0.16; ctx.strokeStyle = 'rgba(0,0,0,0.9)'; ctx.strokeText(l, W / 2, y); ctx.fillStyle = i === lines.length - 1 ? '#111' : '#fff'; if (i === lines.length - 1) { ctx.lineWidth = 0; } ctx.fillText(l, W / 2, y); });
+    ctx.restore();
+  }
+  ctx.restore();
+}
+function hookSfx(add) {
+  if (!hookOn()) return; const n = Math.max(1, hookPics().length), cutD = 3.1 / n;
+  add(0.02, 'riser', 0.5); add(HOOK_D - 0.65 - 0.9, 'riser', 0.9);
+  for (let i = 1; i < n; i++) add(i * cutD, 'whoosh', 0.8);
+  add(0.25, 'thump', 0.8); add(HOOK_D - 0.65, 'boom', 1);
+}
+
+/* ============ Shorts: title at the start, end card at the end ============ */
+function drawShortOverlay(ctx, W, H, lt, len) {
+  const o = R.short; if (!o) return; const s = Math.min(W, H) / 1080;
+  if (o.title && lt < 3.2) {
+    const a = clamp(lt / 0.25, 0, 1) * clamp((3.2 - lt) / 0.3, 0, 1), maxW = W * 0.86; let size = 92 * s, lines;
+    for (;;) { ctx.font = sansF(size, 900); lines = []; let cur = ''; upper(o.title).split(/\s+/).forEach(w => { const tt = cur ? cur + ' ' + w : w; if (cur && ctx.measureText(tt).width > maxW) { lines.push(cur); cur = w; } else cur = tt; }); if (cur) lines.push(cur); if (lines.length <= 3 || size < 40 * s) break; size *= 0.9; }
+    const lh = size * 1.15, y0 = H * 0.13; ctx.save(); ctx.globalAlpha = a; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+    const bw = Math.max(...lines.map(l => ctx.measureText(l).width)) + size * 0.7; ctx.fillStyle = accent(); ctx.fillRect(W / 2 - bw / 2, y0 - size * 0.4, bw, lh * lines.length + size * 0.2);
+    lines.forEach((l, i) => { ctx.fillStyle = '#111'; ctx.fillText(l, W / 2, y0 + lh * (i + 0.5) - size * 0.2); }); ctx.restore();
+  }
+  const endL = 2.6, et = lt - (len - endL);
+  if (et > 0) {
+    const a = clamp(et / 0.35, 0, 1); ctx.save(); ctx.fillStyle = `rgba(10,10,10,${0.86 * a})`; ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = a; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const k = easeOutBack(clamp(et / 0.5, 0, 1));
+    ctx.translate(W / 2, H / 2); ctx.scale(k, k);
+    const t1 = upper(o.end || 'Poori kahani channel par'), f1 = fitFont(ctx, t1, q => sansF(q, 900), 84 * s, W * 0.86, 30 * s);
+    ctx.fillStyle = '#fff'; ctx.fillText(t1, 0, -f1 * 0.7);
+    const t2 = upper(S.settings.watermark ? 'Subscribe · ' + S.settings.watermark : 'Subscribe karein'); const f2 = fitFont(ctx, t2, q => sansF(q, 800), 54 * s, W * 0.8, 24 * s), w2 = ctx.measureText(t2).width + f2 * 1.2;
+    ctx.fillStyle = '#e62117'; ctx.fillRect(-w2 / 2, f1 * 0.35, w2, f2 * 1.7); ctx.fillStyle = '#fff'; ctx.fillText(t2, 0, f1 * 0.35 + f2 * 0.85);
+    ctx.restore();
+  }
+}
+
+/* ============ 2.5D depth: the person / subject lifts off the picture ============
+   A segmentation model (MediaPipe, downloaded once) finds the subject. While the shot plays,
+   the subject grows and drifts a little more than the background, like a camera move in 3D.
+   Without internet, or if nothing is found, the picture is drawn flat as before. */
+const DEPTH = { seg: null, loading: null, failed: false, masks: new Map(), queue: [], busy: false, fg: new Map() };
+const depthOn = () => S.settings.depth !== 'off' && !DEPTH.failed;
+async function depthModel() {
+  if (DEPTH.seg) return DEPTH.seg; if (DEPTH.failed) return null;
+  if (!DEPTH.loading) DEPTH.loading = (async () => {
+    try {
+      const base = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+      const V = await import(base + '/vision_bundle.mjs');
+      const files = await V.FilesetResolver.forVisionTasks(base + '/wasm');
+      DEPTH.seg = await V.ImageSegmenter.createFromOptions(files, { baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/image_segmenter/deeplab_v3/float32/1/deeplab_v3.tflite', delegate: 'CPU' }, runningMode: 'IMAGE', outputCategoryMask: true, outputConfidenceMasks: false });
+      return DEPTH.seg;
+    } catch (e) { console.warn('2.5D depth unavailable:', e && e.message); DEPTH.failed = true; return null; }
+  })();
+  return DEPTH.loading;
+}
+async function makeMask(key) {
+  const img = R.img[key]; if (!img) return null; const seg = await depthModel(); if (!seg) return null;
+  const k = Math.min(1, 512 / Math.max(img.width, img.height)), w = Math.max(8, Math.round(img.width * k)), h = Math.max(8, Math.round(img.height * k));
+  const c = cv(w, h), x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0, w, h);
+  let res; try { res = seg.segment(c); } catch (e) { return null; }
+  const m = res.categoryMask, mw = m.width, mh = m.height, d = m.getAsUint8Array(); let on = 0, bx0 = mw, by0 = mh, bx1 = 0, by1 = 0;
+  const out = cv(mw, mh), ox = out.getContext('2d'), id = ox.createImageData(mw, mh);
+  let per = 0; for (let i = 0; i < d.length; i++) if (d[i] === 15) per++;   // deeplab class 15 = person
+  const want = per / d.length > 0.03 ? (v => v === 15) : (v => v > 0);
+  for (let i = 0; i < d.length; i++) if (want(d[i])) { on++; id.data[i * 4 + 3] = 255; const px = i % mw, py = (i / mw) | 0; if (px < bx0) bx0 = px; if (px > bx1) bx1 = px; if (py < by0) by0 = py; if (py > by1) by1 = py; }
+  try { m.close(); } catch (_) {}
+  const frac = on / d.length; DEPTH.lastFrac = frac; if (frac < 0.03 || frac > 0.82) return { none: true };
+  ox.putImageData(id, 0, 0);
+  // the head: the highest part of the subject (average x of the top rows)
+  let hs = 0, hn = 0; const hy1 = by0 + Math.max(2, Math.round((by1 - by0) * 0.06));
+  for (let y = by0; y <= hy1; y++) for (let xx = bx0; xx <= bx1; xx++) if (id.data[(y * mw + xx) * 4 + 3]) { hs += xx; hn++; }
+  const hx = hn ? hs / hn / mw : (bx0 + bx1) / 2 / mw, hyN = (by0 + (by1 - by0) * 0.12) / mh;
+  const soft = cv(mw, mh), sx = soft.getContext('2d'); sx.filter = 'blur(1.5px)'; sx.drawImage(out, 0, 0);
+  return { mask: soft, box: { x0: bx0 / mw, y0: by0 / mh, x1: (bx1 + 1) / mw, y1: (by1 + 1) / mh, hx, hy: hyN } };
+}
+function depthKick() {
+  if (DEPTH.busy || !DEPTH.queue.length || !depthOn()) return; DEPTH.busy = true;
+  const key = DEPTH.queue.shift();
+  makeMask(key).then(r => { DEPTH.masks.set(key, r || { none: true }); if (r && !r.none) { touch && touch(); if (typeof redraw === 'function') redraw(); } }).catch(() => DEPTH.masks.set(key, { none: true })).finally(() => { DEPTH.busy = false; setTimeout(depthKick, 30); });
+}
+function depthOf(key) {   // the mask when ready; starts making it otherwise
+  if (!depthOn() || !key) return null; const m = DEPTH.masks.get(key);
+  if (m) return m.none ? null : m;
+  if (!DEPTH.queue.includes(key) && R.img[key]) { DEPTH.queue.push(key); depthKick(); }
+  return null;
+}
+async function depthPrepare(keys, onProg) {   // before an export: make every mask first
+  if (!depthOn()) return; const todo = keys.filter(k => R.img[k] && !DEPTH.masks.has(k)); let n = 0;
+  for (const k of todo) { if (DEPTH.failed) return; DEPTH.masks.set(k, (await makeMask(k)) || { none: true }); onProg && onProg(++n, todo.length); }
+}
+function depthFg(key, src, m) {   // the subject cut out of the (toned) picture
+  const ck = key + '|' + src.width + 'x' + src.height + '|' + (src.__id || (src.__id = Math.random())); let c = DEPTH.fg.get(ck); if (c) return c;
+  if (DEPTH.fg.size > 30) DEPTH.fg.delete(DEPTH.fg.keys().next().value);
+  const k = Math.min(1, 1000 / Math.max(src.width, src.height)); c = cv(src.width * k, src.height * k); const x = c.getContext('2d');
+  x.drawImage(src, 0, 0, c.width, c.height); x.globalCompositeOperation = 'destination-in'; x.drawImage(m.mask, 0, 0, c.width, c.height);
+  DEPTH.fg.set(ck, c); return c;
+}
+// draw a picture into (dx, dy, dw, dh) with depth; p = 0…1 how far the move has gone, pan in pixels
+function drawDepth(ctx, key, src, dx, dy, dw, dh, p, pan, s) {
+  ctx.drawImage(src, dx, dy, dw, dh);
+  const m = depthOf(key); if (!m) return;
+  const fg = depthFg(key, src, m), b = m.box, ax = dx + dw * (b.x0 + b.x1) / 2, ay = dy + dh * b.y1, z = 1 + 0.045 * p, ex = pan * 0.9;
+  ctx.save(); ctx.translate(ax + ex, ay); ctx.scale(z, z); ctx.translate(-ax, -ay);
+  ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 18 * s * p; ctx.shadowOffsetY = 6 * s * p;
+  ctx.drawImage(fg, dx, dy, dw, dh); ctx.restore();
+}
 </script>
 <script>
 /* Vox Studio — screens and buttons. */
@@ -2722,7 +3021,7 @@ $$('.tab').forEach(b => b.onclick = () => showTab(b.dataset.tab));
 $$('[data-go]').forEach(b => b.onclick = () => showTab(b.dataset.go));
 
 /* ============ settings ============ */
-const BIND = ['gemMark', 'mode', 'animVar', 'decor', 'dust', 'stopmo', 'capPos', 'capColor', 'split', 'aspect', 'textLang', 'pace', 'look', 'perImage', 'theme', 'photo', 'accent', 'trans', 'motion', 'grain', 'vignette', 'captions', 'watermark', 'sfx', 'sfxVol', 'musicVol', 'duck', 'res', 'fps'];
+const BIND = ['hook', 'hookText', 'depth', 'shortEnd', 'gemMark', 'mode', 'animVar', 'decor', 'dust', 'stopmo', 'capPos', 'capColor', 'split', 'aspect', 'textLang', 'pace', 'look', 'perImage', 'theme', 'photo', 'accent', 'trans', 'motion', 'grain', 'vignette', 'captions', 'watermark', 'sfx', 'sfxVol', 'musicVol', 'duck', 'res', 'fps'];
 const NUMS = new Set(['perImage', 'motion', 'grain', 'sfxVol', 'musicVol', 'res', 'fps']);
 $('#look').innerHTML = Object.entries(LOOKS).map(([k, v]) => `<option value="${k}">${v.name}</option>`).join('');
 function applyModeDefaults() {
@@ -2966,7 +3265,7 @@ const FIELDS = {
   timeline: [['title', 'Title'], ['items', 'Items: one per line, "1857 | Revolt | cue-word"'], ['prompt', 'Background picture prompt (optional)']],
   list: [['title', 'Heading'], ['items', 'Points: one per line, "text | cue-word"'], ['prompt', 'Picture prompt (optional)']],
   chapter: [['num', 'Number (PART 1, 01…)'], ['text', 'Chapter title'], ['title', 'Subtitle (optional)']],
-  collage: [['citems', 'Items, one per line (kind  name | cue word | options)'], ['exit', 'How this board leaves']]
+  collage: [['citems', 'Items, one per line (kind  name | cue word | options). Kinds: pic, full, tag, title, stamp, note, number, arrow, circle, timeline (1968 Text; 1991 Text), chart (Title: 2004 145; 2009 206), route (Italy > Delhi)'], ['exit', 'How this board leaves']]
 };
 function itemsToText(sh) { return (sh.items || []).map(it => it.text + (it.word ? ' | ' + it.word : '')).join('\n'); }
 function textToItems(sh, v) {
@@ -2981,7 +3280,8 @@ function collageToText(sh) {
   return (sh.items || []).map(it => {
     let k, main;
     if (it.pic) { k = it.full ? 'full' : 'pic'; main = it.pic; }
-    else if (it.tag != null) { k = it.style === 'stamp' ? 'stamp' : it.style === 'note' ? 'note' : it.style === 'title' ? 'title' : 'tag'; main = it.tag; }
+    else if (it.gfx) { k = it.gfx; main = gfxToText(it); }
+    else if (it.tag != null) { k = it.style === 'stamp' ? 'stamp' : it.style === 'note' ? 'note' : it.style === 'title' ? 'title' : it.style === 'number' ? 'number' : 'tag'; main = it.tag; }
     else if (it.arrow) { k = 'arrow'; main = it.arrow + ' > ' + it.to; } else if (it.circle) { k = 'circle'; main = it.circle; } else return '';
     const opts = [it.anim, it.shape, it.on ? 'on=' + it.on : '', it.count ? 'count' : ''].filter(Boolean);
     return `${k} ${main}${it.word || opts.length ? ' | ' + (it.word || '') : ''}${opts.length ? ' | ' + opts.join(' ') : ''}`;
@@ -2994,9 +3294,10 @@ function textToCollage(sh, v) {
     const kind = m[1].toLowerCase(), main = m[2].trim(), it = { seg: (old[j] && old[j].seg) || sh.seg, word };
     opt.split(/\s+/).filter(Boolean).forEach(o => { if (o.startsWith('on=')) it.on = lidOf(o.slice(3)); else if (o === 'count') it.count = true; else if (['torn', 'tape', 'band'].includes(o)) it.shape = o; else if (ANIMS[o]) it.anim = o; });
     if (kind === 'pic' || kind === 'full') { const id = lidOf(main); if (!assetById(id)) (S.assets = S.assets || []).push({ id, kind: kind === 'full' ? 'scene' : 'cutout', prompt: main.replace(/_/g, ' ') }); it.pic = id; if (kind === 'full') it.full = true; return it; }
+    if (kind === 'timeline' || kind === 'chart' || kind === 'route') { it.gfx = kind; it.data = parseGfx(kind, main); return it; }
     if (kind === 'arrow') { const [a, b] = main.split('>').map(x => lidOf(x)); if (!b) return null; it.arrow = a; it.to = b; return it; }
     if (kind === 'circle') { it.circle = lidOf(main); return it; }
-    if (['tag', 'title', 'stamp', 'note'].includes(kind)) { it.tag = main; it.style = kind === 'tag' ? 'paper' : kind; return it; }
+    if (['tag', 'title', 'stamp', 'note', 'number'].includes(kind)) { it.tag = main; it.style = kind === 'tag' ? 'paper' : kind; if (kind === 'number') it.count = true; return it; }
     return null;
   }).filter(Boolean);
 }
@@ -3421,6 +3722,146 @@ function ytValue(id) {
   });
 })();
 
+</script>
+<script>
+/* Vox Studio — EXTRAS (screens): video check, Shorts, thumbnail maker. */
+'use strict';
+
+/* ============ check the video before exporting ============ */
+function projectIssues() {
+  const out = [], res = resolve(), add = (level, text, t) => out.push({ level, text, t });
+  if (!S.audioBlob) add('stop', 'No voiceover yet (step 1).');
+  if (!S.shots.length) add('stop', 'No plan yet (step 2).');
+  const miss = imageSlots().filter(x => !S.images[x.key]);
+  if (miss.length) { const first = miss[0], o = res.shots.find(o => o.sh === first.sh || (o.sh.items || []).some(it => it.pic && assetKey(it.pic) === first.key)); add('warn', `${miss.length} picture${miss.length > 1 ? 's are' : ' is'} missing (dashed boxes in the video).`, o ? o.t0 : null); }
+  const [W, H] = exportDims(); let crowded = 0, short = 0, long = 0, overlap = 0, emptyG = 0, ft = { crowded: null, short: null, long: null, overlap: null, emptyG: null };
+  res.shots.forEach(o => {
+    if (o.d < 1.0 && o.k < res.shots.length - 1) { short++; if (ft.short == null) ft.short = o.t0; }
+    if (o.sh.type !== 'collage') return;
+    const its = o.sh.items || [];
+    its.forEach(it => { if (it.tag && String(it.tag).split(/\s+/).length > 7) { long++; if (ft.long == null) ft.long = o.t0; }
+      if (it.gfx && !((it.data || {}).items || (it.data || {}).bars || (it.data || {}).from)) { emptyG++; if (ft.emptyG == null) ft.emptyG = o.t0; } });
+    if (its.filter(it => it.pic || it.gfx).length >= 4 && its.filter(it => it.tag != null).length >= 3) { crowded++; if (ft.crowded == null) ft.crowded = o.t0; }
+    try { const L = collageLayout(o, W, H); if (L.textBad > 0.08) { overlap++; if (ft.overlap == null) ft.overlap = o.t0; } } catch (_) {}
+  });
+  if (overlap) add('warn', `${overlap} board${overlap > 1 ? 's have' : ' has'} no free room: text still touches a picture. Shorten the text or remove a picture.`, ft.overlap);
+  if (long) add('warn', `${long} text${long > 1 ? 's are' : ' is'} longer than 7 words (hard to read).`, ft.long);
+  if (short) add('info', `${short} shot${short > 1 ? 's are' : ' is'} shorter than 1 second (they flash by).`, ft.short);
+  if (crowded) add('info', `${crowded} board${crowded > 1 ? 's are' : ' is'} crowded (4+ pictures and 3+ texts).`, ft.crowded);
+  if (emptyG) add('warn', `${emptyG} graphic${emptyG > 1 ? 's have' : ' has'} no content (timeline / chart / route).`, ft.emptyG);
+  if (hookOn() && !hookPics().length) add('info', 'Hook intro is on but there are no pictures yet for it.');
+  if (hookOn() && !hookText()) add('info', 'Hook intro has no question text (Look → Hook question).');
+  if (S.settings.aspect === '9:16' && S.settings.captions === 'off') add('info', 'Shorts usually do better with captions on.');
+  if (S.settings.depth !== 'off' && DEPTH.failed) add('info', '2.5D depth could not load (no internet?). Pictures stay flat.');
+  return out;
+}
+function showIssues(list) {
+  const box = $('#checkOut'); if (!box) return;
+  if (!list.length) { box.innerHTML = '<p class="info">✓ No problems found.</p>'; return; }
+  const ic = { stop: '⛔', warn: '⚠️', info: 'ℹ️' };
+  box.innerHTML = '<ul class="issues" style="padding-left:18px;margin:8px 0">' + list.map((x, i) => `<li style="margin:4px 0">${ic[x.level]} ${esc(x.text)}${x.t != null ? ` <button class="btn ghost small" data-it="${i}">Show ${fmt(x.t, 0)}</button>` : ''}</li>`).join('') + '</ul>';
+  box.querySelectorAll('[data-it]').forEach(b => b.onclick = () => { const x = list[+b.dataset.it]; setT(x.t + 0.4); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+}
+$('#checkBtn').onclick = () => showIssues(projectIssues());
+const _exportVideo = exportVideo;
+exportVideo = async function () {   // check first; problems need a second press
+  const btn = $('#exportBtn'), list = projectIssues(), stop = list.filter(x => x.level === 'stop');
+  if (stop.length) { showIssues(list); return toast(stop[0].text); }
+  const warn = list.filter(x => x.level === 'warn');
+  if (warn.length && !btn.dataset.checked) { btn.dataset.checked = '1'; showIssues(list); $('#exportInfo').textContent = 'Some problems found (below). Press Export again to export anyway.'; setTimeout(() => delete btn.dataset.checked, 10000); return; }
+  delete btn.dataset.checked; btn.dataset.confirm = '1';   // the old missing-picture question is already answered
+  try { await _exportVideo(); } finally { delete btn.dataset.confirm; }
+};
+$('#exportBtn').onclick = () => exportVideo();
+
+/* ============ Shorts ============ */
+let shortParts = [];
+const HOT = /\d|\?|!|pehli|pahli|pehla|kabhi nahi|sach|raaz|shock|sabse|first|never|secret|truth|why|kyun|kyon|kaise|lekin|magar|achanak|suddenly|only|sirf|record|crore|lakh|million|billion/i;
+function findShorts() {
+  const g = sentenceGroups(), D = duration(); if (!g.length || D < 30) return [];
+  const st = i => S.starts[i] || 0, en = i => segEnd(i);
+  const score = gi => g[gi].reduce((a, i) => { const tx = plain(S.segments[i].text); return a + (tx.match(HOT) ? 2 : 0) + (/\?/.test(tx) ? 2 : 0) + (/\d/.test(tx) ? 1.5 : 0); }, 0);
+  const cands = [];
+  for (let a = 0; a < g.length; a++) {
+    let b = a; while (b < g.length - 1 && en(g[b][g[b].length - 1]) - st(g[a][0]) < 32) b++;
+    const t0 = st(g[a][0]), t1 = en(g[b][g[b].length - 1]); if (t1 - t0 < 25 || t1 - t0 > 62) continue;
+    let sc = 0; for (let k = a; k <= b; k++) sc += score(k); sc /= Math.max(1, b - a + 1); sc += score(a) * 0.8;   // a strong first line matters most
+    cands.push({ a, b, t0, t1, sc });
+  }
+  cands.sort((x, y) => y.sc - x.sc);
+  const want = D > 240 ? 4 : 3, pick = [];
+  for (const c of cands) { if (pick.length >= want) break; if (pick.some(p => c.t0 < p.t1 + 2 && c.t1 > p.t0 - 2)) continue; pick.push(c); }
+  return pick.sort((x, y) => x.t0 - y.t0).map(c => { const first = plain(S.segments[g[c.a][0]].text).split(/\s+/); return { from: Math.max(0, c.t0 - 0.05), to: Math.min(D, c.t1 + 0.35), title: first.slice(0, 7).join(' ').replace(/[,.;:]+$/, '') + (first.length > 7 ? '…' : '') }; });
+}
+function renderShorts() {
+  const box = $('#shortList');
+  if (!shortParts.length) { box.innerHTML = '<p class="info">No good 30–60 s parts found (the voiceover must be longer than 30 s).</p>'; return; }
+  box.innerHTML = shortParts.map((p, i) => `<div class="card" style="margin:8px 0;padding:10px"><b>Short ${i + 1}</b> · ${fmt(p.from, 0)}–${fmt(p.to, 0)} (${Math.round(p.to - p.from)} s)
+    <label>Title on top <input data-st="${i}" value="${esc(p.title)}"></label>
+    <div class="row"><button class="btn ghost small" data-sp="${i}">▶ Preview</button><button class="btn primary small" data-sx="${i}">Export Short ${i + 1}</button></div></div>`).join('');
+  box.querySelectorAll('[data-st]').forEach(el => el.oninput = () => { shortParts[+el.dataset.st].title = el.value; });
+  box.querySelectorAll('[data-sp]').forEach(el => el.onclick = () => { setT(shortParts[+el.dataset.sp].from); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+  box.querySelectorAll('[data-sx]').forEach(el => el.onclick = () => exportShort(+el.dataset.sx));
+}
+$('#shortFind').onclick = () => { if (!S.audioBlob) return toast('Add the voiceover first (step 1)'); if (!S.shots.length) return toast('Make the plan first (step 2)'); shortParts = findShorts(); renderShorts(); };
+async function exportShort(i) {
+  const p = shortParts[i]; if (!p || !audioBuf) return;
+  if (!(window.VideoEncoder && window.AudioEncoder && window.Mp4Muxer)) return toast('Shorts need the fast exporter (Chrome / the Android app).');
+  if (exporting) return toast('An export is already running');
+  const keep = { aspect: S.settings.aspect, captions: S.settings.captions }, r = +S.settings.res;
+  S.settings.aspect = '9:16'; if (S.settings.captions === 'off') S.settings.captions = 'words'; R.noHook = true; R.short = { title: p.title, end: S.settings.shortEnd }; touch();
+  try { await exportOffline({ from: p.from, to: p.to, dims: [r, Math.round(r * 16 / 9 / 2) * 2], name: `${safeName()}-short-${i + 1}`, label: `Short ${i + 1}:` }); }
+  finally { Object.assign(S.settings, keep); R.noHook = false; R.short = null; R.capOff = false; touch(); sizePreview(); drawPreview(); }
+}
+
+/* ============ thumbnail maker ============ */
+const thCv = $('#thCv'), thX = thCv.getContext('2d'); let thFrame = null, thT = 0;
+function thPictures() {
+  const list = []; (S.assets || []).forEach(a => { const k = assetKey(a.id); if (R.img[k]) list.push({ k, label: a.id.replace(/_/g, ' '), a }); });
+  S.shots.forEach((sh, i) => { const k = imgKey(sh); if (R.img[k]) list.push({ k, label: `Shot ${i + 1}`, sh }); });
+  return list;
+}
+function thFill() {
+  const sel = $('#thPic'), cur = sel.value, L = thPictures();
+  sel.innerHTML = (thFrame ? '<option value="__frame">Preview frame</option>' : '') + L.map(x => `<option value="${esc(x.k)}">${esc(x.label)}</option>`).join('');
+  if (cur && [...sel.options].some(o => o.value === cur)) sel.value = cur; else { const sc = L.find(x => x.a && x.a.kind === 'scene') || L[0]; if (sc) sel.value = sc.k; }
+  if (!$('#thText').value) $('#thText').value = hookText();
+}
+async function thDraw() {
+  const W = 1280, H = 720, s = H / 1080, x = thX, k = $('#thPic').value, right = $('#thSide').value === 'right', col = $('#thCol').value, extra = $('#thExtra').value;
+  await loadFonts(); x.save(); x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = '#111'; x.fillRect(0, 0, W, H);
+  const src = k === '__frame' ? thFrame : (() => { const it = thPictures().find(p => p.k === k); return it ? (it.a ? toned(k, assetMode(it.a)) : filtered(k, photoMode(it.sh))) || R.img[k] : null; })();
+  let m = null; if (src && k !== '__frame' && S.settings.depth !== 'off') { m = DEPTH.masks.get(k); if (!m) { m = await makeMask(k); DEPTH.masks.set(k, m || { none: true }); } if (m && m.none) m = null; }
+  let subj = null;
+  if (src) {
+    const cr = coverRect(src, W, H); x.save(); if (m) x.filter = 'blur(6px) brightness(0.7) saturate(1.2)'; else x.filter = 'brightness(0.85)'; x.drawImage(src, cr.x, cr.y, cr.w, cr.h); x.restore();
+    if (m) {   // the person cut out, bigger, with a white border
+      const fg = depthFg(k, src, m), b = m.box, bw = (b.x1 - b.x0) * src.width, bh = (b.y1 - b.y0) * src.height, z = Math.min(H * 0.98 / bh, W * 0.46 / bw);
+      const dw = src.width * z, dh = src.height * z, cx = right ? W * 0.74 : W * 0.26, dx = cx - (b.x0 + b.x1) / 2 * dw, dy = H - b.y1 * dh + H * 0.02;
+      const sil = cv(fg.width, fg.height), sx = sil.getContext('2d'); sx.drawImage(fg, 0, 0); sx.globalCompositeOperation = 'source-in'; sx.fillStyle = '#fff'; sx.fillRect(0, 0, sil.width, sil.height);
+      x.save(); x.shadowColor = 'rgba(0,0,0,0.6)'; x.shadowBlur = 30; for (let a = 0; a < 16; a++) { const r = 9; x.drawImage(sil, dx + Math.cos(a / 16 * 6.283) * r, dy + Math.sin(a / 16 * 6.283) * r, dw, dh); } x.restore();
+      x.drawImage(fg, dx, dy, dw, dh);
+      subj = { x: dx + b.x0 * dw, y: dy + b.y0 * dh, w: bw * z, h: bh * z, hx: dx + b.hx * dw, hy: dy + b.hy * dh };
+    } else subj = { x: right ? W * 0.5 : W * 0.05, y: H * 0.1, w: W * 0.45, h: H * 0.8 };
+  }
+  const g = x.createLinearGradient(right ? 0 : W, 0, right ? W * 0.62 : W * 0.38, 0); g.addColorStop(0, 'rgba(0,0,0,0.75)'); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, W, H);
+  const txt = upper($('#thText').value || hookText() || ''), hl = upper($('#thHl').value.trim()) || txt.split(/\s+/).pop(), hc = col === 'red' ? '#ff2d2d' : col === 'accent' ? accent() : '#ffd400';
+  const words = txt.split(/\s+/).filter(Boolean), maxW = W * 0.5; let size = 150, lines;
+  for (;;) { x.font = sansF(size, 900); lines = []; let cur = []; words.forEach(w => { const tt = [...cur, w].join(' '); if (cur.length && x.measureText(tt).width > maxW) { lines.push(cur); cur = [w]; } else cur.push(w); }); if (cur.length) lines.push(cur); if (lines.length <= 3 || size < 60) break; size *= 0.9; }
+  const lh = size * 1.02, y0 = H / 2 - lh * lines.length / 2, tx = right ? W * 0.05 : W * 0.95 - maxW;
+  x.textBaseline = 'top'; x.textAlign = 'left'; x.lineJoin = 'round';
+  lines.forEach((ln, i) => { let cx = tx; const y = y0 + i * lh; ln.forEach(w => { x.font = sansF(size, 900); const ww = x.measureText(w + ' ').width, isH = w.replace(/[^\p{L}\p{N}]/gu, '') === hl.replace(/[^\p{L}\p{N}]/gu, '');
+    x.lineWidth = size * 0.16; x.strokeStyle = '#000'; x.strokeText(w, cx, y); x.fillStyle = isH ? hc : '#fff'; x.fillText(w, cx, y); cx += ww; }); });
+  if (subj && (extra === 'circle' || extra === 'both')) { const cx = subj.hx ?? subj.x + subj.w / 2, cy = subj.hy ?? subj.y + subj.h * 0.2, r = Math.min(subj.w * 0.3, subj.h * 0.14, H * 0.16); x.save(); x.strokeStyle = '#ff1f1f'; x.lineWidth = 12; x.shadowColor = 'rgba(0,0,0,0.5)'; x.shadowBlur = 10; x.beginPath(); x.ellipse(cx, cy, r * 1.1, r, -0.1, 0, Math.PI * 1.95); x.stroke(); x.restore(); }
+  if (subj && (extra === 'arrow' || extra === 'both')) { const ax = right ? tx + maxW * 0.9 : tx + maxW * 0.1, ay = y0 + lh * lines.length + 30, bx = (subj.hx ?? subj.x + subj.w / 2) + (right ? -1 : 1) * Math.min(subj.w * 0.36, subj.h * 0.18), by = (subj.hy ?? subj.y + subj.h * 0.2) + subj.h * 0.08; x.save(); x.shadowColor = 'rgba(0,0,0,0.5)'; x.shadowBlur = 10; drawArrow(x, ax, Math.min(H - 40, ay), bx, by, 1, 14, '#ff1f1f'); x.restore(); }
+  x.restore();
+}
+['#thPic', '#thSide', '#thCol', '#thExtra'].forEach(id => $(id).onchange = () => thDraw());
+['#thText', '#thHl'].forEach(id => $(id).oninput = () => { clearTimeout(thT); thT = setTimeout(thDraw, 150); });
+$('#thFromFrame').onclick = () => { const [W, H] = [1280, 720]; thFrame = cv(W, H); drawFrame(thFrame.getContext('2d'), W, H, nowT()); thFill(); $('#thPic').value = '__frame'; thDraw(); };
+$('#thSave').onclick = async () => { await thDraw(); thCv.toBlob(b => download(b, `${safeName()}-thumbnail.png`), 'image/png'); };
+document.querySelectorAll('.tab[data-tab="yt"]').forEach(b => b.addEventListener('click', () => setTimeout(() => { thFill(); thDraw(); }, 50)));
+window.VoxExtras = ({ projectIssues, findShorts, exportShort, thDraw, thFill, drawHook, hookText, hookPics, DEPTH, makeMask });
 </script>
 </body>
 </html>
