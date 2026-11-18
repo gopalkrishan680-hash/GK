@@ -361,6 +361,7 @@ html:not(.mode-layers) .layers-only { display: none !important; }
           <label class="f">Expression <select id="ovExprSel"><option value="on">Natural: questions rise, sad lines slower, happy lines livelier</option><option value="off">Flat (same for every line)</option></select></label>
           <div class="row">
             <label class="f">Hinglish script <select id="ovHi"><option value="auto">Auto: read Roman Hindi as Hindi (clearer words)</option><option value="on">Always convert to Hindi letters</option><option value="off">Read as written</option></select></label>
+            <label class="f">Breaths <select id="ovBreathSel"><option value="on">Soft breaths + room sound (more human)</option><option value="off">Off</option></select></label>
             <label class="f">Sound <select id="ovPolish"><option value="on">Studio polish (warmer, fuller, less robotic)</option><option value="off">Raw phone voice</option></select></label>
           </div>
           <div class="row"><button class="btn primary" id="ovGo">Make voiceover</button><button class="btn" id="ovTest">▶ Test voice</button><button class="btn" id="ovStop" hidden>Stop</button><button class="btn" data-dlvoice id="ovDl" hidden>⬇ Download voiceover</button></div>
@@ -876,7 +877,7 @@ He looked at Papa. Papa smiled, and said, "I am proud of you."`;
 /* ============ state ============ */
 const DEFAULTS = { title: '', aspect: '16:9', grid: 3, style: 'stickman', styleText: STYLES.stickman.text, characters: '', gutter: 'auto',
   splitLevel: 'all', minWords: 2, maxWords: 14, captions: 'bar', fit: 'auto', enhance: 'on', v: 3, capSize: 1, motion: 6, transition: 'fade', transDur: 0.15, res: 1080, fps: 30, musicVol: 0.12, anim: 'on', animAmt: 1, capWords: 'on', pics: 'images', skStyle: 'chibi', lPer: 9, lLib: 'on',
-  fx: 'on', fxAmt: 1, fxDoodle: 'on', fxSfx: 'on', fxVol: 0.6, ovVoice: '', ovEngine: '', ovHi: 'auto', ovPolish: 'on', ovRate: 0.95, ovPitch: 1, ovPause: 0.45, ovExpr: 'on', mode: 'layers', lBg: 'parchment', lEnter: 'auto', lTrans: 'cut', lIdle: 'subtle', lCam: 'on', lCaps: 'off', sfx: 'on', sfxVol: 0.5, duck: 'on' };
+  fx: 'on', fxAmt: 1, fxDoodle: 'on', fxSfx: 'on', fxVol: 0.6, ovVoice: '', ovEngine: '', ovHi: 'auto', ovPolish: 'on', ovBreath: 'on', ovRate: 0.95, ovPitch: 1, ovPause: 0.45, ovExpr: 'on', mode: 'layers', lBg: 'parchment', lEnter: 'auto', lTrans: 'cut', lIdle: 'subtle', lCam: 'on', lCaps: 'off', sfx: 'on', sfxVol: 0.5, duck: 'on' };
 try { if (matchMedia('(pointer: coarse)').matches) DEFAULTS.res = 720; } catch (_) {}   // phones: smaller, faster export
 const S = { settings: { ...DEFAULTS }, script: '', segments: [], starts: [], grids: [], overrides: {}, audioBlob: null, audioName: '', musicBlob: null, musicName: '' };
 let uid = 1;
@@ -5019,11 +5020,18 @@ async function ovGenerate() {
       parts.push({ pcm: lines[i].text.replace(/[^\p{L}\p{N}]/gu, '') ? await ovDecode(await ovSynth(lines[i].text, e.rate, e.pitch)) : new Float32Array(0), pause: e.pause + lines[i].extra });
     }
     const SR = 24000, base = S.settings.ovPause || 0.45;
-    const gaps = parts.map((p, i) => i < parts.length - 1 ? base * (0.85 + 0.3 * ((i * 7919) % 10) / 10) + p.pause : 0);
-    const total = Math.round(SR * 0.3) + parts.reduce((a, p, i) => a + p.pcm.length + Math.round(SR * gaps[i]), 0) + Math.round(SR * 0.6);
-    const out = new Float32Array(total); let t = Math.round(SR * 0.3); const timings = [];
-    parts.forEach((p, i) => { out.set(p.pcm, t); timings.push({ start: +(t / SR).toFixed(3), end: +((t + p.pcm.length) / SR).toFixed(3), text: units[i] }); t += p.pcm.length + Math.round(SR * gaps[i]); });
-    let pk = 0; for (const a of out) pk = Math.max(pk, Math.abs(a)); if (pk > 0) for (let i = 0; i < out.length; i++) out[i] *= 0.95 / pk;
+    const gaps = ovGaps(units, parts, base);
+    let pk = 0; for (const p of parts) for (const a of p.pcm) pk = Math.max(pk, Math.abs(a)); const k = pk > 0 ? 0.95 / pk : 1;
+    const total = Math.round(SR * 0.4) + parts.reduce((a, p, i) => a + p.pcm.length + Math.round(SR * gaps[i]), 0) + Math.round(SR * 0.6);
+    const out = new Float32Array(total); let t = Math.round(SR * 0.4); const timings = [], rnd = mulberry32(7);
+    parts.forEach((p, i) => {
+      // a soft breath before a new thought (after a real pause, or before a long line), as a narrator does
+      const words = units[i].split(/\s+/).length, room = i ? gaps[i - 1] : 0.4;
+      if (S.settings.ovBreath !== 'off' && room >= 0.38 && (words >= 9 || i % 3 === 0)) ovBreath(out, t, SR, rnd, words >= 12 ? 1 : 0.7);
+      for (let j = 0; j < p.pcm.length; j++) out[t + j] += p.pcm[j] * k;
+      timings.push({ start: +(t / SR).toFixed(3), end: +((t + p.pcm.length) / SR).toFixed(3), text: units[i] }); t += p.pcm.length + Math.round(SR * gaps[i]);
+    });
+    if (S.settings.ovBreath !== 'off') ovRoomTone(out, SR);
     const fin = S.settings.ovPolish === 'off' ? out : await ovPolish(out, SR);
     await setVoice(encodeWav(fin, SR), 'Offline voiceover.wav');
     ttsTiming(timings); segmentsChanged(true);
@@ -5049,13 +5057,48 @@ $('#ovTest').onclick = async () => {
 $('#ovSettings').onclick = () => { try { AndroidBridge.ttsSettings(); } catch (_) { toast('Open phone Settings → Text-to-speech output'); } };
 $('#ovVoice').onchange = e => { S.settings.ovVoice = e.target.value; save(); };
 document.addEventListener('visibilitychange', () => { if (!document.hidden && OV.state === 'ready') ovLoadVoices(); });   // back from voice settings: new voices
-function ovToUI() { $('#ovHi').value = S.settings.ovHi || 'auto'; $('#ovPolish').value = S.settings.ovPolish || 'on'; $('#ovRate').value = S.settings.ovRate; $('#ovPitch').value = S.settings.ovPitch; $('#ovPause').value = S.settings.ovPause; $('#ovExprSel').value = S.settings.ovExpr; ovShowVals(); }
+function ovToUI() { $('#ovBreathSel').value = S.settings.ovBreath || 'on'; $('#ovHi').value = S.settings.ovHi || 'auto'; $('#ovPolish').value = S.settings.ovPolish || 'on'; $('#ovRate').value = S.settings.ovRate; $('#ovPitch').value = S.settings.ovPitch; $('#ovPause').value = S.settings.ovPause; $('#ovExprSel').value = S.settings.ovExpr; ovShowVals(); }
 function ovShowVals() { $('#ovRateV').textContent = (+S.settings.ovRate).toFixed(2) + '×'; $('#ovPitchV').textContent = (+S.settings.ovPitch).toFixed(2); $('#ovPauseV').textContent = (+S.settings.ovPause).toFixed(2) + ' s'; }
 [['ovRate', 'ovRate'], ['ovPitch', 'ovPitch'], ['ovPause', 'ovPause']].forEach(([id, k]) => $('#' + id).addEventListener('input', e => { S.settings[k] = +e.target.value; ovShowVals(); save(); }));
 $('#ovExprSel').onchange = e => { S.settings.ovExpr = e.target.value; save(); };
 $('#ovHi').onchange = e => { S.settings.ovHi = e.target.value; save(); };
 $('#ovPolish').onchange = e => { S.settings.ovPolish = e.target.value; save(); };
+$('#ovBreathSel').onchange = e => { S.settings.ovBreath = e.target.value; save(); };
 $('#ovEngine').onchange = e => { S.settings.ovEngine = e.target.value; S.settings.ovVoice = ''; save(); try { OV.state = AndroidBridge.ttsUseEngine(e.target.value); } catch (_) { OV.state = 'failed'; } OV.voices = []; ovRefresh(); };
+// pauses like a narrator: short between joined thoughts, longer after a question, a paragraph or "…", never all the same
+function ovGaps(units, parts, base) {
+  const scr = (S.script || '').replace(/\r/g, ''), low = scr.toLowerCase(); let pos = 0;
+  return parts.map((p, i) => {
+    if (i === parts.length - 1) return 0;
+    const u = plain(units[i]).trim(), next = plain(units[i + 1] || '').trim().toLowerCase(), words = u.split(/\s+/).length;
+    // paragraph end: the script has an empty line or a line break right after this sentence
+    let para = false; const tail = u.slice(-12).toLowerCase(), at = tail ? low.indexOf(tail, pos) : -1;
+    if (at >= 0) { pos = at + tail.length; para = /^[\s"'”’)*]*\n/.test(scr.slice(pos, pos + 6)); }
+    let f = 1;
+    if (/\?["'”’)]*$/.test(u)) f = 1.25; else if (/!["'”’)]*$/.test(u)) f = 1.05;
+    if (/(…|\.\.\.)["'”’)]*$/.test(u)) f = 1.9;
+    if (para) f = Math.max(f, 1.8);
+    if (words <= 4) f *= 0.75;
+    if (/^(aur|or|par|lekin|phir|fir|to|toh|kyunki|but|and|so|then|और|पर|लेकिन|फिर|तो|क्योंकि)\b/.test(next)) f *= 0.8;
+    const jitter = 0.85 + 0.3 * (((i * 7919) % 13) / 13);
+    return base * f * jitter + p.pause;
+  });
+}
+// a breath: soft airy noise that swells and stops just before the line
+function ovBreath(out, at, sr, rnd, size) {
+  const dur = 0.28 + 0.12 * size, n = Math.round(sr * dur), st = at - n - Math.round(sr * 0.06); if (st < 0) return;
+  let lp = 0, lp2 = 0;
+  for (let i = 0; i < n; i++) {
+    const p = i / n, env = Math.pow(Math.sin(Math.PI * Math.min(1, p * 1.15)), 1.5) * (p > 0.87 ? (1 - p) / 0.13 : 1);
+    const w = rnd() * 2 - 1; lp += (w - lp) * 0.35; lp2 += (lp - lp2) * 0.35;   // band-limited "hhh"
+    out[st + i] += (lp - lp2) * env * 0.11 * size;
+  }
+}
+// very quiet room sound under everything, so the gaps are not dead digital silence
+function ovRoomTone(out, sr) {
+  const rnd = mulberry32(3); let b0 = 0, b1 = 0, b2 = 0;
+  for (let i = 0; i < out.length; i++) { const w = rnd() * 2 - 1; b0 = 0.997 * b0 + w * 0.029591; b1 = 0.985 * b1 + w * 0.032534; b2 = 0.95 * b2 + w * 0.048056; out[i] += (b0 + b1 + b2) * 0.0035; }
+}
 // a warmer, fuller voice: low cut, a little body and presence, gentle compression and a very small room
 async function ovPolish(pcm, sr) {
   const oc = new OfflineAudioContext(1, pcm.length + Math.round(sr * 0.3), sr), b = oc.createBuffer(1, pcm.length, sr); b.copyToChannel(pcm, 0);
