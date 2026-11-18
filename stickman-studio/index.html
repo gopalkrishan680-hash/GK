@@ -353,6 +353,10 @@ html:not(.mode-layers) .layers-only { display: none !important; }
           <label class="f">Voice type <select id="ovKind"><option value="kokoro">AI voice (Kokoro): natural, offline after a one-time download</option><option value="phone">Phone voice (Google / Samsung speech engine)</option></select></label>
           <div class="ov-kk" style="display:grid;gap:8px">
             <div class="row"><label class="f" style="flex:1 1 220px">AI voice <select id="kkVoice"><option value="hm_omega">Omega · male (default)</option><option value="hm_psi">Psi · male</option><option value="hf_alpha">Alpha · female</option><option value="hf_beta">Beta · female</option></select></label></div>
+            <div class="row">
+              <label class="f">Speaking speed <span class="tc" id="kkSpeedV"></span><input type="range" id="kkSpeed" min="0.7" max="1.6" step="0.05"></label>
+              <label class="f">Pause after a sentence <span class="tc" id="kkPauseV"></span><input type="range" id="kkPause" min="0.1" max="1" step="0.05"></label>
+            </div>
             <div class="row"><button class="btn small" id="kkGet">⬇ Download AI voice (120 MB, once)</button><button class="btn small" id="kkDel" hidden>Remove AI voice</button></div>
             <progress id="kkProg" value="0" max="1" hidden></progress>
             <p class="hint" style="margin:0" id="kkState"></p>
@@ -362,14 +366,14 @@ html:not(.mode-layers) .layers-only { display: none !important; }
           <div class="row ov-phone"><label class="f" style="flex:1 1 220px">Voice <select id="ovVoice"></select></label><button class="btn small" id="ovSettings" title="Download the Hindi voice for offline use">Voice settings</button></div>
           <p class="hint ov-phone" style="margin:0" id="ovTip">Tip: try every voice with ▶ Test voice. Voices marked "best quality" sound the most human (they need the internet while speaking, but still no API key).</p>
           <div class="row">
-            <label class="f">Speed <span class="tc" id="ovRateV"></span><input type="range" id="ovRate" min="0.7" max="1.3" step="0.01"></label>
+            <label class="f ov-phone">Speed <span class="tc" id="ovRateV"></span><input type="range" id="ovRate" min="0.7" max="1.3" step="0.01"></label>
             <label class="f ov-phone">Pitch <span class="tc" id="ovPitchV"></span><input type="range" id="ovPitch" min="0.8" max="1.2" step="0.01"></label>
-            <label class="f">Pause after a sentence <span class="tc" id="ovPauseV"></span><input type="range" id="ovPause" min="0.15" max="1.2" step="0.05"></label>
+            <label class="f ov-phone">Pause after a sentence <span class="tc" id="ovPauseV"></span><input type="range" id="ovPause" min="0.15" max="1.2" step="0.05"></label>
           </div>
           <label class="f">Expression <select id="ovExprSel"><option value="on">Natural: questions rise, sad lines slower, happy lines livelier</option><option value="off">Flat (same for every line)</option></select></label>
           <div class="row">
             <label class="f">Hinglish script <select id="ovHi"><option value="auto">Auto: read Roman Hindi as Hindi (clearer words)</option><option value="on">Always convert to Hindi letters</option><option value="off">Read as written</option></select></label>
-            <label class="f">Breaths <select id="ovBreathSel"><option value="on">Soft breaths + room sound (more human)</option><option value="off">Off</option></select></label>
+            <label class="f">Breath sounds <select id="ovBreathSel"><option value="off">Off</option><option value="on">On: a soft breath before new thoughts</option></select></label>
             <label class="f">Sound <select id="ovPolish"><option value="on">Studio polish (warmer, fuller, less robotic)</option><option value="off">Raw phone voice</option></select></label>
           </div>
           <div class="row"><button class="btn primary" id="ovGo">Make voiceover</button><button class="btn" id="ovTest">▶ Test voice</button><button class="btn" id="ovStop" hidden>Stop</button><button class="btn" data-dlvoice id="ovDl" hidden>⬇ Download voiceover</button></div>
@@ -885,7 +889,7 @@ He looked at Papa. Papa smiled, and said, "I am proud of you."`;
 /* ============ state ============ */
 const DEFAULTS = { title: '', aspect: '16:9', grid: 3, style: 'stickman', styleText: STYLES.stickman.text, characters: '', gutter: 'auto',
   splitLevel: 'all', minWords: 2, maxWords: 14, captions: 'bar', fit: 'auto', enhance: 'on', v: 3, capSize: 1, motion: 6, transition: 'fade', transDur: 0.15, res: 1080, fps: 30, musicVol: 0.12, anim: 'on', animAmt: 1, capWords: 'on', pics: 'images', skStyle: 'chibi', lPer: 9, lLib: 'on',
-  fx: 'on', fxAmt: 1, fxDoodle: 'on', fxSfx: 'on', fxVol: 0.6, ovKind: 'kokoro', kkVoice: 'hm_omega', ovVoice: '', ovEngine: '', ovHi: 'auto', ovPolish: 'on', ovBreath: 'on', ovRate: 0.95, ovPitch: 1, ovPause: 0.45, ovExpr: 'on', mode: 'layers', lBg: 'parchment', lEnter: 'auto', lTrans: 'cut', lIdle: 'subtle', lCam: 'on', lCaps: 'off', sfx: 'on', sfxVol: 0.5, duck: 'on' };
+  fx: 'on', fxAmt: 1, fxDoodle: 'on', fxSfx: 'on', fxVol: 0.6, ovKind: 'kokoro', kkVoice: 'hm_omega', ovVoice: '', ovEngine: '', ovHi: 'auto', ovPolish: 'on', ovBreath2: 'off', kkSpeed: 1.1, kkPause: 0.35, ovRate: 0.95, ovPitch: 1, ovPause: 0.45, ovExpr: 'on', mode: 'layers', lBg: 'parchment', lEnter: 'auto', lTrans: 'cut', lIdle: 'subtle', lCam: 'on', lCaps: 'off', sfx: 'on', sfxVol: 0.5, duck: 'on' };
 try { if (matchMedia('(pointer: coarse)').matches) DEFAULTS.res = 720; } catch (_) {}   // phones: smaller, faster export
 const S = { settings: { ...DEFAULTS }, script: '', segments: [], starts: [], grids: [], overrides: {}, audioBlob: null, audioName: '', musicBlob: null, musicName: '' };
 let uid = 1;
@@ -4988,7 +4992,7 @@ async function ovDecode(b64) {
 // a little expression per sentence, from its punctuation and words
 function ovExpr(text, idx = 0) {
   const hum = k => 1 + 0.022 * Math.sin(idx * 2.399 + k);   // a tiny natural change from line to line
-  const R = (S.settings.ovRate || 0.95) * hum(0.7), P = (S.settings.ovPitch || 1) * hum(2.1);
+  const R = (kkOn() ? (S.settings.kkSpeed || 1.1) : (S.settings.ovRate || 0.95)) * hum(0.7), P = (S.settings.ovPitch || 1) * hum(2.1);
   if (S.settings.ovExpr === 'off') return { rate: R, pitch: P, pause: 0 };
   const t = text.trim(), sc = amScore(t); let rate = R, pitch = P, pause = 0;
   if (/\?["'”’)]*$/.test(t)) { pitch *= 1.05; pause += 0.1; }
@@ -5027,7 +5031,7 @@ async function ovGenerate() {
       const e = ovExpr(lines[i].text, i);
       parts.push({ pcm: lines[i].text.replace(/[^\p{L}\p{N}]/gu, '') ? await ovSpeak(lines[i].text, e) : new Float32Array(0), pause: e.pause + lines[i].extra });
     }
-    const SR = 24000, base = S.settings.ovPause || 0.45;
+    const SR = 24000, base = kkOn() ? (S.settings.kkPause ?? 0.35) : (S.settings.ovPause || 0.45);
     const gaps = ovGaps(units, parts, base);
     let pk = 0; for (const p of parts) for (const a of p.pcm) pk = Math.max(pk, Math.abs(a)); const k = pk > 0 ? 0.95 / pk : 1;
     const total = Math.round(SR * 0.4) + parts.reduce((a, p, i) => a + p.pcm.length + Math.round(SR * gaps[i]), 0) + Math.round(SR * 0.6);
@@ -5035,11 +5039,11 @@ async function ovGenerate() {
     parts.forEach((p, i) => {
       // a soft breath before a new thought (after a real pause, or before a long line), as a narrator does
       const words = units[i].split(/\s+/).length, room = i ? gaps[i - 1] : 0.4;
-      if (S.settings.ovBreath !== 'off' && room >= 0.38 && (words >= 9 || i % 3 === 0)) ovBreath(out, t, SR, rnd, words >= 12 ? 1 : 0.7);
+      if (S.settings.ovBreath2 === 'on' && room >= 0.38 && (words >= 9 || i % 3 === 0)) ovBreath(out, t, SR, rnd, words >= 12 ? 1 : 0.7);
       for (let j = 0; j < p.pcm.length; j++) out[t + j] += p.pcm[j] * k;
       timings.push({ start: +(t / SR).toFixed(3), end: +((t + p.pcm.length) / SR).toFixed(3), text: units[i] }); t += p.pcm.length + Math.round(SR * gaps[i]);
     });
-    if (S.settings.ovBreath !== 'off') ovRoomTone(out, SR);
+    if (S.settings.ovPolish !== 'off') ovRoomTone(out, SR);
     const fin = S.settings.ovPolish === 'off' ? out : await ovPolish(out, SR);
     await setVoice(encodeWav(fin, SR), 'Offline voiceover.wav');
     ttsTiming(timings); segmentsChanged(true);
@@ -5065,13 +5069,16 @@ $('#ovTest').onclick = async () => {
 $('#ovSettings').onclick = () => { try { AndroidBridge.ttsSettings(); } catch (_) { toast('Open phone Settings → Text-to-speech output'); } };
 $('#ovVoice').onchange = e => { S.settings.ovVoice = e.target.value; save(); };
 document.addEventListener('visibilitychange', () => { if (!document.hidden && OV.state === 'ready') ovLoadVoices(); });   // back from voice settings: new voices
-function ovToUI() { $('#ovKind').value = kkOn() ? 'kokoro' : 'phone'; $('#kkVoice').value = S.settings.kkVoice || 'hm_omega'; kkShow(); $('#ovBreathSel').value = S.settings.ovBreath || 'on'; $('#ovHi').value = S.settings.ovHi || 'auto'; $('#ovPolish').value = S.settings.ovPolish || 'on'; $('#ovRate').value = S.settings.ovRate; $('#ovPitch').value = S.settings.ovPitch; $('#ovPause').value = S.settings.ovPause; $('#ovExprSel').value = S.settings.ovExpr; ovShowVals(); }
+function ovToUI() { $('#ovKind').value = kkOn() ? 'kokoro' : 'phone'; $('#kkVoice').value = S.settings.kkVoice || 'hm_omega'; kkShow(); $('#ovBreathSel').value = S.settings.ovBreath2 || 'off'; $('#kkSpeed').value = S.settings.kkSpeed || 1.1; $('#kkPause').value = S.settings.kkPause ?? 0.35; kkShowVals(); $('#ovHi').value = S.settings.ovHi || 'auto'; $('#ovPolish').value = S.settings.ovPolish || 'on'; $('#ovRate').value = S.settings.ovRate; $('#ovPitch').value = S.settings.ovPitch; $('#ovPause').value = S.settings.ovPause; $('#ovExprSel').value = S.settings.ovExpr; ovShowVals(); }
 function ovShowVals() { $('#ovRateV').textContent = (+S.settings.ovRate).toFixed(2) + '×'; $('#ovPitchV').textContent = (+S.settings.ovPitch).toFixed(2); $('#ovPauseV').textContent = (+S.settings.ovPause).toFixed(2) + ' s'; }
 [['ovRate', 'ovRate'], ['ovPitch', 'ovPitch'], ['ovPause', 'ovPause']].forEach(([id, k]) => $('#' + id).addEventListener('input', e => { S.settings[k] = +e.target.value; ovShowVals(); save(); }));
 $('#ovExprSel').onchange = e => { S.settings.ovExpr = e.target.value; save(); };
 $('#ovHi').onchange = e => { S.settings.ovHi = e.target.value; save(); };
 $('#ovPolish').onchange = e => { S.settings.ovPolish = e.target.value; save(); };
-$('#ovBreathSel').onchange = e => { S.settings.ovBreath = e.target.value; save(); };
+$('#ovBreathSel').onchange = e => { S.settings.ovBreath2 = e.target.value; save(); };
+function kkShowVals() { $('#kkSpeedV').textContent = (+(S.settings.kkSpeed || 1.1)).toFixed(2) + '×'; $('#kkPauseV').textContent = (+(S.settings.kkPause ?? 0.35)).toFixed(2) + ' s'; }
+$('#kkSpeed').addEventListener('input', e => { S.settings.kkSpeed = +e.target.value; kkShowVals(); save(); });
+$('#kkPause').addEventListener('input', e => { S.settings.kkPause = +e.target.value; kkShowVals(); save(); });
 $('#ovEngine').onchange = e => { S.settings.ovEngine = e.target.value; S.settings.ovVoice = ''; save(); try { OV.state = AndroidBridge.ttsUseEngine(e.target.value); } catch (_) { OV.state = 'failed'; } OV.voices = []; ovRefresh(); };
 // pauses like a narrator: short between joined thoughts, longer after a question, a paragraph or "…", never all the same
 function ovGaps(units, parts, base) {
