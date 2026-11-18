@@ -350,14 +350,20 @@ html:not(.mode-layers) .layers-only { display: none !important; }
         <summary><b>🎙 Make the voiceover from the script</b> <span class="hint">offline · free · no API key</span></summary>
         <div style="display:grid;gap:8px;margin-top:8px">
           <p class="hint" style="margin:0">Uses the phone's own Hindi voice (Google speech engine), works without internet. Best in Hindi script (देवनागरी); Hinglish works too.</p>
+          <div class="row"><label class="f" style="flex:1 1 220px">Speech engine <select id="ovEngine"><option value="">Phone default</option></select></label></div>
           <div class="row"><label class="f" style="flex:1 1 220px">Voice <select id="ovVoice"></select></label><button class="btn small" id="ovSettings" title="Download the Hindi voice for offline use">Voice settings</button></div>
+          <p class="hint" style="margin:0" id="ovTip">Tip: try every voice with ▶ Test voice. Voices marked "best quality" sound the most human (they need the internet while speaking, but still no API key).</p>
           <div class="row">
             <label class="f">Speed <span class="tc" id="ovRateV"></span><input type="range" id="ovRate" min="0.7" max="1.3" step="0.01"></label>
             <label class="f">Pitch <span class="tc" id="ovPitchV"></span><input type="range" id="ovPitch" min="0.8" max="1.2" step="0.01"></label>
             <label class="f">Pause after a sentence <span class="tc" id="ovPauseV"></span><input type="range" id="ovPause" min="0.15" max="1.2" step="0.05"></label>
           </div>
           <label class="f">Expression <select id="ovExprSel"><option value="on">Natural: questions rise, sad lines slower, happy lines livelier</option><option value="off">Flat (same for every line)</option></select></label>
-          <div class="row"><button class="btn primary" id="ovGo">Make voiceover</button><button class="btn" id="ovTest">▶ Test voice</button><button class="btn" id="ovStop" hidden>Stop</button></div>
+          <div class="row">
+            <label class="f">Hinglish script <select id="ovHi"><option value="auto">Auto: read Roman Hindi as Hindi (clearer words)</option><option value="on">Always convert to Hindi letters</option><option value="off">Read as written</option></select></label>
+            <label class="f">Sound <select id="ovPolish"><option value="on">Studio polish (warmer, fuller, less robotic)</option><option value="off">Raw phone voice</option></select></label>
+          </div>
+          <div class="row"><button class="btn primary" id="ovGo">Make voiceover</button><button class="btn" id="ovTest">▶ Test voice</button><button class="btn" id="ovStop" hidden>Stop</button><button class="btn" data-dlvoice id="ovDl" hidden>⬇ Download voiceover</button></div>
           <progress id="ovProg" value="0" max="1" hidden></progress>
           <div class="hint" id="ovState"></div>
           <div class="hint" id="ovInfo"></div>
@@ -367,8 +373,8 @@ html:not(.mode-layers) .layers-only { display: none !important; }
       <input type="file" id="voFile" accept="audio/*" hidden>
       <input type="file" id="oneAudio" accept="audio/*,video/*,.opus,.ogg,.m4a,.aac" hidden>
       <div id="voInfo" class="hint"></div>
-      <audio id="vo" controls preload="auto"></audio>
-      <div class="row" hidden><button class="btn small" data-dlvoice>Download voiceover</button></div>
+      <audio id="vo" controls controlslist="nodownload" preload="auto"></audio>
+      <div class="row" id="voDlRow" hidden><button class="btn small" data-dlvoice>⬇ Download voiceover</button><span class="hint">Saved to Download/Stickman Studio</span></div>
       <div class="row">
         <label class="f">Video shape
           <select id="aspect">
@@ -870,7 +876,7 @@ He looked at Papa. Papa smiled, and said, "I am proud of you."`;
 /* ============ state ============ */
 const DEFAULTS = { title: '', aspect: '16:9', grid: 3, style: 'stickman', styleText: STYLES.stickman.text, characters: '', gutter: 'auto',
   splitLevel: 'all', minWords: 2, maxWords: 14, captions: 'bar', fit: 'auto', enhance: 'on', v: 3, capSize: 1, motion: 6, transition: 'fade', transDur: 0.15, res: 1080, fps: 30, musicVol: 0.12, anim: 'on', animAmt: 1, capWords: 'on', pics: 'images', skStyle: 'chibi', lPer: 9, lLib: 'on',
-  fx: 'on', fxAmt: 1, fxDoodle: 'on', fxSfx: 'on', fxVol: 0.6, ovVoice: '', ovRate: 0.95, ovPitch: 1, ovPause: 0.45, ovExpr: 'on', mode: 'layers', lBg: 'parchment', lEnter: 'auto', lTrans: 'cut', lIdle: 'subtle', lCam: 'on', lCaps: 'off', sfx: 'on', sfxVol: 0.5, duck: 'on' };
+  fx: 'on', fxAmt: 1, fxDoodle: 'on', fxSfx: 'on', fxVol: 0.6, ovVoice: '', ovEngine: '', ovHi: 'auto', ovPolish: 'on', ovRate: 0.95, ovPitch: 1, ovPause: 0.45, ovExpr: 'on', mode: 'layers', lBg: 'parchment', lEnter: 'auto', lTrans: 'cut', lIdle: 'subtle', lCam: 'on', lCaps: 'off', sfx: 'on', sfxVol: 0.5, duck: 'on' };
 try { if (matchMedia('(pointer: coarse)').matches) DEFAULTS.res = 720; } catch (_) {}   // phones: smaller, faster export
 const S = { settings: { ...DEFAULTS }, script: '', segments: [], starts: [], grids: [], overrides: {}, audioBlob: null, audioName: '', musicBlob: null, musicName: '' };
 let uid = 1;
@@ -2618,6 +2624,7 @@ function renderStatus() {
 let actxDecode;
 async function setVoice(blob, name) {
   S.audioBlob = blob; S.audioName = name || S.audioName || 'voiceover';
+  $('#voDlRow').hidden = !blob; $('#ovDl').hidden = !blob;
   if (vo.src) URL.revokeObjectURL(vo.src); vo.src = URL.createObjectURL(blob);
   $('#voInfo').textContent = 'Reading the voiceover...';
   try {
@@ -4921,16 +4928,20 @@ window.ssTtsState = s => { OV.state = s; ovLoadVoices(); };
 window.ssTtsDone = (id, ok, data) => { const p = OV.pending.get(id); if (!p) return; OV.pending.delete(id); clearTimeout(p.timer); ok ? p.res(data) : p.rej(new Error(data)); };
 function ovStart() {
   if (OV.state === 'none') return;
-  try { OV.state = AndroidBridge.ttsStart(); } catch (_) { OV.state = 'failed'; }
+  try { OV.state = S.settings.ovEngine && AndroidBridge.ttsUseEngine ? AndroidBridge.ttsUseEngine(S.settings.ovEngine) : AndroidBridge.ttsStart(); } catch (_) { OV.state = 'failed'; }
   if (OV.state === 'ready') ovLoadVoices(); else ovRefresh();
 }
 function ovLoadVoices() {
-  if (OV.state === 'ready') { try { OV.voices = JSON.parse(AndroidBridge.ttsVoices() || '[]'); } catch (_) { OV.voices = []; } }
+  if (OV.state === 'ready') {
+    try { OV.voices = JSON.parse(AndroidBridge.ttsVoices() || '[]'); } catch (_) { OV.voices = []; }
+    try { OV.engines = AndroidBridge.ttsEngines ? JSON.parse(AndroidBridge.ttsEngines() || '[]') : []; } catch (_) { OV.engines = []; }
+    const es = $('#ovEngine'); es.innerHTML = '<option value="">Phone default</option>' + (OV.engines || []).map(e => `<option value="${esc(e.name)}">${esc(e.label)}${e.isDefault ? ' (default)' : ''}</option>`).join(''); es.value = S.settings.ovEngine || '';
+  }
   ovRefresh();
 }
 function ovVoiceLabel(v, k) {
   const hi = v.lang.toLowerCase().startsWith('hi'), m = v.name.match(/x-([a-z]{3})/i), code = m ? m[1].toUpperCase() : '';
-  return `${hi ? 'Hindi' : 'Indian English'} voice ${k + 1}${code ? ' (' + code + ')' : ''} · ${!v.offline ? 'needs internet' : v.installed ? 'offline' : 'offline, not downloaded'}${v.quality >= 400 ? ' · high quality' : ''}`;
+  return `${hi ? 'Hindi' : 'Indian English'} voice ${k + 1}${code ? ' (' + code + ')' : ''} · ${!v.offline ? '★ best quality · needs internet, no key' : v.installed ? 'offline' : 'offline, not downloaded'}`;
 }
 function ovRefresh() {
   const sel = $('#ovVoice'), info = $('#ovState');
@@ -4966,8 +4977,9 @@ async function ovDecode(b64) {
   return d.slice(Math.max(0, a - sr * 0.03), Math.min(d.length, b + sr * 0.08));
 }
 // a little expression per sentence, from its punctuation and words
-function ovExpr(text) {
-  const R = S.settings.ovRate || 0.95, P = S.settings.ovPitch || 1;
+function ovExpr(text, idx = 0) {
+  const hum = k => 1 + 0.022 * Math.sin(idx * 2.399 + k);   // a tiny natural change from line to line
+  const R = (S.settings.ovRate || 0.95) * hum(0.7), P = (S.settings.ovPitch || 1) * hum(2.1);
   if (S.settings.ovExpr === 'off') return { rate: R, pitch: P, pause: 0 };
   const t = text.trim(), sc = amScore(t); let rate = R, pitch = P, pause = 0;
   if (/\?["'”’)]*$/.test(t)) { pitch *= 1.05; pause += 0.1; }
@@ -4980,8 +4992,13 @@ function ovExpr(text) {
   return { rate: clamp(rate, 0.5, 2), pitch: clamp(pitch, 0.5, 2), pause };
 }
 // text the engine should read: no *stars*, no [tags]; [pause 1.5] becomes extra silence
+function ovHindiLetters() {
+  const v = OV.voices.find(x => x.name === $('#ovVoice').value), hiVoice = !v || v.lang.toLowerCase().startsWith('hi');
+  return hiVoice && (S.settings.ovHi === 'on' || (S.settings.ovHi !== 'off' && looksHinglish(S.script || '')));
+}
 function ovText(units) {
-  const out = units.map(u => { const m = u.match(/\[\s*pause\s*([\d.]+)?\s*\]/i); return { text: plain(u).replace(/["“”]/g, ''), extra: m ? (+m[1] || 0.8) : 0, lead: m ? /^\s*\[\s*pause/i.test(u) : false }; });
+  const conv = ovHindiLetters();
+  const out = units.map(u => { const m = u.match(/\[\s*pause\s*([\d.]+)?\s*\]/i), t = plain(u).replace(/["“”]/g, ''); return { text: conv ? r2d(t) : t, extra: m ? (+m[1] || 0.8) : 0, lead: m ? /^\s*\[\s*pause/i.test(u) : false }; });
   out.forEach((o, i) => { if (o.lead && i > 0) { out[i - 1].extra += o.extra; o.extra = 0; } });
   return out;
 }
@@ -4998,7 +5015,7 @@ async function ovGenerate() {
       if (OV.stop) throw new Error('Stopped');
       const el = (performance.now() - t0) / 1000, left = i ? el / i * (lines.length - i) : 0;
       info.textContent = `Speaking line ${i + 1} of ${lines.length}${left > 3 ? ` · about ${Math.ceil(left)} s left` : ''}`; $('#ovProg').value = i / lines.length;
-      const e = ovExpr(lines[i].text);
+      const e = ovExpr(lines[i].text, i);
       parts.push({ pcm: lines[i].text.replace(/[^\p{L}\p{N}]/gu, '') ? await ovDecode(await ovSynth(lines[i].text, e.rate, e.pitch)) : new Float32Array(0), pause: e.pause + lines[i].extra });
     }
     const SR = 24000, base = S.settings.ovPause || 0.45;
@@ -5007,7 +5024,8 @@ async function ovGenerate() {
     const out = new Float32Array(total); let t = Math.round(SR * 0.3); const timings = [];
     parts.forEach((p, i) => { out.set(p.pcm, t); timings.push({ start: +(t / SR).toFixed(3), end: +((t + p.pcm.length) / SR).toFixed(3), text: units[i] }); t += p.pcm.length + Math.round(SR * gaps[i]); });
     let pk = 0; for (const a of out) pk = Math.max(pk, Math.abs(a)); if (pk > 0) for (let i = 0; i < out.length; i++) out[i] *= 0.95 / pk;
-    await setVoice(encodeWav(out, SR), 'Offline voiceover.wav');
+    const fin = S.settings.ovPolish === 'off' ? out : await ovPolish(out, SR);
+    await setVoice(encodeWav(fin, SR), 'Offline voiceover.wav');
     ttsTiming(timings); segmentsChanged(true);
     S.tts = { engine: 'offline', timings }; save();
     info.textContent = `Voiceover ready · ${fmt(out.length / SR, 0)} long, scenes synced. Play it above. Not happy? Change speed or voice and make it again.`;
@@ -5022,7 +5040,8 @@ $('#ovTest').onclick = async () => {
   S.settings.ovVoice = $('#ovVoice').value; save(); ovBusy(true);
   try {
     const line = plain((S.segments[0] && sentenceGroups()[0].map(i => S.segments[i].text).join(' ')) || 'Namaste! Yeh meri awaaz ka chhota sa test hai.');
-    const e = ovExpr(line), pcm = await ovDecode(await ovSynth(line, e.rate, e.pitch));
+    const say = ovHindiLetters() ? r2d(line) : line, e = ovExpr(say), raw = await ovDecode(await ovSynth(say, e.rate, e.pitch));
+    const pcm = S.settings.ovPolish === 'off' ? raw : await ovPolish(raw, 24000);
     const a = new Audio(URL.createObjectURL(encodeWav(pcm, 24000))); a.play();
   } catch (e) { toast(e.message); }
   ovBusy(false);
@@ -5030,10 +5049,31 @@ $('#ovTest').onclick = async () => {
 $('#ovSettings').onclick = () => { try { AndroidBridge.ttsSettings(); } catch (_) { toast('Open phone Settings → Text-to-speech output'); } };
 $('#ovVoice').onchange = e => { S.settings.ovVoice = e.target.value; save(); };
 document.addEventListener('visibilitychange', () => { if (!document.hidden && OV.state === 'ready') ovLoadVoices(); });   // back from voice settings: new voices
-function ovToUI() { $('#ovRate').value = S.settings.ovRate; $('#ovPitch').value = S.settings.ovPitch; $('#ovPause').value = S.settings.ovPause; $('#ovExprSel').value = S.settings.ovExpr; ovShowVals(); }
+function ovToUI() { $('#ovHi').value = S.settings.ovHi || 'auto'; $('#ovPolish').value = S.settings.ovPolish || 'on'; $('#ovRate').value = S.settings.ovRate; $('#ovPitch').value = S.settings.ovPitch; $('#ovPause').value = S.settings.ovPause; $('#ovExprSel').value = S.settings.ovExpr; ovShowVals(); }
 function ovShowVals() { $('#ovRateV').textContent = (+S.settings.ovRate).toFixed(2) + '×'; $('#ovPitchV').textContent = (+S.settings.ovPitch).toFixed(2); $('#ovPauseV').textContent = (+S.settings.ovPause).toFixed(2) + ' s'; }
 [['ovRate', 'ovRate'], ['ovPitch', 'ovPitch'], ['ovPause', 'ovPause']].forEach(([id, k]) => $('#' + id).addEventListener('input', e => { S.settings[k] = +e.target.value; ovShowVals(); save(); }));
 $('#ovExprSel').onchange = e => { S.settings.ovExpr = e.target.value; save(); };
+$('#ovHi').onchange = e => { S.settings.ovHi = e.target.value; save(); };
+$('#ovPolish').onchange = e => { S.settings.ovPolish = e.target.value; save(); };
+$('#ovEngine').onchange = e => { S.settings.ovEngine = e.target.value; S.settings.ovVoice = ''; save(); try { OV.state = AndroidBridge.ttsUseEngine(e.target.value); } catch (_) { OV.state = 'failed'; } OV.voices = []; ovRefresh(); };
+// a warmer, fuller voice: low cut, a little body and presence, gentle compression and a very small room
+async function ovPolish(pcm, sr) {
+  const oc = new OfflineAudioContext(1, pcm.length + Math.round(sr * 0.3), sr), b = oc.createBuffer(1, pcm.length, sr); b.copyToChannel(pcm, 0);
+  const src = oc.createBufferSource(); src.buffer = b;
+  const hp = oc.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 75;
+  const body = oc.createBiquadFilter(); body.type = 'peaking'; body.frequency.value = 180; body.Q.value = 0.8; body.gain.value = 2.5;
+  const mud = oc.createBiquadFilter(); mud.type = 'peaking'; mud.frequency.value = 450; mud.Q.value = 1.2; mud.gain.value = -1.5;
+  const pres = oc.createBiquadFilter(); pres.type = 'peaking'; pres.frequency.value = 3200; pres.Q.value = 0.9; pres.gain.value = 2;
+  const harsh = oc.createBiquadFilter(); harsh.type = 'highshelf'; harsh.frequency.value = 7500; harsh.gain.value = -3;
+  const comp = oc.createDynamicsCompressor(); comp.threshold.value = -22; comp.ratio.value = 2.5; comp.attack.value = 0.008; comp.release.value = 0.18; comp.knee.value = 8;
+  const rnd = mulberry32(5), ir = oc.createBuffer(1, Math.round(sr * 0.35), sr), d = ir.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (rnd() * 2 - 1) * Math.pow(1 - i / d.length, 4);
+  const room = oc.createConvolver(); room.buffer = ir; const wet = oc.createGain(); wet.gain.value = 0.05;
+  src.connect(hp).connect(body).connect(mud).connect(pres).connect(harsh).connect(comp);
+  comp.connect(oc.destination); comp.connect(room).connect(wet).connect(oc.destination);
+  src.start(); const o = (await oc.startRendering()).getChannelData(0).slice(0, pcm.length);
+  let pk = 0; for (const x of o) pk = Math.max(pk, Math.abs(x)); if (pk > 0) for (let i = 0; i < o.length; i++) o[i] *= 0.95 / pk;
+  return o;
+}
 
 /* ============ viewer hooks: camera punch-in, shake, flash, reaction doodles and sounds on the key words ============
    Found from the script by itself: shock words shake the screen with a boom, reveals flash with a riser (and the music
@@ -5347,6 +5387,48 @@ $('#ideaUse').onclick = () => {
   save(); showTab('script'); $('#splitBtn').click();
   toast('Script added and scenes made. Next: make the voiceover');
 };
+
+/* ---- Hinglish (Roman) -> Devanagari, only for the voice: the Hindi voice pronounces Hindi script far better ----
+   Common words come from a list (that also fixes ट/ड words like beta, bada); other Hindi words are spelled by rules;
+   English words (phone, exam, result…) stay in Roman letters, so the voice says them the English way. */
+const R2D_WORDS = (`hai है|hain हैं|tha था|thi थी|the थे|thaa था|nahi नहीं|nahin नहीं|nhi नहीं|kya क्या|kyun क्यों|kyon क्यों|kyu क्यों|mein में|me में|main मैं|mai मैं|aur और|ki की|ka का|ke के|ko को|se से|par पर|pe पे|ye ये|yeh ये|woh वो|wo वो|vo वो|voh वो|ek एक|do दो|teen तीन|char चार|chaar चार|paanch पाँच|bhi भी|hi ही|to तो|toh तो|jab जब|tab तब|phir फिर|fir फिर|lekin लेकिन|magar मगर|bahut बहुत|bohot बहुत|bahot बहुत|sab सब|sabko सबको|sabse सबसे|kuch कुछ|kuchh कुछ|koi कोई|kaun कौन|kab कब|kahan कहाँ|kaha कहा|kaise कैसे|kaisa कैसा|kaisi कैसी|apna अपना|apni अपनी|apne अपने|uska उसका|uski उसकी|uske उसके|usne उसने|use उसे|usse उससे|unka उनका|unki उनकी|unke उनके|unhe उन्हें|unhone उन्होंने|iska इसका|iski इसकी|iske इसके|isse इससे|mera मेरा|meri मेरी|mere मेरे|mujhe मुझे|tera तेरा|teri तेरी|tere तेरे|tum तुम|tumhe तुम्हें|tumhara तुम्हारा|tumhari तुम्हारी|aap आप|aapka आपका|aapko आपको|hum हम|ham हम|hame हमें|hamein हमें|hamara हमारा|ghar घर|din दिन|raat रात|subah सुबह|shaam शाम|log लोग|logon लोगों|dost दोस्त|papa पापा|maa माँ|maa-baap माँ-बाप|baap बाप|beta बेटा|beti बेटी|bhai भाई|behen बहन|dada दादा|dadaji दादाजी|dadi दादी|nana नाना|nani नानी|chacha चाचा|paisa पैसा|paise पैसे|kaam काम|sapna सपना|sapne सपने|mehnat मेहनत|himmat हिम्मत|khush खुश|khushi खुशी|dukh दुख|darr डर|dar डर|sach सच|jhooth झूठ|pyaar प्यार|pyar प्यार|zindagi ज़िंदगी|duniya दुनिया|baat बात|waqt वक़्त|samay समय|achanak अचानक|gaya गया|gayi गई|gaye गए|hua हुआ|hui हुई|hue हुए|raha रहा|rahi रही|rahe रहे|karta करता|karti करती|karte करते|kar कर|karo करो|karna करना|karke करके|kiya किया|kiye किए|diya दिया|liya लिया|dekha देखा|dekho देखो|bola बोला|boli बोली|bole बोले|socha सोचा|laga लगा|lagi लगी|lage लगे|aaya आया|aayi आई|aaye आए|aata आता|aati आती|chala चला|chali चली|jaata जाता|jata जाता|jaati जाती|jaate जाते|jao जाओ|hota होता|hoti होती|hote होते|hona होना|ho हो|sakta सकता|sakti सकती|sakte सकते|chahiye चाहिए|chahta चाहता|wala वाला|wali वाली|wale वाले|waala वाला|waali वाली|waale वाले|liye लिए|saath साथ|baad बाद|pehle पहले|pahle पहले|andar अंदर|bahar बाहर|upar ऊपर|neeche नीचे|niche नीचे|aaj आज|kal कल|abhi अभी|yahan यहाँ|yaha यहाँ|wahan वहाँ|waha वहाँ|bas बस|sirf सिर्फ़|bilkul बिल्कुल|accha अच्छा|achha अच्छा|acha अच्छा|achchha अच्छा|theek ठीक|thik ठीक|haan हाँ|han हाँ|na न|mat मत|kabhi कभी|hamesha हमेशा|chhota छोटा|chhoti छोटी|chhote छोटे|chota छोटा|choti छोटी|chote छोटे|bada बड़ा|badi बड़ी|bade बड़े|ladka लड़का|ladki लड़की|ladke लड़के|ladkiyan लड़कियाँ|ghanta घंटा|ped पेड़|gaadi गाड़ी|gadi गाड़ी|sadak सड़क|ghadi घड़ी|toota टूटा|tooti टूटी|tuta टूटा|chhod छोड़|chhodo छोड़ो|chhoda छोड़ा|baitha बैठा|baithi बैठी|baith बैठ|utha उठा|uthi उठी|uthta उठता|padhai पढ़ाई|padhta पढ़ता|padh पढ़|padha पढ़ा|thanda ठंडा|pet पेट|daal दाल|dhadkan धड़कन|pada पड़ा|padi पड़ी|pade पड़े|ladai लड़ाई|jhagda झगड़ा|aankh आँख|aankhen आँखें|aansu आँसू|gaon गाँव|gaanv गाँव|shahar शहर|school स्कूल|exam एग्ज़ाम|phone फ़ोन|kitab किताब|kitaab किताब|naam नाम|man मन|dil दिल|sar सिर|haath हाथ|pair पैर|muh मुँह|munh मुँह|chehra चेहरा|awaaz आवाज़|aawaz आवाज़|awaz आवाज़|darwaza दरवाज़ा|darwaaza दरवाज़ा|darwaze दरवाज़े|pani पानी|paani पानी|khana खाना|roti रोटी|chai चाय|chaay चाय|ladkon लड़कों|bachcha बच्चा|bachche बच्चे|bacche बच्चे|baccha बच्चा|mazaak मज़ाक|mazak मज़ाक|raaz राज़|raz राज़|kahani कहानी|kahaani कहानी|zyada ज़्यादा|jyada ज़्यादा|kam कम|thoda थोड़ा|thodi थोड़ी|thode थोड़े|sabhi सभी|shuru शुरू|khatam ख़त्म|khatm ख़त्म|jeet जीत|jeeta जीता|haar हार|hara हारा|roya रोया|royi रोई|rona रोना|hasna हँसना|hansi हँसी|hasi हँसी|hans हँस|muskuraya मुस्कुराया|muskurayi मुस्कुराई|kaha कहा|kehte कहते|kahte कहते|kehta कहता|kahta कहता|kehti कहती|bolta बोलता|soch सोच|samajh समझ|samjha समझा|pata पता|chala चला|yaad याद|intezaar इंतज़ार|zaroor ज़रूर|zarur ज़रूर|zaroori ज़रूरी|lakh लाख|crore करोड़|karod करोड़|rupaye रुपये|rupee रुपये|hazaar हज़ार|hazar हज़ार|sau सौ|saal साल|mahina महीना|mahine महीने|hafte हफ़्ते|pal पल|baar बार|aakhir आख़िर|aakhirkaar आख़िरकार|asli असली|sachchai सच्चाई|kismat किस्मत|bhagwan भगवान|mandir मंदिर|maut मौत|jaan जान|rasta रास्ता|raasta रास्ता|manzil मंज़िल|safar सफ़र|safalta सफलता|kamyabi कामयाबी|koshish कोशिश|seekh सीख|seekha सीखा|galti ग़लती|galat ग़लत|sahi सही|uss उस|us उस|is इस|iss इस|un उन|in इन|jo जो|jis जिस|jise जिसे|jiske जिसके|jisne जिसने|tak तक|jaise जैसे|aisa ऐसा|aise ऐसे|waisa वैसा|kitna कितना|kitni कितनी|itna इतना|itni इतनी|kyunki क्योंकि|isliye इसलिए|warna वरना|agar अगर|tab तब|sabse सबसे|zaroorat ज़रूरत|madad मदद|rehta रहता|rehti रहती|rehte रहते|reh रह|rahta रहता|rahti रहती|rahte रहते|padhaai पढ़ाई|dhamaka धमाका|chillaya चिल्लाया|khidki खिड़की|mitti मिट्टी|garib ग़रीब|raaste रास्ते|raste रास्ते|mushkil मुश्किल|aankhon आँखों|sannata सन्नाटा|sannaata सन्नाटा|bhaga भागा|uthkar उठकर|baithkar बैठकर|dekhkar देखकर|sunkar सुनकर|sun सुन|suno सुनो|suna सुना|ab अब|jaldi जल्दी|dheere धीरे|zor ज़ोर|tez तेज़|khud ख़ुद|saamne सामने|samne सामने|peeche पीछे|piche पीछे|bachpan बचपन|budha बूढ़ा|boodha बूढ़ा|aadmi आदमी|aurat औरत|insaan इंसान|kisaan किसान|raja राजा|rani रानी|shaadi शादी|shadi शादी|biwi बीवी|pati पति|patni पत्नी|payega पाएगा|paayega पाएगा|paya पाया|paaya पाया|banega बनेगा|karega करेगा|hoga होगा|jayega जाएगा|jaayega जाएगा|milega मिलेगा|mila मिला|mili मिली|mile मिले|dekhega देखेगा|samjho समझो|bolo बोलो|chalo चलो|aao आओ|baitho बैठो|bhool भूल|bhoola भूला|maaf माफ़|maafi माफ़ी`).split('|').reduce((m, p) => { const k = p.indexOf(' '); m.set(p.slice(0, k), p.slice(k + 1)); return m; }, new Map());
+// English words that stay in Roman letters (the voice then says them in English)
+const R2D_EN = new Set(('phone mobile call exam result school college office doctor teacher class video job salary number message police hospital bus train time problem life sorry thank thanks please love friend friends game cricket india ok okay hello bye ' +
+  'boss team company business money market computer laptop internet online youtube channel subscribe like comment share bike car taxi station ticket hotel room party birthday gift cake card bank loan engineer pilot officer manager interview ' +
+  'the and you your is are was were of in on at to for with from this that it he she they we be have has had do does did not but or so if no yes my me what when where why who how can will just very really').split(' '));
+const R2D_C = [['chh', 'छ'], ['ch', 'च'], ['kh', 'ख'], ['gh', 'घ'], ['jh', 'झ'], ['th', 'थ'], ['dh', 'ध'], ['ph', 'फ'], ['bh', 'भ'], ['sh', 'श'], ['rh', 'ढ़'],
+  ['k', 'क'], ['g', 'ग'], ['c', 'क'], ['j', 'ज'], ['t', 'त'], ['d', 'द'], ['n', 'न'], ['p', 'प'], ['f', 'फ़'], ['b', 'ब'], ['m', 'म'], ['y', 'य'], ['r', 'र'], ['l', 'ल'], ['v', 'व'], ['w', 'व'], ['s', 'स'], ['h', 'ह'], ['z', 'ज़'], ['q', 'क़'], ['x', 'क्स']];
+const R2D_V = [['aa', 'आ', 'ा'], ['ai', 'ऐ', 'ै'], ['au', 'औ', 'ौ'], ['ee', 'ई', 'ी'], ['oo', 'ऊ', 'ू'], ['ii', 'ई', 'ी'], ['a', 'अ', ''], ['i', 'इ', 'ि'], ['u', 'उ', 'ु'], ['e', 'ए', 'े'], ['o', 'ओ', 'ो']];
+function r2dWord(w) {
+  const lw = w.toLowerCase(); if (R2D_WORDS.has(lw)) return R2D_WORDS.get(lw);
+  if (R2D_EN.has(lw) || !/^[a-z]+$/.test(lw)) return w;
+  const parts = []; let i = 0;   // C or V pieces
+  while (i < lw.length) {
+    const c = R2D_C.find(([r]) => lw.startsWith(r, i)); if (c) { parts.push({ c: c[1], r: c[0] }); i += c[0].length; continue; }
+    const v = R2D_V.find(([r]) => lw.startsWith(r, i)); if (v) { parts.push({ v }); i += v[0].length; continue; }
+    parts.push({ x: lw[i] }); i++;
+  }
+  let out = '';
+  for (let k = 0; k < parts.length; k++) {
+    const p = parts[k], nx = parts[k + 1];
+    if (p.v) { out += k === parts.length - 1 && p.v[0] === 'i' ? 'ई' : p.v[1]; continue; }   // a vowel at the start or after a vowel: full letter
+    if (p.x) { out += p.x; continue; }
+    // n / m before another consonant = nasal dot
+    const STOP = /^(k|kh|g|gh|ch|chh|j|jh|t|th|d|dh|s|sh|z|p|ph|b|bh|f)$/;
+    if (k > 0 && parts[k - 1].v && nx && nx.c && nx.c !== p.c && ((p.c === 'न' && STOP.test(nx.r)) || (p.c === 'म' && /^(p|ph|b|bh)$/.test(nx.r)))) { out += 'ं'; continue; }
+    out += p.c;
+    if (nx && nx.v) { const last = k + 1 === parts.length - 1; out += !last ? nx.v[2] : nx.v[0] === 'a' ? 'ा' : nx.v[0] === 'i' ? 'ी' : nx.v[0] === 'u' ? 'ू' : nx.v[2]; k++; continue; }   // final a / i / u are long: sapna सपना, kursi कुर्सी
+    const first = parts.findIndex(q => q.c) === k, end = !nx, before = parts[k - 1], after = nx && nx.c;
+    // clusters: doubled letters, start of word (pr, tr, st…), the end of a word (dost, waqt)
+    if (after && (nx.c === p.c || (first && !before) || (parts[k + 2] === undefined))) out += '्';
+  }
+  return out.replace(/([ोेै])न$/, '$1ं');   // plural endings: aankhon आँखों, baaten बातें
+}
+function r2d(text) {
+  if (/[ऀ-ॿ]/.test(text) && !/[a-z]{3}/i.test(text.replace(/[ऀ-ॿ]/g, ''))) return text;   // already Hindi
+  return text.replace(/[A-Za-z]+/g, r2dWord).replace(/\.(?=\s|$)/g, '।');
+}
+const looksHinglish = t => { const w = (t.match(/[a-z]+/gi) || []).map(x => x.toLowerCase()); if (w.length < 3) return false; const hi = w.filter(x => R2D_WORDS.has(x)).length; return hi / w.length > 0.25; };
 
 (async function boot() {
   sizePreview();

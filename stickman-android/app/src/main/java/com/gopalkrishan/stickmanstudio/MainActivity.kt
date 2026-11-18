@@ -472,6 +472,30 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface
         fun ttsStatus(): String = ttsState
 
+        /** Speech engines installed on the phone (Google, Samsung, others) as JSON: [{name, label}]. */
+        @JavascriptInterface
+        fun ttsEngines(): String {
+            val arr = JSONArray()
+            try { tts?.engines?.forEach { arr.put(JSONObject().apply { put("name", it.name); put("label", it.label); put("isDefault", it.name == tts?.defaultEngine) }) } } catch (_: Exception) {}
+            return arr.toString()
+        }
+
+        /** Restarts the speech with another engine (package name; empty = the phone's default). */
+        @JavascriptInterface
+        fun ttsUseEngine(engine: String): String {
+            ttsState = "starting"
+            runOnUiThread {
+                try { tts?.shutdown() } catch (_: Exception) {}
+                val listener = TextToSpeech.OnInitListener { status ->
+                    ttsState = if (status == TextToSpeech.SUCCESS) "ready" else "failed"
+                    if (ttsState == "ready") tts?.setOnUtteranceProgressListener(ttsListener)
+                    js("window.ssTtsState && ssTtsState('$ttsState')")
+                }
+                tts = if (engine.isBlank()) TextToSpeech(this@MainActivity, listener) else TextToSpeech(this@MainActivity, listener, engine)
+            }
+            return ttsState
+        }
+
         /** Voices of the engine as JSON: [{name, lang, quality, offline, installed}] — Hindi and Indian English first. */
         @JavascriptInterface
         fun ttsVoices(): String {
