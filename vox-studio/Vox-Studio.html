@@ -274,7 +274,7 @@ pre.mono { background: #faf6ec; border: 1px solid var(--line); border-radius: 8p
       <p class="hint">Copy a prompt → make the picture in ChatGPT / Gemini / any image AI → bring it back here (<b>Paste</b>, <b>Upload</b>, share it to the app, or drop many at once: files named 1, 2, 3… go to those numbers).</p>
       <div class="row wrap-row">
         <label class="inline">Picture look <select id="look"></select></label>
-        <label class="inline">Gemini watermark <select id="gemMark"><option value="auto">Remove automatically</option><option value="off">Keep</option></select></label>
+        <label class="inline">Gemini watermark <select id="gemMark"><option value="auto">Remove automatically</option><option value="off">Keep</option></select></label> <button class="btn ghost small" id="gemAll">Remove ✦ from all pictures</button>
         <label class="inline">Decor layers <select id="decor"><option value="on">On (old maps, pages behind · modern: circles, tape, grid)</option><option value="off">Off</option></select></label>
         <label class="inline">Pictures per AI image <select id="perImage"><option value="6">6 (3×2 sheet, cut automatically) — fastest</option><option value="4">4 (2×2 sheet, cut automatically)</option><option value="1">1 (one prompt per picture)</option></select></label>
       </div>
@@ -2413,50 +2413,67 @@ const PROMPT_POLICY = `- The picture prompts must pass AI image-generator conten
 async function cleanGeminiMark(blob) {
   if (S.settings.gemMark === 'off') return { blob, removed: false };
   let bmp; try { bmp = await createImageBitmap(blob); } catch (_) { return { blob, removed: false }; }
-  const W = bmp.width, H = bmp.height, bs = Math.round(Math.min(W, H) * 0.14);
-  if (bs < 24) { bmp.close && bmp.close(); return { blob, removed: false }; }
+  const W = bmp.width, H = bmp.height;
+  if (Math.min(W, H) * 0.14 < 24) { bmp.close && bmp.close(); return { blob, removed: false }; }
   const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(bmp, 0, 0); bmp.close && bmp.close();
-  const x0 = W - bs, y0 = H - bs, id = x.getImageData(x0, y0, bs, bs), d = id.data, N = bs * bs;
-  const L = new Float32Array(N), sat = new Float32Array(N);
-  for (let p = 0; p < N; p++) { const o = p * 4, r = d[o], g = d[o + 1], b = d[o + 2]; L[p] = 0.299 * r + 0.587 * g + 0.114 * b; sat[p] = Math.max(r, g, b) - Math.min(r, g, b); }
-  // local background = box blur of the luma (integral image)
-  const rad = Math.max(4, Math.round(bs * 0.12)), I = new Float64Array((bs + 1) * (bs + 1));
-  for (let yy = 0; yy < bs; yy++) { let row = 0; for (let xx = 0; xx < bs; xx++) { row += L[yy * bs + xx]; I[(yy + 1) * (bs + 1) + xx + 1] = I[yy * (bs + 1) + xx + 1] + row; } }
-  const blur = p => { const xx = p % bs, yy = (p / bs) | 0, a = Math.max(0, xx - rad), b = Math.max(0, yy - rad), e = Math.min(bs, xx + rad + 1), f = Math.min(bs, yy + rad + 1); return (I[f * (bs + 1) + e] - I[b * (bs + 1) + e] - I[f * (bs + 1) + a] + I[b * (bs + 1) + a]) / ((e - a) * (f - b)); };
-  const bg = new Float32Array(N); for (let p = 0; p < N; p++) bg[p] = blur(p);
-  const best = (sign) => {
-    const m = new Uint8Array(N); for (let p = 0; p < N; p++) { const dd = (L[p] - bg[p]) * sign; if (dd > 11 && sat[p] < 60) m[p] = 1; }
-    // connected parts; keep a compact star-sized one away from the outer edge
-    const lab = new Int32Array(N), st = new Int32Array(N); let bestC = null, id2 = 0;
-    for (let p0 = 0; p0 < N; p0++) {
-      if (!m[p0] || lab[p0]) continue; id2++; let sp = 0, n = 0, ax = bs, ay = bs, bx = 0, by = 0; st[sp++] = p0; lab[p0] = id2;
-      while (sp) { const p = st[--sp], px = p % bs, py = (p / bs) | 0; n++; if (px < ax) ax = px; if (px > bx) bx = px; if (py < ay) ay = py; if (py > by) by = py;
-        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const qx = px + dx, qy = py + dy; if (qx < 0 || qy < 0 || qx >= bs || qy >= bs) continue; const q = qy * bs + qx; if (m[q] && !lab[q]) { lab[q] = id2; st[sp++] = q; } } }
-      const w = bx - ax + 1, h = by - ay + 1, fill = n / (w * h), asp = w / h;
-      if (w < bs * 0.12 || w > bs * 0.75 || h < bs * 0.12 || h > bs * 0.75) continue;
-      if (asp < 0.7 || asp > 1.4 || fill < 0.18 || fill > 0.75) continue;
-      if (ax < 1 || ay < 1 || bx > bs - 2 || by > bs - 2) continue;     // the mark sits inside the corner, never touching the edges
-      const score = n * (1 - Math.abs(1 - asp));
-      if (!bestC || score > bestC.score) bestC = { id: id2, ax, ay, bx, by, w, h, score };
-    }
-    return bestC ? { ...bestC, lab } : null;
+  // The mark's size depends on the picture (and is big in a cell cut from a large sheet), so the corner is
+  // searched at two sizes, each with a small and a large "background" window.
+  const tryFind = (bsK, radK) => {
+    const bs = Math.round(Math.min(W, H) * bsK), x0 = W - bs, y0 = H - bs, id = x.getImageData(x0, y0, bs, bs), d = id.data, N = bs * bs;
+    let clear = 0; for (let p = 0; p < N; p++) if (d[p * 4 + 3] < 250) clear++; if (clear > N * 0.01) return null;   // see-through corner: not a Gemini picture
+    const L = new Float32Array(N), sat = new Float32Array(N);
+    for (let p = 0; p < N; p++) { const o = p * 4, r = d[o], g = d[o + 1], b = d[o + 2]; L[p] = 0.299 * r + 0.587 * g + 0.114 * b; sat[p] = Math.max(r, g, b) - Math.min(r, g, b); }
+    const rad = Math.max(4, Math.round(bs * radK)), I = new Float64Array((bs + 1) * (bs + 1));
+    for (let yy = 0; yy < bs; yy++) { let row = 0; for (let xx = 0; xx < bs; xx++) { row += L[yy * bs + xx]; I[(yy + 1) * (bs + 1) + xx + 1] = I[yy * (bs + 1) + xx + 1] + row; } }
+    const blur = p => { const xx = p % bs, yy = (p / bs) | 0, a = Math.max(0, xx - rad), b = Math.max(0, yy - rad), e = Math.min(bs, xx + rad + 1), f = Math.min(bs, yy + rad + 1); return (I[f * (bs + 1) + e] - I[b * (bs + 1) + e] - I[f * (bs + 1) + a] + I[b * (bs + 1) + a]) / ((e - a) * (f - b)); };
+    const bg = new Float32Array(N); for (let p = 0; p < N; p++) bg[p] = blur(p);
+    const best = (sign) => {
+      const m = new Uint8Array(N); for (let p = 0; p < N; p++) { const dd = (L[p] - bg[p]) * sign; if (dd > 11 && sat[p] < 60) m[p] = 1; }
+      const lab = new Int32Array(N), st = new Int32Array(N); let bestC = null, id2 = 0;
+      for (let p0 = 0; p0 < N; p0++) {
+        if (!m[p0] || lab[p0]) continue; id2++; let sp = 0, n = 0, ax = bs, ay = bs, bx = 0, by = 0, sx = 0, sy = 0; st[sp++] = p0; lab[p0] = id2;
+        while (sp) { const p = st[--sp], px = p % bs, py = (p / bs) | 0; n++; sx += px; sy += py; if (px < ax) ax = px; if (px > bx) bx = px; if (py < ay) ay = py; if (py > by) by = py;
+          for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const qx = px + dx, qy = py + dy; if (qx < 0 || qy < 0 || qx >= bs || qy >= bs) continue; const q = qy * bs + qx; if (m[q] && !lab[q]) { lab[q] = id2; st[sp++] = q; } } }
+        const w = bx - ax + 1, h = by - ay + 1, fill = n / (w * h), asp = w / h;
+        if (w < bs * 0.12 || w > bs * 0.75 || h < bs * 0.12 || h > bs * 0.75) continue;
+        if (asp < 0.7 || asp > 1.4 || fill < 0.18 || fill > 0.75) continue;
+        if (ax < 1 || ay < 1 || bx > bs - 2 || by > bs - 2) continue;     // the mark sits inside the corner, never touching the edges
+        // a 4-point star is symmetric: its centre of mass sits in the middle of its box
+        const cxn = (sx / n - ax) / w, cyn = (sy / n - ay) / h; if (Math.abs(cxn - 0.5) > 0.12 || Math.abs(cyn - 0.5) > 0.12) continue;
+        if (w < 12 || h < 12) continue;   // specks and dust are not the mark
+        // …and looks the same turned by 90°
+        { const mx = sx / n, my = sy / n; let hitN = 0, tot = 0;
+          for (let yy = ay; yy <= by; yy++) for (let xx = ax; xx <= bx; xx++) { if (lab[yy * bs + xx] !== id2) continue; tot++; const rx = Math.round(mx - (yy - my)), ry = Math.round(my + (xx - mx)); if (rx >= 0 && ry >= 0 && rx < bs && ry < bs && lab[ry * bs + rx] === id2) hitN++; }
+          if (hitN / tot < 0.7) continue; }
+        const score = n * (1 - Math.abs(1 - asp));
+        if (!bestC || score > bestC.score) bestC = { id: id2, ax, ay, bx, by, w, h, score };
+      }
+      return bestC ? { ...bestC, lab } : null;
+    };
+    const hit = best(1) || (radK < 0.2 && bsK < 0.2 ? best(-1) : null);   // the big searches only look for a lighter mark
+    return hit ? { hit, bs, x0, y0, id, d, N, L, bg } : null;
   };
-  const hit = best(1) || best(-1);
-  if (!hit) return { blob, removed: false };
+  let F = null;
+  for (const [bk, rk] of [[0.14, 0.12], [0.14, 0.4], [0.22, 0.4], [0.34, 0.4]]) { F = tryFind(bk, rk); if (F) break; }
+  if (!F) return { blob, removed: false };
+  const { hit, bs, x0, y0, id, d, N, L, bg } = F;
   // the mask: the spot itself, grown a little, plus faint pixels of the same glyph inside its box
-  const mask = new Uint8Array(N), grow = Math.max(2, Math.round(hit.w * 0.08));
+  const mask = new Uint8Array(N), grow = Math.max(3, Math.round(hit.w * 0.14));
   for (let yy = Math.max(0, hit.ay - grow); yy <= Math.min(bs - 1, hit.by + grow); yy++) for (let xx = Math.max(0, hit.ax - grow); xx <= Math.min(bs - 1, hit.bx + grow); xx++) {
     let near = false; for (let dy = -grow; dy <= grow && !near; dy++) for (let dx = -grow; dx <= grow; dx++) { const qx = xx + dx, qy = yy + dy; if (qx >= 0 && qy >= 0 && qx < bs && qy < bs && hit.lab[qy * bs + qx] === hit.id) { near = true; break; } }
-    const p = yy * bs + xx; if (near || Math.abs(L[p] - bg[p]) > 6) mask[p] = near ? 1 : (xx > hit.ax && xx < hit.bx && yy > hit.ay && yy < hit.by ? 1 : 0);
+    const p = yy * bs + xx; if (near || Math.abs(L[p] - bg[p]) > 4) mask[p] = near ? 1 : (xx >= hit.ax - grow && xx <= hit.bx + grow && yy >= hit.ay - grow && yy <= hit.by + grow ? 1 : 0);
   }
-  // fill the mask from the outside in (each pixel = mean of its known neighbours)
+  // fill the mask from the outside in (each pixel = the median of its known neighbours)
+  const L2 = q => d[q * 4] * 0.299 + d[q * 4 + 1] * 0.587 + d[q * 4 + 2] * 0.114;
+  { const ex = Math.max(3, Math.round(hit.w * 0.05)), m2 = mask.slice();   // also the soft halo around the mark
+    for (let yy = 0; yy < bs; yy++) for (let xx = 0; xx < bs; xx++) { if (!m2[yy * bs + xx]) continue; for (let dy = -ex; dy <= ex; dy++) for (let dx = -ex; dx <= ex; dx++) { const qx = xx + dx, qy = yy + dy; if (qx >= 0 && qy >= 0 && qx < bs && qy < bs) mask[qy * bs + qx] = 1; } } }
   let todo = 0; for (let p = 0; p < N; p++) if (mask[p]) todo++;
   for (let pass = 0; todo > 0 && pass < bs; pass++) {
     const fillNow = [];
     for (let p = 0; p < N; p++) {
-      if (!mask[p]) continue; const px = p % bs, py = (p / bs) | 0; let r = 0, g = 0, b = 0, k = 0;
-      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; const qx = px + dx, qy = py + dy; if (qx < 0 || qy < 0 || qx >= bs || qy >= bs) continue; const q = qy * bs + qx; if (mask[q]) continue; r += d[q * 4]; g += d[q * 4 + 1]; b += d[q * 4 + 2]; k++; }
-      if (k >= 2) fillNow.push([p, r / k, g / k, b / k]);
+      if (!mask[p]) continue; const px = p % bs, py = (p / bs) | 0; const nb = [];
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; const qx = px + dx, qy = py + dy; if (qx < 0 || qy < 0 || qx >= bs || qy >= bs) continue; const q = qy * bs + qx; if (mask[q]) continue; nb.push(q); }
+      if (nb.length >= 2) { nb.sort((u, v) => L2(u) - L2(v)); const q = nb[(nb.length - 1) >> 1]; fillNow.push([p, d[q * 4], d[q * 4 + 1], d[q * 4 + 2]]); }   // median neighbour: stars and specks do not spread
     }
     if (!fillNow.length) break;
     for (const [p, r, g, b] of fillNow) { d[p * 4] = r; d[p * 4 + 1] = g; d[p * 4 + 2] = b; mask[p] = 0; todo--; }
@@ -3898,6 +3915,15 @@ async function thDraw() {
 $('#thFromFrame').onclick = () => { const [W, H] = [1280, 720]; thFrame = cv(W, H); drawFrame(thFrame.getContext('2d'), W, H, nowT()); thFill(); $('#thPic').value = '__frame'; thDraw(); };
 $('#thSave').onclick = async () => { await thDraw(); thCv.toBlob(b => download(b, `${safeName()}-thumbnail.png`), 'image/png'); };
 document.querySelectorAll('.tab[data-tab="yt"]').forEach(b => b.addEventListener('click', () => setTimeout(() => { thFill(); thDraw(); }, 50)));
+
+/* ============ Gemini ✦ mark: clean the pictures that are already in the project ============ */
+$('#gemAll').onclick = async () => {
+  const keys = Object.keys(S.images || {}); if (!keys.length) return toast('No pictures yet');
+  const btn = $('#gemAll'), keep = S.settings.gemMark; btn.disabled = true; S.settings.gemMark = 'auto'; let n = 0, done = 0;
+  try { for (const k of keys) { const b = S.images[k]; if (!b) continue; const r = await cleanGeminiMark(b); if (r.removed) { await setImage(k, r.blob); n++; } btn.textContent = `Checking… ${++done} / ${keys.length}`; } }
+  finally { S.settings.gemMark = keep; btn.disabled = false; btn.textContent = 'Remove ✦ from all pictures'; }
+  if (typeof renderSlots === 'function') renderSlots(); redraw(); toast(n ? `Gemini ✦ removed from ${n} picture${n > 1 ? 's' : ''}` : 'No Gemini ✦ found in the pictures');
+};
 window.VoxExtras = ({ projectIssues, findShorts, exportShort, thDraw, thFill, drawHook, hookText, hookPics, DEPTH, makeMask });
 </script>
 </body>
