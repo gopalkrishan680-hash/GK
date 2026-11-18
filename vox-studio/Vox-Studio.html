@@ -385,6 +385,7 @@ pre.mono { background: #faf6ec; border: 1px solid var(--line); border-radius: 8p
         <h3>Shorts from this video</h3>
         <p class="muted">Finds the 3–4 strongest 30–60 s parts (numbers, questions, surprises) and makes each a 9:16 Short with a title at the start and a "full video" end card. Your long video settings are not changed.</p>
         <label>End card text <input id="shortEnd" placeholder="Poori kahani channel par"></label>
+        <label>Captions in Shorts <select id="shortCaps"><option value="off">Off</option><option value="on">On (word by word)</option></select></label>
         <div class="row"><button class="btn" id="shortFind">Find the best parts</button></div>
         <div id="shortList"></div>
       </div>
@@ -490,7 +491,7 @@ const DEFAULTS = {
   mode: 'collage', split: 'sentence', pace: 'normal', textLang: 'auto', look: 'sepia', perImage: 6, animVar: 'mixed', decor: 'on', dust: 'on', stopmo: 'off', safe: 'on', gemMark: 'auto', capPos: 'mid', capColor: '#a6ff1a',
   theme: 'parchment', photo: 'warm', grain: 0.05, vignette: 'on', captions: 'words', watermark: '', accent: '#f5d327',
   trans: 'auto', motion: 1, sfx: 'on', sfxVol: 0.55, musicVol: 0.14, duck: 'on',
-  hook: 'on', hookText: '', depth: 'on', shortEnd: ''
+  hook: 'on', hookText: '', depth: 'on', shortEnd: '', shortCaps: 'off'
 };
 const S = { v: 1, settings: { ...DEFAULTS }, script: '', segments: [], starts: [], timing: 'auto', shots: [], assets: [], images: {}, audioBlob: null, audioName: '', musicBlob: null, musicName: '', uid: 1 };
 const R = { img: {}, filt: new Map(), ver: 1, res: null, paper: new Map(), grain: null, models: null };   // runtime caches
@@ -3021,7 +3022,7 @@ $$('.tab').forEach(b => b.onclick = () => showTab(b.dataset.tab));
 $$('[data-go]').forEach(b => b.onclick = () => showTab(b.dataset.go));
 
 /* ============ settings ============ */
-const BIND = ['hook', 'hookText', 'depth', 'shortEnd', 'gemMark', 'mode', 'animVar', 'decor', 'dust', 'stopmo', 'capPos', 'capColor', 'split', 'aspect', 'textLang', 'pace', 'look', 'perImage', 'theme', 'photo', 'accent', 'trans', 'motion', 'grain', 'vignette', 'captions', 'watermark', 'sfx', 'sfxVol', 'musicVol', 'duck', 'res', 'fps'];
+const BIND = ['hook', 'hookText', 'depth', 'shortEnd', 'shortCaps', 'gemMark', 'mode', 'animVar', 'decor', 'dust', 'stopmo', 'capPos', 'capColor', 'split', 'aspect', 'textLang', 'pace', 'look', 'perImage', 'theme', 'photo', 'accent', 'trans', 'motion', 'grain', 'vignette', 'captions', 'watermark', 'sfx', 'sfxVol', 'musicVol', 'duck', 'res', 'fps'];
 const NUMS = new Set(['perImage', 'motion', 'grain', 'sfxVol', 'musicVol', 'res', 'fps']);
 $('#look').innerHTML = Object.entries(LOOKS).map(([k, v]) => `<option value="${k}">${v.name}</option>`).join('');
 function applyModeDefaults() {
@@ -3809,7 +3810,7 @@ async function exportShort(i) {
   if (!(window.VideoEncoder && window.AudioEncoder && window.Mp4Muxer)) return toast('Shorts need the fast exporter (Chrome / the Android app).');
   if (exporting) return toast('An export is already running');
   const keep = { aspect: S.settings.aspect, captions: S.settings.captions }, r = +S.settings.res;
-  S.settings.aspect = '9:16'; if (S.settings.captions === 'off') S.settings.captions = 'words'; R.noHook = true; R.short = { title: p.title, end: S.settings.shortEnd }; touch();
+  S.settings.aspect = '9:16'; S.settings.captions = S.settings.shortCaps === 'on' ? 'words' : 'off'; R.noHook = true; R.short = { title: p.title, end: S.settings.shortEnd }; touch();
   try { await exportOffline({ from: p.from, to: p.to, dims: [r, Math.round(r * 16 / 9 / 2) * 2], name: `${safeName()}-short-${i + 1}`, label: `Short ${i + 1}:` }); }
   finally { Object.assign(S.settings, keep); R.noHook = false; R.short = null; R.capOff = false; touch(); sizePreview(); drawPreview(); }
 }
