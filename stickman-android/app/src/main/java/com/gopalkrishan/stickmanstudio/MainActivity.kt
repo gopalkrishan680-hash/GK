@@ -15,6 +15,9 @@ import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
 import android.provider.OpenableColumns
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import android.speech.tts.Voice
 import android.util.Base64
 import android.util.Log
 import android.view.WindowManager
@@ -32,7 +35,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.webkit.WebViewAssetLoader
+import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
+import java.util.Locale
 import java.io.InputStream
 import java.io.OutputStream
 
@@ -50,6 +56,11 @@ class MainActivity : ComponentActivity() {
     private var pendingLink: String? = null
     private var lastClipStamp = -1L
     private var pageReady = false
+
+    // Offline voiceover: the phone's own text-to-speech engine (Google speech services has Hindi voices
+    // that work without internet once downloaded). No API key, nothing leaves the phone.
+    private var tts: TextToSpeech? = null
+    @Volatile private var ttsState = "off"   // off, starting, ready, failed
 
     private var saveStream: OutputStream? = null
     private var saveUri: Uri? = null
@@ -192,6 +203,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         try { saveStream?.close() } catch (_: Exception) {}
+        try { tts?.shutdown() } catch (_: Exception) {}
         web.destroy()
         super.onDestroy()
     }
@@ -439,6 +451,96 @@ class MainActivity : ComponentActivity() {
             }
             return true
         }
+
+        // ---------- offline voice (phone text-to-speech) ----------
+
+        /** Starts the phone's speech engine. Returns the state: starting, ready or failed. */
+        @JavascriptInterface
+        fun ttsStart(): String {
+            if (ttsState == "ready" || ttsState == "starting") return ttsState
+            ttsState = "starting"
+            runOnUiThread {
+                tts = TextToSpeech(this@MainActivity) { status ->
+                    ttsState = if (status == TextToSpeech.SUCCESS) "ready" else "failed"
+                    if (ttsState == "ready") tts?.setOnUtteranceProgressListener(ttsListener)
+                    js("window.ssTtsState && ssTtsState('$ttsState')")
+                }
+            }
+            return ttsState
+        }
+
+        @JavascriptInterface
+        fun ttsStatus(): String = ttsState
+
+        /** Voices of the engine as JSON: [{name, lang, quality, offline, installed}] — Hindi and Indian English first. */
+        @JavascriptInterface
+        fun ttsVoices(): String {
+            val t = tts ?: return "[]"
+            if (ttsState != "ready") return "[]"
+            val arr = JSONArray()
+            try {
+                val list = (t.voices ?: emptySet<Voice>()).filter {
+                    val l = it.locale
+                    l.language == "hi" || (l.language == "en" && l.country == "IN")
+                }.sortedWith(compareBy<Voice>({ if (it.locale.language == "hi") 0 else 1 }, { if (it.isNetworkConnectionRequired) 1 else 0 }, { -it.quality }, { it.name }))
+                for (v in list) {
+                    val feats = v.features ?: emptySet()
+                    arr.put(JSONObject().apply {
+                        put("name", v.name); put("lang", v.locale.toLanguageTag()); put("quality", v.quality)
+                        put("offline", !v.isNetworkConnectionRequired)
+                        put("installed", !feats.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED))
+                    })
+                }
+            } catch (e: Exception) { Log.i(TAG, "SSAPP tts voices: ${e.message}") }
+            return arr.toString()
+        }
+
+        /** Speaks one line into a WAV file in the background; the page gets ssTtsDone(id, ok, base64 or error). */
+        @JavascriptInterface
+        fun ttsSynth(id: String, text: String, voice: String, rate: Float, pitch: Float): Boolean {
+            val t = tts ?: return false
+            if (ttsState != "ready") return false
+            runOnUiThread {
+                try {
+                    val v = t.voices?.firstOrNull { it.name == voice }
+                    if (v != null) t.voice = v else t.language = Locale("hi", "IN")
+                    t.setSpeechRate(rate); t.setPitch(pitch)
+                    val f = File(cacheDir, "tts-$id.wav")
+                    val p = Bundle().apply { putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, id) }
+                    val r = t.synthesizeToFile(text, p, f, id)
+                    if (r != TextToSpeech.SUCCESS) js("ssTtsDone(${JSONObject.quote(id)}, false, 'the speech engine refused this line')")
+                } catch (e: Exception) { js("ssTtsDone(${JSONObject.quote(id)}, false, ${JSONObject.quote(e.message ?: "error")})") }
+            }
+            return true
+        }
+
+        /** Opens Android's text-to-speech settings (to install the Hindi voice data for offline use). */
+        @JavascriptInterface
+        fun ttsSettings() {
+            runOnUiThread {
+                try { startActivity(Intent("com.android.settings.TTS_SETTINGS")) }
+                catch (_: Exception) {
+                    try { startActivity(Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA)) } catch (_: Exception) { toast("Open Settings → Text-to-speech") }
+                }
+            }
+        }
+    }
+
+    private val ttsListener = object : UtteranceProgressListener() {
+        override fun onStart(utteranceId: String) {}
+        override fun onDone(utteranceId: String) {
+            Thread {
+                val f = File(cacheDir, "tts-$utteranceId.wav")
+                try {
+                    val b64 = Base64.encodeToString(f.readBytes(), Base64.NO_WRAP)
+                    f.delete()
+                    js("ssTtsDone(${JSONObject.quote(utteranceId)}, true, '$b64')")
+                } catch (e: Exception) { js("ssTtsDone(${JSONObject.quote(utteranceId)}, false, ${JSONObject.quote(e.message ?: "read failed")})") }
+            }.start()
+        }
+        @Deprecated("Deprecated in Java")
+        override fun onError(utteranceId: String) { js("ssTtsDone(${JSONObject.quote(utteranceId)}, false, 'speech engine error')") }
+        override fun onError(utteranceId: String, errorCode: Int) { js("ssTtsDone(${JSONObject.quote(utteranceId)}, false, 'speech engine error $errorCode')") }
     }
 
     companion object {

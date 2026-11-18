@@ -32,6 +32,28 @@ by one on the word where they are spoken. The screen clears at every new **board
 4. **Preview + Export:** the same exact-frame MP4 export. Sound effects (pop, whoosh, swish, ding, buzz) are made
    in the app and placed on every entrance; background music gets quieter under the voice and fades in/out.
 
+## Idea + Script tab (first tab)
+Ready story ideas (motivation, emotional family, suspense, funny, moral) with a strong hook, and a **video length**
+choice (30 s to 8 min). Tap an idea and the app writes its script offline in Hindi (देवनागरी, best for the offline
+voice) or Hinglish; longer lengths add more scenes. Ready stories go up to about 2 minutes. For your own topic or
+a longer video, **Copy script prompt** into ChatGPT / Gemini / Claude (free, no API key), paste the reply and press
+**Use this script**: it goes into the Script tab and the scenes are made. Facts topics always use the prompt, so
+nothing is made up.
+
+## Offline voiceover (Android app)
+**Script + Voice → 🎙 Make the voiceover from the script.** Uses the phone's own text-to-speech (Google speech
+engine, Hindi voice). No API key, no internet once the Hindi voice is downloaded (**Voice settings** → Install voice
+data → Hindi). Each sentence is spoken separately with a natural pause, questions rise, sad lines are slower and
+happy lines livelier; `[pause 1.5]` adds silence. The scenes are synced to it automatically. Speed, pitch and pause
+can be set. The phone voice is clear and natural for Hindi, but not as expressive as Gemini's AI Studio voices,
+which need the internet and a key.
+
+## Viewer hooks (Preview + Export)
+Found in the script by itself: shock words shake the screen with a boom, a reveal flashes with a riser and the music
+dips just before it, key words, *starred* words and numbers get a quick zoom, fear and sadness a slow push-in, and
+reaction doodles pop up (❗ ❓ 💢 💧 ✨ "HA HA"), with heartbeat, boing, hit and ding sounds. If nothing happens for
+about 7 seconds, a gentle zoom keeps the picture moving. Strength, doodles, sounds and their volume can be set.
+
 ## Auto background music
 **Preview + Export → Background music → 🎵 Make music from script.** The app reads the script in parts of about
 20 seconds, gives every part a mood from its words (English, Hinglish and Hindi words): *Calm story, Happy, Sad,

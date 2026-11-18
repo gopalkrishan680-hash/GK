@@ -61,6 +61,10 @@ header.top { background: var(--surface); }
   .top-row > .row { order: 5; }
 }
 .touch-only { display: none; }
+.idealist { display: grid; gap: 8px; max-height: 560px; overflow: auto; }
+.ideacard { text-align: left; display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: inherit; font: inherit; cursor: pointer; }
+.ideacard .chip { width: fit-content; }
+.ideacard.sel { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
 .yt-thumbs { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 .yt-thumb { border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .yt-text { display: inline-block; background: #1b1b1b; color: #ffcf5a; font-weight: 800; padding: 2px 8px; border-radius: 6px; width: fit-content; }
@@ -268,6 +272,7 @@ html:not(.mode-layers) .layers-only { display: none !important; }
 <div class="tabbar">
   <div class="wrap">
     <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="idea" aria-selected="false"><span class="n">1</span>Idea + Script</button>
       <button role="tab" data-tab="script" aria-selected="true"><span class="n">1</span>Script + Voice</button>
       <button role="tab" data-tab="layers" aria-selected="false"><span class="n">2</span>Layers</button>
       <button role="tab" data-tab="prompts" aria-selected="false"><span class="n">2</span>Image Prompts</button>
@@ -280,6 +285,35 @@ html:not(.mode-layers) .layers-only { display: none !important; }
 </div>
 
 <main class="wrap">
+
+<!-- IDEA + SCRIPT -->
+<section class="step" data-panel="idea" hidden>
+  <div>
+    <h2>Idea + script</h2>
+    <p class="lead">Pick an idea, choose the length, and get a script that starts with a <b>strong hook</b>. Ready ideas work offline; for any topic or a longer video, copy the prompt into ChatGPT / Gemini / Claude (free, no API key).</p>
+  </div>
+  <div class="cols">
+    <div class="panel">
+      <div class="row">
+        <label class="f">Type <select id="ideaGenre"><option value="">All ideas</option><option value="motivation">Motivation / success</option><option value="family">Emotional family</option><option value="suspense">Suspense / horror</option><option value="funny">Funny</option><option value="moral">Moral story</option><option value="facts">Facts / explainer</option></select></label>
+        <label class="f">Video length <select id="ideaDur"><option value="30">30 s (Short)</option><option value="60" selected>1 minute</option><option value="120">2 minutes</option><option value="180">3 minutes</option><option value="300">5 minutes</option><option value="480">8 minutes</option></select></label>
+        <label class="f">Language <select id="ideaLang"><option value="hi">Hindi (देवनागरी, best for the offline voice)</option><option value="hinglish">Hinglish (Roman)</option><option value="en">English (prompt only)</option></select></label>
+      </div>
+      <div class="row"><button class="btn small" id="ideaShuffle">🎲 Surprise me</button><span class="hint">Tap an idea to write its script.</span></div>
+      <div class="idealist" id="ideaList"></div>
+    </div>
+    <div class="panel">
+      <h3>Your own topic, any length (AI, free)</h3>
+      <label class="f">Topic or idea (optional) <input type="text" id="ideaTopic" placeholder="e.g. Ek garib ladka jo cricketer bana"></label>
+      <div class="row"><button class="btn" id="ideaCopyIdeas">Copy "10 ideas" prompt</button><button class="btn primary" id="ideaCopyScript">Copy script prompt</button></div>
+      <div class="row"><button class="btn small" data-ytopen="chatgpt">ChatGPT</button><button class="btn small" data-ytopen="gemini">Gemini</button><button class="btn small" data-ytopen="claude">Claude</button></div>
+      <h3>Script</h3>
+      <textarea id="ideaOut" rows="12" placeholder="The script appears here. Or paste the script from ChatGPT / Gemini / Claude."></textarea>
+      <div class="row"><button class="btn primary" id="ideaUse">Use this script →</button><button class="btn" id="ideaPaste">Paste</button></div>
+      <p class="hint" id="ideaInfo" style="margin:0"></p>
+    </div>
+  </div>
+</section>
 
 <!-- STEP 1 -->
 <section class="step" data-panel="script">
@@ -312,6 +346,23 @@ html:not(.mode-layers) .layers-only { display: none !important; }
     </div>
     <div class="panel">
       <h3>Voiceover</h3>
+      <details class="ovbox" id="ovBox" open>
+        <summary><b>🎙 Make the voiceover from the script</b> <span class="hint">offline · free · no API key</span></summary>
+        <div style="display:grid;gap:8px;margin-top:8px">
+          <p class="hint" style="margin:0">Uses the phone's own Hindi voice (Google speech engine), works without internet. Best in Hindi script (देवनागरी); Hinglish works too.</p>
+          <div class="row"><label class="f" style="flex:1 1 220px">Voice <select id="ovVoice"></select></label><button class="btn small" id="ovSettings" title="Download the Hindi voice for offline use">Voice settings</button></div>
+          <div class="row">
+            <label class="f">Speed <span class="tc" id="ovRateV"></span><input type="range" id="ovRate" min="0.7" max="1.3" step="0.01"></label>
+            <label class="f">Pitch <span class="tc" id="ovPitchV"></span><input type="range" id="ovPitch" min="0.8" max="1.2" step="0.01"></label>
+            <label class="f">Pause after a sentence <span class="tc" id="ovPauseV"></span><input type="range" id="ovPause" min="0.15" max="1.2" step="0.05"></label>
+          </div>
+          <label class="f">Expression <select id="ovExprSel"><option value="on">Natural: questions rise, sad lines slower, happy lines livelier</option><option value="off">Flat (same for every line)</option></select></label>
+          <div class="row"><button class="btn primary" id="ovGo">Make voiceover</button><button class="btn" id="ovTest">▶ Test voice</button><button class="btn" id="ovStop" hidden>Stop</button></div>
+          <progress id="ovProg" value="0" max="1" hidden></progress>
+          <div class="hint" id="ovState"></div>
+          <div class="hint" id="ovInfo"></div>
+        </div>
+      </details>
       <div class="drop" id="voDrop" tabindex="0" role="button"><strong>Drop the voiceover file here</strong>or click to choose (mp3, wav, m4a)</div>
       <input type="file" id="voFile" accept="audio/*" hidden>
       <input type="file" id="oneAudio" accept="audio/*,video/*,.opus,.ogg,.m4a,.aac" hidden>
@@ -681,6 +732,17 @@ html:not(.mode-layers) .layers-only { display: none !important; }
         <select id="enhance"><option value="on">Sharpen + upscale small panels (recommended)</option><option value="off">Original pixels</option></select>
       </label>
       </div>
+      <h3>Viewer hooks</h3>
+      <p class="hint" style="margin:0">Found in the script by itself: the screen shakes with a boom on shock words, flashes on a reveal (the music dips first), zooms in on key words and numbers, and doodles pop up: ❗ ❓ 💢 💧 ✨ "HA HA". Where nothing happens for 7 seconds, a gentle zoom keeps it moving.</p>
+      <div class="row">
+        <label class="f">Zoom, shake and flash <select id="fx"><option value="on">On (recommended)</option><option value="off">Off</option></select></label>
+        <label class="f">Strength <input type="range" id="fxAmt" min="0.4" max="1.6" step="0.05"></label>
+      </div>
+      <div class="row">
+        <label class="f">Reaction doodles <select id="fxDoodle"><option value="on">On</option><option value="off">Off</option></select></label>
+        <label class="f">Hook sounds <select id="fxSfx"><option value="on">On (boom, heartbeat, boing, riser…)</option><option value="off">Off</option></select></label>
+        <label class="f">Hook sound volume <input type="range" id="fxVol" min="0" max="1" step="0.05"></label>
+      </div>
       <h3>Background music</h3>
       <div class="row"><button class="btn small" id="musicBtn">Choose music file</button><button class="btn small danger" id="musicDel">Remove</button><span class="hint" id="musicInfo">No music</span></div>
       <input type="file" id="musicFile" accept="audio/*" hidden>
@@ -808,7 +870,7 @@ He looked at Papa. Papa smiled, and said, "I am proud of you."`;
 /* ============ state ============ */
 const DEFAULTS = { title: '', aspect: '16:9', grid: 3, style: 'stickman', styleText: STYLES.stickman.text, characters: '', gutter: 'auto',
   splitLevel: 'all', minWords: 2, maxWords: 14, captions: 'bar', fit: 'auto', enhance: 'on', v: 3, capSize: 1, motion: 6, transition: 'fade', transDur: 0.15, res: 1080, fps: 30, musicVol: 0.12, anim: 'on', animAmt: 1, capWords: 'on', pics: 'images', skStyle: 'chibi', lPer: 9, lLib: 'on',
-  mode: 'layers', lBg: 'parchment', lEnter: 'auto', lTrans: 'cut', lIdle: 'subtle', lCam: 'on', lCaps: 'off', sfx: 'on', sfxVol: 0.5, duck: 'on' };
+  fx: 'on', fxAmt: 1, fxDoodle: 'on', fxSfx: 'on', fxVol: 0.6, ovVoice: '', ovRate: 0.95, ovPitch: 1, ovPause: 0.45, ovExpr: 'on', mode: 'layers', lBg: 'parchment', lEnter: 'auto', lTrans: 'cut', lIdle: 'subtle', lCam: 'on', lCaps: 'off', sfx: 'on', sfxVol: 0.5, duck: 'on' };
 try { if (matchMedia('(pointer: coarse)').matches) DEFAULTS.res = 720; } catch (_) {}   // phones: smaller, faster export
 const S = { settings: { ...DEFAULTS }, script: '', segments: [], starts: [], grids: [], overrides: {}, audioBlob: null, audioName: '', musicBlob: null, musicName: '' };
 let uid = 1;
@@ -2307,7 +2369,13 @@ function drawCaption(ctx, W, H, text, lt, L, dur) {
   });
   ctx.restore();
 }
-function drawFrame(ctx, W, H, t) {
+function drawFrame(ctx, W, H, t) {   // the frame, moved by the viewer-hook camera, with doodles and flash on top
+  const cam = fxAt(t);
+  if (cam.z === 1 && !cam.dx && !cam.dy) drawFrameBase(ctx, W, H, t);
+  else { ctx.save(); ctx.translate(W / 2 + cam.dx * W, H / 2 + cam.dy * H); ctx.scale(cam.z, cam.z); ctx.translate(-W / 2, -H / 2); drawFrameBase(ctx, W, H, t); ctx.restore(); }
+  fxOverlay(ctx, W, H, t, cam);
+}
+function drawFrameBase(ctx, W, H, t) {
   if (isLayers()) return lDrawFrame(ctx, W, H, t);
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
   const n = S.segments.length; if (!n) return;
@@ -2586,9 +2654,9 @@ $('#dlPrompts').onclick = () => { const bs = batches(); if (!bs.length) return; 
 $('#loadChars').onclick = () => { const ta = $('#characters'); ta.value = (ta.value.trim() ? ta.value.trim() + '\n' : '') + CHANNEL_CHARS; S.settings.characters = ta.value; renderPrompts(); save(); };
 
 /* ============ settings binding ============ */
-const BIND = ['aspect', 'grid', 'style', 'styleText', 'characters', 'gutter', 'splitLevel', 'minWords', 'maxWords', 'captions', 'fit', 'enhance', 'capSize', 'motion', 'transition', 'transDur', 'res', 'fps', 'musicVol', 'anim', 'animAmt', 'capWords', 'pics', 'skStyle',
+const BIND = ['fx', 'fxAmt', 'fxDoodle', 'fxSfx', 'fxVol', 'aspect', 'grid', 'style', 'styleText', 'characters', 'gutter', 'splitLevel', 'minWords', 'maxWords', 'captions', 'fit', 'enhance', 'capSize', 'motion', 'transition', 'transDur', 'res', 'fps', 'musicVol', 'anim', 'animAmt', 'capWords', 'pics', 'skStyle',
   'lBg', 'lEnter', 'lTrans', 'lIdle', 'lCam', 'lCaps', 'sfx', 'sfxVol', 'duck', 'lPer', 'lLib'];
-const NUM = new Set(['grid', 'minWords', 'maxWords', 'capSize', 'motion', 'transDur', 'res', 'fps', 'musicVol', 'animAmt', 'sfxVol', 'lPer']);
+const NUM = new Set(['grid', 'minWords', 'maxWords', 'capSize', 'motion', 'transDur', 'res', 'fps', 'musicVol', 'animAmt', 'sfxVol', 'lPer', 'fxAmt', 'fxVol']);
 function applySettingsToUI() { BIND.forEach(k => { const el = $('#' + k); if (el) el.value = S.settings[k]; }); $('#projTitle').value = S.settings.title || ''; lApplyMode(); }
 BIND.forEach(k => { const el = $('#' + k); if (!el) return; el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => {
   S.settings[k] = NUM.has(k) ? +el.value : el.value;
@@ -2617,6 +2685,7 @@ function showTab(name) {
   updateTargetUI();
   if (name === 'layers') lRender();
   if (name === 'yt') ytShow();
+  if (name === 'idea') ideaRender();
 }
 $$('nav.tabs button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
 document.addEventListener('keydown', e => {
@@ -2648,8 +2717,8 @@ async function mixAudio(sr) {
   const v = oc.createBufferSource(); v.buffer = audioBuf; v.connect(oc.destination); v.start(0);
   if (S.musicBlob) { try { const mb = await actxDecode.decodeAudioData(await S.musicBlob.arrayBuffer()); const m = oc.createBufferSource(); m.buffer = mb; m.loop = true; const g = oc.createGain(); g.gain.setValueCurveAtTime(musicCurve(D), 0, D); m.connect(g).connect(oc.destination); m.start(0); } catch (_) {} }
   // sound effects of the layered video, at the moment each picture / keyword / icon appears
-  const ev = lSfxEvents();
-  if (ev.length) { const bank = sfxBank(oc); for (const e of ev) { if (e.t >= D) continue; const s = oc.createBufferSource(); s.buffer = bank[e.s]; const g = oc.createGain(); g.gain.value = S.settings.sfxVol * e.v; s.connect(g).connect(oc.destination); s.start(Math.max(0, e.t)); } }
+  const ev = allSfxEvents();
+  if (ev.length) { const bank = sfxBank(oc); for (const e of ev) { if (e.t >= D) continue; const s = oc.createBufferSource(); s.buffer = bank[e.s]; const g = oc.createGain(); g.gain.value = sfxGain(e); s.connect(g).connect(oc.destination); s.start(Math.max(0, e.t)); } }
   return await oc.startRendering();
 }
 // Renders every frame at its exact time (frame k = k / fps seconds) and writes a normal, seekable MP4.
@@ -2790,7 +2859,7 @@ async function restore(p) {
   for (let i = 0; i < (p.grids || []).length; i++) { const g = p.grids[i]; if (g && g.blob) { try { R.grids[i] = { img: await loadImage(g.blob) }; S.grids[i] = { blob: g.blob, auto: g.auto !== false, trim: g.trim ?? 1.5 }; } catch (_) {} } }
   for (const [k, v] of Object.entries(p.overrides || {})) if (v) await setOverride(k, v);
   if (p.audioBlob) await setVoice(p.audioBlob, p.audioName);
-  await setMusic(p.musicBlob || null, p.musicName || ''); amShowPlan(); $('#amMood').value = (S.autoMusic && S.autoMusic.mood) || 'auto';
+  await setMusic(p.musicBlob || null, p.musicName || ''); amShowPlan(); ovToUI(); $('#amMood').value = (S.autoMusic && S.autoMusic.mood) || 'auto';
   if (S.starts.length !== S.segments.length) ratioTiming();
   // projects saved before the improved Smart Sync: redo their timing once
   const resync = (p.syncVer || 0) < 3 && analysis && S.segments.length > 1;
@@ -3661,7 +3730,7 @@ function sfxBank(actx) {
     wrong: mk(0.38, d => { for (let i = 0; i < d.length; i++) { const t = i / sr, k = t < 0.17 ? 0 : 1, lt = t - k * 0.19; if (lt < 0) { d[i] = 0; continue; } const f = k ? 220 : 294; d[i] = (2 / Math.PI) * Math.asin(Math.sin(2 * Math.PI * f * lt)) * Math.exp(-lt * 13) * Math.min(1, lt * 300); } }),
     tick: mk(0.07, d => { for (let i = 0; i < d.length; i++) { const t = i / sr; d[i] = (rnd() * 2 - 1) * Math.exp(-t * 140) * 0.5 + Math.sin(2 * Math.PI * 1900 * t) * Math.exp(-t * 80); } })
   };
-  SFX_BANKS.set(actx, bank); return bank;
+  fxBankAdd(actx, bank); SFX_BANKS.set(actx, bank); return bank;
 }
 function lSfxEvents() {
   if (!isLayers() || S.settings.sfx === 'off' || !S.segments.length) return [];
@@ -3683,11 +3752,11 @@ function lSfxEvents() {
 const sfxLive = { ctx: null, nodes: [] };
 function sfxStop() { sfxLive.nodes.forEach(n => { try { n.stop(); } catch (_) {} }); sfxLive.nodes = []; }
 function sfxStart() {
-  sfxStop(); if (exporting || vo.paused) return; const ev = lSfxEvents(); if (!ev.length) return;
+  sfxStop(); if (exporting || vo.paused) return; const ev = allSfxEvents(); if (!ev.length) return;
   try {
     const c = sfxLive.ctx || (sfxLive.ctx = new (window.AudioContext || window.webkitAudioContext)()); if (c.state === 'suspended') c.resume();
     const bank = sfxBank(c), now = vo.currentTime, base = c.currentTime + 0.03 - now;
-    for (const e of ev) { if (e.t < now - 0.01) continue; const src = c.createBufferSource(); src.buffer = bank[e.s]; const g = c.createGain(); g.gain.value = S.settings.sfxVol * e.v; src.connect(g).connect(c.destination); src.start(Math.max(c.currentTime, base + e.t)); sfxLive.nodes.push(src); }
+    for (const e of ev) { if (e.t < now - 0.01) continue; const src = c.createBufferSource(); src.buffer = bank[e.s]; const g = c.createGain(); g.gain.value = sfxGain(e); src.connect(g).connect(c.destination); src.start(Math.max(c.currentTime, base + e.t)); sfxLive.nodes.push(src); }
   } catch (_) {}
 }
 vo.addEventListener('play', sfxStart); vo.addEventListener('pause', sfxStop); vo.addEventListener('seeked', () => { if (!vo.paused) sfxStart(); }); vo.addEventListener('ended', sfxStop);
@@ -3704,7 +3773,7 @@ function duckCurve() {
 function musicGainAt(t) {
   const D = duration(); let v = S.settings.musicVol;
   if (S.settings.duck !== 'off') { const e = duckCurve(); if (e) v *= e.g[clamp(Math.floor(t / e.hop), 0, e.g.length - 1)]; v *= clamp(t / 1.5, 0, 1) * clamp((D - t) / 2.5, 0, 1); }
-  return v;
+  return v * fxMusicDip(t);
 }
 function musicCurve(D) { const n = Math.max(2, Math.ceil(D * 20) + 1), c = new Float32Array(n); for (let k = 0; k < n; k++) c[k] = musicGainAt(k / 20); return c; }
 
@@ -3725,7 +3794,7 @@ function lBusy(on, info) { $('#lStop').hidden = !on; $('#lAutoPlan').disabled = 
 function lApplyMode() {
   const L = isLayers(); document.documentElement.classList.toggle('mode-layers', L);
   $$('input[name=vmode]').forEach(r => r.checked = r.value === (L ? 'layers' : 'grid'));
-  const order = L ? ['script', 'layers', 'sync', 'video', 'yt'] : ['script', 'prompts', 'grids', 'sync', 'video', 'yt'];
+  const order = L ? ['idea', 'script', 'layers', 'sync', 'video', 'yt'] : ['idea', 'script', 'prompts', 'grids', 'sync', 'video', 'yt'];
   $$('nav.tabs button').forEach(b => { const k = order.indexOf(b.dataset.tab); b.hidden = k < 0; const n = b.querySelector('.n'); if (n && k >= 0) n.textContent = k + 1; });
   $('#lBgRow').hidden = S.settings.lBg !== 'custom';
 }
@@ -4711,9 +4780,10 @@ const AM_WORDS = {
   inspiring: 'dream dreams goal goals never give up try again hard work practice believe courage brave strong strength power rise future hope inspire inspiring change world journey fight fought champion achieve achievement determination discipline motivation sapna sapne mehnat himmat hausla koshish kamyabi safalta jeet manzil rasta badlav takat vishwas lakshya junoon'
 };
 const AM_DEVA = { happy: 'खुश खुशी मुस्कुरा हंस हँस जश्न जीत प्यार मज़ा मजा बधाई शादी त्योहार तोहफ़ा', sad: 'रो आंसू आँसू अकेला अकेली उदास दुख दुःख दर्द मौत याद टूट हार गरीब बीमार अफ़सोस अलविदा', suspense: 'अचानक राज़ रहस्य अंधेरा अंधेरी रात साया अजीब खतरा ख़तरा डर भूत सन्नाटा चोर खून भाग सच कौन क्यों', funny: 'मज़ाक मजाक चुटकुला पागल बेवकूफ़ मस्ती शरारत गड़बड़', inspiring: 'सपना सपने मेहनत हिम्मत हौसला कोशिश कामयाबी सफलता मंज़िल रास्ता बदलाव ताकत विश्वास लक्ष्य जुनून' };
+const AM_SKIP = new Set('gaya gayi mar jeet haar what who why happened door question truth quietly never give up try again hard work power rise change world future hope journey'.split(' '));
 const AM_LEX = (() => {
   const m = new Map();
-  for (const [mood, s] of Object.entries(AM_WORDS)) s.split(/\s+/).forEach(w => m.set(w, mood));
+  for (const [mood, s] of Object.entries(AM_WORDS)) s.split(/\s+/).forEach(w => { if (!AM_SKIP.has(w)) m.set(w, mood); });
   for (const [mood, s] of Object.entries(AM_DEVA)) s.split(/\s+/).forEach(w => m.set(w, mood));
   return m;
 })();
@@ -4842,6 +4912,442 @@ $('#amMake').onclick = () => { if (S.autoMusic) S.autoMusic.seed = 0; amMake(fal
 $('#amAgain').onclick = () => { if (!S.autoMusic) return amMake(false); S.autoMusic.seed = (S.autoMusic.seed * 7 + 13) & 0xffffff || 1; amMake(true); };
 $('#amParts').addEventListener('change', e => { const i = e.target.dataset.ampart; if (i == null || !S.autoMusic) return; S.autoMusic.plan[+i].mood = e.target.value; amMake(true); });
 
+/* ============ offline voiceover: the phone's own speech engine, no API key, no internet ============
+   Every sentence is spoken separately by Android's text-to-speech (Google speech services has Hindi voices that
+   work offline), trimmed, given a natural pause and a little expression (questions rise, exclamations are livelier,
+   sad lines slower...), then joined into one voiceover. The sentence times are known exactly, so the scenes sync. */
+const OV = { state: APP && window.AndroidBridge && AndroidBridge.ttsStart ? 'off' : 'none', voices: [], pending: new Map(), seq: 0, stop: false };
+window.ssTtsState = s => { OV.state = s; ovLoadVoices(); };
+window.ssTtsDone = (id, ok, data) => { const p = OV.pending.get(id); if (!p) return; OV.pending.delete(id); clearTimeout(p.timer); ok ? p.res(data) : p.rej(new Error(data)); };
+function ovStart() {
+  if (OV.state === 'none') return;
+  try { OV.state = AndroidBridge.ttsStart(); } catch (_) { OV.state = 'failed'; }
+  if (OV.state === 'ready') ovLoadVoices(); else ovRefresh();
+}
+function ovLoadVoices() {
+  if (OV.state === 'ready') { try { OV.voices = JSON.parse(AndroidBridge.ttsVoices() || '[]'); } catch (_) { OV.voices = []; } }
+  ovRefresh();
+}
+function ovVoiceLabel(v, k) {
+  const hi = v.lang.toLowerCase().startsWith('hi'), m = v.name.match(/x-([a-z]{3})/i), code = m ? m[1].toUpperCase() : '';
+  return `${hi ? 'Hindi' : 'Indian English'} voice ${k + 1}${code ? ' (' + code + ')' : ''} · ${!v.offline ? 'needs internet' : v.installed ? 'offline' : 'offline, not downloaded'}${v.quality >= 400 ? ' · high quality' : ''}`;
+}
+function ovRefresh() {
+  const sel = $('#ovVoice'), info = $('#ovState');
+  if (OV.state === 'none') { info.textContent = 'Works in the Android app (it uses the phone\'s own Hindi voice). In a browser, use your own recording.'; $('#ovGo').disabled = true; $('#ovTest').disabled = true; return; }
+  if (OV.state === 'off' || OV.state === 'starting') { info.textContent = 'Starting the phone\'s speech engine…'; return; }
+  if (OV.state === 'failed') { info.textContent = 'The phone has no speech engine. Install "Speech Recognition & Synthesis from Google" from the Play Store, then press Voice settings.'; return; }
+  let k = { hi: 0, en: 0 };
+  sel.innerHTML = OV.voices.length ? OV.voices.map(v => { const g = v.lang.toLowerCase().startsWith('hi') ? 'hi' : 'en'; return `<option value="${esc(v.name)}">${esc(ovVoiceLabel(v, k[g]++))}</option>`; }).join('') : '<option value="">Hindi (default voice)</option>';
+  const want = S.settings.ovVoice, okV = OV.voices.find(v => v.name === want) || OV.voices.find(v => v.lang.toLowerCase().startsWith('hi') && v.offline && v.installed) || OV.voices[0];
+  if (okV) sel.value = okV.name;
+  const hasHi = OV.voices.some(v => v.lang.toLowerCase().startsWith('hi') && v.offline && v.installed);
+  info.textContent = hasHi ? 'Ready: Hindi voice on this phone, works without internet.' : 'No offline Hindi voice downloaded yet: press "Voice settings" → Google → Install voice data → Hindi.';
+  $('#ovGo').disabled = false; $('#ovTest').disabled = false;
+}
+function ovSynth(text, rate, pitch) {
+  return new Promise((res, rej) => {
+    const id = 'ov' + (++OV.seq) + '_' + Date.now();
+    const timer = setTimeout(() => { OV.pending.delete(id); rej(new Error('The speech engine did not answer')); }, 60000);
+    OV.pending.set(id, { res, rej, timer });
+    let ok = false; try { ok = AndroidBridge.ttsSynth(id, text, $('#ovVoice').value || '', rate, pitch); } catch (e) { }
+    if (!ok) { clearTimeout(timer); OV.pending.delete(id); rej(new Error('The speech engine is not ready')); }
+  });
+}
+// base64 WAV from the engine -> trimmed 24 kHz mono samples
+async function ovDecode(b64) {
+  actxDecode = actxDecode || new (window.AudioContext || window.webkitAudioContext)();
+  const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  const dec = await actxDecode.decodeAudioData(bytes.buffer);
+  const sr = 24000, oc = new OfflineAudioContext(1, Math.max(1, Math.ceil(dec.duration * sr)), sr), src = oc.createBufferSource();
+  src.buffer = dec; src.connect(oc.destination); src.start(); const d = (await oc.startRendering()).getChannelData(0);
+  let pk = 0; for (const x of d) pk = Math.max(pk, Math.abs(x)); const th = Math.max(0.004, pk * 0.02);
+  let a = 0, b = d.length - 1; while (a < b && Math.abs(d[a]) < th) a++; while (b > a && Math.abs(d[b]) < th) b--;
+  return d.slice(Math.max(0, a - sr * 0.03), Math.min(d.length, b + sr * 0.08));
+}
+// a little expression per sentence, from its punctuation and words
+function ovExpr(text) {
+  const R = S.settings.ovRate || 0.95, P = S.settings.ovPitch || 1;
+  if (S.settings.ovExpr === 'off') return { rate: R, pitch: P, pause: 0 };
+  const t = text.trim(), sc = amScore(t); let rate = R, pitch = P, pause = 0;
+  if (/\?["'”’)]*$/.test(t)) { pitch *= 1.05; pause += 0.1; }
+  if (/!["'”’)]*$/.test(t)) { rate *= 1.05; pitch *= 1.04; }
+  if (/(…|\.\.\.)["'”’)]*$/.test(t)) { rate *= 0.94; pause += 0.35; }
+  if (sc.sad >= 1) { rate *= 0.92; pitch *= 0.97; pause += 0.15; }
+  else if (sc.suspense >= 1.5) { rate *= 0.93; pause += 0.2; }
+  else if (sc.happy >= 1 || sc.funny >= 1) { rate *= 1.03; pitch *= 1.03; }
+  else if (sc.inspiring >= 1) { rate *= 0.98; pitch *= 1.02; }
+  return { rate: clamp(rate, 0.5, 2), pitch: clamp(pitch, 0.5, 2), pause };
+}
+// text the engine should read: no *stars*, no [tags]; [pause 1.5] becomes extra silence
+function ovText(units) {
+  const out = units.map(u => { const m = u.match(/\[\s*pause\s*([\d.]+)?\s*\]/i); return { text: plain(u).replace(/["“”]/g, ''), extra: m ? (+m[1] || 0.8) : 0, lead: m ? /^\s*\[\s*pause/i.test(u) : false }; });
+  out.forEach((o, i) => { if (o.lead && i > 0) { out[i - 1].extra += o.extra; o.extra = 0; } });
+  return out;
+}
+function ovBusy(on) { $('#ovGo').disabled = on; $('#ovTest').disabled = on; $('#ovStop').hidden = !on; $('#ovProg').hidden = !on; }
+async function ovGenerate() {
+  S.script = $('#script').value;
+  if (!S.segments.length) return toast('Press Create scenes first');
+  if (OV.state !== 'ready') { ovStart(); return toast('The speech engine is starting, try again in a moment'); }
+  S.settings.ovVoice = $('#ovVoice').value; save();
+  const units = sentenceGroups().map(g => g.map(i => S.segments[i].text.trim()).join(' ')), lines = ovText(units);
+  OV.stop = false; ovBusy(true); const parts = [], info = $('#ovInfo'), t0 = performance.now();
+  try {
+    for (let i = 0; i < lines.length; i++) {
+      if (OV.stop) throw new Error('Stopped');
+      const el = (performance.now() - t0) / 1000, left = i ? el / i * (lines.length - i) : 0;
+      info.textContent = `Speaking line ${i + 1} of ${lines.length}${left > 3 ? ` · about ${Math.ceil(left)} s left` : ''}`; $('#ovProg').value = i / lines.length;
+      const e = ovExpr(lines[i].text);
+      parts.push({ pcm: lines[i].text.replace(/[^\p{L}\p{N}]/gu, '') ? await ovDecode(await ovSynth(lines[i].text, e.rate, e.pitch)) : new Float32Array(0), pause: e.pause + lines[i].extra });
+    }
+    const SR = 24000, base = S.settings.ovPause || 0.45;
+    const gaps = parts.map((p, i) => i < parts.length - 1 ? base * (0.85 + 0.3 * ((i * 7919) % 10) / 10) + p.pause : 0);
+    const total = Math.round(SR * 0.3) + parts.reduce((a, p, i) => a + p.pcm.length + Math.round(SR * gaps[i]), 0) + Math.round(SR * 0.6);
+    const out = new Float32Array(total); let t = Math.round(SR * 0.3); const timings = [];
+    parts.forEach((p, i) => { out.set(p.pcm, t); timings.push({ start: +(t / SR).toFixed(3), end: +((t + p.pcm.length) / SR).toFixed(3), text: units[i] }); t += p.pcm.length + Math.round(SR * gaps[i]); });
+    let pk = 0; for (const a of out) pk = Math.max(pk, Math.abs(a)); if (pk > 0) for (let i = 0; i < out.length; i++) out[i] *= 0.95 / pk;
+    await setVoice(encodeWav(out, SR), 'Offline voiceover.wav');
+    ttsTiming(timings); segmentsChanged(true);
+    S.tts = { engine: 'offline', timings }; save();
+    info.textContent = `Voiceover ready · ${fmt(out.length / SR, 0)} long, scenes synced. Play it above. Not happy? Change speed or voice and make it again.`;
+    toast('Offline voiceover ready and synced');
+  } catch (e) { info.textContent = e.message; toast(e.message); }
+  ovBusy(false);
+}
+$('#ovGo').onclick = ovGenerate;
+$('#ovStop').onclick = () => { OV.stop = true; };
+$('#ovTest').onclick = async () => {
+  if (OV.state !== 'ready') { ovStart(); return toast('The speech engine is starting, try again in a moment'); }
+  S.settings.ovVoice = $('#ovVoice').value; save(); ovBusy(true);
+  try {
+    const line = plain((S.segments[0] && sentenceGroups()[0].map(i => S.segments[i].text).join(' ')) || 'Namaste! Yeh meri awaaz ka chhota sa test hai.');
+    const e = ovExpr(line), pcm = await ovDecode(await ovSynth(line, e.rate, e.pitch));
+    const a = new Audio(URL.createObjectURL(encodeWav(pcm, 24000))); a.play();
+  } catch (e) { toast(e.message); }
+  ovBusy(false);
+};
+$('#ovSettings').onclick = () => { try { AndroidBridge.ttsSettings(); } catch (_) { toast('Open phone Settings → Text-to-speech output'); } };
+$('#ovVoice').onchange = e => { S.settings.ovVoice = e.target.value; save(); };
+document.addEventListener('visibilitychange', () => { if (!document.hidden && OV.state === 'ready') ovLoadVoices(); });   // back from voice settings: new voices
+function ovToUI() { $('#ovRate').value = S.settings.ovRate; $('#ovPitch').value = S.settings.ovPitch; $('#ovPause').value = S.settings.ovPause; $('#ovExprSel').value = S.settings.ovExpr; ovShowVals(); }
+function ovShowVals() { $('#ovRateV').textContent = (+S.settings.ovRate).toFixed(2) + '×'; $('#ovPitchV').textContent = (+S.settings.ovPitch).toFixed(2); $('#ovPauseV').textContent = (+S.settings.ovPause).toFixed(2) + ' s'; }
+[['ovRate', 'ovRate'], ['ovPitch', 'ovPitch'], ['ovPause', 'ovPause']].forEach(([id, k]) => $('#' + id).addEventListener('input', e => { S.settings[k] = +e.target.value; ovShowVals(); save(); }));
+$('#ovExprSel').onchange = e => { S.settings.ovExpr = e.target.value; save(); };
+
+/* ============ viewer hooks: camera punch-in, shake, flash, reaction doodles and sounds on the key words ============
+   Found from the script by itself: shock words shake the screen with a boom, reveals flash with a riser (and the music
+   dips just before), anger gets 💢, fear and sadness a slow push-in with a sweat drop / tear, success ✨ with a ding,
+   jokes "HA HA" with a boing, questions ❓, *starred* words and numbers a quick punch-in. Where nothing happens for
+   7 s a gentle punch-in keeps the picture moving. Works for both video styles, in the preview and the export. */
+const FX_WORDS = {
+  shock: 'achanak suddenly shock shocked boom dhamaka dhamaake chheekh chilla scream screamed bomb accident hadsa crash dhoka dhokha jhatka thappad slap explosion attack hamla toofan earthquake bhookamp',
+  reveal: 'sach truth secret raaz rahasya twist finally aakhirkaar asli real reveal revealed khulasa pata chala hidden chhupa',
+  anger: 'gussa gusse angry naraz naraaz chillaya chillayi shouted fight ladai jhagda maara maar beat hit hate nafrat',
+  fear: 'darr dar dara dari daravna scared afraid fear bhoot ghost andhera andheri paseena kaanp kaanpne trembling horror',
+  sad: 'aansu roya royi rone crying cried tears maut died death udaas dukh dard akela akeli alone lonely toota broken alvida goodbye',
+  win: 'jeet jeeta jeeti win won winner success kamyabi kamyab safalta safal topper pass passed khush khushi jashn celebrate proud shabash award medal trophy',
+  money: 'paisa paise rupaye rupees rupay crore karod lakh million billion dollar salary amir ameer rich gold sona',
+  funny: 'mazak mazaak chutkula pagal bewakoof ullu masti shararat gadbad joke funny prank silly crazy oops lol haha'
+};
+const FX_DEVA = {
+  shock: 'अचानक झटका धमाका हादसा धोखा चीख थप्पड़ हमला तूफ़ान भूकंप', reveal: 'सच राज़ राज रहस्य आखिरकार असली खुलासा छुपा',
+  anger: 'गुस्सा गुस्से नाराज़ नाराज चिल्लाया लड़ाई झगड़ा मारा नफ़रत', fear: 'डर डरा डरी भूत अंधेरा अंधेरी पसीना काँप',
+  sad: 'आंसू आँसू रोया रोई रोने मौत उदास दुख दर्द अकेला अकेली टूटा अलविदा', win: 'जीत जीता जीती कामयाबी कामयाब सफलता सफल पास खुश खुशी जश्न शाबाश',
+  money: 'पैसा पैसे रुपये करोड़ लाख अमीर सोना', funny: 'मज़ाक मजाक चुटकुला पागल बेवकूफ़ मस्ती शरारत गड़बड़'
+};
+const FX_LEX = (() => { const m = new Map(); for (const o of [FX_WORDS, FX_DEVA]) for (const [k, s] of Object.entries(o)) s.split(/\s+/).forEach(w => m.set(w, k)); return m; })();
+// what each kind of moment does: camera move, doodle, sound
+const FX_KIND = {
+  shock:  { cam: 'shake', doodle: '!', sfx: 'boom', pri: 5 },
+  reveal: { cam: 'flash', doodle: '!', sfx: 'hit', riser: true, dip: true, pri: 6 },
+  anger:  { cam: 'shake', doodle: 'anger', sfx: 'hit', pri: 4 },
+  fear:   { cam: 'push', doodle: 'sweat', sfx: 'heart', pri: 4 },
+  sad:    { cam: 'push', doodle: 'tear', sfx: null, pri: 3 },
+  win:    { cam: 'punch', doodle: 'spark', sfx: 'ding', pri: 3 },
+  money:  { cam: 'punch', doodle: 'spark', sfx: 'ding', pri: 3 },
+  funny:  { cam: 'wobble', doodle: 'haha', sfx: 'boing', pri: 3 },
+  ask:    { cam: null, doodle: '?', sfx: 'pop', pri: 2 },
+  stress: { cam: 'punch', doodle: null, sfx: null, pri: 1 },
+  keep:   { cam: 'punch', doodle: null, sfx: null, pri: 0 }
+};
+const fxOn = () => S.settings.fx !== 'off';
+let fxMemo = null;
+function fxEvents() {
+  if (!fxOn() || !S.segments.length) return [];
+  const key = S.settings.fx + S.settings.fxDoodle + S.starts.join(',') + '|' + S.segments.map(s => s.text).join('|');
+  if (fxMemo && fxMemo.key === key) return fxMemo.ev;
+  const cand = [], n = S.segments.length;
+  S.segments.forEach((sg, i) => {
+    const toks = captionTokens(sg.text);
+    toks.forEach((tk, k) => {
+      const w = lNorm(tk.w); if (!w) return;
+      let kind = FX_LEX.get(w) || (w.length > 4 && FX_LEX.get(w.replace(/(e|a|i|en|on|ed|ing|s)$/u, ''))) || null;
+      if (!kind && tk.hl) kind = 'stress';
+      if (!kind && /\d/.test(w) && /\d{2,}|%|crore|lakh/.test(tk.w + (toks[k + 1] ? toks[k + 1].w : ''))) kind = 'stress';
+      if (kind) cand.push({ t: lWordTime(i, tk.w), kind, i });
+    });
+    if (/\?["'”’)]*$/.test(plain(sg.text))) cand.push({ t: Math.max(S.starts[i] || 0, segEnd(i) - 0.35), kind: 'ask', i });
+  });
+  cand.sort((a, b) => a.t - b.t);
+  // keep the strongest moment in every 2 s, then fill long quiet stretches with a gentle punch-in
+  const ev = [];
+  for (const c of cand) {
+    const last = ev[ev.length - 1];
+    if (last && c.t - last.t < 2) { if (FX_KIND[c.kind].pri > FX_KIND[last.kind].pri) ev[ev.length - 1] = c; continue; }
+    ev.push(c);
+  }
+  const D = duration(), out = []; let prev = 0;
+  const fill = (a, b) => { for (let t = a + 5.5; t < b - 2; t += 5.5) { const i = Math.max(0, sceneAt(t)); out.push({ t: Math.max(t - 1, S.starts[i] || t), kind: 'keep', i }); } };
+  for (const e of ev) { if (e.t - prev > 7.5) fill(prev, e.t); out.push(e); prev = e.t; }
+  if (D - prev > 7.5) fill(prev, D);
+  out.forEach((e, k) => { e.side = k % 2 ? -1 : 1; });
+  fxMemo = { key, ev: out }; return out;
+}
+const fxEase = p => 1 - Math.pow(1 - clamp(p, 0, 1), 3);
+// camera at time t: zoom, shift (fractions of the frame), white flash
+function fxAt(t) {
+  const r = { z: 1, dx: 0, dy: 0, flash: 0 }; if (!fxOn()) return r;
+  const A = S.settings.fxAmt || 1;
+  for (const e of fxEvents()) {
+    const u = t - e.t; if (u < -1.2 || u > 3.2) continue;
+    const c = FX_KIND[e.kind].cam;
+    if (c === 'punch') { const env = u < 0 ? 0 : u < 0.14 ? fxEase(u / 0.14) : u < 0.8 ? 1 : 1 - easeInOut(clamp((u - 0.8) / 0.7, 0, 1)); r.z += A * (e.kind === 'keep' ? 0.04 : 0.075) * env; }
+    else if (c === 'push') { const env = u < 0 ? 0 : u < 1.2 ? easeInOut(u / 1.2) : u < 2 ? 1 : 1 - easeInOut(clamp((u - 2) / 1.1, 0, 1)); r.z += A * 0.06 * env; }
+    else if (c === 'shake' && u >= 0 && u < 0.5) { const k = Math.exp(-u * 7) * A * (e.kind === 'anger' ? 0.008 : 0.013); r.dx += Math.sin(u * 61) * k; r.dy += Math.cos(u * 47) * k * 0.8; r.z += 0.03 * A * Math.exp(-u * 5); }
+    else if (c === 'wobble' && u >= 0 && u < 0.6) { r.z += A * 0.04 * Math.sin(Math.PI * u / 0.6); r.dx += Math.sin(u * 30) * 0.004 * A * (1 - u / 0.6); }
+    else if (c === 'flash' && u >= 0 && u < 0.6) { r.flash = Math.max(r.flash, 0.8 * Math.exp(-u * 6)); r.z += A * 0.05 * fxEase(u / 0.2); }
+  }
+  r.z = Math.max(r.z, 1 + 2.2 * Math.max(Math.abs(r.dx), Math.abs(r.dy)));   // never show an edge
+  return r;
+}
+// music gets almost silent just before a reveal, then comes back: makes the moment land
+function fxMusicDip(t) {
+  if (!fxOn()) return 1; let g = 1;
+  for (const e of fxEvents()) { if (!FX_KIND[e.kind].dip) continue; const u = t - e.t; if (u > -1 && u < 0) g = Math.min(g, 1 - 0.8 * clamp((u + 1) / 0.3, 0, 1)); else if (u >= 0 && u < 0.8) g = Math.min(g, 0.2 + 0.8 * easeInOut(u / 0.8)); }
+  return g;
+}
+function fxSfxEvents() {
+  if (!fxOn() || S.settings.fxSfx === 'off') return [];
+  const out = [];
+  for (const e of fxEvents()) { const K = FX_KIND[e.kind]; if (K.riser) out.push({ t: e.t - 0.75, s: 'riser', v: 0.6, fx: 1 }); if (K.sfx) out.push({ t: e.t, s: K.sfx, v: K.sfx === 'pop' ? 0.5 : 0.8, fx: 1 }); }
+  return out;
+}
+function allSfxEvents() { return lSfxEvents().concat(fxSfxEvents()); }
+const sfxGain = e => (e.fx ? (S.settings.fxVol ?? 0.6) : S.settings.sfxVol) * e.v;
+
+/* ---- reaction doodles, drawn like the rest: bold ink with a little colour ---- */
+function fxDoodle(ctx, W, H, kind, u, side, seed) {
+  const life = 1.5; if (u < 0 || u > life) return;
+  const s = Math.min(W, H) * 0.14, inT = clamp(u / 0.16, 0, 1), sc = inT < 1 ? 0.3 + 0.9 * fxEase(inT) - 0.2 * Math.sin(Math.PI * inT) : 1;
+  const a = u > life - 0.3 ? (life - u) / 0.3 : 1, bob = Math.sin(u * 6 + seed) * s * 0.04;
+  const x = W / 2 + side * W * (W > H ? 0.3 : 0.27), y = H * (W > H ? 0.24 : 0.2) + bob;
+  ctx.save(); ctx.globalAlpha = clamp(a, 0, 1); ctx.translate(x, y); ctx.rotate(side * 0.12); ctx.scale(sc, sc);
+  ctx.lineJoin = ctx.lineCap = 'round'; const ink = '#1b1b1b', lw = s * 0.07;
+  const glyph = (ch, fill) => { ctx.font = `800 ${s * 1.35}px "Baloo 2", sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = lw * 1.6; ctx.strokeStyle = ink; ctx.strokeText(ch, 0, 0); ctx.fillStyle = fill; ctx.fillText(ch, 0, 0); };
+  const burst = col => { ctx.strokeStyle = col; ctx.lineWidth = lw; for (let k = 0; k < 7; k++) { const an = -Math.PI / 2 + (k - 3) * 0.42; ctx.beginPath(); ctx.moveTo(Math.cos(an) * s * 0.62, Math.sin(an) * s * 0.62); ctx.lineTo(Math.cos(an) * s * 0.9, Math.sin(an) * s * 0.9); ctx.stroke(); } };
+  if (kind === '!') { burst('#e53935'); glyph('!', '#ff5a4e'); }
+  else if (kind === '?') { glyph('?', '#4aa3ff'); }
+  else if (kind === 'anger') {
+    ctx.strokeStyle = '#e53935'; ctx.lineWidth = lw * 1.5;
+    for (let k = 0; k < 4; k++) { ctx.save(); ctx.rotate(k * Math.PI / 2); ctx.beginPath(); ctx.moveTo(s * 0.12, -s * 0.5); ctx.quadraticCurveTo(s * 0.14, -s * 0.14, s * 0.5, -s * 0.12); ctx.stroke(); ctx.restore(); }
+  } else if (kind === 'sweat' || kind === 'tear') {
+    const drop = (dx, dy, k, fall) => { ctx.save(); ctx.translate(dx, dy + fall); ctx.scale(k, k); ctx.beginPath(); ctx.moveTo(0, -s * 0.45); ctx.bezierCurveTo(s * 0.32, -s * 0.05, s * 0.3, s * 0.32, 0, s * 0.32); ctx.bezierCurveTo(-s * 0.3, s * 0.32, -s * 0.32, -s * 0.05, 0, -s * 0.45); ctx.closePath(); ctx.fillStyle = '#5ab4ff'; ctx.fill(); ctx.lineWidth = lw; ctx.strokeStyle = ink; ctx.stroke(); ctx.beginPath(); ctx.arc(-s * 0.08, s * 0.05, s * 0.06, 0, 7); ctx.fillStyle = '#fff'; ctx.fill(); ctx.restore(); };
+    const fall = kind === 'tear' ? u * s * 0.5 : 0; drop(0, 0, 1, fall); if (kind === 'sweat') drop(s * 0.5, s * 0.3, 0.6, u * s * 0.2);
+  } else if (kind === 'spark') {
+    const star = (dx, dy, r, ph) => { const k = 0.8 + 0.2 * Math.sin(u * 9 + ph); ctx.save(); ctx.translate(dx, dy); ctx.scale(k, k); ctx.beginPath(); for (let q = 0; q < 8; q++) { const an = q * Math.PI / 4, rr = q % 2 ? r * 0.28 : r; ctx.lineTo(Math.cos(an) * rr, Math.sin(an) * rr); } ctx.closePath(); ctx.fillStyle = '#ffd21f'; ctx.fill(); ctx.lineWidth = lw * 0.8; ctx.strokeStyle = ink; ctx.stroke(); ctx.restore(); };
+    star(0, 0, s * 0.55, 0); star(s * 0.6, -s * 0.45, s * 0.28, 1.7); star(-s * 0.55, s * 0.4, s * 0.22, 3.1);
+  } else if (kind === 'haha') {
+    ctx.font = `800 ${s * 0.62}px "Baloo 2", sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = lw * 1.3; ctx.strokeStyle = ink;
+    [['HA', -s * 0.32, -s * 0.18], ['HA!', s * 0.36, s * 0.22]].forEach(([w, dx, dy], k) => { const j = Math.sin(u * 22 + k) * s * 0.03; ctx.strokeText(w, dx, dy + j); ctx.fillStyle = '#ffb02e'; ctx.fillText(w, dx, dy + j); });
+  }
+  ctx.restore();
+}
+function fxOverlay(ctx, W, H, t, cam) {
+  if (!fxOn()) return;
+  if (S.settings.fxDoodle !== 'off') for (const e of fxEvents()) { const d = FX_KIND[e.kind].doodle; if (d && t >= e.t && t < e.t + 1.5) fxDoodle(ctx, W, H, d, t - e.t, e.side, e.i); }
+  if (cam.flash > 0.01) { ctx.save(); ctx.fillStyle = `rgba(255,255,255,${cam.flash})`; ctx.fillRect(0, 0, W, H); ctx.restore(); }
+}
+// extra sounds for the hooks, made in the app like the others
+function fxBankAdd(actx, bank) {
+  if (bank.boom) return bank;
+  const sr = actx.sampleRate, rnd = mulberry32(23);
+  const mk = (dur, fn) => { const n = Math.ceil(dur * sr), b = actx.createBuffer(1, n, sr), d = b.getChannelData(0); fn(d); let pk = 0; for (let i = 0; i < n; i++) pk = Math.max(pk, Math.abs(d[i])); if (pk) for (let i = 0; i < n; i++) d[i] *= 0.9 / pk; return b; };
+  bank.boom = mk(0.9, d => { let ph = 0, lp = 0; for (let i = 0; i < d.length; i++) { const t = i / sr, f = 38 + 90 * Math.exp(-t * 9); ph += 2 * Math.PI * f / sr; lp += ((rnd() * 2 - 1) - lp) * 0.08; d[i] = (Math.sin(ph) * 0.9 + lp * 0.6 * Math.exp(-t * 14)) * Math.exp(-t * 4) * Math.min(1, t * 600); } });
+  bank.hit = mk(0.5, d => { let ph = 0; for (let i = 0; i < d.length; i++) { const t = i / sr, f = 55 + 160 * Math.exp(-t * 30); ph += 2 * Math.PI * f / sr; d[i] = Math.sin(ph) * Math.exp(-t * 7) + (rnd() * 2 - 1) * 0.5 * Math.exp(-t * 30); } });
+  bank.heart = mk(0.9, d => { for (let i = 0; i < d.length; i++) { const t = i / sr; let v = 0; for (const t0 of [0, 0.26]) { const u = t - t0; if (u >= 0) v += Math.sin(2 * Math.PI * (48 + 30 * Math.exp(-u * 25)) * u) * Math.exp(-u * 16) * (t0 ? 0.75 : 1); } d[i] = v; } });
+  bank.boing = mk(0.5, d => { let ph = 0; for (let i = 0; i < d.length; i++) { const t = i / sr, f = 180 + 140 * Math.sin(t * 2 * Math.PI * 9) * Math.exp(-t * 3) + 120 * t; ph += 2 * Math.PI * f / sr; d[i] = Math.sin(ph) * Math.exp(-t * 5) * Math.min(1, t * 300); } });
+  bank.riser = mk(0.8, d => { lBandNoise(d, sr, rnd, 400, 5200); for (let i = 0; i < d.length; i++) d[i] *= Math.pow(i / d.length, 1.6); });
+  return bank;
+}
+
+/* ============ ideas and scripts: ready story ideas with a strong hook, written for narration ============
+   Offline: every idea has a hook, the story, extra scenes (used for longer videos) and an ending with a lesson.
+   Written in Hindi (देवनागरी, best for the offline voice); Hinglish is made from it letter by letter. For any topic
+   and any length, the AI prompt (ChatGPT / Gemini / Claude, free, no API key) writes a fresh script. */
+const IDEA_GENRES = { motivation: 'Motivation / success', family: 'Emotional family', suspense: 'Suspense / horror', funny: 'Funny', moral: 'Moral story', facts: 'Facts / explainer' };
+const IDEAS = [
+  { g: 'motivation', title: 'चाय वाले का बेटा जो अफ़सर बना',
+    hook: ['जिस लड़के का पूरा गाँव मज़ाक उड़ाता था, एक दिन वही गाँव उसे सलाम करने के लिए लाइन में खड़ा था।', 'पर ये हुआ कैसे?'],
+    main: ['रोहन के पापा स्टेशन पर चाय बेचते थे।', 'रोहन सुबह चार बजे उठता, पापा के साथ केतली उठाता, और फिर स्कूल भागता।', 'उसका एक ही सपना था, *अफ़सर* बनना।', 'लोग हँसते थे, कहते थे, चाय वाले का बेटा चाय ही बेचेगा।', 'पहली बार वो परीक्षा में फेल हो गया।', 'दूसरी बार भी नहीं हुआ।', 'रात को वो स्टेशन की पीली लाइट के नीचे बैठकर पढ़ता था।', 'पापा चुपचाप उसके पास गरम चाय रख जाते, और कुछ नहीं कहते।'],
+    extra: ['एक दिन पैसों की कमी से उसकी किताबें बिक गईं।', 'उसने लाइब्रेरी में बैठकर दूसरों की पुरानी किताबों से पढ़ाई की।', 'दोस्त घूमने जाते, रोहन कमरे में बैठा रहता।', 'कई बार उसका मन हुआ कि सब छोड़ दे।', 'पर हर बार उसे पापा के फटे हुए जूते याद आ जाते।', 'और वो फिर से किताब खोल लेता।'],
+    end: ['तीसरी बार, रिज़ल्ट आया।', 'रोहन का नाम लिस्ट में सबसे ऊपर था।', 'उस दिन पहली बार पापा रो पड़े, पर ये खुशी के आँसू थे।', 'याद रखना, लोग तुम्हारी शुरुआत देखते हैं, पर तुम्हारी कहानी का अंत तुम लिखते हो।'] },
+  { g: 'motivation', title: '100 बार रिजेक्ट हुई लड़की',
+    hook: ['सौ कंपनियों ने उसे *ना* कहा।', 'एक सौ एकवीं बार उसने जो किया, उसने सबको हैरान कर दिया।'],
+    main: ['प्रिया एक छोटे शहर की लड़की थी, जिसे खाना बनाना बहुत पसंद था।', 'उसका सपना था अपना छोटा सा *फ़ूड बिज़नेस* शुरू करना।', 'पर बैंक ने लोन देने से मना कर दिया।', 'रिश्तेदारों ने कहा, लड़कियाँ बिज़नेस नहीं करतीं।', 'उसने हर दुकान, हर ऑफ़िस में जाकर अपने टिफ़िन का सैंपल दिया।', 'कोई हँसता, कोई दरवाज़ा बंद कर देता।', 'उसने एक डायरी में हर ना लिखी, और गिनती करती रही।'],
+    extra: ['पचासवीं ना के बाद उसकी माँ ने कहा, बस कर बेटा।', 'प्रिया ने मुस्कुराकर कहा, बस पचास और।', 'उसने अपनी रेसिपी हर बार थोड़ी बेहतर की।', 'ग्राहकों से पूछा, क्या कमी है।', 'और हर कमी को अगले दिन ठीक किया।'],
+    end: ['एक सौ एकवें ऑफ़िस ने पचास टिफ़िन का ऑर्डर दिया।', 'आज प्रिया की रसोई से हर दिन दो हज़ार टिफ़िन जाते हैं।', 'हर ना तुम्हें हाँ के एक कदम पास ले जाती है।'] },
+  { g: 'motivation', title: 'आख़िरी बेंच वाला लड़का',
+    hook: ['क्लास का सबसे कमज़ोर लड़का, जिसे टीचर भी भूल चुके थे।', 'दस साल बाद उसी स्कूल में वो चीफ़ गेस्ट बनकर आया।'],
+    main: ['अमन हमेशा आख़िरी बेंच पर बैठता था।', 'उसे पढ़ाई समझ नहीं आती थी, तो वो चुप रहता था।', 'एक दिन टीचर ने सबके सामने कहा, तुमसे कुछ नहीं होगा।', 'उस रात अमन बहुत रोया।', 'फिर उसने खुद से एक वादा किया, रोज़ सिर्फ़ एक घंटा, बिना छुट्टी।', 'पहले महीने कुछ नहीं बदला।', 'तीसरे महीने उसके नंबर थोड़े बढ़े।'],
+    extra: ['उसने गणित को कहानियों की तरह समझना शुरू किया।', 'दोस्तों को पढ़ाने लगा, ताकि खुद भी समझ सके।', 'धीरे धीरे वही लड़का क्लास में हाथ उठाने लगा।', 'जिस टीचर ने ताना मारा था, वो भी हैरान थी।'],
+    end: ['आज अमन एक इंजीनियर है, और गरीब बच्चों के लिए फ़्री क्लास चलाता है।', 'स्टेज से उसने बस इतना कहा, रोज़ का एक घंटा ज़िंदगी बदल देता है।', 'छोटी आदतें, बड़ा बदलाव।'] },
+  { g: 'family', title: 'पापा की घड़ी का राज़',
+    hook: ['पापा ने अपनी सबसे प्यारी घड़ी कहाँ गायब कर दी?', 'जिस दिन रोहन को ये सच पता चला, उसकी आँखें भर आईं।'],
+    main: ['पापा के पास एक पुरानी घड़ी थी, जो दादाजी ने उन्हें दी थी।', 'वो उसे रोज़ साफ़ करते, और बड़े प्यार से पहनते।', 'एक दिन रोहन के कॉलेज की फ़ीस भरनी थी, और घर में पैसे नहीं थे।', 'अगले दिन फ़ीस भर गई।', 'और पापा की कलाई खाली हो गई।', 'रोहन ने पूछा, पापा घड़ी कहाँ है?', 'पापा हँसकर बोले, पुरानी हो गई थी, अब अच्छी नहीं लगती।'],
+    extra: ['रोहन ने बात मान ली, और कॉलेज चला गया।', 'सालों तक उसे कुछ पता नहीं चला।', 'पापा अब समय पूछने के लिए फ़ोन देखते थे।', 'पर कभी शिकायत नहीं की।'],
+    end: ['नौकरी लगने के बाद रोहन को घड़ी बेचने वाली दुकान की रसीद मिली।', 'उसने अपनी पहली सैलरी से वही घड़ी वापस खरीदी।', 'जब पापा ने वो घड़ी देखी, तो कुछ बोल नहीं पाए, बस गले लगा लिया।', 'माँ बाप अपनी खुशियाँ चुपचाप बेच देते हैं, ताकि हम मुस्कुरा सकें।'] },
+  { g: 'family', title: 'माँ का झूठ',
+    hook: ['माँ हर रात कहती थी, मुझे भूख नहीं है।', 'पर सच कुछ और था।'],
+    main: ['घर में खाना कम होता था।', 'माँ पहले बच्चों को खिलाती, फिर पापा को।', 'और खुद कहती, मैंने पहले ही खा लिया।', 'छोटी नेहा को लगता था, माँ को सच में भूख नहीं लगती।', 'एक रात नेहा पानी पीने उठी।', 'उसने देखा, माँ रसोई में बची हुई सूखी रोटी पानी के साथ खा रही थी।'],
+    extra: ['नेहा चुपचाप वापस बिस्तर पर आ गई।', 'उस रात वो सो नहीं पाई।', 'अगले दिन उसने अपनी आधी रोटी चुपके से माँ की थाली में रख दी।', 'माँ ने देखा, और मुस्कुरा दी।'],
+    end: ['आज नेहा डॉक्टर है, और हर रात माँ के साथ बैठकर खाना खाती है।', 'माँ अब भी कहती है, मुझे भूख नहीं है।', 'पर अब नेहा उनकी थाली भर देती है।', 'माँ का प्यार कभी अपनी भूख नहीं गिनता।'] },
+  { g: 'family', title: 'दादाजी की आख़िरी चिट्ठी',
+    hook: ['दादाजी के जाने के बाद उनकी अलमारी में एक बंद लिफ़ाफ़ा मिला।', 'उस पर लिखा था, सिर्फ़ अमन खोले।'],
+    main: ['अमन और दादाजी सबसे अच्छे दोस्त थे।', 'शाम को दोनों पार्क जाते, और दादाजी कहानियाँ सुनाते।', 'फिर अमन बड़ा हुआ, फ़ोन और दोस्तों में बिज़ी हो गया।', 'दादाजी रोज़ पूछते, आज पार्क चलेगा?', 'अमन कहता, कल दादाजी, कल पक्का।', 'और वो कल कभी नहीं आया।'],
+    extra: ['एक सुबह दादाजी बीमार पड़ गए।', 'हॉस्पिटल में उन्होंने अमन का हाथ पकड़ा, और मुस्कुराए।', 'कुछ दिन बाद दादाजी हमेशा के लिए चले गए।', 'अमन बहुत रोया, उसे हर वो कल याद आया।'],
+    end: ['लिफ़ाफ़े में लिखा था, बेटा, मैं नाराज़ नहीं हूँ, बस अपने पापा के साथ वो शामें मत खोना।', 'उस दिन अमन ने फ़ोन रखा, और पापा का हाथ पकड़कर पार्क चला गया।', 'जिनके पास वक़्त कम है, उन्हें अपना वक़्त दो।'] },
+  { g: 'suspense', title: 'रात 3 बजे का मिस्ड कॉल',
+    hook: ['हर रात ठीक तीन बजे एक ही नंबर से मिस्ड कॉल आता था।', 'और वो नंबर, रोहन के अपने फ़ोन का था।'],
+    main: ['रोहन नए शहर में अकेला रहता था।', 'पहली रात तीन बजे फ़ोन बजा, एक बार, फिर बंद।', 'उसने सोचा, कोई गलती से लगा होगा।', 'दूसरी रात फिर वही, ठीक तीन बजे।', 'तीसरी रात उसने नंबर देखा, और उसकी साँस रुक गई।', 'नंबर उसका अपना था।', 'कमरे में अचानक सन्नाटा छा गया।'],
+    extra: ['उसने सिम बदल दी, फ़ोन बंद कर दिया।', 'फिर भी तीन बजे बंद फ़ोन की स्क्रीन जल उठी।', 'उसकी धड़कन तेज़ हो गई, हाथ काँपने लगे।', 'खिड़की के बाहर किसी की परछाई हिली।'],
+    end: ['चौथी रात उसने कॉल उठा लिया।', 'दूसरी तरफ़ से उसकी अपनी आवाज़ आई, दरवाज़ा मत खोलना।', 'और उसी पल, दरवाज़े पर दस्तक हुई।', 'आगे क्या हुआ, कमेंट में बताओ, तुम दरवाज़ा खोलते?'] },
+  { g: 'suspense', title: 'खाली बस का आख़िरी स्टॉप',
+    hook: ['उस रात बस में सिर्फ़ दो लोग थे।', 'रोहन, और एक आदमी, जिसका चेहरा कभी दिखा ही नहीं।'],
+    main: ['ऑफ़िस से लौटते हुए रोहन की आख़िरी बस छूटने वाली थी।', 'वो भागकर चढ़ा, बस बिल्कुल खाली थी।', 'पीछे की सीट पर बस एक आदमी बैठा था, टोपी नीचे किए हुए।', 'बस ऐसे रास्ते पर मुड़ गई जो रोहन ने पहले कभी नहीं देखा था।', 'उसने ड्राइवर से पूछा, ये कौन सा रास्ता है?', 'ड्राइवर ने कोई जवाब नहीं दिया।'],
+    extra: ['बाहर घना अंधेरा था, कोई लाइट नहीं।', 'रोहन ने पीछे देखा, वो आदमी अब एक सीट आगे आ चुका था।', 'उसने फिर देखा, वो और पास था।', 'रोहन का दिल ज़ोर से धड़कने लगा।'],
+    end: ['अचानक बस रुकी, और दरवाज़ा अपने आप खुल गया।', 'रोहन कूदकर बाहर भागा, और पीछे मुड़कर देखा।', 'सड़क पर कोई बस थी ही नहीं।', 'तुम्हारे साथ कभी ऐसा कुछ अजीब हुआ है? कमेंट में लिखो।'] },
+  { g: 'funny', title: 'राजू और नया स्मार्टफ़ोन',
+    hook: ['राजू ने पहली बार स्मार्टफ़ोन खरीदा।', 'और एक ही दिन में पूरे मोहल्ले में हंगामा हो गया।'],
+    main: ['राजू बड़े गर्व से नया फ़ोन लेकर घर आया।', 'उसने फ़ोन से कहा, हेलो फ़ोन, चाय बनाओ।', 'फ़ोन ने जवाब दिया, मुझे समझ नहीं आया।', 'राजू को गुस्सा आ गया, बोला, इतना महँगा और चाय भी नहीं बनाता!', 'फिर उसने गलती से फ़ैमिली ग्रुप में वीडियो कॉल लगा दी।', 'स्क्रीन पर सत्ताईस रिश्तेदार, और राजू बनियान में।'],
+    extra: ['मौसी ने पूछा, राजू, ये पीछे भैंस क्यों बैठी है?', 'राजू बोला, मौसी, वो भैंस नहीं, मेरा भाई है।', 'पूरा ग्रुप हँस पड़ा, और भाई ने फ़ोन छीन लिया।', 'फिर राजू ने सेल्फ़ी ली, पर कैमरा उल्टा था।'],
+    end: ['शाम तक राजू का फ़ोन हैंग हो गया।', 'राजू ने उसे फ़्रिज में रख दिया, बोला, गर्मी लग रही होगी बेचारे को।', 'अगली बार राजू क्या करेगा, कमेंट में बताओ।'] },
+  { g: 'funny', title: 'जब पापा ने ऑनलाइन क्लास जॉइन की',
+    hook: ['पापा बोले, ऑनलाइन क्लास में क्या मुश्किल है?', 'पाँच मिनट बाद पूरी क्लास हँस रही थी।'],
+    main: ['अमन का नेटवर्क खराब था, तो पापा ने कहा, मैं संभाल लूँगा।', 'पापा ने लैपटॉप को टीवी की तरह दूर से देखना शुरू किया।', 'टीचर ने पूछा, अमन, जवाब बताओ।', 'पापा ज़ोर से बोले, अमन बाज़ार गया है, मैं बताऊँ?', 'फिर उन्होंने माइक बंद करने की जगह कैमरा बंद कर दिया।', 'और सबको उनकी आवाज़ आ रही थी, अरे अमन की माँ, चाय लाना!'],
+    extra: ['माँ ने पीछे से जवाब दिया, खुद बना लो, मैं सीरियल देख रही हूँ।', 'पूरी क्लास ने सब सुना।', 'टीचर भी अपनी हँसी नहीं रोक पाई।'],
+    end: ['अगले दिन अमन क्लास में गया, तो सब उसे चाय वाला अमन बुलाने लगे।', 'उस दिन से पापा ने कहा, ये टेक्नोलॉजी मेरे बस की नहीं।', 'तुम्हारे घर में ऐसा कौन है? उसे टैग करो।'] },
+  { g: 'moral', title: 'लालची दुकानदार और सोने का सिक्का',
+    hook: ['एक सोने के सिक्के ने एक लालची दुकानदार की पूरी दुकान डुबा दी।', 'कैसे? सुनो।'],
+    main: ['एक गाँव में मोहन नाम का दुकानदार था, जो हमेशा कम तौलता था।', 'एक दिन एक बूढ़ा आदमी आया, और गलती से सोने का सिक्का दे गया।', 'मोहन ने सोचा, किसी को पता नहीं चलेगा।', 'उसने सिक्का छुपा लिया।', 'अगले दिन बूढ़ा आदमी वापस आया, और पूछा, क्या मेरा सिक्का यहाँ गिरा था?', 'मोहन ने कहा, नहीं, मुझे कुछ नहीं पता।'],
+    extra: ['बूढ़े आदमी ने मुस्कुराकर कहा, कोई बात नहीं।', 'पर बाहर खड़े गाँव वालों ने सब देख लिया था।', 'बात पूरे गाँव में फैल गई।'],
+    end: ['असल में वो बूढ़ा आदमी गाँव का नया मुखिया था, जो ईमानदार दुकानदार ढूँढ रहा था।', 'मोहन के ग्राहक एक एक करके चले गए।', 'ईमानदारी का एक पल, लालच के सौ सिक्कों से ज़्यादा कीमती है।'] },
+  { g: 'moral', title: 'आलसी राजा और दो बीज',
+    hook: ['राजा ने दो लोगों को एक एक बीज दिया।', 'एक साल बाद, एक के पास पेड़ था, और दूसरे के पास बहाना।'],
+    main: ['एक राज्य में राजा को नया मंत्री चुनना था।', 'उसने दो युवकों को बुलाया, और दोनों को एक बीज दिया।', 'कहा, एक साल बाद जिसका पौधा अच्छा होगा, वही मंत्री बनेगा।', 'पहले युवक ने रोज़ पानी दिया, धूप दिखाई, मेहनत की।', 'दूसरे ने बीज गमले में डाला, और भूल गया।'],
+    extra: ['बारिश में पहले युवक ने पौधे को ढककर बचाया।', 'दूसरा कहता रहा, बीज खराब होगा, मेरी गलती नहीं।', 'महीने बीतते गए।'],
+    end: ['एक साल बाद एक के पास छोटा हरा पेड़ था, और दूसरे के पास खाली गमला।', 'राजा ने पहले युवक को मंत्री बना दिया।', 'किस्मत बीज देती है, पर पेड़ मेहनत उगाती है।'] }
+];
+const FACT_TOPICS = ['आसमान नीला क्यों दिखता है?', 'हम सपने क्यों देखते हैं?', 'पैसा असल में कैसे काम करता है?', 'मोबाइल फ़ोन हमारे दिमाग़ को कैसे बदल रहा है?', 'पिरामिड कैसे बने?', 'समुद्र खारा क्यों है?', 'हम बोर क्यों होते हैं?', 'ATM मशीन पैसे कैसे गिनती है?'];
+/* Devanagari -> Roman Hinglish (spoken style: mein, hai, kya…), letter by letter with schwa dropping */
+const HL_C = { 'क': 'k', 'ख': 'kh', 'ग': 'g', 'घ': 'gh', 'ङ': 'n', 'च': 'ch', 'छ': 'chh', 'ज': 'j', 'झ': 'jh', 'ञ': 'n', 'ट': 't', 'ठ': 'th', 'ड': 'd', 'ढ': 'dh', 'ण': 'n', 'त': 't', 'थ': 'th', 'द': 'd', 'ध': 'dh', 'न': 'n', 'प': 'p', 'फ': 'ph', 'ब': 'b', 'भ': 'bh', 'म': 'm', 'य': 'y', 'र': 'r', 'ल': 'l', 'व': 'w', 'श': 'sh', 'ष': 'sh', 'स': 's', 'ह': 'h', 'क़': 'q', 'ख़': 'kh', 'ग़': 'gh', 'ज़': 'z', 'फ़': 'f', 'ड़': 'd', 'ढ़': 'rh' };
+const HL_V = { 'अ': 'a', 'आ': 'aa', 'इ': 'i', 'ई': 'ee', 'उ': 'u', 'ऊ': 'oo', 'ए': 'e', 'ऐ': 'ai', 'ओ': 'o', 'औ': 'au', 'ऋ': 'ri', 'ऑ': 'o' };
+const HL_M = { 'ा': 'aa', 'ि': 'i', 'ी': 'ee', 'ु': 'u', 'ू': 'oo', 'े': 'e', 'ै': 'ai', 'ो': 'o', 'ौ': 'au', 'ृ': 'ri', 'ॉ': 'o' };
+const HL_WORDS = { 'पापा': 'papa', 'चाय': 'chai', 'फ़ोन': 'phone', 'कॉल': 'call', 'मिस्ड': 'missed', 'नंबर': 'number', 'लाइट': 'light', 'स्टेशन': 'station', 'रिज़ल्ट': 'result', 'कमेंट': 'comment', 'वीडियो': 'video', 'चैनल': 'channel', 'लाइक': 'like', 'सब्सक्राइब': 'subscribe', 'ऑफ़िस': 'office', 'स्कूल': 'school', 'कॉलेज': 'college', 'लिस्ट': 'list', 'सैलरी': 'salary', 'हॉस्पिटल': 'hospital', 'लाइब्रेरी': 'library', 'डॉक्टर': 'doctor', 'इंजीनियर': 'engineer', 'बिज़नेस': 'business', 'टिफ़िन': 'tiffin', 'ऑर्डर': 'order', 'लैपटॉप': 'laptop', 'टीवी': 'TV', 'टीचर': 'teacher', 'क्लास': 'class', 'ऑनलाइन': 'online', 'माइक': 'mic', 'कैमरा': 'camera', 'सेल्फ़ी': 'selfie', 'स्मार्टफ़ोन': 'smartphone', 'ग्रुप': 'group', 'हेलो': 'hello', 'फ़्रिज': 'fridge', 'टैग': 'tag', 'सीरियल': 'serial', 'नेटवर्क': 'network', 'स्टेज': 'stage', 'गेस्ट': 'guest', 'चीफ़': 'chief', 'सैंपल': 'sample', 'बैंक': 'bank', 'लोन': 'loan', 'फ़ूड': 'food', 'डायरी': 'diary', 'रेसिपी': 'recipe', 'फ़्री': 'free', 'फ़ैमिली': 'family', 'वीडियो': 'video', 'फ़ेल': 'fail', 'पास': 'paas', 'हम': 'hum', 'गई': 'gayi', 'गईं': 'gayin', 'गए': 'gaye', 'नए': 'naye', 'आई': 'aayi', 'हुई': 'hui', 'मज़ाक': 'mazaak', 'ज़िंदगी': 'zindagi', 'इंजीनियर': 'engineer', 'बनियान': 'baniyan', 'हैंग': 'hang', 'में': 'mein', 'है': 'hai', 'हैं': 'hain', 'मैं': 'main', 'नहीं': 'nahi', 'क्या': 'kya', 'क्यों': 'kyun', 'यह': 'yeh', 'ये': 'ye', 'वह': 'woh', 'वो': 'woh', 'और': 'aur', 'कि': 'ki', 'हूँ': 'hoon', 'हाँ': 'haan', 'माँ': 'maa', 'गाँव': 'gaon', 'पाँच': 'paanch', 'आँखें': 'aankhen', 'आँसू': 'aansu', 'कहाँ': 'kahan', 'यहाँ': 'yahan', 'वहाँ': 'wahan', 'दिमाग़': 'dimaag', 'रोहन': 'Rohan', 'प्रिया': 'Priya', 'अमन': 'Aman', 'नेहा': 'Neha', 'राजू': 'Raju', 'मोहन': 'Mohan' };
+const HL_W = new Map(Object.entries(HL_WORDS).map(([k, v]) => [k.normalize('NFD'), v]));
+function hinglish(text) {
+  return text.normalize('NFD').replace(/[\u0900-\u0963\u0966-\u097F]+/g, w => {
+    const fixed = HL_W.get(w); if (fixed) return fixed;
+    const ch = [...w], out = [];   // syllables: {s, schwa (inherent a), vowel (has a vowel), cons (starts with a consonant)}
+    for (let i = 0; i < ch.length; i++) {
+      let c = ch[i]; if (ch[i + 1] === '\u093C' && HL_C[c + '\u093C']) { c = c + '\u093C'; i++; }
+      if (HL_C[c]) {
+        const nx = ch[i + 1];
+        if (nx === '\u094D') { out.push({ s: HL_C[c], half: 1, cons: 1 }); i++; continue; }
+        if (HL_M[nx]) { out.push({ s: HL_C[c] + HL_M[nx], vowel: 1, cons: 1 }); i++; continue; }
+        out.push({ s: HL_C[c] + 'a', schwa: 1, vowel: 1, cons: 1 }); continue;
+      }
+      if (HL_V[c]) { out.push({ s: HL_V[c], vowel: 1 }); continue; }
+      if (c === '\u0902' || c === '\u0901') { if (out.length) out[out.length - 1].s += 'n'; continue; }
+      out.push({ s: c });
+    }
+    // the inherent "a" is not spoken at the end of a word, nor in the middle between two sounded syllables
+    const drop = o => { o.s = o.s.replace(/a(n?)$/, '$1'); o.schwa = 0; o.vowel = 0; o.dropped = 1; };
+    const last = out[out.length - 1]; if (out.length > 1 && last.schwa) drop(last);
+    for (let k = 1; k < out.length - 1; k++) { const p = out[k - 1], o = out[k], n = out[k + 1]; if (o.schwa && p.vowel && !p.dropped && n.cons && n.vowel) drop(o); }
+    return out.map(o => o.s).join('').replace(/aa$/, 'a').replace(/ee$/, 'i');
+  }).replace(/\u0964/g, '.').replace(/(^|[.!?]\s+|\n)([a-z])/g, (m, a, b) => a + b.toUpperCase());
+}
+const IDEA_WPM = 130;   // spoken words per minute for Hindi narration
+function ideaScript(idea, sec, lang) {
+  const want = Math.round(sec / 60 * IDEA_WPM), cta = ['अगर कहानी अच्छी लगी, तो वीडियो को लाइक करो और चैनल को सब्सक्राइब करो।'];
+  const wc = a => a.join(' ').split(/\s+/).length;
+  let body = [...idea.main]; const extra = [...idea.extra];
+  const base = () => [...idea.hook, ...body, ...idea.end, ...(sec >= 45 ? cta : [])];
+  // short videos: drop middle lines until it fits; long videos: add the extra scenes
+  while (wc(base()) > want * 1.15 && body.length > 3) body.splice(Math.floor(body.length / 2), 1);
+  while (wc(base()) < want * 0.9 && extra.length) body.push(extra.shift());
+  const lines = base(), words = wc(lines), short = words < want * 0.75;
+  const txt = lines.join('\n');
+  return { text: lang === 'hinglish' ? hinglish(txt) : txt, words, sec: Math.round(words / IDEA_WPM * 60), short };
+}
+function ideaPromptIdeas(genre, lang, sec, topic) {
+  return `You are a YouTube script writer for a Hindi stickman animation channel. Suggest 10 video ideas${genre ? ` in the genre "${IDEA_GENRES[genre]}"` : ''}${topic ? ` about: ${topic}` : ''} for videos of about ${ideaLen(sec)}.
+For each idea give: a title (max 60 characters), the first hook line the narrator says (must stop the scroll in 3 seconds: a shocking fact, a question, or the ending told first), and one line on the twist.
+Prefer ideas that are emotional, surprising and easy to draw with stickman characters. Write in ${ideaLangName(lang)}. Numbered list, no other text.`;
+}
+function ideaPromptScript(genre, lang, sec, topic) {
+  const words = Math.round(sec / 60 * IDEA_WPM);
+  return `Write a voiceover script for a Hindi stickman animation YouTube video${genre ? ` (genre: ${IDEA_GENRES[genre]})` : ''}.
+Topic / idea: ${topic || 'choose a strong, emotional, surprising story idea yourself'}
+Length: about ${words} words (${ideaLen(sec)} of narration).
+Language: ${ideaLangName(lang)}.
+
+RULES
+- First 2 lines = the HOOK: stop the scroll in 3 seconds (a shocking fact, a big question, or the ending told first). No greetings, no "aaj hum baat karenge".
+- Then the story with a clear problem, rising tension, an open loop ("par asli twist abhi baaki tha…") about every 30–40 seconds, a twist, and an emotional ending.
+- Last line: one simple lesson${sec >= 45 ? ', then one short line asking to like and subscribe' : ''}.
+- Short spoken sentences (6–14 words), one sentence per line, with commas where the narrator breathes. Use emotional words (achanak, sach, darr, khushi, aansu, jeet) where they fit.
+- Wrap 1–2 key words per paragraph in *stars* (they get highlighted).
+- Characters are simple stickman people with Indian names. Things must be easy to show as drawings.
+- Output ONLY the script text. No title, no headings, no scene numbers, no stage directions, no emojis.`;
+}
+const ideaLangName = l => l === 'hinglish' ? 'Hinglish (Hindi written in Roman letters)' : l === 'en' ? 'simple English' : 'Hindi in Devanagari script (keep common English words like phone, exam, office in Devanagari too)';
+const ideaLen = s => s < 60 ? s + ' seconds' : (s / 60) + (s === 60 ? ' minute' : ' minutes');
+let ideaPick = null;
+function ideaRender() {
+  const g = $('#ideaGenre').value, box = $('#ideaList');
+  if (g === 'facts') { box.innerHTML = `<p class="hint" style="margin:0">Facts need real information, so the app does not make them up: pick a topic, then use <b>Copy script prompt</b> (ChatGPT / Gemini / Claude).</p>` + FACT_TOPICS.map(t => `<button class="ideacard" data-ideatopic="${esc(t)}"><b>${esc(t)}</b></button>`).join(''); return; }
+  const list = IDEAS.filter(x => !g || x.g === g), L = $('#ideaLang').value, tx = s => L === 'hinglish' ? hinglish(s) : s;
+  box.innerHTML = list.map(x => { const k = IDEAS.indexOf(x); return `<button class="ideacard${ideaPick === k ? ' sel' : ''}" data-idea="${k}"><span class="chip">${esc(IDEA_GENRES[x.g])}</span><b>${esc(tx(x.title))}</b><span class="hint">${esc(tx(x.hook.join(' ')))}</span></button>`; }).join('');
+}
+function ideaWrite() {
+  if (ideaPick == null) return toast('Pick an idea first');
+  const sec = +$('#ideaDur').value, r = ideaScript(IDEAS[ideaPick], sec, $('#ideaLang').value);
+  $('#ideaOut').value = r.text;
+  $('#ideaInfo').textContent = `${r.words} words · about ${fmt(r.sec, 0)} of voice.` + (r.short ? ` This story is shorter than ${ideaLen(sec)}: for a longer video use "Copy script prompt" with this idea.` : '');
+}
+$('#ideaGenre').onchange = () => { ideaPick = null; ideaRender(); };
+$('#ideaLang').onchange = () => { ideaRender(); if (ideaPick != null) { ideaWrite(); const t = IDEAS[ideaPick].title; $('#ideaTopic').value = $('#ideaLang').value === 'hinglish' ? hinglish(t) : t; } };
+$('#ideaDur').onchange = () => { if (ideaPick != null) ideaWrite(); };
+$('#ideaList').addEventListener('click', e => {
+  const b = e.target.closest('.ideacard'); if (!b) return;
+  if (b.dataset.ideatopic) { $('#ideaTopic').value = b.dataset.ideatopic; toast('Topic set. Now press Copy script prompt'); return; }
+  ideaPick = +b.dataset.idea; ideaRender(); ideaWrite();
+  const t = IDEAS[ideaPick]; $('#ideaTopic').value = ($('#ideaLang').value === 'hinglish' ? hinglish(t.title) : t.title);
+});
+$('#ideaShuffle').onclick = () => { const g = $('#ideaGenre').value, list = IDEAS.filter(x => !g || x.g === g); if (!list.length) return; ideaPick = IDEAS.indexOf(list[Math.floor(Math.random() * list.length)]); ideaRender(); ideaWrite(); };
+$('#ideaCopyIdeas').onclick = () => copyText(ideaPromptIdeas($('#ideaGenre').value, $('#ideaLang').value, +$('#ideaDur').value, $('#ideaTopic').value.trim()));
+$('#ideaCopyScript').onclick = () => { copyText(ideaPromptScript($('#ideaGenre').value, $('#ideaLang').value, +$('#ideaDur').value, $('#ideaTopic').value.trim())); $('#ideaInfo').textContent = 'Prompt copied. Paste it into ChatGPT / Gemini / Claude, then paste the script below and press "Use this script".'; };
+$('#ideaPaste').onclick = async () => { try { $('#ideaOut').value = APP && AndroidBridge.clipboardText ? AndroidBridge.clipboardText() : await navigator.clipboard.readText(); } catch (_) { toast('Long-press in the box and Paste'); } };
+$('#ideaUse').onclick = () => {
+  const t = $('#ideaOut').value.trim(); if (!t) return toast('No script yet');
+  $('#script').value = t; S.script = t;
+  if (!S.settings.title && $('#ideaTopic').value.trim()) { S.settings.title = $('#ideaTopic').value.trim().slice(0, 80); $('#projTitle').value = S.settings.title; }
+  save(); showTab('script'); $('#splitBtn').click();
+  toast('Script added and scenes made. Next: make the voiceover');
+};
+
 (async function boot() {
   sizePreview();
   try { await DB.open(); } catch (_) {}
@@ -4857,6 +5363,7 @@ $('#amParts').addEventListener('change', e => { const i = e.target.dataset.ampar
   let tab = 'script'; try { tab = localStorage.getItem('ss-tab') || 'script'; } catch (_) {}
   showTab(tab);
   document.fonts && document.fonts.ready.then(() => { drawPreview(); });
+  ovToUI(); ovStart();
   bootDone();
   if (APP) { console.log('SSAPP-READY scenes=' + S.segments.length + ' idb=' + !!DB.db); if (location.hash === '#selftest') ssSelfTest(); }
 })();
