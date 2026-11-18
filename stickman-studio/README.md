@@ -32,6 +32,15 @@ by one on the word where they are spoken. The screen clears at every new **board
 4. **Preview + Export:** the same exact-frame MP4 export. Sound effects (pop, whoosh, swish, ding, buzz) are made
    in the app and placed on every entrance; background music gets quieter under the voice and fades in/out.
 
+## Auto background music
+**Preview + Export → Background music → 🎵 Make music from script.** The app reads the script in parts of about
+20 seconds, gives every part a mood from its words (English, Hinglish and Hindi words): *Calm story, Happy, Sad,
+Suspense, Funny, Inspiring*, and plays it with instruments made inside the app (pad, keys, bass, light drums), with
+soft crossfades where the mood changes. No internet, and no copyright claims, because the music is made fresh.
+Each part's mood can be changed in its own box; **Try another tune** makes a new melody with the same moods; the
+first box can also set one mood for the whole video. The music is a normal track: it gets quieter under the voice,
+fades in and out, and goes into the export like a chosen music file. Make it again after changing the script or voice.
+
 ## YouTube Kit tab
 The last tab makes the upload package from the script: **3 thumbnail prompts** (in the video's own art style and
 main character), **5 titles**, a **description** with chapters (timestamps from the voice sync), **tags** and

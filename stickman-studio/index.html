@@ -684,6 +684,11 @@ html:not(.mode-layers) .layers-only { display: none !important; }
       <h3>Background music</h3>
       <div class="row"><button class="btn small" id="musicBtn">Choose music file</button><button class="btn small danger" id="musicDel">Remove</button><span class="hint" id="musicInfo">No music</span></div>
       <input type="file" id="musicFile" accept="audio/*" hidden>
+      <div class="row"><label class="f" style="flex:1 1 180px">Auto music from the script (made in the app, offline, no copyright)
+        <select id="amMood"><option value="auto">Auto: mood from the script, part by part</option><option value="calm">Whole video: Calm story</option><option value="happy">Whole video: Happy</option><option value="sad">Whole video: Sad</option><option value="suspense">Whole video: Suspense</option><option value="funny">Whole video: Funny</option><option value="inspiring">Whole video: Inspiring</option></select></label></div>
+      <div class="row"><button class="btn small primary" id="amMake">🎵 Make music from script</button><button class="btn small" id="amAgain">Try another tune</button></div>
+      <div class="row" id="amParts"></div>
+      <p class="hint" id="amInfo" style="margin:0">Make it again after you change the script or the voice.</p>
       <label class="f">Music volume <input type="range" id="musicVol" min="0" max="0.6" step="0.01"></label>
       <label class="f">Music under the voice <select id="duck"><option value="on">Automatically quieter while the voice speaks, fade in/out</option><option value="off">Same volume all the time</option></select></label>
       <h3>Export</h3>
@@ -825,7 +830,7 @@ const DB = {
 function snapshot() {
   return { v: 1, settings: S.settings, script: S.script, segments: S.segments, starts: S.starts, syncVer: S.syncVer || 3, uid, tts: S.tts || null,
     grids: S.grids.map(g => g ? { blob: g.blob, auto: g.auto, trim: g.trim } : null),
-    overrides: S.overrides, audioBlob: S.audioBlob, audioName: S.audioName, musicBlob: S.musicBlob, musicName: S.musicName, layers: S.layers, yt: S.yt || null };
+    overrides: S.overrides, audioBlob: S.audioBlob, audioName: S.audioName, musicBlob: S.musicBlob, musicName: S.musicName, layers: S.layers, yt: S.yt || null, autoMusic: S.autoMusic || null };
 }
 let saveT;
 function save() { clearTimeout(saveT); saveT = setTimeout(() => { DB.put('project', snapshot()).catch(() => {}); }, 600); }
@@ -2555,8 +2560,8 @@ async function setVoice(blob, name) {
 }
 setupDrop($('#voDrop'), async f => { await setVoice(f[0], f[0].name); if (S.segments.length) smartTiming(); segmentsChanged(true); toast('Voiceover added, scenes synced'); }, $('#voFile'), false);
 async function setMusic(blob, name) { S.musicBlob = blob; S.musicName = name; if (music.src) URL.revokeObjectURL(music.src); music.src = blob ? URL.createObjectURL(blob) : ''; $('#musicInfo').textContent = blob ? name : 'No music'; }
-$('#musicBtn').onclick = async () => { const [f] = await pickFile($('#musicFile')); if (f) { await setMusic(f, f.name); save(); } };
-$('#musicDel').onclick = () => { music.pause(); setMusic(null, ''); save(); };
+$('#musicBtn').onclick = async () => { const [f] = await pickFile($('#musicFile')); if (f) { S.autoMusic = null; amShowPlan(); await setMusic(f, f.name); save(); } };
+$('#musicDel').onclick = () => { music.pause(); S.autoMusic = null; amShowPlan(); setMusic(null, ''); save(); };
 
 /* ============ bulk grid upload ============ */
 setupDrop($('#bulkDrop'), async files => {
@@ -2777,7 +2782,7 @@ async function restore(p) {
   // projects from before the layered mode keep their grid pictures
   if (!(p.settings && p.settings.mode)) S.settings.mode = (p.grids || []).some(Boolean) || Object.keys(p.overrides || {}).length ? 'grid' : 'layers';
   await lRestore(p.layers);
-  S.script = p.script || ''; S.segments = p.segments || []; S.starts = p.starts || []; S.tts = p.tts || null; S.yt = p.yt || null;
+  S.script = p.script || ''; S.segments = p.segments || []; S.starts = p.starts || []; S.tts = p.tts || null; S.yt = p.yt || null; S.autoMusic = p.autoMusic || null;
   uid = Math.max(p.uid || 1, ...S.segments.map(s => s.id + 1), 1);
   S.grids = []; R.grids = []; S.overrides = {}; R.overrides = {}; audioBuf = null; analysis = null; S.audioBlob = null;
   if (vo.src) { URL.revokeObjectURL(vo.src); vo.removeAttribute('src'); vo.load(); }
@@ -2785,7 +2790,7 @@ async function restore(p) {
   for (let i = 0; i < (p.grids || []).length; i++) { const g = p.grids[i]; if (g && g.blob) { try { R.grids[i] = { img: await loadImage(g.blob) }; S.grids[i] = { blob: g.blob, auto: g.auto !== false, trim: g.trim ?? 1.5 }; } catch (_) {} } }
   for (const [k, v] of Object.entries(p.overrides || {})) if (v) await setOverride(k, v);
   if (p.audioBlob) await setVoice(p.audioBlob, p.audioName);
-  await setMusic(p.musicBlob || null, p.musicName || '');
+  await setMusic(p.musicBlob || null, p.musicName || ''); amShowPlan(); $('#amMood').value = (S.autoMusic && S.autoMusic.mood) || 'auto';
   if (S.starts.length !== S.segments.length) ratioTiming();
   // projects saved before the improved Smart Sync: redo their timing once
   const resync = (p.syncVer || 0) < 3 && analysis && S.segments.length > 1;
@@ -4685,6 +4690,157 @@ $('#ytOut').addEventListener('input', e => {
   else { S.yt.description = v; $('#ytDescN').textContent = v.length + ' / 5000 characters'; }
   save();
 });
+
+/* ============ auto background music: made in the app from the script's mood, offline, copyright-free ============
+   The script is cut into parts of about 20 s, each part gets a mood from its words (English, Hinglish, Hindi),
+   and every mood is played by small synthesised instruments (pad, keys, bass, light drums) with soft crossfades.
+   The result is a normal WAV file used as the background music, so preview, ducking and export work as before. */
+const AM_MOODS = {
+  calm:      { name: 'Calm story',   bpm: 78,  key: 0,  prog: [[0, 'M'], [7, 'M'], [9, 'm'], [5, 'M']], arp: 'slow', drums: 0, bass: 'soft', lead: 'keys', bright: 2600 },
+  happy:     { name: 'Happy',        bpm: 112, key: 7,  prog: [[0, 'M'], [5, 'M'], [7, 'M'], [5, 'M']], arp: 'eighth', drums: 1, bass: 'bounce', lead: 'pluck', bright: 4200 },
+  sad:       { name: 'Sad',          bpm: 66,  key: 9,  prog: [[0, 'm'], [8, 'M'], [3, 'M'], [10, 'M']], arp: 'slow', drums: 0, bass: 'soft', lead: 'keys', bright: 1800 },
+  suspense:  { name: 'Suspense',     bpm: 60,  key: 2,  prog: [[0, 'm'], [0, 'm'], [8, 'M'], [7, 'm']], arp: 'pulse', drums: 0, bass: 'drone', lead: 'bell', bright: 1400 },
+  funny:     { name: 'Funny',        bpm: 124, key: 0,  prog: [[0, 'M'], [9, 'm'], [5, 'M'], [7, 'M']], arp: 'stacc', drums: 1, bass: 'pizz', lead: 'xylo', bright: 5000 },
+  inspiring: { name: 'Inspiring',    bpm: 96,  key: 2,  prog: [[9, 'm'], [5, 'M'], [0, 'M'], [7, 'M']], arp: 'eighth', drums: 2, bass: 'drive', lead: 'keys', bright: 3600 }
+};
+const AM_WORDS = {
+  happy: 'happy happiness smile smiled smiling laugh laughed joy joyful celebrate celebration party win won winner success successful proud excited fun love loved lovely beautiful great amazing wonderful gift festival birthday wedding dance danced cheer hug khush khushi muskura muskurana muskuraya hasna hans hansi jashn jeet jeeta jeet gaya pyaar pyar mazaa maza badhai shaadi tyohar diwali holi tohfa shabash khushiyan',
+  sad: 'sad sadness cry cried crying tears tear alone lonely lost loss died death dead miss missed pain hurt broken heart heartbreak sorry grief goodbye fail failed failure poor hungry sick hospital funeral regret rona roya royi aansu akela akeli udaas dukh dard maut mar gaya mar gayi yaad tootna toota haar haar gaya gareeb bimaar afsos alvida pachtava takleef',
+  suspense: 'suddenly secret mystery mysterious dark darkness night shadow strange unknown hidden danger dangerous fear afraid scared scary ghost silence silent quietly creak door knock trap police thief murder kill escape chase truth question why who what happened shock shocked achanak raaz rahasya andhera andheri raat saaya ajeeb khatra darr dar dara daravna bhoot sannata chor khoon bhaag sach kaun kyun kya hua jhatka chupke dhadkan',
+  funny: 'funny joke jokes silly crazy oops prank hilarious comedy laughed lol idiot stupid weird mazak mazaak chutkula pagal bewakoof ullu jhakaas masti shararat gadbad ghoda gadha bandar',
+  inspiring: 'dream dreams goal goals never give up try again hard work practice believe courage brave strong strength power rise future hope inspire inspiring change world journey fight fought champion achieve achievement determination discipline motivation sapna sapne mehnat himmat hausla koshish kamyabi safalta jeet manzil rasta badlav takat vishwas lakshya junoon'
+};
+const AM_DEVA = { happy: 'खुश खुशी मुस्कुरा हंस हँस जश्न जीत प्यार मज़ा मजा बधाई शादी त्योहार तोहफ़ा', sad: 'रो आंसू आँसू अकेला अकेली उदास दुख दुःख दर्द मौत याद टूट हार गरीब बीमार अफ़सोस अलविदा', suspense: 'अचानक राज़ रहस्य अंधेरा अंधेरी रात साया अजीब खतरा ख़तरा डर भूत सन्नाटा चोर खून भाग सच कौन क्यों', funny: 'मज़ाक मजाक चुटकुला पागल बेवकूफ़ मस्ती शरारत गड़बड़', inspiring: 'सपना सपने मेहनत हिम्मत हौसला कोशिश कामयाबी सफलता मंज़िल रास्ता बदलाव ताकत विश्वास लक्ष्य जुनून' };
+const AM_LEX = (() => {
+  const m = new Map();
+  for (const [mood, s] of Object.entries(AM_WORDS)) s.split(/\s+/).forEach(w => m.set(w, mood));
+  for (const [mood, s] of Object.entries(AM_DEVA)) s.split(/\s+/).forEach(w => m.set(w, mood));
+  return m;
+})();
+function amScore(text) {
+  const sc = { happy: 0, sad: 0, suspense: 0, funny: 0, inspiring: 0 };
+  const t = String(text || '').toLowerCase();
+  t.split(/[^\p{L}\p{M}]+/u).forEach(w => { if (!w) return; const m = AM_LEX.get(w) || (w.length > 4 && AM_LEX.get(w.replace(/(ed|ing|s|e|a|i)$/u, ''))); if (m) sc[m]++; });
+  sc.suspense += (t.match(/\?/g) || []).length * 0.3 + (t.match(/\.\.\.|…/g) || []).length * 0.5;
+  sc.happy += (t.match(/!/g) || []).length * 0.2;
+  return sc;
+}
+const amBest = sc => { let b = null, v = 0; for (const [k, x] of Object.entries(sc)) if (x > v) { v = x; b = k; } return v >= 1 ? b : null; };
+// parts of the video with their mood: [{t0, mood}]
+function amPlan() {
+  const D = duration(), n = S.segments.length; if (!n) return [{ t0: 0, mood: 'calm' }];
+  const all = amBest(amScore(S.segments.map(s => plain(s.text)).join(' '))) || 'calm';
+  const parts = []; let cur = null;
+  S.segments.forEach((s, i) => { const t = S.starts[i] || 0; if (!cur || t - cur.t0 >= 20) { cur = { t0: cur ? t : 0, text: '' }; parts.push(cur); } cur.text += ' ' + plain(s.text); });
+  let prev = all; const out = [];
+  parts.forEach(p => { const m = amBest(amScore(p.text)) || prev; prev = m; if (!out.length || out[out.length - 1].mood !== m) out.push({ t0: p.t0, mood: m }); });
+  for (let k = 1; k < out.length; k++) { const last = k + 1 >= out.length, end = last ? D : out[k + 1].t0; if (end - out[k].t0 < (last ? 8 : 15)) { out.splice(k, 1); k--; } }   // no part shorter than 15 s (the last one 8 s)
+  for (let k = 1; k < out.length; k++) if (out[k].mood === out[k - 1].mood) { out.splice(k, 1); k--; }
+  return out.length ? out : [{ t0: 0, mood: all }];
+}
+function amRng(seed) { let a = seed >>> 0 || 1; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const amHz = midi => 440 * Math.pow(2, (midi - 69) / 12);
+
+async function amRender(plan, seed, D) {
+  const SR = 24000, len = Math.ceil((D + 0.5) * SR), oc = new OfflineAudioContext(1, len, SR);
+  const rnd = amRng(seed);
+  // soft room reverb from a decaying noise impulse
+  const ir = oc.createBuffer(1, SR * 2.2, SR), d = ir.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (rnd() * 2 - 1) * Math.pow(1 - i / d.length, 3);
+  const rev = oc.createConvolver(); rev.buffer = ir; const revG = oc.createGain(); revG.gain.value = 0.35;
+  const master = oc.createGain(); master.gain.value = 0.9; const comp = oc.createDynamicsCompressor(); comp.threshold.value = -16; comp.ratio.value = 3;
+  master.connect(comp); rev.connect(revG).connect(comp); comp.connect(oc.destination);
+  const noise = oc.createBuffer(1, SR, SR), nd = noise.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = rnd() * 2 - 1;
+
+  plan.forEach((part, pi) => {
+    const M = AM_MOODS[part.mood] || AM_MOODS.calm, t0 = part.t0, t1 = pi + 1 < plan.length ? plan[pi + 1].t0 : D + 0.5;
+    const X = 2;   // crossfade seconds
+    const bus = oc.createGain(); bus.gain.setValueAtTime(0, Math.max(0, t0 - (pi ? X / 2 : 0)));
+    bus.gain.linearRampToValueAtTime(1, t0 + (pi ? X / 2 : 1.5));
+    bus.gain.setValueAtTime(1, Math.max(t0 + 2, t1 - X / 2)); bus.gain.linearRampToValueAtTime(0, Math.min(D + 0.5, t1 + X / 2));
+    const lp = oc.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = M.bright; lp.Q.value = 0.4;
+    bus.connect(lp); lp.connect(master); lp.connect(rev);
+    const beat = 60 / M.bpm, bar = beat * 4, start = Math.max(0, t0 - X / 2), stop = Math.min(D + 0.5, t1 + X / 2);
+    const root = 48 + M.key, transpose = [0, 0, 0, 0];   // variation per seed: some bars an octave of the arpeggio moves
+    const pattern = [0, 1, 2, 1, 0, 2, 1, 2].map(x => rnd() < 0.25 ? (x + 1) % 3 : x);
+    const tone = (type, f, at, dur, vol, att = 0.01, out = bus, detune = 0, sus = false) => {
+      if (at < 0 || at >= stop || at + dur <= start) return;
+      const o = oc.createOscillator(); o.type = type; o.frequency.value = f; o.detune.value = detune;
+      const g = oc.createGain(); g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(vol, at + att);
+      if (sus) { g.gain.setValueAtTime(vol, Math.max(at + att, at + dur - 0.9)); g.gain.linearRampToValueAtTime(0, at + dur); }   // held notes: pad, drone
+      else g.gain.exponentialRampToValueAtTime(0.0005, at + dur);
+      o.connect(g).connect(out); o.start(at); o.stop(at + dur + 0.05);
+    };
+    const hit = (at, kind, vol) => {
+      if (at >= stop || at < start) return;
+      if (kind === 'kick') { const o = oc.createOscillator(), g = oc.createGain(); o.frequency.setValueAtTime(120, at); o.frequency.exponentialRampToValueAtTime(40, at + 0.15); g.gain.setValueAtTime(vol, at); g.gain.exponentialRampToValueAtTime(0.001, at + 0.25); o.connect(g).connect(bus); o.start(at); o.stop(at + 0.3); return; }
+      const s = oc.createBufferSource(); s.buffer = noise; const f = oc.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = kind === 'hat' ? 7000 : 2500;
+      const g = oc.createGain(); const dur = kind === 'hat' ? 0.05 : 0.12; g.gain.setValueAtTime(vol, at); g.gain.exponentialRampToValueAtTime(0.001, at + dur);
+      s.connect(f).connect(g).connect(bus); s.start(at, rnd() * 0.5); s.stop(at + dur + 0.02);
+    };
+    // whole bars from the part's own start, so every part starts on a fresh chord
+    for (let b = 0, tb = t0 - Math.ceil(X / 2 / bar) * bar; tb < stop; b++, tb += bar) {
+      const [deg, q] = M.prog[b % M.prog.length], cr = root + deg, chord = [cr, cr + (q === 'm' ? 3 : 4), cr + 7];
+      // pad: two detuned waves per chord note
+      chord.forEach(n => { tone('triangle', amHz(n + 12), tb, bar + 0.6, 0.035, Math.min(1.2, bar * 0.3), bus, 0, true); tone('sawtooth', amHz(n + 12), tb, bar + 0.6, 0.009, Math.min(1.2, bar * 0.3), bus, 9, true); });
+      // bass
+      if (M.bass === 'drone') tone('sine', amHz(root - 12), tb, bar + 0.4, 0.12, 0.6, bus, 0, true);
+      else if (M.bass === 'soft') { tone('sine', amHz(cr - 12), tb, bar * 0.9, 0.2, 0.05); }
+      else if (M.bass === 'pizz') for (let k = 0; k < 4; k++) tone('triangle', amHz(cr - 12 + (k % 2 ? 7 : 0)), tb + k * beat, 0.22, 0.22, 0.005);
+      else for (let k = 0; k < (M.bass === 'drive' ? 8 : 4); k++) { const st = M.bass === 'drive' ? beat / 2 : beat; tone('triangle', amHz(cr - 12 + (M.bass === 'bounce' && k % 2 ? 12 : 0)), tb + k * st, st * 0.9, 0.18, 0.01); }
+      // arpeggio / melody
+      const ar = chord.map(n => n + 24 + transpose[b % 4]), lead = M.lead;
+      const ltype = lead === 'xylo' ? 'sine' : lead === 'bell' ? 'sine' : 'triangle', ldec = lead === 'xylo' ? 0.18 : lead === 'pluck' ? 0.35 : lead === 'bell' ? 2.2 : 0.9;
+      const play = (n, at, v) => { tone(ltype, amHz(n), at, ldec, v, 0.004); if (lead === 'bell' || lead === 'keys') tone('sine', amHz(n + 12), at, ldec * 0.6, v * 0.25, 0.004); };
+      if (M.arp === 'eighth') for (let k = 0; k < 8; k++) play(ar[pattern[k]], tb + k * beat / 2, 0.07);
+      else if (M.arp === 'stacc') for (let k = 0; k < 8; k++) { if (k % 4 === 3 && rnd() < 0.5) continue; play(ar[pattern[k]] + (k === 7 ? 12 : 0), tb + k * beat / 2, 0.08); }
+      else if (M.arp === 'slow') for (let k = 0; k < 4; k++) { if (rnd() < 0.15) continue; play(ar[pattern[k]], tb + k * beat, 0.065); }
+      else if (M.arp === 'pulse') { for (let k = 0; k < 8; k++) tone('sine', amHz(root + 12), tb + k * beat / 2, 0.12, 0.05, 0.005); if (b % 2 === 1) play(ar[Math.floor(rnd() * 3)] + 12, tb + beat * (1 + Math.floor(rnd() * 2)), 0.05); }
+      // light drums
+      if (M.drums) for (let k = 0; k < 4; k++) {
+        const at = tb + k * beat;
+        if (k === 0 || k === 2 || M.drums === 2) hit(at, 'kick', M.drums === 2 ? 0.5 : 0.35);
+        if (k === 1 || k === 3) hit(at, 'snap', 0.12);
+        hit(at + beat / 2, 'hat', 0.06);
+      }
+    }
+  });
+  const buf = await oc.startRendering();
+  // normalise and write a 16-bit mono WAV
+  const ch = buf.getChannelData(0); let pk = 0; for (let i = 0; i < ch.length; i++) pk = Math.max(pk, Math.abs(ch[i]));
+  const k = pk > 0 ? 0.85 / pk : 1, ab = new ArrayBuffer(44 + ch.length * 2), v = new DataView(ab);
+  const ws = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  ws(0, 'RIFF'); v.setUint32(4, 36 + ch.length * 2, true); ws(8, 'WAVE'); ws(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, SR, true); v.setUint32(28, SR * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); ws(36, 'data'); v.setUint32(40, ch.length * 2, true);
+  for (let i = 0; i < ch.length; i++) v.setInt16(44 + i * 2, Math.max(-32768, Math.min(32767, Math.round(ch[i] * k * 32767))), true);
+  return new Blob([ab], { type: 'audio/wav' });
+}
+
+S.autoMusic = S.autoMusic || null;
+function amShowPlan() {
+  const el = $('#amParts'), A = S.autoMusic;
+  if (!A || !A.plan) { el.innerHTML = ''; return; }
+  const opts = m => Object.entries(AM_MOODS).map(([k, o]) => `<option value="${k}"${k === m ? ' selected' : ''}>${o.name}</option>`).join('');
+  el.innerHTML = A.plan.map((p, i) => `<label class="f" style="flex:1 1 150px">From ${fmt(p.t0, 0)}<select data-ampart="${i}">${opts(p.mood)}</select></label>`).join('');
+}
+async function amMake(keepPlan) {
+  if (!S.segments.length) return toast('Create scenes first (step 1)');
+  const D = duration(), btn = $('#amMake'); btn.disabled = true; $('#amInfo').textContent = 'Making the music… (a few seconds; up to a minute for a long video on a phone)';
+  try {
+    const all = $('#amMood').value;
+    let plan = keepPlan && S.autoMusic && S.autoMusic.plan ? S.autoMusic.plan : (all === 'auto' ? amPlan() : [{ t0: 0, mood: all }]);
+    const seed = (S.autoMusic && S.autoMusic.seed) || (Date.now() & 0xffff) + 1;
+    S.autoMusic = { seed, plan, mood: all };
+    const blob = await amRender(plan, seed, D);
+    vo.pause(); music.pause();
+    await setMusic(blob, 'Auto music: ' + [...new Set(plan.map(p => AM_MOODS[p.mood].name))].join(', '));
+    amShowPlan(); save();
+    $('#amInfo').textContent = `Done: ${fmt(D, 0)} of music, ${plan.length} part${plan.length > 1 ? 's' : ''}. Press play in the preview. Change a part's mood below, or "Try another tune".`;
+  } catch (e) { $('#amInfo').textContent = 'Could not make the music: ' + e.message; }
+  btn.disabled = false;
+}
+$('#amMake').onclick = () => { if (S.autoMusic) S.autoMusic.seed = 0; amMake(false); };
+$('#amAgain').onclick = () => { if (!S.autoMusic) return amMake(false); S.autoMusic.seed = (S.autoMusic.seed * 7 + 13) & 0xffffff || 1; amMake(true); };
+$('#amParts').addEventListener('change', e => { const i = e.target.dataset.ampart; if (i == null || !S.autoMusic) return; S.autoMusic.plan[+i].mood = e.target.value; amMake(true); });
 
 (async function boot() {
   sizePreview();
