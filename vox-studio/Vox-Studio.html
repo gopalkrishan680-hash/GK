@@ -2418,7 +2418,7 @@ async function cleanGeminiMark(blob) {
   const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(bmp, 0, 0); bmp.close && bmp.close();
   // The mark's size depends on the picture (and is big in a cell cut from a large sheet), so the corner is
   // searched at two sizes, each with a small and a large "background" window.
-  const tryFind = (bsK, radK) => {
+  const tryFind = (bsK, radK, soft = 0) => {
     const bs = Math.round(Math.min(W, H) * bsK), x0 = W - bs, y0 = H - bs, id = x.getImageData(x0, y0, bs, bs), d = id.data, N = bs * bs;
     let clear = 0; for (let p = 0; p < N; p++) if (d[p * 4 + 3] < 250) clear++; if (clear > N * 0.01) return null;   // see-through corner: not a Gemini picture
     const L = new Float32Array(N), sat = new Float32Array(N);
@@ -2427,8 +2427,12 @@ async function cleanGeminiMark(blob) {
     for (let yy = 0; yy < bs; yy++) { let row = 0; for (let xx = 0; xx < bs; xx++) { row += L[yy * bs + xx]; I[(yy + 1) * (bs + 1) + xx + 1] = I[yy * (bs + 1) + xx + 1] + row; } }
     const blur = p => { const xx = p % bs, yy = (p / bs) | 0, a = Math.max(0, xx - rad), b = Math.max(0, yy - rad), e = Math.min(bs, xx + rad + 1), f = Math.min(bs, yy + rad + 1); return (I[f * (bs + 1) + e] - I[b * (bs + 1) + e] - I[f * (bs + 1) + a] + I[b * (bs + 1) + a]) / ((e - a) * (f - b)); };
     const bg = new Float32Array(N); for (let p = 0; p < N; p++) bg[p] = blur(p);
+    // on grainy ground (asphalt, sand, film grain) the faint mark is found on a slightly smoothed copy
+    let Ls = L, thr = 11;
+    if (soft) { const r2 = Math.max(1, Math.round(bs * 0.012)); Ls = new Float32Array(N); for (let p = 0; p < N; p++) { const xx = p % bs, yy = (p / bs) | 0, a = Math.max(0, xx - r2), b = Math.max(0, yy - r2), e = Math.min(bs, xx + r2 + 1), f = Math.min(bs, yy + r2 + 1); Ls[p] = (I[f * (bs + 1) + e] - I[b * (bs + 1) + e] - I[f * (bs + 1) + a] + I[b * (bs + 1) + a]) / ((e - a) * (f - b)); } thr = 7; }
     const best = (sign) => {
-      const m = new Uint8Array(N); for (let p = 0; p < N; p++) { const dd = (L[p] - bg[p]) * sign; if (dd > 11 && sat[p] < 60) m[p] = 1; }
+      let m = new Uint8Array(N); for (let p = 0; p < N; p++) { const dd = (Ls[p] - bg[p]) * sign; if (dd > thr && sat[p] < 60) m[p] = 1; }
+      if (soft) { const m2 = new Uint8Array(N); for (let p = 0; p < N; p++) { const xx = p % bs, yy = (p / bs) | 0; let k = 0, n = 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const qx = xx + dx, qy = yy + dy; if (qx < 0 || qy < 0 || qx >= bs || qy >= bs) continue; n++; k += m[qy * bs + qx]; } m2[p] = k * 2 > n ? 1 : 0; } m = m2; }   // majority filter: no loose grains
       const lab = new Int32Array(N), st = new Int32Array(N); let bestC = null, id2 = 0;
       for (let p0 = 0; p0 < N; p0++) {
         if (!m[p0] || lab[p0]) continue; id2++; let sp = 0, n = 0, ax = bs, ay = bs, bx = 0, by = 0, sx = 0, sy = 0; st[sp++] = p0; lab[p0] = id2;
@@ -2445,18 +2449,50 @@ async function cleanGeminiMark(blob) {
         { const mx = sx / n, my = sy / n; let hitN = 0, tot = 0;
           for (let yy = ay; yy <= by; yy++) for (let xx = ax; xx <= bx; xx++) { if (lab[yy * bs + xx] !== id2) continue; tot++; const rx = Math.round(mx - (yy - my)), ry = Math.round(my + (xx - mx)); if (rx >= 0 && ry >= 0 && rx < bs && ry < bs && lab[ry * bs + rx] === id2) hitN++; }
           if (hitN / tot < 0.7) continue; }
+        // a 4-point star: the middle is solid, the four corners of its box are empty (a square or a round spot is not)
+        { let cIn = 0, cN = 0, mIn = 0, mN = 0;
+          for (let yy = ay; yy <= by; yy++) for (let xx = ax; xx <= bx; xx++) { const u = (xx - ax) / w, v = (yy - ay) / h, on = lab[yy * bs + xx] === id2 ? 1 : 0;
+            if ((u < 0.22 || u > 0.78) && (v < 0.22 || v > 0.78)) { cN++; cIn += on; } else if (u > 0.38 && u < 0.62 && v > 0.38 && v < 0.62) { mN++; mIn += on; } }
+          if (cIn / Math.max(1, cN) > 0.12 || mIn / Math.max(1, mN) < 0.8) continue; }
         const score = n * (1 - Math.abs(1 - asp));
         if (!bestC || score > bestC.score) bestC = { id: id2, ax, ay, bx, by, w, h, score };
       }
-      return bestC ? { ...bestC, lab } : null;
+      return bestC ? { ...bestC, lab, sign } : null;
     };
     const hit = best(1) || (radK < 0.2 && bsK < 0.2 ? best(-1) : null);   // the big searches only look for a lighter mark
     return hit ? { hit, bs, x0, y0, id, d, N, L, bg } : null;
   };
   let F = null;
-  for (const [bk, rk] of [[0.14, 0.12], [0.14, 0.4], [0.22, 0.4], [0.34, 0.4]]) { F = tryFind(bk, rk); if (F) break; }
+  for (const [bk, rk, sf] of [[0.14, 0.12, 0], [0.14, 0.4, 0], [0.22, 0.4, 0], [0.34, 0.4, 0], [0.34, 0.22, 0], [0.14, 0.4, 1], [0.22, 0.4, 1], [0.34, 0.22, 1]]) { F = tryFind(bk, rk, sf); if (F) break; }
   if (!F) return { blob, removed: false };
   const { hit, bs, x0, y0, id, d, N, L, bg } = F;
+  if (hit.sign > 0) {
+    // The mark is a see-through white layer: seen = a·255 + (1 − a)·picture. Estimate a, then undo it,
+    // so the texture under the mark (asphalt, stars, grain) comes back instead of a smeared patch.
+    const lab = hit.lab, C = p => lab[p] === hit.id, r2 = Math.max(1, Math.round(hit.w * 0.03));
+    const Ls = new Float32Array(N); { const I2 = new Float64Array((bs + 1) * (bs + 1)); for (let yy = 0; yy < bs; yy++) { let row = 0; for (let xx = 0; xx < bs; xx++) { row += L[yy * bs + xx]; I2[(yy + 1) * (bs + 1) + xx + 1] = I2[yy * (bs + 1) + xx + 1] + row; } }
+      for (let p = 0; p < N; p++) { const xx = p % bs, yy = (p / bs) | 0, a = Math.max(0, xx - r2), b = Math.max(0, yy - r2), e = Math.min(bs, xx + r2 + 1), f = Math.min(bs, yy + r2 + 1); Ls[p] = (I2[f * (bs + 1) + e] - I2[b * (bs + 1) + e] - I2[f * (bs + 1) + a] + I2[b * (bs + 1) + a]) / ((e - a) * (f - b)); } }
+    const grow = Math.max(3, Math.round(hit.w * 0.12)), M = new Uint8Array(N), core = new Uint8Array(N), er = Math.max(2, Math.round(hit.w * 0.06));
+    for (let yy = Math.max(0, hit.ay - grow); yy <= Math.min(bs - 1, hit.by + grow); yy++) for (let xx = Math.max(0, hit.ax - grow); xx <= Math.min(bs - 1, hit.bx + grow); xx++) {
+      let near = false, all = true;
+      for (let dy = -grow; dy <= grow; dy++) for (let dx = -grow; dx <= grow; dx++) { const qx = xx + dx, qy = yy + dy; const inC = qx >= 0 && qy >= 0 && qx < bs && qy < bs && C(qy * bs + qx); if (inC) near = true; if (Math.abs(dx) <= er && Math.abs(dy) <= er && !inC) all = false; }
+      if (near) M[yy * bs + xx] = 1; if (all) core[yy * bs + xx] = 1;
+    }
+    // the ground's brightness under the mark: filled in from the ring around it (smooth, luma only)
+    const Lb = Float32Array.from(Ls), todo = Uint8Array.from(M);
+    for (let pass = 0; pass < bs; pass++) { const now = []; for (let p = 0; p < N; p++) { if (!todo[p]) continue; const px = p % bs, py = (p / bs) | 0; let s2 = 0, k = 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const qx = px + dx, qy = py + dy; if ((dx || dy) && qx >= 0 && qy >= 0 && qx < bs && qy < bs && !todo[qy * bs + qx]) { s2 += Lb[qy * bs + qx]; k++; } } if (k >= 2) now.push([p, s2 / k]); } if (!now.length) break; for (const [p, v] of now) { Lb[p] = v; todo[p] = 0; } }
+    const A = new Float32Array(N), av = []; for (let p = 0; p < N; p++) if (M[p]) { A[p] = clamp((Ls[p] - Lb[p]) / Math.max(8, 255 - Lb[p]), 0, 0.9); if (core[p]) av.push(A[p]); }
+    if (!av.length) for (let p = 0; p < N; p++) if (C(p)) av.push(A[p]);
+    av.sort((u, v) => u - v); const aIn = (av[av.length >> 1] || 0) * 0.98;   // a touch under, so grainy ground is never darkened
+    if (aIn > 0.02) {
+      // at the edge the sharp (unsmoothed) value is used, so no outline stays
+      for (let p = 0; p < N; p++) { if (!M[p]) continue; const aRaw = clamp((L[p] - Lb[p]) / Math.max(8, 255 - Lb[p]), 0, 0.9), a = core[p] ? aIn : Math.min(aIn, Math.max(A[p], aRaw)); if (a < 0.008) continue; for (let ch = 0; ch < 3; ch++) d[p * 4 + ch] = clamp((d[p * 4 + ch] - a * 255) / (1 - a), 0, 255); }
+      x.putImageData(id, x0, y0);
+      const type = /png/.test(blob.type) ? 'image/png' : 'image/jpeg';
+      const out = await new Promise(res => c.toBlob(res, type, 0.95));
+      return { blob: out || blob, removed: true, box: { x: x0 + hit.ax, y: y0 + hit.ay, w: hit.w, h: hit.h } };
+    }
+  }
   // the mask: the spot itself, grown a little, plus faint pixels of the same glyph inside its box
   const mask = new Uint8Array(N), grow = Math.max(3, Math.round(hit.w * 0.14));
   for (let yy = Math.max(0, hit.ay - grow); yy <= Math.min(bs - 1, hit.by + grow); yy++) for (let xx = Math.max(0, hit.ax - grow); xx <= Math.min(bs - 1, hit.bx + grow); xx++) {
