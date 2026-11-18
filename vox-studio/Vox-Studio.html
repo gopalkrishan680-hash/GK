@@ -352,8 +352,8 @@ pre.mono { background: #faf6ec; border: 1px solid var(--line); border-radius: 8p
           <label>Dust specks <select id="dust"><option value="on">On</option><option value="off">Off</option></select></label>
           <label>Stop-motion feel <select id="stopmo"><option value="on">On (12 fps steps + paper jitter)</option><option value="off">Off (smooth)</option></select></label>
           <label>Channel name (corner) <input id="watermark" placeholder="e.g. Kissa-e-Kyun"></label>
-          <label>Hook intro (first 4 s) <select id="hook"><option value="on">On: fast cuts + big question + boom</option><option value="off">Off</option></select></label>
-          <label>Hook question <input id="hookText" placeholder="Empty = first YouTube title or first line"></label>
+          <label>Hook intro (first 4 s) <select id="hook"><option value="on">On: fast picture cuts + boom</option><option value="off">Off</option></select></label>
+          <label>Hook text (optional) <input id="hookText" placeholder="Empty = no text, only pictures. Typed text shows after the cuts"></label>
           <label>2.5D depth on pictures <select id="depth"><option value="on">On: the person lifts off the picture (needs internet once)</option><option value="off">Off (flat pictures)</option></select></label>
         </div>
       </div>
@@ -2767,7 +2767,7 @@ async function exportOffline(opt = {}) {
   try {
     ui.info.textContent = 'Mixing the audio…';
     const mixed = await mixAudio(sr);
-    if (depthOn()) { const keys = (S.assets || []).filter(a => a.kind === 'scene').map(a => assetKey(a.id)).filter(k => R.img[k]); ui.info.textContent = 'Preparing 2.5D depth…'; await depthPrepare(keys, (n, m) => { ui.info.textContent = `Preparing 2.5D depth… ${n} / ${m}`; }); }
+    if (depthOn()) { const keys = [...new Set([...(S.assets || []).filter(a => a.kind === 'scene').map(a => assetKey(a.id)), ...(hookOn() ? hookPics().map(c => c.key) : [])])].filter(k => R.img[k]); ui.info.textContent = 'Preparing 2.5D depth…'; await depthPrepare(keys, (n, m) => { ui.info.textContent = `Preparing 2.5D depth… ${n} / ${m}`; }); }
     const muxer = new Mp4Muxer.Muxer({ target: new Mp4Muxer.ArrayBufferTarget(), video: { codec: vc.mux, width: W, height: H, frameRate: fps }, audio: { codec: ac.mux, numberOfChannels: 2, sampleRate: sr }, fastStart: 'in-memory', firstTimestampBehavior: 'offset' });
     let encErr = null;
     const aenc = new AudioEncoder({ output: (c, m) => muxer.addAudioChunk(c, m), error: e => encErr = e }); aenc.configure(ac.cfg);
@@ -2849,8 +2849,9 @@ async function exportVideo() {
    a riser and a boom. It plays over the first seconds of the voiceover. */
 const HOOK_D = 4.2;
 const hookOn = () => S.settings.hook === 'on' && !R.noHook && S.shots.length > 0 && duration() > HOOK_D * 3;
+const hookOwnText = () => String(S.settings.hookText || '').trim();   // text on the hook: only when the user typed one
 function hookText() {
-  const own = String(S.settings.hookText || '').trim(); if (own) return own;
+  const own = hookOwnText(); if (own) return own;
   const yt = S.yt && S.yt.titles && S.yt.titles[0]; if (yt) return yt.replace(/\s*[|–-]\s*.*$/, '');
   const first = plain((S.segments[0] || {}).text || S.settings.title || ''); const w = first.split(/\s+/).slice(0, 9).join(' ');
   return w ? w.replace(/[.,;:!]+$/, '') + (/[?？]$/.test(w) ? '' : '?') : '';
@@ -2880,14 +2881,14 @@ function drawHook(ctx, W, H, t) {
   if (src) {
     const cr = coverRect(src, W, H); ctx.save(); ctx.filter = `blur(${Math.round(24 * s)}px) brightness(0.45)`; ctx.drawImage(src, cr.x - 30 * s, cr.y - 30 * s, cr.w + 60 * s, cr.h + 60 * s); ctx.restore();
     const z = (ci === n - 1 ? 1 + 0.06 * clamp((t - ci * cutD) / 2, 0, 1) : 1.1 - 0.1 * easeOutCubic(clamp(lc / cutD, 0, 1))), f = fitRect(src.width / src.height, { x: W * 0.05, y: H * 0.05, w: W * 0.9, h: H * 0.9 });
-    ctx.save(); ctx.translate(W / 2, H / 2); ctx.scale(z, z); ctx.rotate((ci % 2 ? 1 : -1) * 0.012); shadowOn(ctx, s, 1.2); ctx.drawImage(src, f.x - W / 2, f.y - H / 2, f.w, f.h); shadowOff(ctx); ctx.restore();
-    ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(0, 0, W, H);
+    ctx.save(); ctx.translate(W / 2, H / 2); ctx.scale(z, z); ctx.rotate((ci % 2 ? 1 : -1) * 0.012); shadowOn(ctx, s, 1.2); ctx.drawImage(src, f.x - W / 2, f.y - H / 2, f.w, f.h); shadowOff(ctx); drawDepth(ctx, c.key, src, f.x - W / 2, f.y - H / 2, f.w, f.h, clamp(lc / Math.max(cutD, 1.1), 0, 1), 0, s); ctx.restore();
+    const dim = hookOwnText() ? 0.12 + 0.28 * clamp((t - 3.0) / 0.3, 0, 1) : 0.06; ctx.fillStyle = `rgba(0,0,0,${dim})`; ctx.fillRect(0, 0, W, H);
   }
   if (lc < 0.07 && t > 0.05) { ctx.fillStyle = `rgba(255,255,255,${0.55 * (1 - lc / 0.07)})`; ctx.fillRect(0, 0, W, H); }   // flash on each cut
   if (t > boomT && t < boomT + 0.12) { ctx.fillStyle = `rgba(255,255,255,${0.8 * (1 - (t - boomT) / 0.12)})`; ctx.fillRect(0, 0, W, H); }
-  const txt = hookText();
-  if (txt && t > 0.25) {
-    const p = easeOutBack(clamp((t - 0.25) / 0.4, 0, 1)), maxW = W * (port ? 0.88 : 0.78); let size = (port ? 118 : 104) * s, lines;
+  const txt = hookOwnText(), tIn = 3.1;   // no text during the fast cuts: it only comes on the last picture
+  if (txt && t > tIn) {
+    const p = easeOutBack(clamp((t - tIn) / 0.35, 0, 1)), maxW = W * (port ? 0.88 : 0.78); let size = (port ? 118 : 104) * s, lines;
     for (;;) { ctx.font = sansF(size, 900); lines = []; let cur = ''; upper(txt).split(/\s+/).forEach(w => { const tt = cur ? cur + ' ' + w : w; if (cur && ctx.measureText(tt).width > maxW) { lines.push(cur); cur = w; } else cur = tt; }); if (cur) lines.push(cur); if (lines.length <= 3 || size < 40 * s) break; size *= 0.9; }
     const lh = size * 1.12, th = lh * lines.length, y0 = H / 2 - th / 2 + (port ? -H * 0.05 : 0), big = t > boomT ? 1 + 0.06 * Math.max(0, 1 - (t - boomT) / 0.4) : 1;
     ctx.save(); ctx.translate(W / 2, H / 2); ctx.scale(p * big, p * big); ctx.translate(-W / 2, -H / 2);
@@ -3787,7 +3788,6 @@ function projectIssues() {
   if (crowded) add('info', `${crowded} board${crowded > 1 ? 's are' : ' is'} crowded (4+ pictures and 3+ texts).`, ft.crowded);
   if (emptyG) add('warn', `${emptyG} graphic${emptyG > 1 ? 's have' : ' has'} no content (timeline / chart / route).`, ft.emptyG);
   if (hookOn() && !hookPics().length) add('info', 'Hook intro is on but there are no pictures yet for it.');
-  if (hookOn() && !hookText()) add('info', 'Hook intro has no question text (Look → Hook question).');
   if (S.settings.aspect === '9:16' && S.settings.captions === 'off') add('info', 'Shorts usually do better with captions on.');
   if (S.settings.depth !== 'off' && DEPTH.failed) add('info', '2.5D depth could not load (no internet?). Pictures stay flat.');
   return out;
