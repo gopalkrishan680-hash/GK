@@ -61,6 +61,7 @@ header.top { background: var(--surface); }
   .top-row > .row { order: 5; }
 }
 .touch-only { display: none; }
+#ovBox[data-kind="kokoro"] .ov-phone, #ovBox[data-kind="phone"] .ov-kk { display: none !important; }
 .idealist { display: grid; gap: 8px; max-height: 560px; overflow: auto; }
 .ideacard { text-align: left; display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: inherit; font: inherit; cursor: pointer; }
 .ideacard .chip { width: fit-content; }
@@ -349,13 +350,20 @@ html:not(.mode-layers) .layers-only { display: none !important; }
       <details class="ovbox" id="ovBox" open>
         <summary><b>🎙 Make the voiceover from the script</b> <span class="hint">offline · free · no API key</span></summary>
         <div style="display:grid;gap:8px;margin-top:8px">
-          <p class="hint" style="margin:0">Uses the phone's own Hindi voice (Google speech engine), works without internet. Best in Hindi script (देवनागरी); Hinglish works too.</p>
-          <div class="row"><label class="f" style="flex:1 1 220px">Speech engine <select id="ovEngine"><option value="">Phone default</option></select></label></div>
-          <div class="row"><label class="f" style="flex:1 1 220px">Voice <select id="ovVoice"></select></label><button class="btn small" id="ovSettings" title="Download the Hindi voice for offline use">Voice settings</button></div>
-          <p class="hint" style="margin:0" id="ovTip">Tip: try every voice with ▶ Test voice. Voices marked "best quality" sound the most human (they need the internet while speaking, but still no API key).</p>
+          <label class="f">Voice type <select id="ovKind"><option value="kokoro">AI voice (Kokoro): natural, offline after a one-time download</option><option value="phone">Phone voice (Google / Samsung speech engine)</option></select></label>
+          <div class="ov-kk" style="display:grid;gap:8px">
+            <div class="row"><label class="f" style="flex:1 1 220px">AI voice <select id="kkVoice"><option value="hm_omega">Omega · male (default)</option><option value="hm_psi">Psi · male</option><option value="hf_alpha">Alpha · female</option><option value="hf_beta">Beta · female</option></select></label></div>
+            <div class="row"><button class="btn small" id="kkGet">⬇ Download AI voice (120 MB, once)</button><button class="btn small" id="kkDel" hidden>Remove AI voice</button></div>
+            <progress id="kkProg" value="0" max="1" hidden></progress>
+            <p class="hint" style="margin:0" id="kkState"></p>
+          </div>
+          <p class="hint ov-phone" style="margin:0">Uses the phone's own Hindi voice (Google speech engine), works without internet. Best in Hindi script (देवनागरी); Hinglish works too.</p>
+          <div class="row ov-phone"><label class="f" style="flex:1 1 220px">Speech engine <select id="ovEngine"><option value="">Phone default</option></select></label></div>
+          <div class="row ov-phone"><label class="f" style="flex:1 1 220px">Voice <select id="ovVoice"></select></label><button class="btn small" id="ovSettings" title="Download the Hindi voice for offline use">Voice settings</button></div>
+          <p class="hint ov-phone" style="margin:0" id="ovTip">Tip: try every voice with ▶ Test voice. Voices marked "best quality" sound the most human (they need the internet while speaking, but still no API key).</p>
           <div class="row">
             <label class="f">Speed <span class="tc" id="ovRateV"></span><input type="range" id="ovRate" min="0.7" max="1.3" step="0.01"></label>
-            <label class="f">Pitch <span class="tc" id="ovPitchV"></span><input type="range" id="ovPitch" min="0.8" max="1.2" step="0.01"></label>
+            <label class="f ov-phone">Pitch <span class="tc" id="ovPitchV"></span><input type="range" id="ovPitch" min="0.8" max="1.2" step="0.01"></label>
             <label class="f">Pause after a sentence <span class="tc" id="ovPauseV"></span><input type="range" id="ovPause" min="0.15" max="1.2" step="0.05"></label>
           </div>
           <label class="f">Expression <select id="ovExprSel"><option value="on">Natural: questions rise, sad lines slower, happy lines livelier</option><option value="off">Flat (same for every line)</option></select></label>
@@ -366,7 +374,7 @@ html:not(.mode-layers) .layers-only { display: none !important; }
           </div>
           <div class="row"><button class="btn primary" id="ovGo">Make voiceover</button><button class="btn" id="ovTest">▶ Test voice</button><button class="btn" id="ovStop" hidden>Stop</button><button class="btn" data-dlvoice id="ovDl" hidden>⬇ Download voiceover</button></div>
           <progress id="ovProg" value="0" max="1" hidden></progress>
-          <div class="hint" id="ovState"></div>
+          <div class="hint ov-phone" id="ovState"></div>
           <div class="hint" id="ovInfo"></div>
         </div>
       </details>
@@ -877,7 +885,7 @@ He looked at Papa. Papa smiled, and said, "I am proud of you."`;
 /* ============ state ============ */
 const DEFAULTS = { title: '', aspect: '16:9', grid: 3, style: 'stickman', styleText: STYLES.stickman.text, characters: '', gutter: 'auto',
   splitLevel: 'all', minWords: 2, maxWords: 14, captions: 'bar', fit: 'auto', enhance: 'on', v: 3, capSize: 1, motion: 6, transition: 'fade', transDur: 0.15, res: 1080, fps: 30, musicVol: 0.12, anim: 'on', animAmt: 1, capWords: 'on', pics: 'images', skStyle: 'chibi', lPer: 9, lLib: 'on',
-  fx: 'on', fxAmt: 1, fxDoodle: 'on', fxSfx: 'on', fxVol: 0.6, ovVoice: '', ovEngine: '', ovHi: 'auto', ovPolish: 'on', ovBreath: 'on', ovRate: 0.95, ovPitch: 1, ovPause: 0.45, ovExpr: 'on', mode: 'layers', lBg: 'parchment', lEnter: 'auto', lTrans: 'cut', lIdle: 'subtle', lCam: 'on', lCaps: 'off', sfx: 'on', sfxVol: 0.5, duck: 'on' };
+  fx: 'on', fxAmt: 1, fxDoodle: 'on', fxSfx: 'on', fxVol: 0.6, ovKind: 'kokoro', kkVoice: 'hm_omega', ovVoice: '', ovEngine: '', ovHi: 'auto', ovPolish: 'on', ovBreath: 'on', ovRate: 0.95, ovPitch: 1, ovPause: 0.45, ovExpr: 'on', mode: 'layers', lBg: 'parchment', lEnter: 'auto', lTrans: 'cut', lIdle: 'subtle', lCam: 'on', lCaps: 'off', sfx: 'on', sfxVol: 0.5, duck: 'on' };
 try { if (matchMedia('(pointer: coarse)').matches) DEFAULTS.res = 720; } catch (_) {}   // phones: smaller, faster export
 const S = { settings: { ...DEFAULTS }, script: '', segments: [], starts: [], grids: [], overrides: {}, audioBlob: null, audioName: '', musicBlob: null, musicName: '' };
 let uid = 1;
@@ -4994,7 +5002,7 @@ function ovExpr(text, idx = 0) {
 }
 // text the engine should read: no *stars*, no [tags]; [pause 1.5] becomes extra silence
 function ovHindiLetters() {
-  const v = OV.voices.find(x => x.name === $('#ovVoice').value), hiVoice = !v || v.lang.toLowerCase().startsWith('hi');
+  const v = kkOn() ? null : OV.voices.find(x => x.name === $('#ovVoice').value), hiVoice = !v || v.lang.toLowerCase().startsWith('hi');
   return hiVoice && (S.settings.ovHi === 'on' || (S.settings.ovHi !== 'off' && looksHinglish(S.script || '')));
 }
 function ovText(units) {
@@ -5007,7 +5015,7 @@ function ovBusy(on) { $('#ovGo').disabled = on; $('#ovTest').disabled = on; $('#
 async function ovGenerate() {
   S.script = $('#script').value;
   if (!S.segments.length) return toast('Press Create scenes first');
-  if (OV.state !== 'ready') { ovStart(); return toast('The speech engine is starting, try again in a moment'); }
+  if (!(await ovCanSpeak())) return;
   S.settings.ovVoice = $('#ovVoice').value; save();
   const units = sentenceGroups().map(g => g.map(i => S.segments[i].text.trim()).join(' ')), lines = ovText(units);
   OV.stop = false; ovBusy(true); const parts = [], info = $('#ovInfo'), t0 = performance.now();
@@ -5017,7 +5025,7 @@ async function ovGenerate() {
       const el = (performance.now() - t0) / 1000, left = i ? el / i * (lines.length - i) : 0;
       info.textContent = `Speaking line ${i + 1} of ${lines.length}${left > 3 ? ` · about ${Math.ceil(left)} s left` : ''}`; $('#ovProg').value = i / lines.length;
       const e = ovExpr(lines[i].text, i);
-      parts.push({ pcm: lines[i].text.replace(/[^\p{L}\p{N}]/gu, '') ? await ovDecode(await ovSynth(lines[i].text, e.rate, e.pitch)) : new Float32Array(0), pause: e.pause + lines[i].extra });
+      parts.push({ pcm: lines[i].text.replace(/[^\p{L}\p{N}]/gu, '') ? await ovSpeak(lines[i].text, e) : new Float32Array(0), pause: e.pause + lines[i].extra });
     }
     const SR = 24000, base = S.settings.ovPause || 0.45;
     const gaps = ovGaps(units, parts, base);
@@ -5036,7 +5044,7 @@ async function ovGenerate() {
     await setVoice(encodeWav(fin, SR), 'Offline voiceover.wav');
     ttsTiming(timings); segmentsChanged(true);
     S.tts = { engine: 'offline', timings }; save();
-    info.textContent = `Voiceover ready · ${fmt(out.length / SR, 0)} long, scenes synced. Play it above. Not happy? Change speed or voice and make it again.`;
+    info.textContent = `Voiceover ready · ${fmt(out.length / SR, 0)} long, scenes synced. Play it above. Not happy? Change speed or voice and make it again.` + (kkOn() ? '' : ' Try the AI voice for a more natural sound.');
     toast('Offline voiceover ready and synced');
   } catch (e) { info.textContent = e.message; toast(e.message); }
   ovBusy(false);
@@ -5044,11 +5052,11 @@ async function ovGenerate() {
 $('#ovGo').onclick = ovGenerate;
 $('#ovStop').onclick = () => { OV.stop = true; };
 $('#ovTest').onclick = async () => {
-  if (OV.state !== 'ready') { ovStart(); return toast('The speech engine is starting, try again in a moment'); }
+  if (!(await ovCanSpeak())) return;
   S.settings.ovVoice = $('#ovVoice').value; save(); ovBusy(true);
   try {
     const line = plain((S.segments[0] && sentenceGroups()[0].map(i => S.segments[i].text).join(' ')) || 'Namaste! Yeh meri awaaz ka chhota sa test hai.');
-    const say = ovHindiLetters() ? r2d(line) : line, e = ovExpr(say), raw = await ovDecode(await ovSynth(say, e.rate, e.pitch));
+    const say = ovHindiLetters() ? r2d(line) : line, e = ovExpr(say), raw = await ovSpeak(say, e);
     const pcm = S.settings.ovPolish === 'off' ? raw : await ovPolish(raw, 24000);
     const a = new Audio(URL.createObjectURL(encodeWav(pcm, 24000))); a.play();
   } catch (e) { toast(e.message); }
@@ -5057,7 +5065,7 @@ $('#ovTest').onclick = async () => {
 $('#ovSettings').onclick = () => { try { AndroidBridge.ttsSettings(); } catch (_) { toast('Open phone Settings → Text-to-speech output'); } };
 $('#ovVoice').onchange = e => { S.settings.ovVoice = e.target.value; save(); };
 document.addEventListener('visibilitychange', () => { if (!document.hidden && OV.state === 'ready') ovLoadVoices(); });   // back from voice settings: new voices
-function ovToUI() { $('#ovBreathSel').value = S.settings.ovBreath || 'on'; $('#ovHi').value = S.settings.ovHi || 'auto'; $('#ovPolish').value = S.settings.ovPolish || 'on'; $('#ovRate').value = S.settings.ovRate; $('#ovPitch').value = S.settings.ovPitch; $('#ovPause').value = S.settings.ovPause; $('#ovExprSel').value = S.settings.ovExpr; ovShowVals(); }
+function ovToUI() { $('#ovKind').value = kkOn() ? 'kokoro' : 'phone'; $('#kkVoice').value = S.settings.kkVoice || 'hm_omega'; kkShow(); $('#ovBreathSel').value = S.settings.ovBreath || 'on'; $('#ovHi').value = S.settings.ovHi || 'auto'; $('#ovPolish').value = S.settings.ovPolish || 'on'; $('#ovRate').value = S.settings.ovRate; $('#ovPitch').value = S.settings.ovPitch; $('#ovPause').value = S.settings.ovPause; $('#ovExprSel').value = S.settings.ovExpr; ovShowVals(); }
 function ovShowVals() { $('#ovRateV').textContent = (+S.settings.ovRate).toFixed(2) + '×'; $('#ovPitchV').textContent = (+S.settings.ovPitch).toFixed(2); $('#ovPauseV').textContent = (+S.settings.ovPause).toFixed(2) + ' s'; }
 [['ovRate', 'ovRate'], ['ovPitch', 'ovPitch'], ['ovPause', 'ovPause']].forEach(([id, k]) => $('#' + id).addEventListener('input', e => { S.settings[k] = +e.target.value; ovShowVals(); save(); }));
 $('#ovExprSel').onchange = e => { S.settings.ovExpr = e.target.value; save(); };
@@ -5473,6 +5481,150 @@ function r2d(text) {
 }
 const looksHinglish = t => { const w = (t.match(/[a-z]+/gi) || []).map(x => x.toLowerCase()); if (w.length < 3) return false; const hi = w.filter(x => R2D_WORDS.has(x)).length; return hi / w.length > 0.25; };
 
+
+/* ---- Kokoro voice: text -> phonemes -> model tokens ----
+   The Kokoro model reads espeak-style phonemes. 20 000 common Hindi words and 11 000 English words come
+   ready-made from espeak (kokoro-lex.json, made once with espeak-ng); any other Hindi word is spelled by the
+   rules below, Hinglish (Roman) words are turned into Hindi letters first, numbers become Hindi number words. */
+const KG = { lex: null, vocab: null };
+const KG_VOCAB = {";":1,":":2,",":3,".":4,"!":5,"?":6,"—":9,"…":10,"\"":11,"(":12,")":13,"“":14,"”":15," ":16,"̃":17,"ʣ":18,"ʥ":19,"ʦ":20,"ʨ":21,"ᵝ":22,"ꭧ":23,"A":24,"I":25,"O":31,"Q":33,"S":35,"T":36,"W":39,"Y":41,"ᵊ":42,"a":43,"b":44,"c":45,"d":46,"e":47,"f":48,"h":50,"i":51,"j":52,"k":53,"l":54,"m":55,"n":56,"o":57,"p":58,"q":59,"r":60,"s":61,"t":62,"u":63,"v":64,"w":65,"x":66,"y":67,"z":68,"ɑ":69,"ɐ":70,"ɒ":71,"æ":72,"β":75,"ɔ":76,"ɕ":77,"ç":78,"ɖ":80,"ð":81,"ʤ":82,"ə":83,"ɚ":85,"ɛ":86,"ɜ":87,"ɟ":90,"ɡ":92,"ɥ":99,"ɨ":101,"ɪ":102,"ʝ":103,"ɯ":110,"ɰ":111,"ŋ":112,"ɳ":113,"ɲ":114,"ɴ":115,"ø":116,"ɸ":118,"θ":119,"œ":120,"ɹ":123,"ɾ":125,"ɻ":126,"ʁ":128,"ɽ":129,"ʂ":130,"ʃ":131,"ʈ":132,"ʧ":133,"ʊ":135,"ʋ":136,"ʌ":138,"ɣ":139,"ɤ":140,"χ":142,"ʎ":143,"ʒ":147,"ʔ":148,"ˈ":156,"ˌ":157,"ː":158,"ʰ":162,"ʲ":164,"↓":169,"→":171,"↗":172,"↘":173,"ᵻ":177};
+const KG_C = { 'क': 'k', 'ख': 'kʰ', 'ग': 'ɡ', 'घ': 'ɡʰ', 'ङ': 'ŋ', 'च': 'c', 'छ': 'cʰ', 'ज': 'ɟ', 'झ': 'ɟʰ', 'ञ': 'ɲ', 'ट': 'ʈ', 'ठ': 'ʈʰ', 'ड': 'ɖ', 'ढ': 'ɖʰ', 'ण': 'ɳ', 'त': 't', 'थ': 'tʰ', 'द': 'd', 'ध': 'dʰ', 'न': 'n', 'प': 'p', 'फ': 'pʰ', 'ब': 'b', 'भ': 'bʰ', 'म': 'm', 'य': 'j', 'र': 'ɾ', 'ल': 'l', 'व': 'ʋ', 'श': 'ʃ', 'ष': 'ʂ', 'स': 's', 'ह': 'h',
+  'क़': 'q', 'ख़': 'x', 'ग़': 'ɣ', 'ज़': 'z', 'फ़': 'f', 'ड़': 'r.', 'ढ़': 'r.h', 'य़': 'j' };
+const KG_V = { 'अ': 'ə', 'आ': 'aː', 'इ': 'ɪ', 'ई': 'iː', 'उ': 'ʊ', 'ऊ': 'uː', 'ए': 'eː', 'ऐ': 'ɛː', 'ओ': 'oː', 'औ': 'ɔː', 'ऋ': 'ɾɪ', 'ऑ': 'ɔ', 'ऍ': 'ɛ' };
+const KG_M = { 'ा': 'aː', 'ि': 'ɪ', 'ी': 'iː', 'ु': 'ʊ', 'ू': 'uː', 'े': 'eː', 'ै': 'ɛː', 'ो': 'oː', 'ौ': 'ɔː', 'ृ': 'ɾɪ', 'ॉ': 'ɔ', 'ॅ': 'ɛ' };
+const KG_STOP = { 'k': 'ŋ', 'kʰ': 'ŋ', 'ɡ': 'ŋ', 'ɡʰ': 'ŋ', 'c': 'n', 'cʰ': 'n', 'ɟ': 'n', 'ɟʰ': 'n', 'ʈ': 'ɳ', 'ʈʰ': 'ɳ', 'ɖ': 'ɳ', 'ɖʰ': 'ɳ', 't': 'n', 'tʰ': 'n', 'd': 'n', 'dʰ': 'n', 'p': 'm', 'pʰ': 'm', 'b': 'm', 'bʰ': 'm' };
+const kgLong = v => /ː/.test(v);
+// a Hindi word that is not in the list: syllables, the silent "a", nasal sounds and the stress
+function kgRules(w) {
+  const ch = [...w.normalize('NFD')], syl = [];   // {c: consonant(s), v: vowel, nas, schwa}
+  let onset = '';
+  for (let i = 0; i < ch.length; i++) {
+    let c = ch[i]; if (ch[i + 1] === '़' && KG_C[c + '़']) { c += '़'; i++; }
+    if (KG_C[c]) {
+      const nx = ch[i + 1];
+      if (nx === '्') { onset += KG_C[c]; i++; continue; }
+      if (KG_M[nx]) { syl.push({ c: onset + KG_C[c], v: KG_M[nx] }); onset = ''; i++; continue; }
+      syl.push({ c: onset + KG_C[c], v: 'ə', schwa: 1 }); onset = ''; continue;
+    }
+    if (KG_V[c]) { syl.push({ c: onset, v: KG_V[c] }); onset = ''; continue; }
+    if ((c === 'ं' || c === 'ँ') && syl.length) { syl[syl.length - 1].nas = 1; continue; }
+    if (c === 'ः' && syl.length) { syl[syl.length - 1].v += 'h'; continue; }
+  }
+  if (onset && syl.length) syl[syl.length - 1].coda = (syl[syl.length - 1].coda || '') + onset;
+  if (!syl.length) return '';
+  // the inherent "a" is silent at the end and between two sounded syllables
+  const drop = s => { s.dropped = 1; s.v = ''; };
+  if (syl.length > 1 && syl[syl.length - 1].schwa) drop(syl[syl.length - 1]);
+  for (let k = 1; k < syl.length - 1; k++) { const p = syl[k - 1], o = syl[k], n = syl[k + 1]; if (o.schwa && !p.dropped && n.c && !n.dropped) drop(o); }
+  // a long final ई / ई-matra is said short in espeak (khaali -> kʰaːli)
+  const L = syl[syl.length - 1]; if (L.v === 'iː' && syl.length > 1) L.v = 'i';
+  // stress: the first long or closed syllable, else the first one
+  let st = syl.findIndex((s, k) => !s.dropped && (kgLong(s.v) || (syl[k + 1] && syl[k + 1].dropped)));
+  if (st < 0) st = 0;
+  let out = '';
+  syl.forEach((s, k) => {
+    let v = s.v; if (s.schwa && !s.dropped) v = k === st ? 'ʌ' : 'ə';
+    if (s.nas) {
+      const n = syl[k + 1], nc = n && n.c ? [...Object.keys(KG_STOP)].find(x => n.c.startsWith(x)) : null;
+      // before p/t/k-type sounds: a nasal consonant of the same place; else a nasal vowel (long a/i/u/o said short), and "n" before another consonant
+      if (nc) v += KG_STOP[nc];
+      else if (v) { const keep = /^[eɛ]/.test(v); v = v[0] + '̃' + (keep ? v.slice(1) : v.slice(1).replace('ː', '')); if (n && n.c) v += 'n'; }
+    }
+    out += (s.c || '') + (k === st ? 'ˈ' : '') + v;
+    if (s.coda) out += s.coda;
+  });
+  return out;
+}
+// numbers in Hindi words: 58 -> अट्ठावन, 1250 -> एक हज़ार दो सौ पचास
+function kgNumber(n) {
+  const L = KG.lex, num = k => L.num[String(k)] || '', w = x => L.hi[x] || kgRules(x);
+  n = Math.floor(+n); if (!isFinite(n)) return ''; if (n < 100) return num(n);
+  const parts = []; const cr = Math.floor(n / 1e7), lk = Math.floor(n % 1e7 / 1e5), th = Math.floor(n % 1e5 / 1000), hu = Math.floor(n % 1000 / 100), r = n % 100;
+  if (cr) parts.push(kgNumber(cr), w('करोड़')); if (lk) parts.push(num(lk), w('लाख')); if (th) parts.push(num(th), w('हज़ार')); if (hu) parts.push(num(hu), w('सौ')); if (r) parts.push(num(r));
+  return parts.join(' ');
+}
+function kgWord(w) {
+  const L = KG.lex;
+  if (/^\d+$/.test(w)) return kgNumber(w);
+  if (/[ऀ-ॿ]/.test(w)) { const k = w.normalize('NFC'); return L.hi[k] || L.hi[w] || kgRules(w); }
+  const lw = w.toLowerCase();
+  if (typeof R2D_WORDS !== 'undefined' && R2D_WORDS.has(lw)) { const d = R2D_WORDS.get(lw); return L.hi[d.normalize('NFC')] || kgRules(d); }   // Hinglish
+  if (L.en[lw]) return L.en[lw];
+  if (typeof r2dWord === 'function') { const d = r2dWord(lw); if (/[ऀ-ॿ]/.test(d)) return L.hi[d.normalize('NFC')] || kgRules(d); }
+  return lw.replace(/[^a-z]/g, '');
+}
+// a line of text -> phonemes, keeping the punctuation the model uses for pauses
+function kgPhonemes(text) {
+  const t = String(text).normalize('NFC').replace(/\*/g, '').replace(/।|॥/g, '.').replace(/\.\.\./g, '…').replace(/[‘’']/g, '').replace(/(\d)[,.](?=\d{3}\b)/g, '$1').replace(/(\d+)\s*%/g, '$1 प्रतिशत');
+  const out = [];
+  for (const m of t.matchAll(/(\d+|[\p{L}\p{M}]+)|([,.!?;:—…"“”()])/gu)) {
+    if (m[1]) { const p = m[1] === 'में' && out.length ? 'mẽː' : kgWord(m[1]); if (p) out.push({ p, w: 1 }); }   // में is unstressed inside a sentence
+    else out.push({ p: m[2], w: 0 });
+  }
+  let s = ''; out.forEach((o, k) => { s += (o.w && k ? ' ' : '') + o.p; });
+  return s.replace(/\s+([,.!?;:…])/g, '$1').trim();
+}
+function kgTokens(ph) { return [...ph].map(c => KG_VOCAB[c]).filter(x => x != null); }
+async function kgLoad() {
+  if (KG.lex) return KG.lex;
+  const r = await fetch('kokoro-lex.json'); if (!r.ok) throw new Error('the word list is missing');
+  KG.lex = await r.json(); return KG.lex;
+}
+
+/* ---- Kokoro AI voice: tokens made here (kgPhonemes), speech made natively by the app (onnxruntime) ---- */
+const kkAvail = () => APP && window.AndroidBridge && !!AndroidBridge.kokoroSynth;
+const kkOn = () => kkAvail() && S.settings.ovKind !== 'phone';
+const KK = { ready: false, busy: false };
+function kkStatus() { try { const j = JSON.parse(AndroidBridge.kokoroStatus()); KK.ready = j.ready; KK.busy = j.downloading; } catch (_) { KK.ready = false; } return KK; }
+function kkShow() {
+  $('#ovBox').dataset.kind = kkOn() ? 'kokoro' : 'phone';
+  if (!kkAvail()) { $('#ovKind').value = 'phone'; $('#ovKind').disabled = true; $('#ovKind').title = 'The AI voice works in the Android app'; return; }
+  if (!kkOn()) return;
+  kkStatus();
+  $('#kkGet').hidden = KK.ready; $('#kkDel').hidden = !KK.ready; $('#kkGet').disabled = KK.busy;
+  $('#kkState').textContent = KK.ready ? 'AI voice ready: works without internet. Best in Hindi script (देवनागरी); Hinglish works too.' : KK.busy ? 'Downloading the AI voice…' : 'Download the AI voice once (about 120 MB, Wi-Fi recommended). After that it works offline.';
+  if (KK.ready) { $('#ovGo').disabled = false; $('#ovTest').disabled = false; }
+}
+window.ssKokoro = (what, a, b) => {
+  const p = $('#kkProg');
+  if (what === 'progress') { p.hidden = false; p.value = b ? a / b : 0; $('#kkState').textContent = `Downloading the AI voice… ${Math.round(a / 1048576)} / ${Math.round(b / 1048576)} MB`; return; }
+  p.hidden = true;
+  if (what === 'ready') { toast('AI voice downloaded: it now works offline'); kkShow(); }
+  else { $('#kkState').textContent = 'Download failed: ' + a + '. Check the internet and try again.'; $('#kkGet').disabled = false; }
+};
+$('#kkGet').onclick = () => { if (!AndroidBridge.kokoroDownload()) return toast('Already downloading'); $('#kkGet').disabled = true; $('#kkProg').hidden = false; $('#kkProg').value = 0; $('#kkState').textContent = 'Starting the download…'; };
+$('#kkDel').onclick = () => { if (!confirm('Remove the AI voice from this phone? (120 MB; you can download it again)')) return; AndroidBridge.kokoroDelete(); setTimeout(kkShow, 800); };
+$('#ovKind').onchange = e => { S.settings.ovKind = e.target.value; save(); kkShow(); if (!kkOn()) ovStart(); };
+$('#kkVoice').onchange = e => { S.settings.kkVoice = e.target.value; save(); };
+async function ovCanSpeak() {
+  if (kkOn()) {
+    if (!kkStatus().ready) { toast(KK.busy ? 'The AI voice is still downloading' : 'First download the AI voice (button above), or choose Phone voice'); return false; }
+    try { await kgLoad(); } catch (e) { toast('AI voice: ' + e.message); return false; }
+    return true;
+  }
+  if (OV.state !== 'ready') { ovStart(); toast('The speech engine is starting, try again in a moment'); return false; }
+  return true;
+}
+function kkSynth(tokens, speed) {
+  return new Promise((res, rej) => {
+    const id = 'kk' + (++OV.seq) + '_' + Date.now();
+    const timer = setTimeout(() => { OV.pending.delete(id); rej(new Error('The AI voice did not answer')); }, 180000);
+    OV.pending.set(id, { res, rej, timer });
+    let ok = false; try { ok = AndroidBridge.kokoroSynth(id, tokens.join(','), S.settings.kkVoice || 'hm_omega', speed); } catch (_) {}
+    if (!ok) { clearTimeout(timer); OV.pending.delete(id); rej(new Error('The AI voice is not downloaded')); }
+  });
+}
+// one sentence -> samples; a very long sentence is spoken in comma pieces (the model takes up to 510 sounds)
+async function ovSpeak(text, e) {
+  if (!kkOn()) return ovDecode(await ovSynth(text, e.rate, e.pitch));
+  const ph = kgPhonemes(text); let pieces = [ph];
+  if (kgTokens(ph).length > 480) { pieces = []; let cur = ''; for (const bit of ph.split(/(?<=[,;:])\s+/)) { if (cur && kgTokens(cur + ' ' + bit).length > 480) { pieces.push(cur); cur = bit; } else cur = cur ? cur + ' ' + bit : bit; } if (cur) pieces.push(cur); pieces = pieces.flatMap(x => { const t = []; for (let k = 0; k < x.length; k += 400) t.push(x.slice(k, k + 400)); return t; }); }
+  const out = [];
+  for (const p of pieces) { const tk = kgTokens(p); if (!tk.length) continue; out.push(await ovDecode(await kkSynth(tk, clamp(e.rate, 0.5, 2)))); }
+  if (out.length === 1) return out[0];
+  const gap = Math.round(24000 * 0.15), all = new Float32Array(out.reduce((a, x) => a + x.length + gap, 0)); let t = 0; for (const x of out) { all.set(x, t); t += x.length + gap; }
+  return all;
+}
 (async function boot() {
   sizePreview();
   try { await DB.open(); } catch (_) {}

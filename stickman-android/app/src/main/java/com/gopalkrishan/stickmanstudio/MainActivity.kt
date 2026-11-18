@@ -39,6 +39,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.util.Locale
+import java.util.concurrent.Executors
 import java.io.InputStream
 import java.io.OutputStream
 
@@ -61,6 +62,11 @@ class MainActivity : ComponentActivity() {
     // that work without internet once downloaded). No API key, nothing leaves the phone.
     private var tts: TextToSpeech? = null
     @Volatile private var ttsState = "off"   // off, starting, ready, failed
+
+    // Kokoro AI voice (offline after a one-time model download); one job at a time, off the UI thread
+    private val kokoro by lazy { KokoroVoice(this) }
+    private val kokoroJobs = Executors.newSingleThreadExecutor()
+    @Volatile private var kokoroLoading = false
 
     private var saveStream: OutputStream? = null
     private var saveUri: Uri? = null
@@ -448,6 +454,51 @@ class MainActivity : ComponentActivity() {
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
                 startActivity(Intent.createChooser(send, "Share video"))
+            }
+            return true
+        }
+
+
+        // ---------- Kokoro AI voice ----------
+
+        /** {"ready": bool, "bytes": size on disk, "downloading": bool} */
+        @JavascriptInterface
+        fun kokoroStatus(): String = JSONObject().apply {
+            put("ready", kokoro.ready); put("bytes", kokoro.sizeOnDisk()); put("downloading", kokoroLoading)
+        }.toString()
+
+        /** Downloads the voice model (once); the page gets ssKokoro('progress'|'ready'|'error', a, b). */
+        @JavascriptInterface
+        fun kokoroDownload(): Boolean {
+            if (kokoroLoading) return false
+            kokoroLoading = true
+            kokoroJobs.execute {
+                try {
+                    kokoro.download { done, total -> js("window.ssKokoro && ssKokoro('progress', $done, $total)") }
+                    js("window.ssKokoro && ssKokoro('ready', 0, 0)")
+                } catch (e: Exception) {
+                    js("window.ssKokoro && ssKokoro('error', ${JSONObject.quote(e.message ?: "download failed")}, 0)")
+                } finally { kokoroLoading = false }
+            }
+            return true
+        }
+
+        @JavascriptInterface
+        fun kokoroDelete() { kokoroJobs.execute { kokoro.delete() } }
+
+        /** Speaks model tokens ("12,55,3,...") with a voice; the page gets ssTtsDone(id, ok, base64 WAV or error). */
+        @JavascriptInterface
+        fun kokoroSynth(id: String, tokens: String, voice: String, speed: Float): Boolean {
+            if (!kokoro.ready) return false
+            kokoroJobs.execute {
+                try {
+                    val t = tokens.split(',').filter { it.isNotBlank() }.map { it.trim().toLong() }.toLongArray()
+                    val audio = kokoro.speak(t, voice, speed.coerceIn(0.5f, 2f))
+                    val b64 = Base64.encodeToString(KokoroVoice.wav(audio), Base64.NO_WRAP)
+                    js("ssTtsDone(${JSONObject.quote(id)}, true, '$b64')")
+                } catch (e: Throwable) {
+                    js("ssTtsDone(${JSONObject.quote(id)}, false, ${JSONObject.quote("AI voice: " + (e.message ?: e.javaClass.simpleName))})")
+                }
             }
             return true
         }

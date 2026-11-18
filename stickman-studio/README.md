@@ -40,6 +40,16 @@ a longer video, **Copy script prompt** into ChatGPT / Gemini / Claude (free, no 
 **Use this script**: it goes into the Script tab and the scenes are made. Facts topics always use the prompt, so
 nothing is made up.
 
+## AI voice: Kokoro (Android app, default)
+**Script + Voice → 🎙 Make the voiceover → Voice type: AI voice (Kokoro).** Kokoro is a small open AI voice model
+(Apache-2.0) that runs on the phone with onnxruntime: four Hindi voices (Omega and Psi male, Alpha and Beta female;
+Omega is the default). Download it once (about 120 MB, from the kokoro-onnx GitHub release); after that it works with
+no internet and no API key. The app turns the text into the model's sounds itself: `kokoro-lex.json` holds about
+20 000 common Hindi words and 11 000 English words prepared with espeak-ng, other Hindi words are spelled by rules,
+Hinglish (Roman) words are converted, and numbers become Hindi number words. Pauses, breaths, studio polish and
+the scene sync are the same as for the phone voice. It is much more natural than the phone voice, but still not
+as expressive as Gemini's Puck / Orus.
+
 ## Offline voiceover (Android app)
 **Script + Voice → 🎙 Make the voiceover from the script.** Uses the phone's own text-to-speech (Google speech
 engine, Hindi voice). No API key, no internet once the Hindi voice is downloaded (**Voice settings** → Install voice
