@@ -40,6 +40,13 @@ a longer video, **Copy script prompt** into ChatGPT / Gemini / Claude (free, no 
 **Use this script**: it goes into the Script tab and the scenes are made. Facts topics always use the prompt, so
 nothing is made up.
 
+## Gemini watermark
+Gemini puts a small ✦ sparkle in the bottom-right corner of its images. With **Script + Voice → Gemini watermark:
+Remove automatically** (the default), every new picture (grid image, sticker sheet, single picture, a scene's own
+picture) is checked: if the corner holds a small star-shaped spot, only those pixels are filled in from the pixels
+around them; nothing else changes. **Keep** leaves pictures as they are. The invisible SynthID mark that Google adds
+is not touched.
+
 ## Hindi AI voice: Indic-TTS (Android app, default)
 **Script + Voice → 🎙 Make the voiceover → Voice type: Hindi AI voice (Indic-TTS).** AI4Bharat's Indic-TTS Hindi
 (FastPitch + HiFiGAN, trained only on native Hindi speech, CC-BY-4.0) runs on the phone with onnxruntime. Male is

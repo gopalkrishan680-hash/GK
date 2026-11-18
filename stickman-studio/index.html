@@ -402,6 +402,9 @@ html:not(.mode-layers) .layers-only { display: none !important; }
             <option value="2">2×2 – 4 scenes (better quality)</option>
           </select>
         </label>
+        <label class="f">Gemini watermark
+          <select id="gemMark"><option value="auto">Remove automatically (✦ in the corner)</option><option value="off">Keep</option></select>
+        </label>
       </div>
       <p class="hint grid-only">Next: check the scenes, then open the <b>Image Prompts</b> tab.</p>
       <p class="hint layers-only">Next: check the scenes, then open the <b>Layers</b> tab.</p>
@@ -889,7 +892,7 @@ He looked at Papa. Papa smiled, and said, "I am proud of you."`;
 /* ============ state ============ */
 const DEFAULTS = { title: '', aspect: '16:9', grid: 3, style: 'stickman', styleText: STYLES.stickman.text, characters: '', gutter: 'auto',
   splitLevel: 'all', minWords: 2, maxWords: 14, captions: 'bar', fit: 'auto', enhance: 'on', v: 3, capSize: 1, motion: 6, transition: 'fade', transDur: 0.15, res: 1080, fps: 30, musicVol: 0.12, anim: 'on', animAmt: 1, capWords: 'on', pics: 'images', skStyle: 'chibi', lPer: 9, lLib: 'on',
-  fx: 'on', fxAmt: 1, fxDoodle: 'on', fxSfx: 'on', fxVol: 0.6, ovKind2: 'indic', kkVoice: 'hm_omega', inVoice: 'male', inSpeed: 1, ovVoice: '', ovEngine: '', ovHi: 'auto', ovPolish: 'on', ovBreath2: 'off', kkSpeed: 1.1, kkPause: 0.35, ovRate: 0.95, ovPitch: 1, ovPause: 0.45, ovExpr: 'on', mode: 'layers', lBg: 'parchment', lEnter: 'auto', lTrans: 'cut', lIdle: 'subtle', lCam: 'on', lCaps: 'off', sfx: 'on', sfxVol: 0.5, duck: 'on' };
+  gemMark: 'auto', fx: 'on', fxAmt: 1, fxDoodle: 'on', fxSfx: 'on', fxVol: 0.6, ovKind2: 'indic', kkVoice: 'hm_omega', inVoice: 'male', inSpeed: 1, ovVoice: '', ovEngine: '', ovHi: 'auto', ovPolish: 'on', ovBreath2: 'off', kkSpeed: 1.1, kkPause: 0.35, ovRate: 0.95, ovPitch: 1, ovPause: 0.45, ovExpr: 'on', mode: 'layers', lBg: 'parchment', lEnter: 'auto', lTrans: 'cut', lIdle: 'subtle', lCam: 'on', lCaps: 'off', sfx: 'on', sfxVol: 0.5, duck: 'on' };
 try { if (matchMedia('(pointer: coarse)').matches) DEFAULTS.res = 720; } catch (_) {}   // phones: smaller, faster export
 const S = { settings: { ...DEFAULTS }, script: '', segments: [], starts: [], grids: [], overrides: {}, audioBlob: null, audioName: '', musicBlob: null, musicName: '' };
 let uid = 1;
@@ -1216,6 +1219,7 @@ function renderPrompts() {
   $$('[data-psrc]').forEach(cv => { const r = R.grids[+cv.dataset.psrc]; if (!r || !r.img) return; const sc = Math.min(1, 480 / r.img.width); cv.width = Math.round(r.img.width * sc); cv.height = Math.round(r.img.height * sc); const x = cv.getContext('2d'); x.drawImage(r.img, 0, 0, cv.width, cv.height); x.strokeStyle = '#f5c518'; x.lineWidth = 2; (r.cells || []).forEach(c => x.strokeRect(c.x * sc, c.y * sc, c.w * sc, c.h * sc)); });
 }
 async function placeGrid(gi, blob) {
+  blob = await cleanMark(blob);
   await setGrid(gi, blob); if (!S.grids[gi]) return;
   const b = batches()[gi]; const nx = nextPending(); pasteTarget = nx;
   segmentsChanged(true);
@@ -2596,7 +2600,7 @@ document.addEventListener('click', async e => {
   else if (d.openapp) { if (APP) AndroidBridge.openApp(d.openapp); }
   else if (d.sharelast != null) { if (APP && !AndroidBridge.shareLast()) toast('Still saving, try again in a moment'); }
   else if (d.pick != null) { const gi = +d.pick; const [f] = await pickFile($('#oneFile')); if (f) placeGrid(gi, f); }
-  else if (d.one != null) { const i = +d.one; const [f] = await pickFile($('#oneFile')); if (f) { await setOverride(S.segments[i].id, f); segmentsChanged(true); } }
+  else if (d.one != null) { const i = +d.one; const [f] = await pickFile($('#oneFile')); if (f) { await setOverride(S.segments[i].id, await cleanMark(f)); segmentsChanged(true); } }
   else if (d.oneclear != null) { const id = S.segments[+d.oneclear].id; delete S.overrides[id]; delete R.overrides[id]; segmentsChanged(true); }
 });
 document.addEventListener('change', e => {
@@ -2674,7 +2678,7 @@ $('#dlPrompts').onclick = () => { const bs = batches(); if (!bs.length) return; 
 $('#loadChars').onclick = () => { const ta = $('#characters'); ta.value = (ta.value.trim() ? ta.value.trim() + '\n' : '') + CHANNEL_CHARS; S.settings.characters = ta.value; renderPrompts(); save(); };
 
 /* ============ settings binding ============ */
-const BIND = ['fx', 'fxAmt', 'fxDoodle', 'fxSfx', 'fxVol', 'aspect', 'grid', 'style', 'styleText', 'characters', 'gutter', 'splitLevel', 'minWords', 'maxWords', 'captions', 'fit', 'enhance', 'capSize', 'motion', 'transition', 'transDur', 'res', 'fps', 'musicVol', 'anim', 'animAmt', 'capWords', 'pics', 'skStyle',
+const BIND = ['gemMark', 'fx', 'fxAmt', 'fxDoodle', 'fxSfx', 'fxVol', 'aspect', 'grid', 'style', 'styleText', 'characters', 'gutter', 'splitLevel', 'minWords', 'maxWords', 'captions', 'fit', 'enhance', 'capSize', 'motion', 'transition', 'transDur', 'res', 'fps', 'musicVol', 'anim', 'animAmt', 'capWords', 'pics', 'skStyle',
   'lBg', 'lEnter', 'lTrans', 'lIdle', 'lCam', 'lCaps', 'sfx', 'sfxVol', 'duck', 'lPer', 'lLib'];
 const NUM = new Set(['grid', 'minWords', 'maxWords', 'capSize', 'motion', 'transDur', 'res', 'fps', 'musicVol', 'animAmt', 'sfxVol', 'lPer', 'fxAmt', 'fxVol']);
 function applySettingsToUI() { BIND.forEach(k => { const el = $('#' + k); if (el) el.value = S.settings[k]; }); $('#projTitle').value = S.settings.title || ''; lApplyMode(); }
@@ -3703,6 +3707,7 @@ function lAfterPicture(msg) {
 }
 async function lPlaceSheet(k, blob) {
   const sh = lSheets()[k]; if (!sh) return toast('Make the plan first');
+  blob = await cleanMark(blob);
   let bmp; try { bmp = await createImageBitmap(blob); } catch (_) { return toast('Could not open this image'); }
   const cells = lSplit(bmp, sh.cols, sh.rows, sh.ids.length); try { bmp.close(); } catch (_) {}
   for (let j = 0; j < sh.ids.length; j++) { const a = lAsset(sh.ids[j]); if (!a || !cells[j]) continue; a.raw = await lBlob(cells[j]); await lProcess(a); }
@@ -3710,6 +3715,7 @@ async function lPlaceSheet(k, blob) {
 }
 async function lSetAssetImage(id, blob) {
   const a = lAsset(id); if (!a) return;
+  blob = await cleanMark(blob);
   let bmp; try { bmp = await createImageBitmap(blob); } catch (_) { return toast('Could not open this image'); }
   a.lib = null;
   a.raw = await lBlob(lCrop(bmp, 0, 0, bmp.width, bmp.height)); try { bmp.close(); } catch (_) {}
@@ -5718,6 +5724,71 @@ async function ovSpeak(text, e) {
   const gap = Math.round(24000 * 0.15), all = new Float32Array(out.reduce((a, x) => a + x.length + gap, 0)); let t = 0; for (const x of out) { all.set(x, t); t += x.length + gap; }
   return all;
 }
+/* ============ Gemini watermark: removes the small visible sparkle mark that Gemini puts in the bottom-right corner of its images.
+   The corner is searched for a small, compact star-shaped spot that is lighter (or darker) than its surroundings;
+   if one is found, only those pixels are filled in from the pixels around them. Nothing else in the picture changes. */
+async function cleanGeminiMark(blob) {
+  if (S.settings.gemMark === 'off') return { blob, removed: false };
+  let bmp; try { bmp = await createImageBitmap(blob); } catch (_) { return { blob, removed: false }; }
+  const W = bmp.width, H = bmp.height, bs = Math.round(Math.min(W, H) * 0.14);
+  if (bs < 24) { bmp.close && bmp.close(); return { blob, removed: false }; }
+  const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(bmp, 0, 0); bmp.close && bmp.close();
+  const x0 = W - bs, y0 = H - bs, id = x.getImageData(x0, y0, bs, bs), d = id.data, N = bs * bs;
+  const L = new Float32Array(N), sat = new Float32Array(N);
+  for (let p = 0; p < N; p++) { const o = p * 4, r = d[o], g = d[o + 1], b = d[o + 2]; L[p] = 0.299 * r + 0.587 * g + 0.114 * b; sat[p] = Math.max(r, g, b) - Math.min(r, g, b); }
+  // local background = box blur of the luma (integral image)
+  const rad = Math.max(4, Math.round(bs * 0.12)), I = new Float64Array((bs + 1) * (bs + 1));
+  for (let yy = 0; yy < bs; yy++) { let row = 0; for (let xx = 0; xx < bs; xx++) { row += L[yy * bs + xx]; I[(yy + 1) * (bs + 1) + xx + 1] = I[yy * (bs + 1) + xx + 1] + row; } }
+  const blur = p => { const xx = p % bs, yy = (p / bs) | 0, a = Math.max(0, xx - rad), b = Math.max(0, yy - rad), e = Math.min(bs, xx + rad + 1), f = Math.min(bs, yy + rad + 1); return (I[f * (bs + 1) + e] - I[b * (bs + 1) + e] - I[f * (bs + 1) + a] + I[b * (bs + 1) + a]) / ((e - a) * (f - b)); };
+  const bg = new Float32Array(N); for (let p = 0; p < N; p++) bg[p] = blur(p);
+  const best = (sign) => {
+    const m = new Uint8Array(N); for (let p = 0; p < N; p++) { const dd = (L[p] - bg[p]) * sign; if (dd > 11 && sat[p] < 60) m[p] = 1; }
+    // connected parts; keep a compact star-sized one away from the outer edge
+    const lab = new Int32Array(N), st = new Int32Array(N); let bestC = null, id2 = 0;
+    for (let p0 = 0; p0 < N; p0++) {
+      if (!m[p0] || lab[p0]) continue; id2++; let sp = 0, n = 0, ax = bs, ay = bs, bx = 0, by = 0; st[sp++] = p0; lab[p0] = id2;
+      while (sp) { const p = st[--sp], px = p % bs, py = (p / bs) | 0; n++; if (px < ax) ax = px; if (px > bx) bx = px; if (py < ay) ay = py; if (py > by) by = py;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const qx = px + dx, qy = py + dy; if (qx < 0 || qy < 0 || qx >= bs || qy >= bs) continue; const q = qy * bs + qx; if (m[q] && !lab[q]) { lab[q] = id2; st[sp++] = q; } } }
+      const w = bx - ax + 1, h = by - ay + 1, fill = n / (w * h), asp = w / h;
+      if (w < bs * 0.12 || w > bs * 0.75 || h < bs * 0.12 || h > bs * 0.75) continue;
+      if (asp < 0.7 || asp > 1.4 || fill < 0.18 || fill > 0.75) continue;
+      if (ax < 1 || ay < 1 || bx > bs - 2 || by > bs - 2) continue;     // the mark sits inside the corner, never touching the edges
+      const score = n * (1 - Math.abs(1 - asp));
+      if (!bestC || score > bestC.score) bestC = { id: id2, ax, ay, bx, by, w, h, score };
+    }
+    return bestC ? { ...bestC, lab } : null;
+  };
+  const hit = best(1) || best(-1);
+  if (!hit) return { blob, removed: false };
+  // the mask: the spot itself, grown a little, plus faint pixels of the same glyph inside its box
+  const mask = new Uint8Array(N), grow = Math.max(2, Math.round(hit.w * 0.08));
+  for (let yy = Math.max(0, hit.ay - grow); yy <= Math.min(bs - 1, hit.by + grow); yy++) for (let xx = Math.max(0, hit.ax - grow); xx <= Math.min(bs - 1, hit.bx + grow); xx++) {
+    let near = false; for (let dy = -grow; dy <= grow && !near; dy++) for (let dx = -grow; dx <= grow; dx++) { const qx = xx + dx, qy = yy + dy; if (qx >= 0 && qy >= 0 && qx < bs && qy < bs && hit.lab[qy * bs + qx] === hit.id) { near = true; break; } }
+    const p = yy * bs + xx; if (near || Math.abs(L[p] - bg[p]) > 6) mask[p] = near ? 1 : (xx > hit.ax && xx < hit.bx && yy > hit.ay && yy < hit.by ? 1 : 0);
+  }
+  // fill the mask from the outside in (each pixel = mean of its known neighbours)
+  let todo = 0; for (let p = 0; p < N; p++) if (mask[p]) todo++;
+  for (let pass = 0; todo > 0 && pass < bs; pass++) {
+    const fillNow = [];
+    for (let p = 0; p < N; p++) {
+      if (!mask[p]) continue; const px = p % bs, py = (p / bs) | 0; let r = 0, g = 0, b = 0, k = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; const qx = px + dx, qy = py + dy; if (qx < 0 || qy < 0 || qx >= bs || qy >= bs) continue; const q = qy * bs + qx; if (mask[q]) continue; r += d[q * 4]; g += d[q * 4 + 1]; b += d[q * 4 + 2]; k++; }
+      if (k >= 2) fillNow.push([p, r / k, g / k, b / k]);
+    }
+    if (!fillNow.length) break;
+    for (const [p, r, g, b] of fillNow) { d[p * 4] = r; d[p * 4 + 1] = g; d[p * 4 + 2] = b; mask[p] = 0; todo--; }
+  }
+  x.putImageData(id, x0, y0);
+  const type = /png/.test(blob.type) ? 'image/png' : 'image/jpeg';
+  const out = await new Promise(res => c.toBlob(res, type, 0.95));
+  return { blob: out || blob, removed: true, box: { x: x0 + hit.ax, y: y0 + hit.ay, w: hit.w, h: hit.h } };
+}
+
+// used by every place a new picture comes in; a picture without the mark comes back unchanged
+async function cleanMark(blob) {
+  try { const r = await cleanGeminiMark(blob); if (r.removed) toast('Gemini ✦ mark removed from the corner'); return r.blob || blob; } catch (_) { return blob; }
+}
+
 (async function boot() {
   sizePreview();
   try { await DB.open(); } catch (_) {}
