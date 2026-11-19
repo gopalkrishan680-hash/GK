@@ -39,6 +39,7 @@ export const SIZES = [
   ["🖥️ Wide 16:9", 768, 448],
   ["🏞️ Landscape 3:2", 768, 512],
   ["🎞️ Landscape 4:3", 704, 512],
+  ["🔹 Small 1:1 (less memory)", 384, 384],
 ];
 
 const pick = (a) => a[Math.floor(Math.random() * a.length)];

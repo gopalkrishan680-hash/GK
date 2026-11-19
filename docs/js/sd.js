@@ -99,14 +99,45 @@ export async function downloadFile(f, onProgress, signal) {
   await putMeta(cache, f, { chunks: idx, done: true, size: loaded });
 }
 
+// Memory: reading 1.7 GB from Cache Storage leaves big temporary copies behind until the garbage
+// collector runs, and on phones Android kills Chrome before that happens. So the file is assembled
+// in a short-lived Worker (terminating it frees its temporary memory at once), and after the weights
+// are on the GPU the buffer is handed to another Worker that is terminated, freeing it instantly.
+const WORKER_URL = new URL("./load-worker.js", import.meta.url);
+
+function runWorker(msg, transfer = []) {
+  return new Promise((resolve, reject) => {
+    let w;
+    try { w = new Worker(WORKER_URL); } catch (e) { reject(e); return; }
+    w.onmessage = (e) => { w.terminate(); e.data.ok ? resolve(e.data) : reject(new Error(e.data.error)); };
+    w.onerror = (e) => { w.terminate(); reject(new Error(e.message || "worker error")); };
+    w.postMessage(msg, transfer);
+  });
+}
+
+export function freeNow(u8) {
+  if (!u8?.buffer || u8.buffer.detached || typeof Worker === "undefined") return;
+  runWorker({ mode: "free" }, [u8.buffer]).catch(() => {});
+}
+
 async function loadBytes(f) {
   const cache = await caches.open(CACHE);
   const m = await getMeta(cache, f);
   if (!m.done) throw new Error(`${f.label} is not downloaded yet.`);
+  const keys = Array.from({ length: m.chunks }, (_, i) => chunkKey(f, i));
+  if (typeof Worker !== "undefined") {
+    try {
+      const r = await runWorker({ cacheName: CACHE, keys, size: m.size });
+      return new Uint8Array(r.buffer);
+    } catch (e) {
+      if (/missing chunk|size mismatch/.test(e.message)) throw new Error(`${f.label} is damaged. Delete the model and download again.`);
+      console.warn("Worker loading failed, loading on the page", e);
+    }
+  }
   const out = new Uint8Array(m.size);
   let pos = 0;
-  for (let i = 0; i < m.chunks; i++) {
-    const r = await cache.match(chunkKey(f, i));
+  for (const k of keys) {
+    const r = await cache.match(k);
     if (!r) throw new Error(`${f.label} is damaged. Delete the model and download again.`);
     const b = new Uint8Array(await r.arrayBuffer());
     out.set(b, pos); pos += b.length;
@@ -232,6 +263,7 @@ export class Engine {
       console.warn("External-data loading failed, loading normally", e);
       s = await this.ort.InferenceSession.create(bytes, opts);
     }
+    freeNow(bytes); // weights are on the GPU now; free the 1.7 GB copy immediately
     bytes = null;
     this.sessions[key] = s;
     return s;
