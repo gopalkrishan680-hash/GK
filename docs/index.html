@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GK Image Studio</title>
+<meta name="description" content="Offline AI image generator that runs on your phone or PC (WebGPU).">
+<meta name="theme-color" content="#14121a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<style>
+:root{
+  --bg:#f6f4f1; --surface:#ffffff; --surface2:#efebe6; --text:#1d1b20; --muted:#6b6670; --line:#e2ddd6;
+  --accent:#ea6a1f; --accent-ink:#ffffff; --accent-soft:#fde6d6; --ok:#1f8a4c; --warn:#b26a00; --err:#c62828;
+  --radius:14px; --shadow:0 1px 2px rgba(0,0,0,.06),0 4px 14px rgba(0,0,0,.05);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#14121a; --surface:#1e1b25; --surface2:#2a2632; --text:#f2eff5; --muted:#a59fae; --line:#353040;
+    --accent:#ff8a3d; --accent-ink:#1a0e05; --accent-soft:#3a2516; --ok:#4cc483; --warn:#f0b04a; --err:#ff6b6b;
+    --shadow:none;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#14121a; --surface:#1e1b25; --surface2:#2a2632; --text:#f2eff5; --muted:#a59fae; --line:#353040;
+  --accent:#ff8a3d; --accent-ink:#1a0e05; --accent-soft:#3a2516; --ok:#4cc483; --warn:#f0b04a; --err:#ff6b6b;
+  --shadow:none;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  padding-bottom:calc(72px + env(safe-area-inset-bottom));-webkit-tap-highlight-color:transparent}
+header{position:sticky;top:0;z-index:5;background:var(--bg);padding:12px 16px 8px;display:flex;align-items:center;gap:10px;
+  border-bottom:1px solid var(--line)}
+header h1{font-size:18px;margin:0;flex:1;letter-spacing:.2px}
+header h1 span{color:var(--accent)}
+.chip{font-size:12px;padding:4px 10px;border-radius:999px;background:var(--surface2);color:var(--muted);white-space:nowrap}
+.chip.ok{color:var(--ok)} .chip.warn{color:var(--warn)}
+main{max-width:760px;margin:0 auto;padding:12px 16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:12px;box-shadow:var(--shadow)}
+.card h2{font-size:15px;margin:0 0 8px}
+label.lbl{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:10px 0 6px}
+textarea,input[type=number],input[type=text],select{width:100%;font:inherit;color:var(--text);background:var(--surface2);
+  border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+textarea{min-height:92px;resize:vertical}
+textarea:focus,input:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row>*{flex:1}
+button{font:inherit;white-space:nowrap;cursor:pointer;border:1px solid var(--line);background:var(--surface2);color:var(--text);
+  border-radius:10px;padding:9px 12px;min-height:40px}
+button:active{transform:scale(.98)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent;font-weight:700}
+button.big{width:100%;min-height:54px;font-size:17px;margin-top:12px}
+button.ghost{background:transparent}
+button.danger{color:var(--err)}
+button:disabled{opacity:.5;cursor:not-allowed}
+.scroller{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.scroller::-webkit-scrollbar{display:none}
+.pill{flex:0 0 auto;border-radius:999px;padding:7px 12px;min-height:36px;font-size:14px}
+.pill.on{background:var(--accent-soft);border-color:var(--accent);color:var(--text);font-weight:600}
+.seg{display:flex;background:var(--surface2);border-radius:10px;padding:3px;gap:3px}
+.seg button{flex:1;border:none;background:transparent;min-height:36px;font-size:14px}
+.seg button.on{background:var(--surface);box-shadow:var(--shadow);font-weight:700;color:var(--accent)}
+.muted{color:var(--muted);font-size:13px}
+.status{margin-top:10px;font-size:14px;min-height:20px}
+.bar{height:8px;background:var(--surface2);border-radius:99px;overflow:hidden;margin:6px 0}
+.bar>i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+@media (min-width:600px){.grid{grid-template-columns:repeat(3,1fr)}}
+.grid img{width:100%;border-radius:10px;display:block;background:var(--surface2);aspect-ratio:1/1;object-fit:cover;cursor:pointer}
+.result img{width:100%;border-radius:12px;display:block}
+.files .f{margin:10px 0}
+.files .f b{font-weight:600}
+details summary{cursor:pointer;font-weight:600;padding:4px 0}
+.check{display:flex;align-items:center;gap:10px;margin:10px 0}
+.check input{width:20px;height:20px;accent-color:var(--accent)}
+nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--line);display:flex;
+  padding:6px 8px calc(6px + env(safe-area-inset-bottom));z-index:6}
+nav button{flex:1;border:none;background:transparent;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:12px;color:var(--muted)}
+nav button span{font-size:20px}
+nav button.on{color:var(--accent);font-weight:700}
+.view{display:none}.view.on{display:block}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:20;display:none;flex-direction:column;padding:16px;
+  padding-top:calc(16px + env(safe-area-inset-top))}
+.modal.on{display:flex}
+.modal img{max-width:100%;max-height:62vh;object-fit:contain;margin:auto;border-radius:10px}
+.modal .meta{color:#ddd;font-size:13px;margin:10px 0;max-height:18vh;overflow:auto;word-break:break-word}
+.modal .row button{background:#2a2632;color:#fff;border-color:#444}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));background:#222;color:#fff;
+  padding:10px 16px;border-radius:10px;font-size:14px;z-index:30;opacity:0;transition:opacity .25s;pointer-events:none;max-width:90vw}
+.toast.on{opacity:1}
+.thumb-in{width:96px;height:96px;object-fit:cover;border-radius:10px;display:none}
+.hidden{display:none!important}
+input[type=range]{width:100%;accent-color:var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎨 GK <span>Image Studio</span></h1>
+  <span id="netChip" class="chip">…</span>
+  <button id="installBtn" class="hidden pill">⬇ Install</button>
+</header>
+
+<main>
+  <!-- ============ CREATE ============ -->
+  <section id="v-create" class="view on">
+    <div id="capCard" class="card hidden" style="border-color:var(--err)">
+      <h2>⚠️ This device can't run the AI model</h2>
+      <p id="capReason" class="muted"></p>
+    </div>
+    <div id="setupCard" class="card hidden">
+      <h2>One-time setup: download the AI model</h2>
+      <p class="muted">About <b>2.5 GB</b>. Use WiFi. After this the app works <b>without internet</b>.
+        If the download stops, just tap the button again — it continues from where it stopped.</p>
+      <button id="setupBtn" class="primary big">⬇ Download model (2.5 GB)</button>
+      <div id="setupProg" class="status"></div>
+    </div>
+
+    <div class="card">
+      <label class="lbl" for="prompt">Prompt — describe the image you want</label>
+      <textarea id="prompt" placeholder="a royal bengal tiger walking in a misty jungle at sunrise"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button id="enhanceBtn">✨ Enhance</button>
+        <button id="surpriseBtn">🎲 Surprise</button>
+        <button id="clearBtn" class="ghost">Clear</button>
+      </div>
+
+      <label class="lbl">Style</label>
+      <div id="styles" class="scroller"></div>
+
+      <label class="lbl">Size</label>
+      <div id="sizes" class="scroller"></div>
+
+      <label class="lbl">Quality</label>
+      <div id="quality" class="seg">
+        <button data-steps="1" class="on">⚡ Fast</button>
+        <button data-steps="2">Balanced</button>
+        <button data-steps="4">✨ Best</button>
+      </div>
+
+      <div class="row" style="margin-top:4px">
+        <div>
+          <label class="lbl" for="count">Images</label>
+          <select id="count"><option>1</option><option>2</option><option>3</option><option>4</option></select>
+        </div>
+        <div>
+          <label class="lbl" for="seed">Seed (empty = random)</label>
+          <div class="row"><input id="seed" type="number" inputmode="numeric" placeholder="random"><button id="seedBtn" style="flex:0 0 46px">🎲</button></div>
+        </div>
+      </div>
+
+      <details style="margin-top:10px">
+        <summary>🖌️ Start from a photo (Image → Image)</summary>
+        <p class="muted">Your photo is redrawn in the style of your prompt.</p>
+        <div class="row" style="align-items:center">
+          <img id="initThumb" class="thumb-in" alt="">
+          <input id="initFile" type="file" accept="image/*">
+        </div>
+        <button id="initClear" class="ghost hidden" style="margin-top:6px">Remove photo</button>
+        <label class="lbl" for="strength">Change amount: <span id="strengthVal">60%</span></label>
+        <input id="strength" type="range" min="25" max="100" step="5" value="60">
+      </details>
+
+      <button id="genBtn" class="primary big">🎨 Generate</button>
+      <button id="stopBtn" class="big hidden">⏹ Stop</button>
+      <div class="bar"><i id="genBar"></i></div>
+      <div id="status" class="status muted">Write a prompt and tap Generate.</div>
+    </div>
+
+    <div id="results" class="grid"></div>
+  </section>
+
+  <!-- ============ HISTORY ============ -->
+  <section id="v-history" class="view">
+    <div class="card">
+      <div class="row" style="align-items:center">
+        <h2 style="margin:0">History</h2>
+        <button id="clearHist" class="ghost danger" style="flex:0 0 auto">Delete all</button>
+      </div>
+      <p class="muted">Saved only on this device.</p>
+    </div>
+    <div id="history" class="grid"></div>
+    <p id="histEmpty" class="muted" style="text-align:center">No images yet.</p>
+  </section>
+
+  <!-- ============ SETTINGS ============ -->
+  <section id="v-settings" class="view">
+    <div class="card">
+      <h2>AI model</h2>
+      <div id="files" class="files"></div>
+      <div class="row">
+        <button id="dlBtn" class="primary">⬇ Download / resume</button>
+        <button id="delBtn" class="danger">Delete model</button>
+      </div>
+      <p id="storage" class="muted"></p>
+    </div>
+    <div class="card">
+      <h2>Performance</h2>
+      <label class="check"><input id="lowMem" type="checkbox"> Low-memory mode (recommended on phones)</label>
+      <p class="muted" id="engineInfo"></p>
+    </div>
+    <div class="card">
+      <h2>Appearance</h2>
+      <div id="theme" class="seg">
+        <button data-theme="auto" class="on">Auto</button><button data-theme="light">Light</button><button data-theme="dark">Dark</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>About</h2>
+      <p class="muted">Model: SD-Turbo (Stability AI, non-commercial research license) running locally with ONNX Runtime Web.
+        Your prompts and images never leave your device.</p>
+    </div>
+  </section>
+</main>
+
+<nav>
+  <button data-view="create" class="on"><span>🎨</span>Create</button>
+  <button data-view="history"><span>🖼️</span>History</button>
+  <button data-view="settings"><span>⚙️</span>Settings</button>
+</nav>
+
+<div id="modal" class="modal">
+  <img id="mImg" alt="">
+  <div id="mMeta" class="meta"></div>
+  <div class="row">
+    <button id="mSave">⬇ Save</button>
+    <button id="mShare">↗ Share</button>
+    <button id="mUse">🖌️ Use as photo</button>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <button id="mReuse">♻️ Reuse settings</button>
+    <button id="mDel" class="danger">Delete</button>
+    <button id="mClose">Close</button>
+  </div>
+</div>
+<div id="toast" class="toast"></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -25,6 +25,11 @@ key, no per-image cost, no limits. Internet is needed **only once**, to install 
 | 📱 **Use from your phone** | `run.bat --listen` → open it in a phone browser on the same WiFi |
 | 🖥️ **Auto hardware detection** | NVIDIA GPU / Apple M-series / CPU; memory-saver mode on low-VRAM GPUs |
 
+## 📱 Phone version
+
+There is also a browser version that runs on a phone's GPU (Chrome + WebGPU), in the `docs/` folder
+of this repository. See [`docs/README.md`](../docs/README.md).
+
 ## 💻 System requirements
 
 | Your computer | What runs | Time per image (approx.) |
