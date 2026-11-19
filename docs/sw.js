@@ -1,8 +1,8 @@
 // Keeps the app itself (HTML/JS/engine) available offline. Models are cached separately by js/sd.js.
-const VERSION = "gk-app-v2";
+const VERSION = "gk-app-v3";
 const FILES = [
   "./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png",
-  "js/app.js", "js/sd.js", "js/styles.js", "js/db.js", "js/tokenizer.js",
+  "js/app.js", "js/sd.js", "js/styles.js", "js/db.js", "js/tokenizer.js", "js/onnx-external.js",
   "vendor/ort/ort.all.min.mjs", "vendor/ort/ort-wasm-simd-threaded.jsep.mjs",
   "vendor/ort/ort-wasm-simd-threaded.jsep.wasm",
   "model/tokenizer/vocab.json", "model/tokenizer/merges.txt",

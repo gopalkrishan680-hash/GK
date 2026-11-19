@@ -3,6 +3,7 @@
 // so everything works offline afterwards.
 import * as ort from "../vendor/ort/ort.all.min.mjs";
 import { ClipTokenizer } from "./tokenizer.js";
+import { externalizeModel } from "./onnx-external.js";
 
 ort.env.wasm.wasmPaths = new URL("../vendor/ort/", import.meta.url).href;
 ort.env.wasm.numThreads = globalThis.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 2) : 1;
@@ -216,9 +217,21 @@ export class Engine {
     const f = MODEL_FILES.find((x) => x.key === key);
     log?.(`Loading ${f.label}…`);
     let bytes = await loadBytes(f);
-    const s = await this.ort.InferenceSession.create(bytes, {
+    // Low-RAM loading: weights stay in one buffer and go straight to the GPU (see onnx-external.js)
+    const opts = {
       executionProviders: [this.backend], graphOptimizationLevel: "all",
-    });
+      enableMemPattern: false, enableCpuMemArena: false,
+      extra: { session: { disable_prepacking: "1", use_device_allocator_for_initializers: "1" } },
+    };
+    let s;
+    try {
+      const { graph } = externalizeModel(bytes, "weights.bin");
+      s = await this.ort.InferenceSession.create(graph, { ...opts, externalData: [{ path: "weights.bin", data: bytes }] });
+    } catch (e) {
+      if (/memory|alloc/i.test(String(e?.message))) throw e;
+      console.warn("External-data loading failed, loading normally", e);
+      s = await this.ort.InferenceSession.create(bytes, opts);
+    }
     bytes = null;
     this.sessions[key] = s;
     return s;
