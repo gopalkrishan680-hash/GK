@@ -2,8 +2,7 @@
     <string name="app_name">Dot Launcher</string>
     <string name="settings">Settings</string>
     <string name="search_hint">Search apps</string>
-    <string name="lock_service_label">Dot Launcher – double tap to lock</string>
-    <string name="lock_service_desc">Lets you double-tap the home screen to lock it. This service does not read any of your data.</string>
+    <string name="lock_admin_desc">Only used to lock the screen when you double-tap the home screen. Dot Launcher cannot see or change anything else.</string>
     <string name="widget_clock">Dot Clock</string>
     <string name="widget_date">Dot Date</string>
 </resources>

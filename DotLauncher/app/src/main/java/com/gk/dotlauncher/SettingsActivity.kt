@@ -52,7 +52,7 @@ class SettingsActivity : Activity() {
             setTextColor(Palette.TEXT)
         })
         list.addView(TextView(this).apply {
-            text = "Dot Launcher v1.0"
+            text = "Dot Launcher v1.1"
             typeface = Fonts.mono(context); textSize = 11f; setTextColor(Palette.DIM)
         })
 
@@ -87,10 +87,14 @@ class SettingsActivity : Activity() {
         action("Hidden apps", "${prefs.hidden.size} hidden") { hiddenApps() }
 
         section("Gestures")
-        toggle("Double-tap to lock", "Needs the accessibility service", prefs.doubleTapLock) { prefs.doubleTapLock = it }
+        toggle("Double-tap to lock", "Needs screen lock permission", prefs.doubleTapLock) { prefs.doubleTapLock = it }
         toggle("Swipe down = notifications", null, prefs.swipeDownNotifications) { prefs.swipeDownNotifications = it }
-        action("Accessibility service", if (LockService.instance != null) "ON ●" else "OFF — tap to enable") {
-            open(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        if (ScreenLock.isEnabled(this)) {
+            action("Screen lock permission", "ON ● — tap to turn off (do this before uninstalling)") {
+                ScreenLock.disable(this); list.postDelayed({ build() }, 300)
+            }
+        } else {
+            action("Screen lock permission", "OFF — tap to allow") { open(ScreenLock.requestIntent(this)) }
         }
 
         section("Home widgets")

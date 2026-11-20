@@ -544,18 +544,17 @@ class MainActivity : Activity() {
 
     private fun doubleTapLock() {
         if (!prefs.doubleTapLock) return
-        if (LockService.lock()) return
+        if (ScreenLock.lock(this)) return
         AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
             .setTitle("Double-tap to lock")
-            .setMessage("To lock the screen, turn on the \"Dot Launcher\" service in Accessibility settings. The service does not read any of your data.")
-            .setPositiveButton("Open settings") { _, _ -> safeStart(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+            .setMessage("Allow Dot Launcher to lock the screen. It can only lock the screen, nothing else.\n\nNote: after a double-tap lock, Android asks for your PIN once instead of fingerprint.")
+            .setPositiveButton("Allow") { _, _ -> safeStart(ScreenLock.requestIntent(this)) }
             .setNegativeButton("Feature off") { _, _ -> prefs.doubleTapLock = false }
             .show()
     }
 
     @SuppressLint("WrongConstant", "PrivateApi")
     private fun expandNotifications() {
-        if (LockService.notifications()) return
         runCatching {
             val sbm = getSystemService("statusbar")
             Class.forName("android.app.StatusBarManager").getMethod("expandNotificationsPanel").invoke(sbm)

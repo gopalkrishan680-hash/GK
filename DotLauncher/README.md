@@ -5,7 +5,7 @@ Nothing-phone jaisa minimal, dot-matrix style Android launcher. Kaala background
 ![Home](screenshots/home.png)
 
 ## Install
-1. `release/DotLauncher-v1.0.apk` phone me download karo aur install karo ("Unknown sources" allow karna padega).
+1. `release/DotLauncher-v1.1.apk` phone me download karo aur install karo ("Unknown sources" allow karna padega).
 2. Home button dabao → **Dot Launcher** chuno → "Always".
    (Ya app ke Settings → *Set as default launcher*.)
 
@@ -33,7 +33,7 @@ Nothing-phone jaisa minimal, dot-matrix style Android launcher. Kaala background
 **Aur**
 - Monochrome icons (Android 13+ themed icons, warna grayscale)
 - Dock: max 5 apps (pehli baar Phone/Messages/Browser/Camera)
-- Double-tap = screen lock (Accessibility service ON karni hogi, koi data nahi padhti)
+- Double-tap = screen lock (pehli baar "Allow" dabana hoga — sirf screen lock ki permission. Uninstall se pehle Settings me ise OFF karein)
 - Neeche swipe = notifications
 - Accent color: Red / White / Yellow / Green / Blue
 - 24h clock, seconds, drawer columns (3–6), app names, haptics, hidden apps
