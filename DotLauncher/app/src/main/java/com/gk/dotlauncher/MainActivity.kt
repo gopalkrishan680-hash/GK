@@ -325,7 +325,7 @@ class MainActivity : Activity() {
 
         if (column.childCount == 0) {
             column.addView(TextView(this).apply {
-                text = "Long-press karke widget add karein"
+                text = "Long-press to add a widget"
                 typeface = Fonts.mono(context); setTextColor(Palette.DIM); gravity = Gravity.CENTER
             }, LinearLayout.LayoutParams(-1, dp(200)))
         }
@@ -459,7 +459,7 @@ class MainActivity : Activity() {
             prefs.recordLaunch(app.key)
             if (drawerOpen) v.postDelayed({ closeDrawer(animate = false) }, 350)
         } catch (e: Exception) {
-            Toast.makeText(this, "App nahi khul paya", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Couldn't open the app", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -483,7 +483,7 @@ class MainActivity : Activity() {
                 menu.add("Remove from dock").setOnMenuItemClickListener { prefs.dock = dockList - app.key; buildDock(); true }
             } else {
                 menu.add("Add to dock").setOnMenuItemClickListener {
-                    if (dockList.size >= 5) Toast.makeText(this@MainActivity, "Dock me max 5 apps", Toast.LENGTH_SHORT).show()
+                    if (dockList.size >= 5) Toast.makeText(this@MainActivity, "The dock holds up to 5 apps", Toast.LENGTH_SHORT).show()
                     else { prefs.dock = dockList + app.key; buildDock() }
                     true
                 }
@@ -496,7 +496,7 @@ class MainActivity : Activity() {
                 prefs.dock = dockList - app.key
                 lastSettingsStamp = settingsStamp()
                 applyFilter(); buildDock()
-                Toast.makeText(this@MainActivity, "${app.label} hidden (Settings se wapas la sakte ho)", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, "${app.label} hidden. You can unhide it in Settings.", Toast.LENGTH_SHORT).show()
                 true
             }
             menu.add("Uninstall").setOnMenuItemClickListener {
@@ -547,7 +547,7 @@ class MainActivity : Activity() {
         if (LockService.lock()) return
         AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
             .setTitle("Double-tap to lock")
-            .setMessage("Screen lock karne ke liye Accessibility me \"Dot Launcher\" service ON karni hogi. Ye service koi data nahi padhti.")
+            .setMessage("To lock the screen, turn on the \"Dot Launcher\" service in Accessibility settings. The service does not read any of your data.")
             .setPositiveButton("Open settings") { _, _ -> safeStart(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
             .setNegativeButton("Feature off") { _, _ -> prefs.doubleTapLock = false }
             .show()
@@ -584,7 +584,7 @@ class MainActivity : Activity() {
     private fun safeStart(i: Intent): Boolean = try {
         startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); true
     } catch (e: Exception) {
-        Toast.makeText(this, "Koi app nahi mila", Toast.LENGTH_SHORT).show(); false
+        Toast.makeText(this, "No app found to handle this", Toast.LENGTH_SHORT).show(); false
     }
 
     // ------------------------------------------------------------------ System widget picker

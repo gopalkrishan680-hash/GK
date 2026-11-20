@@ -30,7 +30,7 @@ class TorchCard(context: Context) : DotCard(context, "torch") {
         setOnClickListener {
             val id = camId
             if (id == null) {
-                Toast.makeText(context, "Is phone me flash nahi mila", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "No flashlight found on this phone", Toast.LENGTH_SHORT).show()
             } else {
                 runCatching { cm.setTorchMode(id, !on) }
                 buzz()

@@ -57,13 +57,13 @@ class SettingsActivity : Activity() {
         })
 
         section("General")
-        action("Set as default launcher", "Home button par yahi launcher khule") {
+        action("Set as default launcher", "Open this launcher when you press Home") {
             open(Intent(Settings.ACTION_HOME_SETTINGS))
         }
-        action("Wallpaper", "System wallpaper badlein") {
+        action("Wallpaper", "Change the system wallpaper") {
             open(Intent.createChooser(Intent(Intent.ACTION_SET_WALLPAPER), "Wallpaper"))
         }
-        toggle("Dot grid wallpaper", "Kaala background + dots. Off = system wallpaper", prefs.dotWallpaper) { prefs.dotWallpaper = it }
+        toggle("Dot grid wallpaper", "Black background with dots. Off shows the system wallpaper", prefs.dotWallpaper) { prefs.dotWallpaper = it }
         action("Accent color", Prefs.ACCENTS[prefs.accentIndex].first) {
             val names = Prefs.ACCENTS.map { it.first }.toTypedArray()
             dialog().setTitle("Accent color").setSingleChoiceItems(names, prefs.accentIndex) { d, w ->
@@ -74,20 +74,20 @@ class SettingsActivity : Activity() {
 
         section("Clock")
         toggle("24-hour time", null, prefs.use24h) { prefs.use24h = it }
-        toggle("Show seconds", "Clock me seconds ki dot line", prefs.showSeconds) { prefs.showSeconds = it }
+        toggle("Show seconds", "Seconds dot line in the clock", prefs.showSeconds) { prefs.showSeconds = it }
 
         section("Apps & icons")
-        toggle("Monochrome icons", "Minimal safed/kaale icons", prefs.monoIcons) { prefs.monoIcons = it }
+        toggle("Monochrome icons", "Minimal black & white icons", prefs.monoIcons) { prefs.monoIcons = it }
         toggle("Show app names", null, prefs.showLabels) { prefs.showLabels = it }
         action("Drawer columns", "${prefs.drawerColumns}") {
             prefs.drawerColumns = if (prefs.drawerColumns >= 6) 3 else prefs.drawerColumns + 1
             build()
         }
-        toggle("Keyboard auto-open", "Drawer kholte hi search", prefs.autoKeyboard) { prefs.autoKeyboard = it }
+        toggle("Keyboard auto-open", "Focus search when the drawer opens", prefs.autoKeyboard) { prefs.autoKeyboard = it }
         action("Hidden apps", "${prefs.hidden.size} hidden") { hiddenApps() }
 
         section("Gestures")
-        toggle("Double-tap to lock", "Accessibility service chahiye", prefs.doubleTapLock) { prefs.doubleTapLock = it }
+        toggle("Double-tap to lock", "Needs the accessibility service", prefs.doubleTapLock) { prefs.doubleTapLock = it }
         toggle("Swipe down = notifications", null, prefs.swipeDownNotifications) { prefs.swipeDownNotifications = it }
         action("Accessibility service", if (LockService.instance != null) "ON ●" else "OFF — tap to enable") {
             open(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
@@ -98,8 +98,8 @@ class SettingsActivity : Activity() {
             toggle(name, null, prefs.isCardEnabled(key)) { prefs.setCardEnabled(key, it) }
         }
         list.addView(TextView(this).apply {
-            text = "Tip: Home par khaali jagah long-press karke Android widgets bhi add kar sakte hain. " +
-                "Dot Clock / Dot Date widgets dusre launchers me bhi milenge."
+            text = "Tip: long-press an empty spot on the home screen to add Android widgets. " +
+                "The Dot Clock and Dot Date widgets also work in other launchers."
             typeface = Fonts.mono(context); textSize = 11f; setTextColor(Palette.DIM)
             setPadding(0, dp(16), 0, 0)
         })
@@ -156,7 +156,7 @@ class SettingsActivity : Activity() {
     private fun hiddenApps() {
         val hidden = prefs.hidden.toList()
         if (hidden.isEmpty()) {
-            Toast.makeText(this, "Koi app hidden nahi hai. Drawer me app long-press → Hide app", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "No hidden apps. Long-press an app in the drawer → Hide app", Toast.LENGTH_LONG).show()
             return
         }
         val la = getSystemService(LAUNCHER_APPS_SERVICE) as LauncherApps
@@ -168,7 +168,7 @@ class SettingsActivity : Activity() {
         }
         val names = hidden.map { labels[it] ?: it.substringBefore('/') }.toTypedArray()
         val checked = BooleanArray(hidden.size) { true }
-        dialog().setTitle("Hidden apps (untick = wapas dikhao)")
+        dialog().setTitle("Hidden apps (untick to show again)")
             .setMultiChoiceItems(names, checked) { _, w, c -> checked[w] = c }
             .setPositiveButton("Save") { _, _ ->
                 prefs.hidden = hidden.filterIndexed { i, _ -> checked[i] }.toSet(); build()
@@ -181,7 +181,7 @@ class SettingsActivity : Activity() {
 
     private fun open(i: Intent) {
         try { startActivity(i) } catch (e: Exception) {
-            Toast.makeText(this, "Ye setting is phone par nahi mili", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "This setting isn't available on this phone", Toast.LENGTH_SHORT).show()
         }
     }
 
