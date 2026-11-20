@@ -280,7 +280,7 @@ html:not(.mode-layers) .layers-only { display: none !important; }
   <div class="cols">
     <div class="panel">
       <label class="f" for="script">Script (Hindi / Hinglish / English)</label>
-      <textarea id="script" spellcheck="false"></textarea>
+      <textarea id="script" spellcheck="false" placeholder="Paste or write your script here, then press Create scenes."></textarea>
       <div class="row">
         <label class="f">Split at
           <select id="splitLevel">
@@ -738,10 +738,8 @@ const CHANNEL_CHARS = `Rohan (hero): black silhouette, plain round head with NO 
 Maa (mother): hair tied in a bun at the back, saree pallu over the shoulder, warm golden glow
 Papa (father): glasses, short flat hair, slightly bigger body, cream glow
 Aman (best friend): spiky hair with 5 sharp spikes, warm yellow glow`;
-const SAMPLE = `It was Rohan's result day. Since morning his heart had been racing, and his hands had gone cold.
-Papa was quietly reading the newspaper, but his eyes kept drifting to the phone.
-Then the phone rang. Rohan opened the result with shaking hands, and the screen said, *58 percent*.
-He looked at Papa. Papa smiled, and said, "I am proud of you."`;
+// older versions opened with an example story ("Rohan's result day"); a project that is still only that example opens empty
+const isOldSample = p => /^It was Rohan's result day\./.test(String(p.script || '').trim()) && !p.audioBlob && !(p.grids || []).some(Boolean) && !Object.keys(p.overrides || {}).length;
 
 /* ============ state ============ */
 const DEFAULTS = { title: '', aspect: '16:9', grid: 3, style: 'stickman', styleText: STYLES.stickman.text, characters: '', gutter: 'auto',
@@ -4551,11 +4549,11 @@ async function cleanMark(blob) {
   await loadVP(); $('#lGemKey').value = VP.gemKey || ''; $('#ytGemKey').value = VP.gemKey || '';
   await libLoad();
   let p = null; try { p = await DB.get('project'); } catch (_) {}
+  if (p && isOldSample(p)) p = { ...p, script: '', segments: [], starts: [], tts: null, yt: null, autoMusic: null, layers: null };
   if (p && (p.script || (p.segments && p.segments.length))) await restore(p);
   else {
-    S.script = SAMPLE; $('#script').value = SAMPLE; applySettingsToUI();
-    setSegmentsFromTexts(splitScript(SAMPLE, 'all', 2, 14));
-    $('#splitInfo').textContent = 'This is an example script. Paste your own and press "Create scenes".';
+    await restore({ settings: { ...DEFAULTS, ...((p && p.settings) || {}) }, script: '', segments: [], starts: [], grids: [], overrides: {} });
+    $('#splitInfo').textContent = 'Paste your script and press "Create scenes".';
   }
   let tab = 'script'; try { tab = localStorage.getItem('ss-tab') || 'script'; } catch (_) {}
   showTab(tab);
