@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/card_bg"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="12dp">
+    <TextClock
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:fontFamily="@font/doto"
+        android:format12Hour="hh:mm"
+        android:format24Hour="HH:mm"
+        android:textColor="@color/text"
+        android:textSize="64sp" />
+    <TextClock
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:fontFamily="@font/space_mono"
+        android:format12Hour="EEE, dd MMM"
+        android:format24Hour="EEE, dd MMM"
+        android:letterSpacing="0.1"
+        android:textAllCaps="true"
+        android:textColor="@color/accent"
+        android:textSize="13sp" />
+</LinearLayout>

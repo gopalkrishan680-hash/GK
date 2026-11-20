@@ -1,0 +1,9 @@
+<resources>
+    <color name="bg">#000000</color>
+    <color name="card">#141414</color>
+    <color name="card_alt">#1E1E1E</color>
+    <color name="text">#FFFFFF</color>
+    <color name="text_dim">#8A8A8A</color>
+    <color name="dot_off">#2A2A2A</color>
+    <color name="accent">#D71921</color>
+</resources>

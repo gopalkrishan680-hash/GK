@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Dot Launcher</string>
+    <string name="settings">Settings</string>
+    <string name="search_hint">Search apps</string>
+    <string name="lock_service_label">Dot Launcher – double tap to lock</string>
+    <string name="lock_service_desc">Home screen par double-tap karke screen lock karne ke liye. Ye service koi data read nahi karti.</string>
+    <string name="widget_clock">Dot Clock</string>
+    <string name="widget_date">Dot Date</string>
+</resources>
