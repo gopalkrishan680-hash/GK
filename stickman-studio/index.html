@@ -61,11 +61,7 @@ header.top { background: var(--surface); }
   .top-row > .row { order: 5; }
 }
 .touch-only { display: none; }
-#ovBox[data-kind="kokoro"] .ov-phone, #ovBox[data-kind="indic"] .ov-phone, #ovBox[data-kind="phone"] .ov-kk { display: none !important; }
-.idealist { display: grid; gap: 8px; max-height: 560px; overflow: auto; }
-.ideacard { text-align: left; display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: inherit; font: inherit; cursor: pointer; }
-.ideacard .chip { width: fit-content; }
-.ideacard.sel { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.allauto { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; padding: 10px 14px; }
 .yt-thumbs { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 .yt-thumb { border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .yt-text { display: inline-block; background: #1b1b1b; color: #ffcf5a; font-weight: 800; padding: 2px 8px; border-radius: 6px; width: fit-content; }
@@ -142,23 +138,7 @@ audio { width: 100%; }
 .batch-h h3 { margin-right: auto; }
 pre.prompt { margin: 0; padding: 14px; font: 13px/1.55 var(--font-mono); white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow: auto; }
 .batches { display: grid; gap: 14px; }
-.slots { display: grid; gap: 8px; }
-#aiVoice[data-engine="gemini"] .colab-only, #aiVoice[data-engine="colab"] .gem-only { display: none !important; }
-#aiVoice[data-engine="gemini"][data-vc="1"] .colab-only.vc-show { display: flex !important; }
-.gembox { display: grid; gap: 10px; }
-.slot { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
-.slot .nm { font-weight: 600; }
-.slot .ds { font-size: 12.5px; color: var(--muted); }
-.slot .acts { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
-.slot.has { border-color: var(--good); }
-.slot.rec { border-color: var(--bad); box-shadow: 0 0 0 2px var(--bad); }
-@media (max-width: 560px) { .slot { grid-template-columns: 1fr; } .slot .acts { justify-content: flex-start; } }
-.tagbtns { display: flex; gap: 4px; flex-wrap: wrap; }
-.tagbtns .btn { font-family: var(--font-mono); font-size: 12px; padding: 3px 8px; }
-.linelist { display: grid; gap: 4px; max-height: 320px; overflow: auto; }
-.linelist .ln { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 13.5px; padding: 4px 0; border-bottom: 1px solid var(--line); }
-.linelist .ln span.tx { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.callout { border: 2px solid var(--accent); border-radius: var(--r); background: var(--surface); padding: 14px 16px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+@media (max-width: 560px) { .callout { border: 2px solid var(--accent); border-radius: var(--r); background: var(--surface); padding: 14px 16px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
 .callout .big { font-family: var(--font-display); font-weight: 800; font-size: 22px; line-height: 1.2; }
 .callout .grow { flex: 1 1 260px; min-width: 0; }
 .flow { display: grid; gap: 10px; }
@@ -273,7 +253,6 @@ html:not(.mode-layers) .layers-only { display: none !important; }
 <div class="tabbar">
   <div class="wrap">
     <nav class="tabs" role="tablist">
-      <button role="tab" data-tab="idea" aria-selected="false"><span class="n">1</span>Idea + Script</button>
       <button role="tab" data-tab="script" aria-selected="true"><span class="n">1</span>Script + Voice</button>
       <button role="tab" data-tab="layers" aria-selected="false"><span class="n">2</span>Layers</button>
       <button role="tab" data-tab="prompts" aria-selected="false"><span class="n">2</span>Image Prompts</button>
@@ -287,39 +266,10 @@ html:not(.mode-layers) .layers-only { display: none !important; }
 
 <main class="wrap">
 
-<!-- IDEA + SCRIPT -->
-<section class="step" data-panel="idea" hidden>
-  <div>
-    <h2>Idea + script</h2>
-    <p class="lead">Pick an idea, choose the length, and get a script that starts with a <b>strong hook</b>. Ready ideas work offline; for any topic or a longer video, copy the prompt into ChatGPT / Gemini / Claude (free, no API key).</p>
-  </div>
-  <div class="cols">
-    <div class="panel">
-      <div class="row">
-        <label class="f">Type <select id="ideaGenre"><option value="">All ideas</option><option value="motivation">Motivation / success</option><option value="family">Emotional family</option><option value="suspense">Suspense / horror</option><option value="funny">Funny</option><option value="moral">Moral story</option><option value="facts">Facts / explainer</option></select></label>
-        <label class="f">Video length <select id="ideaDur"><option value="30">30 s (Short)</option><option value="60" selected>1 minute</option><option value="120">2 minutes</option><option value="180">3 minutes</option><option value="300">5 minutes</option><option value="480">8 minutes</option></select></label>
-        <label class="f">Language <select id="ideaLang"><option value="hi">Hindi (देवनागरी, best for the offline voice)</option><option value="hinglish">Hinglish (Roman)</option><option value="en">English (prompt only)</option></select></label>
-      </div>
-      <div class="row"><button class="btn small" id="ideaShuffle">🎲 Surprise me</button><span class="hint">Tap an idea to write its script.</span></div>
-      <div class="idealist" id="ideaList"></div>
-    </div>
-    <div class="panel">
-      <h3>Your own topic, any length (AI, free)</h3>
-      <label class="f">Topic or idea (optional) <input type="text" id="ideaTopic" placeholder="e.g. Ek garib ladka jo cricketer bana"></label>
-      <div class="row"><button class="btn" id="ideaCopyIdeas">Copy "10 ideas" prompt</button><button class="btn primary" id="ideaCopyScript">Copy script prompt</button></div>
-      <div class="row"><button class="btn small" data-ytopen="chatgpt">ChatGPT</button><button class="btn small" data-ytopen="gemini">Gemini</button><button class="btn small" data-ytopen="claude">Claude</button></div>
-      <h3>Script</h3>
-      <textarea id="ideaOut" rows="12" placeholder="The script appears here. Or paste the script from ChatGPT / Gemini / Claude."></textarea>
-      <div class="row"><button class="btn primary" id="ideaUse">Use this script →</button><button class="btn" id="ideaPaste">Paste</button></div>
-      <p class="hint" id="ideaInfo" style="margin:0"></p>
-    </div>
-  </div>
-</section>
-
 <!-- STEP 1 -->
 <section class="step" data-panel="script">
   <div>
-    <h2>Write the script, add the voiceover</h2>
+    <h2>Write the script, upload your voiceover</h2>
     <p class="lead">The script is split into scenes at every comma, full stop, <b>।</b>, ? and !. <span class="grid-only">One scene = one image. To <b>highlight a word in yellow</b> in the captions, wrap it in <kbd>*stars*</kbd>.</span><span class="layers-only">Short scenes give the most exact timing: every picture, keyword and icon appears on the word where it is spoken.</span></p>
   </div>
   <div class="modepick" role="radiogroup" aria-label="Video style">
@@ -347,47 +297,11 @@ html:not(.mode-layers) .layers-only { display: none !important; }
     </div>
     <div class="panel">
       <h3>Voiceover</h3>
-      <details class="ovbox" id="ovBox" open>
-        <summary><b>🎙 Make the voiceover from the script</b> <span class="hint">offline · free · no API key</span></summary>
-        <div style="display:grid;gap:8px;margin-top:8px">
-          <label class="f">Voice type <select id="ovKind"><option value="indic">Hindi AI voice (Indic-TTS): most natural Hindi, offline after a one-time download</option><option value="kokoro">AI voice (Kokoro): offline after a one-time download</option><option value="phone">Phone voice (Google / Samsung speech engine)</option></select></label>
-          <div class="ov-kk" style="display:grid;gap:8px">
-            <div class="row"><label class="f" style="flex:1 1 220px">AI voice <select id="kkVoice"></select></label></div>
-            <div class="row">
-              <label class="f">Speaking speed <span class="tc" id="kkSpeedV"></span><input type="range" id="kkSpeed" min="0.7" max="1.6" step="0.05"></label>
-              <label class="f">Pause after a sentence <span class="tc" id="kkPauseV"></span><input type="range" id="kkPause" min="0.1" max="1" step="0.05"></label>
-            </div>
-            <div class="row"><button class="btn small" id="kkGet">⬇ Download AI voice</button><button class="btn small" id="kkDel" hidden>Remove AI voice</button></div>
-            <progress id="kkProg" value="0" max="1" hidden></progress>
-            <p class="hint" style="margin:0" id="kkState"></p>
-          </div>
-          <p class="hint ov-phone" style="margin:0">Uses the phone's own Hindi voice (Google speech engine), works without internet. Best in Hindi script (देवनागरी); Hinglish works too.</p>
-          <div class="row ov-phone"><label class="f" style="flex:1 1 220px">Speech engine <select id="ovEngine"><option value="">Phone default</option></select></label></div>
-          <div class="row ov-phone"><label class="f" style="flex:1 1 220px">Voice <select id="ovVoice"></select></label><button class="btn small" id="ovSettings" title="Download the Hindi voice for offline use">Voice settings</button></div>
-          <p class="hint ov-phone" style="margin:0" id="ovTip">Tip: try every voice with ▶ Test voice. Voices marked "best quality" sound the most human (they need the internet while speaking, but still no API key).</p>
-          <div class="row">
-            <label class="f ov-phone">Speed <span class="tc" id="ovRateV"></span><input type="range" id="ovRate" min="0.7" max="1.3" step="0.01"></label>
-            <label class="f ov-phone">Pitch <span class="tc" id="ovPitchV"></span><input type="range" id="ovPitch" min="0.8" max="1.2" step="0.01"></label>
-            <label class="f ov-phone">Pause after a sentence <span class="tc" id="ovPauseV"></span><input type="range" id="ovPause" min="0.15" max="1.2" step="0.05"></label>
-          </div>
-          <label class="f">Expression <select id="ovExprSel"><option value="on">Natural: questions rise, sad lines slower, happy lines livelier</option><option value="off">Flat (same for every line)</option></select></label>
-          <div class="row">
-            <label class="f">Hinglish script <select id="ovHi"><option value="auto">Auto: read Roman Hindi as Hindi (clearer words)</option><option value="on">Always convert to Hindi letters</option><option value="off">Read as written</option></select></label>
-            <label class="f">Breath sounds <select id="ovBreathSel"><option value="off">Off</option><option value="on">On: a soft breath before new thoughts</option></select></label>
-            <label class="f">Sound <select id="ovPolish"><option value="on">Studio polish (warmer, fuller, less robotic)</option><option value="off">Raw phone voice</option></select></label>
-          </div>
-          <div class="row"><button class="btn primary" id="ovGo">Make voiceover</button><button class="btn" id="ovTest">▶ Test voice</button><button class="btn" id="ovStop" hidden>Stop</button><button class="btn" data-dlvoice id="ovDl" hidden>⬇ Download voiceover</button></div>
-          <progress id="ovProg" value="0" max="1" hidden></progress>
-          <div class="hint ov-phone" id="ovState"></div>
-          <div class="hint" id="ovInfo"></div>
-        </div>
-      </details>
       <div class="drop" id="voDrop" tabindex="0" role="button"><strong>Drop the voiceover file here</strong>or click to choose (mp3, wav, m4a)</div>
       <input type="file" id="voFile" accept="audio/*" hidden>
       <input type="file" id="oneAudio" accept="audio/*,video/*,.opus,.ogg,.m4a,.aac" hidden>
       <div id="voInfo" class="hint"></div>
       <audio id="vo" controls controlslist="nodownload" preload="auto"></audio>
-      <div class="row" id="voDlRow" hidden><button class="btn small" data-dlvoice>⬇ Download voiceover</button><span class="hint">Saved to Download/Stickman Studio</span></div>
       <div class="row">
         <label class="f">Video shape
           <select id="aspect">
@@ -409,69 +323,6 @@ html:not(.mode-layers) .layers-only { display: none !important; }
       <p class="hint grid-only">Next: check the scenes, then open the <b>Image Prompts</b> tab.</p>
       <p class="hint layers-only">Next: check the scenes, then open the <b>Layers</b> tab.</p>
     </div>
-  </div>
-  <div class="panel" id="aiVoice" hidden>
-    <div class="row"><h3 style="margin-right:auto">AI voice</h3><span class="chip wait" id="ttsChip">Not connected</span></div>
-    <div class="row"><label class="f">Voice engine <select id="ttsEngine"><option value="gemini">Google Gemini: most natural, like AI Studio (free API key, no Colab)</option><option value="colab">Free open model on Google Colab (Chatterbox)</option></select></label></div>
-    <div class="gembox gem-only">
-      <p class="hint" style="margin:0">Uses Google's Gemini speech model (the one in AI Studio) directly from this app. Get a free API key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> and paste it here. The key is stored only on this device. Free keys have a per-minute limit; the app waits and continues by itself.</p>
-      <div class="row"><input type="password" id="gemKey" placeholder="Gemini API key (starts with AIza…)" aria-label="Gemini API key" autocomplete="off" style="flex:1 1 260px"><button class="btn" id="gemCheck">Check key</button></div>
-      <div class="row">
-        <label class="f">Style <select id="gemStyle"><option value="narrative">Narrative</option><option value="promo_high">Promo – High</option><option value="storyteller">Dramatic storyteller</option><option value="documentary">Documentary</option><option value="conversational">Conversational</option><option value="calm">Calm</option><option value="custom">My own style…</option></select></label>
-        <label class="f">Pace <select id="gemPace"><option value="natural">Natural</option><option value="slow">Slow</option><option value="fast">Fast</option></select></label>
-        <label class="f">Accent <select id="gemAccent"><option value="neutral">Neutral</option><option value="indian">Neutral Indian</option><option value="hindi">Native Hindi</option></select></label>
-      </div>
-      <label class="f" id="gemCustomWrap" hidden>My style (how it should be performed) <textarea id="gemCustom" rows="2" placeholder="e.g. A warm young narrator telling an emotional family story, soft and intimate"></textarea></label>
-      <div class="row">
-        <label class="f">Voice <select id="gemVoice"><option value="mine_free">My voice – free (Gemini performance + conversion on Colab)</option><option value="mine">My voice – Google cloning (needs a paid Google tier)</option><option value="Kore">Kore</option><option value="Puck">Puck</option><option value="Charon">Charon</option><option value="Fenrir">Fenrir</option><option value="Aoede">Aoede</option><option value="Enceladus">Enceladus</option><option value="Zephyr">Zephyr</option><option value="Leda">Leda</option><option value="Orus">Orus</option><option value="Callirrhoe">Callirrhoe</option><option value="Autonoe">Autonoe</option><option value="Iapetus">Iapetus</option><option value="Umbriel">Umbriel</option><option value="Algieba">Algieba</option><option value="Despina">Despina</option><option value="Erinome">Erinome</option><option value="Algenib">Algenib</option><option value="Rasalgethi">Rasalgethi</option><option value="Laomedeia">Laomedeia</option><option value="Achernar">Achernar</option><option value="Alnilam">Alnilam</option><option value="Schedar">Schedar</option><option value="Gacrux">Gacrux</option><option value="Pulcherrima">Pulcherrima</option><option value="Achird">Achird</option><option value="Zubenelgenubi">Zubenelgenubi</option><option value="Vindemiatrix">Vindemiatrix</option><option value="Sadachbia">Sadachbia</option><option value="Sadaltager">Sadaltager</option><option value="Sulafat">Sulafat</option></select></label>
-        <label class="f" id="gemBaseWrap" hidden>Base voice (choose one close to yours) <select id="gemBase"><option value="Kore">Kore</option><option value="Puck">Puck</option><option value="Charon">Charon</option><option value="Fenrir">Fenrir</option><option value="Aoede">Aoede</option><option value="Enceladus">Enceladus</option><option value="Zephyr">Zephyr</option><option value="Leda">Leda</option><option value="Orus">Orus</option><option value="Callirrhoe">Callirrhoe</option><option value="Autonoe">Autonoe</option><option value="Iapetus">Iapetus</option><option value="Umbriel">Umbriel</option><option value="Algieba">Algieba</option><option value="Despina">Despina</option><option value="Erinome">Erinome</option><option value="Algenib">Algenib</option><option value="Rasalgethi">Rasalgethi</option><option value="Laomedeia">Laomedeia</option><option value="Achernar">Achernar</option><option value="Alnilam">Alnilam</option><option value="Schedar">Schedar</option><option value="Gacrux">Gacrux</option><option value="Pulcherrima">Pulcherrima</option><option value="Achird">Achird</option><option value="Zubenelgenubi">Zubenelgenubi</option><option value="Vindemiatrix">Vindemiatrix</option><option value="Sadachbia">Sadachbia</option><option value="Sadaltager">Sadaltager</option><option value="Sulafat">Sulafat</option></select></label>
-        <label class="f">Model <select id="gemModel"><option value="gemini-3.8-flash-tts">Gemini 3.8 Flash TTS (best)</option><option value="gemini-3.8-flash-lite-tts">Gemini 3.8 Flash Lite TTS (faster)</option></select></label>
-      </div>
-      <div class="slot" id="gemCloneBox" hidden>
-        <div><div class="nm">Consent for cloning your voice with Google</div>
-          <div class="ds">Google clones a voice only with the owner's spoken consent. Record yourself reading this sentence in English, in the same room and with the same phone as your voice sample:<br><b>"I am the owner of this voice and I consent to Google using this voice to create a synthetic voice model."</b></div>
-          <div class="ds" id="gemCloneInfo"></div></div>
-        <div class="acts"><button class="btn small" data-rec="consent" id="gemConsentRec">Record consent</button><button class="btn small" data-slotup="consent">Upload</button><button class="btn small" data-slotplay="consent" id="gemConsentPlay" hidden>Play</button><button class="btn small primary" id="gemMake">Create my Gemini voice</button></div>
-      </div>
-    </div>
-    <p class="hint colab-only" style="margin:0">Turn the script into a voiceover in a ready-made voice or <b>your own cloned voice</b>, with pauses, laughs and moods. The voice model runs free on Google Colab: <a href="https://colab.research.google.com/github/gopalkrishan680-hash/GK/blob/claude/stickman-video-voiceover-sync-ivss4s/stickman-voice/StickmanVoice.ipynb" target="_blank" rel="noopener">open the Colab notebook</a>, run cells 1 and 2, then tap <b>Open in Stickman Studio</b> there (or paste the link it shows here). Colab GPU used up for today? Use the <a href="https://www.kaggle.com/kernels/welcome?src=https://github.com/gopalkrishan680-hash/GK/blob/claude/stickman-video-voiceover-sync-ivss4s/stickman-voice/StickmanVoiceKaggle.ipynb" target="_blank" rel="noopener">Kaggle notebook</a> instead (about 30 free GPU hours a week).</p>
-    <p class="hint colab-only vc-show" id="vcHint" style="margin:0;display:none">For "My voice – free": Gemini speaks in the base voice, then the free model on Google Colab turns it into your voice. <a href="https://colab.research.google.com/github/gopalkrishan680-hash/GK/blob/claude/stickman-video-voiceover-sync-ivss4s/stickman-voice/StickmanVoice.ipynb" target="_blank" rel="noopener">Open the Colab notebook</a> (or the <a href="https://www.kaggle.com/kernels/welcome?src=https://github.com/gopalkrishan680-hash/GK/blob/claude/stickman-video-voiceover-sync-ivss4s/stickman-voice/StickmanVoiceKaggle.ipynb" target="_blank" rel="noopener">Kaggle notebook</a> when Colab's GPU is used up), run it, then tap <b>Open in Stickman Studio</b> there, or paste the link here and press Connect.</p>
-    <div id="linkAsk" hidden style="border:2px solid #f5c518;border-radius:10px;padding:10px;margin:6px 0;background:rgba(245,197,24,.12)">
-      <div>Voice server link found: <b id="linkAskHost"></b></div>
-      <div class="hint" style="margin:4px 0 8px">Connect only if you just started it in your own Colab or Kaggle notebook: your voice samples are sent to it.</div>
-      <div class="row"><button class="btn" id="linkAskYes">Connect</button><button class="btn small" id="linkAskNo">Not now</button></div>
-    </div>
-    <div class="row colab-only vc-show"><input type="text" id="ttsUrl" placeholder="https://…trycloudflare.com" aria-label="Voice server link" style="flex:1 1 260px"><button class="btn" id="ttsConnect">Connect</button></div>
-    <div class="row colab-only">
-      <label class="f">Language <select id="ttsLang"><option value="hi">Hindi / Hinglish</option><option value="en">English</option></select></label>
-      <label class="f">Voice <select id="ttsVoice"><option value="default">Ready-made voice</option><option value="mine">My cloned voice</option></select></label>
-      <label class="f">Expression strength <span class="tc" id="ttsExprV"></span><input type="range" id="ttsExpr" min="0.6" max="1.6" step="0.05"></label>
-    </div>
-    <div class="slot" id="sampleBox" hidden>
-      <div><div class="nm">Your voice sample</div><div class="ds" id="sampleInfo">Upload a clear recording of your own voice (10–30 s is best; mp3, wav, m4a, a WhatsApp voice note or even a video). <b>Speak it the way you narrate your videos</b>, with feeling and at your normal pace: the clone copies the style of the sample, so a flat, rushed reading gives a flat, rushed voice.</div></div>
-      <div class="acts"><button class="btn small primary" id="sampleUp">Upload my voice sample</button><button class="btn small" data-rec="normal" id="sampleRec">Record now</button><button class="btn small" data-slotplay="normal" id="samplePlay" hidden>Play</button><button class="btn small" data-slotorig="normal" id="sampleOrig" hidden>Original</button></div>
-    </div>
-    <div class="row">
-      <label class="f colab-only">Speaking pace <select id="ttsPace"><option value="relaxed">Relaxed (slowest, most human)</option><option value="normal">Normal</option><option value="fast">Fast</option></select></label>
-      <label class="f">Pause after a sentence <span class="tc" id="ttsSentPauseV"></span><input type="range" id="ttsSentPause" min="0.15" max="1.2" step="0.05"></label>
-      <label class="f colab-only">Pause at a comma <span class="tc" id="ttsCommaPauseV"></span><input type="range" id="ttsCommaPause" min="0" max="0.5" step="0.05"></label>
-    </div>
-    <div class="row colab-only"><button class="btn small" id="ttsRecommended">Use recommended settings</button><span class="hint" id="ttsPaceHint"></span></div>
-    <div class="f" style="font-size:13px;font-weight:600;color:var(--muted)">Add to the script at the cursor (tags are spoken, never shown in captions):</div>
-    <div class="tagbtns" id="tagBtns"></div>
-    <details id="myVoice">
-      <summary>My voice and my sounds (for cloning)</summary>
-      <div style="display:grid;gap:10px;margin-top:10px">
-        <label style="display:flex;gap:8px;align-items:flex-start;flex-wrap:nowrap"><input type="checkbox" id="ttsConsent" style="margin-top:4px;flex:none"> <span>This is <b>my own voice</b>, or the speaker has given me permission to clone it.</span></label>
-        <label style="display:flex;gap:8px;align-items:flex-start;flex-wrap:nowrap"><input type="checkbox" id="ttsClean" style="margin-top:4px;flex:none"> <span><b>Clean my samples first</b> (recommended): remove background noise, and "uh", "um", "hmm", coughs and long gaps from voice samples, then clone from the cleaned sample. Sounds like a laugh only get the noise removed.</span></label>
-        <label style="display:flex;gap:8px;align-items:flex-start;flex-wrap:nowrap"><input type="checkbox" id="ttsEnhance" style="margin-top:4px;flex:none"> <span><b>Make it crystal clear</b>: a gentle studio polish (removes rumble, a little less boominess, a little more clarity, even loudness). It does not regenerate your voice, so it still sounds like you.</span></label>
-        <p class="hint" style="margin:0">Record in a quiet room, phone close to your mouth. <b>Main voice</b> is needed for cloning; the others are optional. A mood recording makes <code>[happy]</code>, <code>[sad]</code>… sound like you in that mood. A sound recording is used wherever its tag appears, e.g. your real laugh for <code>[laugh]</code>. Recordings stay on this device and are not put into project files.</p>
-        <div class="slots" id="slots"></div>
-      </div>
-    </details>
-    <div class="row"><button class="btn primary" id="ttsGo">Generate voiceover</button><button class="btn" id="ttsStop" hidden>Stop waiting</button><button class="btn" data-dlvoice>Download voiceover</button><span class="hint" id="ttsInfo"></span></div>
-    <progress id="ttsProg" value="0" max="1" hidden></progress>
-    <details id="ttsLines" hidden><summary>Lines of the last voiceover (play one, or redo it)</summary><div class="linelist" id="ttsLineList"></div></details>
   </div>
   <div class="callout layers-only" id="lCallout" hidden>
     <div class="grow"><div class="big" id="lCalloutBig"></div><div class="hint">Next: plan the boards and make the pictures.</div></div>
@@ -653,6 +504,7 @@ html:not(.mode-layers) .layers-only { display: none !important; }
   <div class="drop" id="bulkDrop" tabindex="0" role="button"><strong>Drop all grid images here at once</strong>They fill the empty grids in file-name order (grid1.png, grid2.png...)</div>
   <input type="file" id="bulkFile" accept="image/*" multiple hidden>
   <input type="file" id="oneFile" accept="image/*" hidden>
+  <div class="panel allauto"><label class="row" style="gap:8px;margin:0"><input type="checkbox" id="allAuto" checked> <b>Auto-detect lines – all images</b></label><span class="hint" id="allAutoInfo"></span></div>
   <div class="batches" id="gridCards"></div>
 </section>
 
@@ -892,7 +744,7 @@ He looked at Papa. Papa smiled, and said, "I am proud of you."`;
 /* ============ state ============ */
 const DEFAULTS = { title: '', aspect: '16:9', grid: 3, style: 'stickman', styleText: STYLES.stickman.text, characters: '', gutter: 'auto',
   splitLevel: 'all', minWords: 2, maxWords: 14, captions: 'bar', fit: 'auto', enhance: 'on', v: 3, capSize: 1, motion: 6, transition: 'fade', transDur: 0.15, res: 1080, fps: 30, musicVol: 0.12, anim: 'on', animAmt: 1, capWords: 'on', pics: 'images', skStyle: 'chibi', lPer: 9, lLib: 'on',
-  gemMark: 'auto', fx: 'on', fxAmt: 1, fxDoodle: 'on', fxSfx: 'on', fxVol: 0.6, ovKind2: 'indic', kkVoice: 'hm_omega', inVoice: 'male', inSpeed: 1, ovVoice: '', ovEngine: '', ovHi: 'auto', ovPolish: 'on', ovBreath2: 'off', kkSpeed: 1.1, kkPause: 0.35, ovRate: 0.95, ovPitch: 1, ovPause: 0.45, ovExpr: 'on', mode: 'layers', lBg: 'parchment', lEnter: 'auto', lTrans: 'cut', lIdle: 'subtle', lCam: 'on', lCaps: 'off', sfx: 'on', sfxVol: 0.5, duck: 'on' };
+  gemMark: 'auto', fx: 'on', fxAmt: 1, fxDoodle: 'on', fxSfx: 'on', fxVol: 0.6, gridAuto: true, mode: 'layers', lBg: 'parchment', lEnter: 'auto', lTrans: 'cut', lIdle: 'subtle', lCam: 'on', lCaps: 'off', sfx: 'on', sfxVol: 0.5, duck: 'on' };
 try { if (matchMedia('(pointer: coarse)').matches) DEFAULTS.res = 720; } catch (_) {}   // phones: smaller, faster export
 const S = { settings: { ...DEFAULTS }, script: '', segments: [], starts: [], grids: [], overrides: {}, audioBlob: null, audioName: '', musicBlob: null, musicName: '' };
 let uid = 1;
@@ -1340,12 +1192,23 @@ async function loadImage(blob) { return await createImageBitmap(blob); }
 async function setGrid(gi, blob) {
   try {
     const img = await loadImage(blob);
-    S.grids[gi] = { blob, auto: true, trim: 1.5 }; R.grids[gi] = { img };
+    S.grids[gi] = { blob, auto: S.settings.gridAuto !== false, trim: 1.5 }; R.grids[gi] = { img };
     computeCells(gi);
   } catch (e) { toast('Could not open this image. Try PNG or JPG.'); }
 }
 async function setOverride(segId, blob) { try { R.overrides[segId] = await loadImage(blob); S.overrides[segId] = blob; } catch (e) { toast('Could not open the image'); } }
 
+function allAutoUI() {   // the "all images" switch: on, off, or mixed when single images were changed by hand
+  const el = $('#allAuto'); if (!el) return; const gs = S.grids.filter(Boolean);
+  const on = gs.filter(g => g.auto).length, all = gs.length ? on === gs.length : S.settings.gridAuto !== false, none = gs.length ? on === 0 : S.settings.gridAuto === false;
+  el.checked = all; el.indeterminate = !all && !none;
+  $('#allAutoInfo').textContent = el.indeterminate ? `Mixed: ${on} of ${gs.length} images use auto-detect. Tap to set all at once.` : all ? 'On for every image: the app finds the grid lines. Turn off to split every image into equal parts.' : 'Off for every image: equal split. Turn on to let the app find the grid lines.';
+}
+$('#allAuto').addEventListener('change', e => {
+  const on = e.target.checked; S.settings.gridAuto = on;
+  S.grids.forEach((g, gi) => { if (g) { g.auto = on; if (R.grids[gi] && R.grids[gi].img) computeCells(gi); } });
+  segmentsChanged(true); toast(on ? 'Auto-detect lines: on for all images' : 'Auto-detect lines: off for all images (equal split)');
+});
 function renderGridCards() {
   const bs = batches(); const asp = S.settings.aspect.replace(':', '/');
   if (!bs.length) { $('#gridCards').innerHTML = '<p class="hint">Create scenes in Step 1 first.</p>'; return; }
@@ -1367,6 +1230,7 @@ function renderGridCards() {
     }
     return `<div class="batch gridcard${b.index === pasteTarget ? ' current' : ''}" id="gcard-${b.index}" data-card="${b.index}"><div class="batch-h"><h3>Image ${b.index + 1}</h3><span class="chip">Scenes ${b.start + 1}–${b.start + b.count}</span>${selChip(!!g)}<span class="chip unsel-only ${g ? 'ok' : 'wait'}">${g ? 'Ready' : 'Pending'}</span><button class="btn small" data-copy="${b.index}">Copy prompt</button></div>${body}</div>`;
   }).join('');
+  allAutoUI();
   $$('#gridCards [data-griddrop]').forEach(el => { const gi = +el.dataset.griddrop; setupDrop(el, f => placeGrid(gi, f[0]), $('#oneFile'), false, false); });
   updateTargetUI();
   bs.forEach(b => { drawSrc(b.index); });
@@ -2588,15 +2452,6 @@ document.addEventListener('click', async e => {
       if (!blob) return toast('No image on the clipboard. Copy the image first, or use Choose file…');
       placeGrid(gi, blob);
     } catch (err) { toast(TOUCH ? 'This browser did not share the copied image. Save the image and use Choose file…' : 'Could not read the clipboard. Press Ctrl+V instead, or use Choose file…'); } }
-  else if (d.tag) insertTag(d.tag);
-  else if (d.rec) toggleRec(d.rec);
-  else if (d.slotup) { const [f] = await pickFile($('#oneAudio')); if (f) setSlot(d.slotup, f); }
-  else if (d.slotplay) { const a = new Audio(URL.createObjectURL(slotUse(VP.slots[d.slotplay]))); a.play(); }
-  else if (d.slotorig) { const a = new Audio(URL.createObjectURL(slotRaw(VP.slots[d.slotorig]))); a.play(); }
-  else if (d.slotdel) { delete VP.slots[d.slotdel]; saveVP(); renderSlots(); }
-  else if (d.lineplay != null) playLine(+d.lineplay);
-  else if (d.lineredo != null) redoLine(+d.lineredo);
-  else if (d.dlvoice != null) downloadVoice();
   else if (d.openapp) { if (APP) AndroidBridge.openApp(d.openapp); }
   else if (d.sharelast != null) { if (APP && !AndroidBridge.shareLast()) toast('Still saving, try again in a moment'); }
   else if (d.pick != null) { const gi = +d.pick; const [f] = await pickFile($('#oneFile')); if (f) placeGrid(gi, f); }
@@ -2641,7 +2496,6 @@ function renderStatus() {
 let actxDecode;
 async function setVoice(blob, name) {
   S.audioBlob = blob; S.audioName = name || S.audioName || 'voiceover';
-  $('#voDlRow').hidden = !blob; $('#ovDl').hidden = !blob;
   if (vo.src) URL.revokeObjectURL(vo.src); vo.src = URL.createObjectURL(blob);
   $('#voInfo').textContent = 'Reading the voiceover...';
   try {
@@ -2701,6 +2555,7 @@ let curTab = 'script';
 function showTab(name) {
   if (isLayers() && (name === 'prompts' || name === 'grids')) name = 'layers';
   if (!isLayers() && name === 'layers') name = 'prompts';
+  if (!document.querySelector(`section.step[data-panel="${name}"]`)) name = 'script';   // e.g. the removed Idea tab
   curTab = name; $$('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === name)); $$('section.step').forEach(s => s.hidden = s.dataset.panel !== name);
   try { localStorage.setItem('ss-tab', name); } catch (_) {}
   if (name === 'sync') { renderTimes(); requestAnimationFrame(drawTimeline); }
@@ -2709,7 +2564,6 @@ function showTab(name) {
   updateTargetUI();
   if (name === 'layers') lRender();
   if (name === 'yt') ytShow();
-  if (name === 'idea') ideaRender();
 }
 $$('nav.tabs button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
 document.addEventListener('keydown', e => {
@@ -2883,7 +2737,7 @@ async function restore(p) {
   for (let i = 0; i < (p.grids || []).length; i++) { const g = p.grids[i]; if (g && g.blob) { try { R.grids[i] = { img: await loadImage(g.blob) }; S.grids[i] = { blob: g.blob, auto: g.auto !== false, trim: g.trim ?? 1.5 }; } catch (_) {} } }
   for (const [k, v] of Object.entries(p.overrides || {})) if (v) await setOverride(k, v);
   if (p.audioBlob) await setVoice(p.audioBlob, p.audioName);
-  await setMusic(p.musicBlob || null, p.musicName || ''); amShowPlan(); ovToUI(); $('#amMood').value = (S.autoMusic && S.autoMusic.mood) || 'auto';
+  await setMusic(p.musicBlob || null, p.musicName || ''); amShowPlan(); $('#amMood').value = (S.autoMusic && S.autoMusic.mood) || 'auto';
   if (S.starts.length !== S.segments.length) ratioTiming();
   // projects saved before the improved Smart Sync: redo their timing once
   const resync = (p.syncVer || 0) < 3 && analysis && S.segments.length > 1;
@@ -2891,7 +2745,6 @@ async function restore(p) {
   S.syncVer = 3;
   segmentsChanged(true);
   if (resync) { save(); toast('Scene timing was redone with the improved Smart Sync'); }
-  renderTtsLines();
 }
 
 /* ============ LAYERED EXPLAINER ============
@@ -3820,7 +3673,7 @@ function lBusy(on, info) { $('#lStop').hidden = !on; $('#lAutoPlan').disabled = 
 function lApplyMode() {
   const L = isLayers(); document.documentElement.classList.toggle('mode-layers', L);
   $$('input[name=vmode]').forEach(r => r.checked = r.value === (L ? 'layers' : 'grid'));
-  const order = L ? ['idea', 'script', 'layers', 'sync', 'video', 'yt'] : ['idea', 'script', 'prompts', 'grids', 'sync', 'video', 'yt'];
+  const order = L ? ['script', 'layers', 'sync', 'video', 'yt'] : ['script', 'prompts', 'grids', 'sync', 'video', 'yt'];
   $$('nav.tabs button').forEach(b => { const k = order.indexOf(b.dataset.tab); b.hidden = k < 0; const n = b.querySelector('.n'); if (n && k >= 0) n.textContent = k + 1; });
   $('#lBgRow').hidden = S.settings.lBg !== 'custom';
 }
@@ -4015,338 +3868,15 @@ $('#pasteBadge').onclick = () => {
 };
 
 /* ============ boot ============ */
-/* ============ AI voice (talks to the Colab voice server) ============ */
-const VOICE_SLOTS = [
-  { k: 'normal', kind: 'voice', nm: 'Main voice', ds: 'Narrate 2–4 sentences like in your videos, with feeling (15–30 s).', max: 30 },
-  { k: 'happy', kind: 'voice', nm: 'Happy', ds: 'A happy line, smiling (5–15 s).', max: 20 },
-  { k: 'excited', kind: 'voice', nm: 'Excited', ds: 'Energetic and fast (5–15 s).', max: 20 },
-  { k: 'sad', kind: 'voice', nm: 'Sad', ds: 'Slow and low (5–15 s).', max: 20 },
-  { k: 'angry', kind: 'voice', nm: 'Angry', ds: 'Firm and loud (5–15 s).', max: 20 },
-  { k: 'whisper', kind: 'voice', nm: 'Whisper', ds: 'Whispering (5–15 s).', max: 20 },
-  { k: 'laugh', kind: 'sound', nm: 'Laugh', ds: 'Your real laugh (1–4 s).', max: 5 },
-  { k: 'chuckle', kind: 'sound', nm: 'Chuckle', ds: 'A small laugh (1–3 s).', max: 4 },
-  { k: 'sigh', kind: 'sound', nm: 'Sigh', ds: 'A sigh (1–3 s).', max: 4 },
-  { k: 'gasp', kind: 'sound', nm: 'Gasp', ds: 'A surprised breath (1–2 s).', max: 3 },
-  { k: 'hmm', kind: 'sound', nm: 'Hmm', ds: 'Thinking "hmm" (1–3 s).', max: 4 },
-  { k: 'cry', kind: 'sound', nm: 'Cry', ds: 'A sob (1–4 s).', max: 5 },
-  { k: 'consent', kind: 'consent', nm: 'Consent', ds: 'The consent sentence for Google.', max: 15 },
-];
-const TAGS = ['[pause]', '[pause 1.5]', '[laugh]', '[chuckle]', '[sigh]', '[gasp]', '[hmm]', '[happy]', '[excited]', '[sad]', '[angry]', '[whisper]', '[calm]', '[normal]'];
-const VP = { url: '', lang: 'hi', voice: 'default', expr: 1, sentPause: 0.6, commaPause: 0.25, pace: 'normal', pv: 2, consent: false, clean: true, enhance: true, slots: {},
-  engine: 'gemini', gemKey: '', gemStyle: 'narrative', gemPace: 'natural', gemAccent: 'neutral', gemCustom: '', gemVoice: 'Charon', gemBase: 'Charon', gemModel: 'gemini-3.8-flash-tts', gemVoiceKey: '', gemVoiceSig: '' };
-let ttsOnline = false;
-let ttsPoll = null, recNow = null;
-const ttsBase = () => (VP.url || '').trim().replace(/\/+$/, '');
-function saveVP() { DB.put('voiceProfile', VP).catch(() => {}); }
-async function loadVP() { try { const v = await DB.get('voiceProfile'); if (v) Object.assign(VP, v); } catch (_) {}
-  if ((VP.pv || 1) < 3) { VP.engine = 'gemini'; }
-  if ((VP.pv || 1) < 4 && VP.gemVoice === 'mine') VP.gemVoice = 'mine_free';
-  // v5: Gemini's ready voice by default: works with just the API key, no Colab or Kaggle
-  if ((VP.pv || 1) < 5) { VP.engine = 'gemini'; if (VP.gemVoice === 'mine' || VP.gemVoice === 'mine_free') VP.gemVoice = VP.gemBase || 'Charon'; }
-  if ((VP.pv || 1) < 2) { if (VP.sentPause === 0.45) VP.sentPause = 0.6; if (VP.commaPause === 0.15) VP.commaPause = 0.25; VP.pace = VP.pace || 'normal'; }
-  VP.pv = 5; for (const v of Object.values(VP.slots || {})) if (v) v.cleaning = false; }
-// Natural-sounding defaults: relaxed pace, real pauses, a little more expression.
-const TTS_RECOMMENDED = { pace: 'relaxed', sentPause: 0.6, commaPause: 0.25, expr: 1.1 };
-function showTtsValues() {
-  $('#ttsExprV').textContent = '× ' + (+VP.expr).toFixed(2);
-  $('#ttsSentPauseV').textContent = (+VP.sentPause).toFixed(2) + ' s';
-  $('#ttsCommaPauseV').textContent = (+VP.commaPause).toFixed(2) + ' s';
-  const flat = VP.sentPause < 0.4 || VP.commaPause < 0.1;
-  $('#ttsPaceHint').textContent = flat ? 'Pauses are very short: speech without breaths sounds robotic.' : '';
-  $('#ttsPaceHint').style.color = flat ? 'var(--warn)' : '';
-}
-$('#ttsRecommended').onclick = () => { Object.assign(VP, TTS_RECOMMENDED); saveVP(); vpToUI(); toast('Recommended settings applied: relaxed pace, 0.6 s / 0.25 s pauses'); };
-function vpToUI() { $('#ttsUrl').value = VP.url; $('#ttsLang').value = VP.lang; $('#ttsVoice').value = VP.voice; $('#ttsExpr').value = VP.expr; $('#ttsSentPause').value = VP.sentPause; $('#ttsCommaPause').value = VP.commaPause; $('#ttsPace').value = VP.pace || 'normal'; showTtsValues(); $('#ttsEngine').value = VP.engine || 'gemini'; $('#gemKey').value = VP.gemKey || ''; $('#gemStyle').value = VP.gemStyle; $('#gemPace').value = VP.gemPace; $('#gemAccent').value = VP.gemAccent; $('#gemCustom').value = VP.gemCustom || ''; $('#gemVoice').value = VP.gemVoice; $('#gemBase').value = VP.gemBase || 'Charon'; $('#gemModel').value = VP.gemModel; showEngine();
-  $('#ttsConsent').checked = VP.consent; $('#ttsClean').checked = VP.clean !== false; $('#ttsEnhance').checked = VP.enhance !== false; $('#ttsEnhance').disabled = VP.clean === false; renderSlots(); }
-[['ttsUrl', 'url'], ['ttsLang', 'lang'], ['ttsVoice', 'voice'], ['ttsExpr', 'expr', 1], ['ttsSentPause', 'sentPause', 1], ['ttsCommaPause', 'commaPause', 1], ['ttsPace', 'pace'], ['ttsEngine', 'engine'], ['gemKey', 'gemKey'], ['gemStyle', 'gemStyle'], ['gemPace', 'gemPace'], ['gemAccent', 'gemAccent'], ['gemCustom', 'gemCustom'], ['gemVoice', 'gemVoice'], ['gemBase', 'gemBase'], ['gemModel', 'gemModel']].forEach(([id, key, num]) => {
-  const el = $('#' + id); el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => { VP[key] = num ? +el.value : el.value; saveVP(); showTtsValues(); if (/^(engine|gem)/.test(key)) showEngine(); });
-});
-$('#sampleUp').onclick = async () => {
-  if (!VP.consent) { $('#myVoice').open = true; $('#ttsConsent').focus(); return toast('First tick the box: this is my own voice (or I have permission)'); }
-  const [f] = await pickFile($('#oneAudio')); if (f) setSlot('normal', f);
-};
-$('#ttsConsent').addEventListener('change', e => { VP.consent = e.target.checked; saveVP(); renderSlots(); });
-$('#ttsClean').addEventListener('change', e => { VP.clean = e.target.checked; $('#ttsEnhance').disabled = !VP.clean; saveVP(); renderSlots(); if (VP.clean) cleanPending(); });
-$('#ttsEnhance').addEventListener('change', e => {   // redo the cleaning with or without the polish
-  VP.enhance = e.target.checked;
-  for (const v of Object.values(VP.slots)) if (v && v.cleaned) { v.blob = slotRaw(v); v.dur = v.rawDur || v.dur; v.cleaned = false; v.report = null; }
-  saveVP(); renderSlots(); if (ttsOnline) cleanPending(); else toast('Your samples will be cleaned again when the voice server is connected');
-});
-$('#ttsVoice').addEventListener('change', () => { renderSample(); if (VP.voice === 'mine' && !VP.slots.normal) toast('Upload or record a sample of your voice'); });
-$('#tagBtns').innerHTML = TAGS.map(t => `<button class="btn" data-tag="${t}">${t}</button>`).join('');
-function insertTag(tag) {
-  const ta = $('#script'), a = ta.selectionStart ?? ta.value.length, b = ta.selectionEnd ?? a;
-  const pre = ta.value.slice(0, a), post = ta.value.slice(b);
-  const ins = (pre && !/\s$/.test(pre) ? ' ' : '') + tag + (post && !/^\s/.test(post) ? ' ' : '');
-  ta.value = pre + ins + post; ta.focus(); ta.selectionStart = ta.selectionEnd = a + ins.length; S.script = ta.value; save();
-  toast(`${tag} added. Press Create scenes when you are done editing.`);
-}
-const slotRaw = v => v && (v.raw || v.blob);
-const slotUse = v => v && (VP.clean !== false && v.cleaned ? v.blob : slotRaw(v));
-function cleanSummary(v) {
-  if (!v) return '';
-  if (VP.clean === false) return `Original · ${(v.rawDur || v.dur).toFixed(1)} s (cleaning is off)`;
-  if (!v.cleaned) return `Recorded · ${(v.rawDur || v.dur).toFixed(1)} s · ${v.cleanError ? 'could not clean: ' + v.cleanError : 'will be cleaned when the voice server is connected'}`;
-  const r = v.report || {}, parts = [];
-  if (r.noise_reduced_db > 0.5) parts.push(`background noise −${Math.round(r.noise_reduced_db)} dB`);
-  if (r.asr) parts.push(r.fillers ? `${r.fillers} filler${r.fillers > 1 ? 's' : ''} removed (${(r.filler_words || []).slice(0, 4).join(', ')})` : 'no uh/um found');
-  if (r.enhanced) parts.push('clarity polished');
-  if (r.removed_sec > 0.2) parts.push(`${r.before} s → ${r.after} s`);
-  if (r.note) parts.push(r.note);
-  return `Cleaned · ${v.dur.toFixed(1)} s · ${parts.join(' · ') || 'already clean'}`;
-}
-async function refineSlot(k, quiet) {
-  const v = VP.slots[k]; if (!v || v.cleaning) return;
-  const sl = VOICE_SLOTS.find(x => x.k === k); v.cleaning = true; v.cleanError = ''; renderSlots();
-  try {
-    const r = await (await ttsFetch('/refine', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ audio: await blobB64(slotRaw(v)), language: VP.lang, kind: sl.kind, enhance: VP.enhance !== false }) })).json();
-    v.raw = slotRaw(v); v.rawDur = v.rawDur || v.dur;
-    v.blob = new Blob([Uint8Array.from(atob(r.audio), c => c.charCodeAt(0))], { type: 'audio/wav' });
-    v.dur = r.report.after; v.report = r.report; v.cleaned = true;
-    if (!quiet) toast(`${sl.nm} cleaned: ${cleanSummary(v).split(' · ').slice(2).join(', ') || 'already clean'}`);
-  } catch (e) { v.cleanError = e.message; if (!quiet) toast('Could not clean the sample: ' + e.message); }
-  v.cleaning = false; saveVP(); renderSlots();
-}
-async function cleanPending(quiet) {
-  if (VP.clean === false || !ttsBase()) return;
-  for (const sl of VOICE_SLOTS) { const v = VP.slots[sl.k]; if (v && !v.cleaned && sl.kind !== 'consent') await refineSlot(sl.k, quiet); }
-}
-const voiceMine = () => (VP.engine === 'gemini' ? (VP.gemVoice === 'mine' || VP.gemVoice === 'mine_free') : VP.voice === 'mine');
-function renderSample() {
-  const box = $('#sampleBox'); box.hidden = !voiceMine();
-  const has = VP.slots.normal; box.classList.toggle('has', !!has);
-  $('#sampleInfo').textContent = has ? (has.cleaning ? 'Cleaning the sample: removing background noise and uh/um, polishing the voice…' : cleanSummary(has) + '. Generate the voiceover and it will speak in this voice.') : 'Upload a clear recording of your own voice (10–30 s is best; mp3, wav, m4a, a WhatsApp voice note or even a video). Speak it the way you narrate your videos, with feeling and at your normal pace: the clone copies the style of the sample.';
-  $('#sampleUp').textContent = has ? 'Replace sample' : 'Upload my voice sample';
-  $('#samplePlay').hidden = !has; $('#sampleOrig').hidden = !(has && has.cleaned && VP.clean !== false);
-  if (has && VP.engine === 'gemini') { $('#sampleInfo').textContent = `Voice sample ready · ${(has.rawDur || has.dur).toFixed(1)} s. Gemini clones from your original recording (best when it is clean and 10–20 s long).`; $('#sampleOrig').hidden = true; }
-  const recording = recNow && recNow.slot === 'normal'; $('#sampleRec').textContent = recording ? 'Stop' : 'Record now'; box.classList.toggle('rec', !!recording);
-}
-function renderSlots() {
-  renderSample();
-  const dis = !VP.consent;
-  $('#slots').innerHTML = VOICE_SLOTS.filter(sl => sl.kind !== 'consent').map(sl => {
-    const b = VP.slots[sl.k], recording = recNow && recNow.slot === sl.k;
-    return `<div class="slot${b ? ' has' : ''}${recording ? ' rec' : ''}"><div><div class="nm">${sl.nm}${sl.kind === 'sound' ? ` <code>[${sl.k}]</code>` : sl.k !== 'normal' ? ` <code>[${sl.k}]</code>` : ''}</div><div class="ds">${b ? (b.cleaning ? 'Cleaning…' : cleanSummary(b)) : sl.ds}</div></div>
-      <div class="acts"><button class="btn small ${recording ? 'danger' : ''}" data-rec="${sl.k}" ${dis ? 'disabled' : ''}>${recording ? 'Stop' : 'Record'}</button><button class="btn small" data-slotup="${sl.k}" ${dis ? 'disabled' : ''}>Upload</button>${b ? `<button class="btn small" data-slotplay="${sl.k}">Play</button>${b.cleaned && VP.clean !== false ? `<button class="btn small" data-slotorig="${sl.k}">Original</button>` : ''}<button class="btn small danger" data-slotdel="${sl.k}">Remove</button>` : ''}</div></div>`;
-  }).join('');
-}
-function encodeWav(f32, sr) {
-  const buf = new ArrayBuffer(44 + f32.length * 2), v = new DataView(buf), str = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
-  str(0, 'RIFF'); v.setUint32(4, 36 + f32.length * 2, true); str(8, 'WAVE'); str(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
-  v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); str(36, 'data'); v.setUint32(40, f32.length * 2, true);
-  for (let i = 0; i < f32.length; i++) v.setInt16(44 + i * 2, Math.max(-1, Math.min(1, f32[i])) * 32767, true);
-  return new Blob([buf], { type: 'audio/wav' });
-}
-// any recording/upload -> trimmed 24 kHz mono WAV (what the voice model works with)
-async function toVoiceWav(blob, maxSec) {
-  actxDecode = actxDecode || new (window.AudioContext || window.webkitAudioContext)();
-  const dec = await actxDecode.decodeAudioData(await blob.arrayBuffer());
-  const sr = 24000, oc = new OfflineAudioContext(1, Math.max(1, Math.ceil(dec.duration * sr)), sr), src = oc.createBufferSource();
-  src.buffer = dec; src.connect(oc.destination); src.start(); const out = (await oc.startRendering()).getChannelData(0);
-  let pk = 0; for (const x of out) pk = Math.max(pk, Math.abs(x)); const thr = Math.max(0.01, pk * 0.06);
-  let a = 0, b = out.length - 1; while (a < b && Math.abs(out[a]) < thr) a++; while (b > a && Math.abs(out[b]) < thr) b--;
-  a = Math.max(0, a - sr * 0.08); b = Math.min(out.length, b + sr * 0.12, a + sr * maxSec);
-  const cut = out.slice(a, b); if (cut.length < sr * 0.3) throw new Error('The recording is silent or too short');
-  const g = pk > 0 ? Math.min(4, 0.9 / pk) : 1; for (let i = 0; i < cut.length; i++) cut[i] *= g;
-  return { blob: encodeWav(cut, sr), dur: cut.length / sr };
-}
-async function setSlot(k, blob) {
-  const sl = VOICE_SLOTS.find(x => x.k === k);
-  try {
-    const r = await toVoiceWav(blob, sl.max); VP.slots[k] = { blob: r.blob, raw: r.blob, dur: r.dur, rawDur: r.dur, cleaned: sl.kind === 'consent' }; if (k === 'normal' || k === 'consent') VP.gemVoiceKey = ''; saveVP(); renderSlots(); showEngine();
-    if (sl.kind === 'consent') toast('Consent recorded. Now press Create my Gemini voice.');
-    else if (VP.clean !== false && ttsOnline) await refineSlot(k); else toast(`${sl.nm} saved (${r.dur.toFixed(1)} s)` + (VP.clean !== false ? '. It will be cleaned when the voice server is connected.' : ''));
-  }
-  catch (e) { toast('Could not use this recording: ' + e.message); }
-}
-async function toggleRec(k) {
-  if (recNow) { const was = recNow.slot; recNow.mr.stop(); if (was === k) return; }
-  if (!VP.consent) { $('#myVoice').open = true; return toast('First tick the box: this is my own voice (or I have permission)'); }
-  let stream; try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
-  catch (e) { return toast('Microphone not available: ' + (e.message || e.name) + '. You can upload a recording instead.'); }
-  const mr = new MediaRecorder(stream), chunks = [], sl = VOICE_SLOTS.find(x => x.k === k);
-  mr.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
-  mr.onstop = async () => { stream.getTracks().forEach(t => t.stop()); clearTimeout(recNow && recNow.timer); recNow = null; renderSlots(); await setSlot(k, new Blob(chunks, { type: mr.mimeType || 'audio/webm' })); };
-  recNow = { slot: k, mr, timer: setTimeout(() => { if (recNow && recNow.mr === mr) mr.stop(); }, sl.max * 1000) };
-  mr.start(); renderSlots(); showEngine(); toast(`Recording ${sl.nm}… press Stop when done`);
-}
-const blobB64 = b => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(',')[1]); fr.onerror = rej; fr.readAsDataURL(b); });
-async function ttsFetch(path, opt = {}) {
-  if (!ttsBase()) throw new Error('Paste the voice server link first');
-  let r; try { r = await fetch(ttsBase() + path, opt); } catch (e) { throw new Error('Could not reach the voice server. Is the Colab notebook still running? The link changes on every restart.'); }
-  if (!r.ok) { let m = r.status + ''; try { m = (await r.json()).detail || m; } catch (_) {} throw new Error(m); }
-  return r;
-}
-async function ttsConnect() {
-  const chip = $('#ttsChip'); chip.textContent = 'Connecting…'; chip.className = 'chip';
-  try { const h = await (await ttsFetch('/health')).json(); chip.textContent = `Connected · ${h.engine === 'fake' ? 'test engine' : 'GPU ready'}${h.model ? ' · ' + ({ hindi: 'Hindi model', v3: 'V3 model', v2: 'V2 model' }[h.model] || h.model) : ''}${h.version ? ' · server v' + h.version : ''}`; chip.className = 'chip ok'; ttsOnline = true;
-    $('#ttsInfo').textContent = (h.model && h.model !== 'hindi' && h.notes && h.notes.length) ? `Hindi model not used (running ${h.model.toUpperCase()}): ${h.notes.join(' | ')}` : '';
-    cleanPending(); return true; }
-  catch (e) { chip.textContent = 'Not connected'; chip.className = 'chip wait'; ttsOnline = false; toast(e.message); return false; }
-}
-$('#ttsConnect').onclick = ttsConnect;
-// A voice server link handed to the app: the notebook's "Open in Stickman Studio" button, or a copied link.
-// The user always confirms, since connecting sends their voice samples to that server.
-const linkOk = u => { try { const x = new URL(String(u).trim()); return x.protocol === 'https:' && /^[a-z0-9-]+\.trycloudflare\.com$/.test(x.hostname) ? x.origin : ''; } catch (_) { return ''; } };
-let linkAsked = '', linkSkip = '';
-function askServerLink(u) {
-  const url = linkOk(u); if (!url) return false;
-  if (url === ttsBase().replace(/\/+$/, '') && ttsOnline) return false;
-  linkAsked = url; $('#linkAskHost').textContent = new URL(url).hostname; $('#linkAsk').hidden = false;
-  console.log('SSAPP-LINK ' + new URL(url).hostname);
-  showTab('script'); setTimeout(() => $('#linkAsk').scrollIntoView({ block: 'center', behavior: 'smooth' }), 50);
-  return true;
-}
-window.ssConnectLink = () => false;   // the AI voice panel is not shown, so voice server links are ignored
-$('#linkAskYes').onclick = async () => {
-  $('#linkAsk').hidden = true; $('#ttsUrl').value = linkAsked; $('#ttsUrl').dispatchEvent(new Event('input'));
-  if (await ttsConnect()) toast('Connected to the voice server');
-};
-$('#linkAskNo').onclick = () => { $('#linkAsk').hidden = true; linkSkip = linkAsked; };
-// In the Android app: notice a link copied from the notebook when you come back to the app.
-function checkCopiedLink() {
-  return;   // AI voice is not shown
-  if (!APP || !window.AndroidBridge.clipboardText || document.hidden) return;
-  let t = ''; try { t = window.AndroidBridge.clipboardText(); } catch (_) {}
-  const url = linkOk(t); if (url && url !== linkSkip && url !== linkAsked) askServerLink(url);
-}
-window.addEventListener('focus', () => setTimeout(checkCopiedLink, 300));
-document.addEventListener('visibilitychange', () => setTimeout(checkCopiedLink, 300));
-function ttsBusy(on) { $('#ttsGo').disabled = on; $('#ttsStop').hidden = !on; $('#ttsProg').hidden = !on; }
-async function waitJob(id, label) {
-  return new Promise((res, rej) => {
-    const tick = async () => {
-      try {
-        const s = await (await ttsFetch('/jobs/' + id)).json();
-        if (s.status === 'done') return res(s);
-        if (s.status === 'error') return rej(new Error(s.message || 'The voice server failed'));
-        $('#ttsProg').value = s.total ? s.done / s.total : 0;
-        $('#ttsInfo').textContent = s.status === 'queued' ? 'Waiting for the GPU…' : `${label}: line ${Math.min(s.done + 1, s.total)} of ${s.total}…`;
-        ttsPoll = setTimeout(tick, 1500);
-      } catch (e) { rej(e); }
-    };
-    ttsPoll = setTimeout(tick, 600);
-  });
-}
-$('#ttsStop').onclick = () => { gemStop = true; if (gemAbort) gemAbort.abort(); gemEnd(); clearTimeout(ttsPoll); ttsBusy(false); $('#ttsInfo').textContent = 'Stopped waiting. The server may still finish in the background.'; };
-async function applyTtsResult(id, st, msg) {
-  const blob = await (await ttsFetch(`/jobs/${id}/audio`)).blob();
-  await setVoice(new Blob([blob], { type: 'audio/wav' }), 'AI voiceover.wav');
-  ttsTiming(st.timings); segmentsChanged(true);
-  S.tts = { url: ttsBase(), job: id, timings: st.timings }; save(); renderTtsLines();
-  $('#ttsInfo').textContent = msg + ` · ${fmt(st.duration, 0)} long. Scenes are synced to it.`;
-}
-// The request body for the voice server: lines, settings and (for "My cloned voice") the cleaned samples.
-async function ttsBody(units) {
-  const body = { units, language: VP.lang, expressiveness: VP.expr, sentence_pause: VP.sentPause, comma_pause: VP.commaPause, pace: VP.pace || 'normal', seed: 7, voice: {}, sounds: {} };
-  if (VP.voice === 'mine' && VP.clean !== false && VOICE_SLOTS.some(sl => sl.kind !== 'consent' && VP.slots[sl.k] && !VP.slots[sl.k].cleaned)) { $('#ttsInfo').textContent = 'Cleaning your samples first…'; await cleanPending(true); }
-  if (VP.voice === 'mine') for (const sl of VOICE_SLOTS) { const v = VP.slots[sl.k]; if (v && sl.kind !== 'consent') (sl.kind === 'voice' ? body.voice : body.sounds)[sl.k] = await blobB64(slotUse(v)); }
-  return body;
-}
-async function ttsGenerate() {
-  S.script = $('#script').value;
-  if (!S.segments.length) return toast('Press Create scenes first');
-  if (VP.voice === 'mine' && (!VP.consent || !VP.slots.normal)) { renderSample(); return toast('For your own voice: tick the permission box, then upload or record a voice sample'); }
-  const groups = sentenceGroups(), units = groups.map(g => g.map(i => S.segments[i].text.trim()).join(' '));
-  const body = await ttsBody(units);
-  ttsBusy(true); $('#ttsInfo').textContent = 'Sending the script…';
-  try {
-    const j = await (await ttsFetch('/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();
-    const st = await waitJob(j.job_id, 'Speaking');
-    await applyTtsResult(j.job_id, st, 'Voiceover ready');
-    toast('Voiceover ready and synced');
-  } catch (e) { $('#ttsInfo').textContent = e.message; toast(e.message); }
-  ttsBusy(false);
-}
-$('#ttsGo').onclick = () => (VP.engine === 'gemini' ? gemGenerate() : ttsGenerate());
-function renderTtsLines() {
-  const t = S.tts; $('#ttsLines').hidden = !(t && t.timings && t.timings.length);
-  if (!t || !t.timings) return;
-  $('#ttsLineList').innerHTML = t.timings.map((x, k) => `<div class="ln"><b class="tc">${k + 1}</b><span class="tx" title="${esc(x.text)}">${esc(x.text)}</span><span class="row" style="gap:4px"><button class="btn small" data-lineplay="${k}">Play</button><button class="btn small" data-lineredo="${k}">Redo</button></span></div>`).join('');
-}
-let linePlayT;
-function playLine(k) { const x = S.tts.timings[k]; vo.currentTime = Math.max(0, x.start - 0.05); vo.play(); clearTimeout(linePlayT); linePlayT = setTimeout(() => vo.pause(), (x.end - x.start + 0.25) * 1000); }
-// Redo one line. If the server still remembers this voiceover it is quick; otherwise (e.g. after a
-// Colab restart) the app sends the voiceover it has, and only that line is replaced in it.
-async function redoLine(k) {
-  const t = S.tts; if (!t || !t.timings) return;
-  if (t.engine === 'gemini') return gemRedo(k);
-  if (!S.audioBlob || S.audioName !== 'AI voiceover.wav') return toast('The current voiceover is not the AI one any more. Generate it again.');
-  ttsBusy(true); $('#ttsInfo').textContent = `Redoing line ${k + 1}…`;
-  try {
-    let jobId = null;
-    if (ttsBase() === t.url && t.job) {
-      try { await ttsFetch(`/jobs/${t.job}/redo`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ unit: k }) }); jobId = t.job; }
-      catch (e) { if (!/Unknown job|404/i.test(e.message)) throw e; }
-    }
-    if (!jobId) {
-      $('#ttsInfo').textContent = `Sending the voiceover so only line ${k + 1} is redone…`;
-      const body = await ttsBody(t.timings.map(x => x.text));
-      Object.assign(body, { audio: await blobB64(S.audioBlob), timings: t.timings.map(x => ({ start: x.start, end: x.end })), unit: k });
-      jobId = (await (await ttsFetch('/redo_line', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json()).job_id;
-    }
-    const st = await waitJob(jobId, 'Redoing');
-    await applyTtsResult(jobId, st, `Line ${k + 1} redone`); playLine(k);
-  } catch (e) { $('#ttsInfo').textContent = e.message; toast(e.message); }
-  ttsBusy(false);
-}
-function downloadVoice() {
-  if (!S.audioBlob) return toast('No voiceover yet');
-  const ext = (S.audioBlob.type.includes('wav') ? 'wav' : (S.audioName.split('.').pop() || 'audio')).toLowerCase();
-  download(S.audioBlob, `${safeName()}-voiceover.${ext}`);
-}
-
-/* ============ Google Gemini voice (Gemini 3.8 TTS, called straight from the app) ============ */
+/* ============ Gemini API key (for Auto plan, Draw all with Gemini and the YouTube kit) ============ */
 const GEM_BASE = 'https://generativelanguage.googleapis.com/v1beta';
-const CONSENT_TEXT = 'I am the owner of this voice and I consent to Google using this voice to create a synthetic voice model.';
-const GEM_STYLES = {
-  narrative: 'Narrative: a warm, engaging storyteller narrating a short story video. Natural and conversational, with real feeling that follows the meaning of every line.',
-  promo_high: 'Promo, high energy: upbeat, punchy and exciting like a lively YouTube promo, with a vocal smile and strong emphasis on key words.',
-  storyteller: 'Dramatic storyteller: expressive and cinematic, building suspense and emotion, letting important moments land.',
-  documentary: 'Documentary narrator: calm, clear and confident, measured and thoughtful.',
-  conversational: 'Conversational: like talking to a close friend, casual, warm and natural.',
-  calm: 'Calm and soothing: soft, relaxed and gentle.',
-};
-const GEM_PACE = { natural: 'Pace: natural, like a real person speaking, with natural pauses and breaths.', slow: 'Pace: slow, measured and deliberate.', fast: 'Pace: fast and energetic, but always clear.' };
-const GEM_ACCENT = { neutral: 'Accent: neutral.', indian: 'Accent: neutral Indian accent.', hindi: 'Accent: natural native Hindi speaker; English words are said the way Indians say them.' };
-const GEM_MOOD = { happy: 'happy and cheerful', excited: 'excited and energetic', sad: 'sad and emotional', angry: 'angry and intense', calm: 'calm and gentle', whisper: 'whispering softly', serious: 'serious' };
+const VP = { gemKey: '' };
+function saveVP() { DB.put('voiceProfile', { gemKey: VP.gemKey || '' }).catch(() => {}); }
+// older versions kept voice samples here too: only the key is kept, the rest is dropped to free space
+async function loadVP() { try { const v = await DB.get('voiceProfile'); if (v) { VP.gemKey = v.gemKey || ''; if (Object.keys(v).length > 1) saveVP(); } } catch (_) {} }
+const blobB64 = b => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(',')[1]); fr.onerror = rej; fr.readAsDataURL(b); });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-let gemStop = false, gemAbort = null, gemTick = null;
-const gemStatus = { label: '', t0: 0, done: 0, total: 0, partStart: 0, wait: '' };
-function gemShow() {
-  const el = (performance.now() - gemStatus.t0) / 1000, mmss = s2 => `${Math.floor(s2 / 60)}:${String(Math.floor(s2 % 60)).padStart(2, '0')}`;
-  let txt = gemStatus.label + ' · ' + mmss(el);
-  if (gemStatus.total) {
-    const pct = Math.round(100 * gemStatus.done / gemStatus.total);
-    txt = `${gemStatus.label} · ${pct}% · ${mmss(el)}`;
-    if (gemStatus.done > 0) { const left = el / gemStatus.done * (gemStatus.total - gemStatus.done); txt += left > 60 ? ` · about ${Math.ceil(left / 60)} min left` : ` · about ${Math.ceil(left / 5) * 5} s left`; }
-    $('#ttsProg').value = gemStatus.done / gemStatus.total;
-  }
-  if (gemStatus.wait) txt += ' · ' + gemStatus.wait;
-  $('#ttsInfo').textContent = txt;
-}
-function gemStart(label, total) {
-  Object.assign(gemStatus, { label, t0: performance.now(), done: 0, total: total || 0, wait: '' });
-  if (total) $('#ttsProg').value = 0; else $('#ttsProg').removeAttribute('value');   // no total: moving bar
-  clearInterval(gemTick); gemTick = setInterval(gemShow, 1000); gemShow();
-}
-function gemEnd() { clearInterval(gemTick); gemTick = null; $('#ttsProg').value = 0; }
-function showEngine() {
-  $('#aiVoice').dataset.engine = VP.engine || 'gemini';
-  if ($('#gemCloneBox').previousElementSibling !== $('#sampleBox')) $('#sampleBox').after($('#gemCloneBox'));   // sample first, then consent
-  $('#gemCustomWrap').hidden = VP.gemStyle !== 'custom';
-  const mine = VP.engine === 'gemini' && VP.gemVoice === 'mine', vc = VP.engine === 'gemini' && VP.gemVoice === 'mine_free';
-  $('#gemCloneBox').hidden = !mine; $('#gemBaseWrap').hidden = !vc; $('#aiVoice').dataset.vc = vc ? '1' : '';
-  $('#vcHint').style.display = vc ? '' : 'none';
-  const c = VP.slots.consent;
-  $('#gemConsentPlay').hidden = !c;
-  $('#gemConsentRec').textContent = recNow && recNow.slot === 'consent' ? 'Stop' : (c ? 'Record again' : 'Record consent');
-  const sig = gemSig();
-  $('#gemCloneInfo').textContent = !VP.slots.normal ? 'First add your voice sample above.' : !c ? 'Consent not recorded yet.' : (VP.gemVoiceKey && VP.gemVoiceSig === sig) ? 'Your Gemini voice is ready.' : 'Consent recorded. Press Create my Gemini voice (or just Generate: it is created automatically).';
-  if (VP.engine === 'gemini' && !(vc && ttsOnline)) { const chip = $('#ttsChip'); chip.textContent = VP.gemKey ? 'Gemini · ' + (VP.gemModel || '').replace('gemini-', '') : 'Gemini · add your API key'; chip.className = 'chip ' + (VP.gemKey ? 'ok' : 'wait'); }
-  renderSample();
-}
-const gemSig = () => { const a = VP.slots.normal, b = VP.slots.consent; return a && b ? `${(a.rawDur || a.dur).toFixed(2)}|${(b.rawDur || b.dur).toFixed(2)}|${VP.gemModel}` : ''; };
+let gemStop = false, gemAbort = null;
 async function gemFetch(path, body, timeoutSec = 180) {
   if (!(VP.gemKey || '').trim()) throw new Error('Paste your Gemini API key first (aistudio.google.com/apikey)');
   for (let attempt = 0; attempt < 10; attempt++) {
@@ -4364,197 +3894,16 @@ async function gemFetch(path, body, timeoutSec = 180) {
     } finally { clearTimeout(timer); gemAbort = null; }
     if (r.status === 429 || r.status === 503) {
       let wait = 20; const d = ((j.error && j.error.details) || []).find(x => x.retryDelay); if (d) wait = parseFloat(d.retryDelay) || wait;
-      wait = Math.min(90, wait);
-      for (let w = Math.ceil(wait); w > 0; w--) { if (gemStop) throw new Error('Stopped'); gemStatus.wait = `Google's free per-minute limit: continuing in ${w} s`; if (gemTick) gemShow(); else $('#ttsInfo').textContent = gemStatus.wait; await sleep(1000); }
-      gemStatus.wait = ''; continue;
+      wait = Math.min(90, Math.ceil(wait)); toast(`Google's free per-minute limit: continuing in ${wait} s`);
+      for (let w = wait; w > 0; w--) { if (gemStop) throw new Error('Stopped'); await sleep(1000); }
+      continue;
     }
-    if (!r.ok) { const m = (j.error && j.error.message) || ('error ' + r.status); throw new Error('Google: ' + m + (/Paid Quota Tier|paid tier|billing/i.test(m) ? ' → Free option: choose Voice "My voice – free".' : '')); }
+    if (!r.ok) throw new Error('Google: ' + ((j.error && j.error.message) || ('error ' + r.status)));
     return j;
   }
   throw new Error('Google kept refusing because of rate limits. Try again in a few minutes.');
 }
-$('#gemCheck').onclick = async () => {
-  try { await gemFetch('/voices?page_size=5'); toast('The Gemini API key works'); $('#ttsChip').textContent = 'Gemini · key works'; $('#ttsChip').className = 'chip ok'; }
-  catch (e) { toast(e.message); $('#ttsChip').textContent = 'Gemini · key problem'; $('#ttsChip').className = 'chip wait'; }
-};
-// WAV <-> samples (24 kHz mono)
-function wavToFloat(buf) {
-  const v = new DataView(buf); let sr = 24000, ch = 1, bits = 16, off = 12, data = null;
-  if (v.getUint32(0, false) !== 0x52494646) { const n = buf.byteLength >> 1, out = new Float32Array(n); for (let i = 0; i < n; i++) out[i] = v.getInt16(i * 2, true) / 32768; return { pcm: out, sr }; }   // raw L16
-  while (off + 8 <= buf.byteLength) {
-    const id = String.fromCharCode(v.getUint8(off), v.getUint8(off + 1), v.getUint8(off + 2), v.getUint8(off + 3)), size = v.getUint32(off + 4, true);
-    if (id === 'fmt ') { ch = v.getUint16(off + 10, true); sr = v.getUint32(off + 12, true); bits = v.getUint16(off + 22, true); }
-    if (id === 'data') { data = [off + 8, Math.min(size, buf.byteLength - off - 8)]; break; }
-    off += 8 + size + (size & 1);
-  }
-  if (!data || bits !== 16) throw new Error('Unexpected audio format from Google');
-  const frames = Math.floor(data[1] / (2 * ch)), out = new Float32Array(frames);
-  for (let i = 0; i < frames; i++) { let s2 = 0; for (let c = 0; c < ch; c++) s2 += v.getInt16(data[0] + (i * ch + c) * 2, true); out[i] = s2 / ch / 32768; }
-  return { pcm: out, sr };
-}
-async function to24k(pcm, sr) {
-  if (sr === 24000) return pcm;
-  const oc = new OfflineAudioContext(1, Math.ceil(pcm.length * 24000 / sr), 24000), b = oc.createBuffer(1, pcm.length, sr); b.copyToChannel(pcm, 0);
-  const src = oc.createBufferSource(); src.buffer = b; src.connect(oc.destination); src.start(); return (await oc.startRendering()).getChannelData(0);
-}
-function trimPcm(x, sr = 24000) {
-  let pk = 0; for (const a of x) pk = Math.max(pk, Math.abs(a)); const thr = Math.max(0.004, pk * 0.02);
-  let a = 0, b = x.length - 1; while (a < b && Math.abs(x[a]) < thr) a++; while (b > a && Math.abs(x[b]) < thr) b--;
-  return x.slice(Math.max(0, a - sr * 0.03), Math.min(x.length, b + sr * 0.08));
-}
-async function blobSlice(blob, maxSec) {   // first maxSec seconds of a 24 kHz WAV, as base64
-  const { pcm, sr } = wavToFloat(await blob.arrayBuffer());
-  return blobB64(encodeWav(pcm.slice(0, Math.floor(sr * maxSec)), sr));
-}
-async function gemMakeVoice(quiet) {
-  if (!VP.consent) { $('#myVoice').open = true; throw new Error('Tick the box: this is my own voice (or I have permission)'); }
-  if (!VP.slots.normal) throw new Error('Add your voice sample first');
-  if (!VP.slots.consent) throw new Error('Record the consent sentence first (see the box above)');
-  const ownTicker = !gemTick; if (ownTicker) { ttsBusy(true); gemStart('Creating your Gemini voice (one time only, usually under a minute)'); }
-  else Object.assign(gemStatus, { label: 'Creating your Gemini voice (one time only, usually under a minute)', total: 0 }), $('#ttsProg').removeAttribute('value');
-  let j;
-  try { j = await gemFetch('/voices', { store: false, voice: { model: VP.gemModel, type: 'replicated', display_name: 'Stickman Studio voice',
-    replicated: { source_audio: { data: await blobSlice(slotRaw(VP.slots.normal), 20), mime_type: 'audio/wav' }, consent_audio: { data: await blobB64(slotRaw(VP.slots.consent)), mime_type: 'audio/wav' } } } }, 120); }
-  finally { if (ownTicker) { gemEnd(); ttsBusy(false); } }
-  const key = j.key || (j.voice && j.voice.key) || j.id;
-  if (!key) throw new Error('Google did not return a voice');
-  VP.gemVoiceKey = key; VP.gemVoiceSig = gemSig(); saveVP(); showEngine();
-  if (!quiet) toast('Your Gemini voice is ready');
-  const sample = j.sample_audio || (j.voice && j.voice.sample_audio);
-  if (!quiet && sample && sample.data) new Audio('data:audio/wav;base64,' + sample.data).play().catch(() => {});
-  return key;
-}
-$('#gemMake').onclick = async () => { gemStop = false; try { await gemMakeVoice(); $('#ttsInfo').textContent = 'Your Gemini voice is ready.'; } catch (e) { toast(e.message); $('#gemCloneInfo').textContent = e.message; $('#ttsInfo').textContent = e.message; } };
-// script tags -> Gemini inline tags; moods start a new part with their own style
-function gemText(t) {
-  return t.replace(/\*/g, '').replace(/\[\s*pause\s+([\d.]+)\s*\]/gi, (m, n) => (+n >= 1 ? ' <long pause> ' : ' <short pause> '))
-    .replace(/\[\s*(short\s+)?pause\s*\]/gi, ' <short pause> ').replace(/\[\s*long\s+pause\s*\]/gi, ' <long pause> ')
-    .replace(/\[\s*(laugh|chuckle|sigh|gasp)\s*\]/gi, (m, n) => ` <${n.toLowerCase()}> `).replace(/\[\s*hmm\s*\]/gi, ' hmm… ').replace(/\[\s*cry\s*\]/gi, ' <sigh> ')
-    .replace(TAG_RX, ' ').replace(/\s{2,}/g, ' ').trim();
-}
-function gemStyleText(mood) {
-  const base = VP.gemStyle === 'custom' ? (VP.gemCustom || GEM_STYLES.narrative) : GEM_STYLES[VP.gemStyle] || GEM_STYLES.narrative;
-  return [base, GEM_PACE[VP.gemPace] || GEM_PACE.natural, GEM_ACCENT[VP.gemAccent] || GEM_ACCENT.neutral, mood && GEM_MOOD[mood] ? 'Mood of this part: ' + GEM_MOOD[mood] + '.' : ''].filter(Boolean).join('\n');
-}
-// Consecutive sentences are spoken together (up to ~450 characters) so the delivery flows like a paragraph.
-function gemChunks(units) {
-  const chunks = []; let mood = 'normal';
-  units.forEach((u, k) => {
-    const lead = u.match(/^\s*\[\s*([a-zA-Z]+)\s*\]/); const startMood = lead && GEM_MOOD[lead[1].toLowerCase()] ? lead[1].toLowerCase() : (lead && lead[1].toLowerCase() === 'normal' ? 'normal' : mood);
-    const text = gemText(u), cur = chunks[chunks.length - 1];
-    if (!cur || cur.mood !== startMood || cur.text.length + text.length > 450) chunks.push({ mood: startMood, groups: [k], text });
-    else { cur.groups.push(k); cur.text += ' ' + text; }
-    const all = [...u.matchAll(/\[\s*([a-zA-Z]+)\s*\]/g)].map(m => m[1].toLowerCase()).filter(m => GEM_MOOD[m] || m === 'normal');
-    mood = all.length ? all[all.length - 1] : startMood;
-  });
-  return chunks;
-}
-// "My voice – free": turn Gemini's performance into the user's voice on the Colab server.
-async function gemConvert(pcm) {
-  const r = await (await ttsFetch('/convert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ audio: await blobB64(encodeWav(pcm, 24000)), ref: await blobB64(VP.slots.normal.dur >= 5 ? slotUse(VP.slots.normal) : slotRaw(VP.slots.normal)) }) })).json();
-  const { pcm: out, sr } = wavToFloat(Uint8Array.from(atob(r.audio), c => c.charCodeAt(0)).buffer);
-  return trimPcm(await to24k(out, sr));
-}
-async function gemPart(text, mood, voice, label) {
-  let pcm = await gemSpeak(text, mood, voice);
-  if (VP.gemVoice === 'mine_free') { gemStatus.label = label + ' · changing it into your voice'; gemShow(); pcm = await gemConvert(pcm); gemStatus.label = label; }
-  return pcm;
-}
-async function gemCheckVc() {
-  if (VP.gemVoice !== 'mine_free') return;
-  if (!VP.slots.normal) throw new Error('Add your voice sample first');
-  if (!ttsBase()) throw new Error('For "My voice – free", start the Colab notebook and paste its link (box above), then press Connect');
-  if (!ttsOnline && !(await ttsConnect())) throw new Error('Could not reach the Colab voice server. Is the notebook running? The link changes on every restart.');
-}
-async function gemSpeak(text, mood, voice) {
-  const j = await gemFetch('/interactions', { model: VP.gemModel, input: [{ type: 'text', text, annotations: [{ type: 'speech_metadata', style: gemStyleText(mood) }] }],
-    response_format: { type: 'audio' }, generation_config: { speech_config: [{ voice }] } });
-  let audio = j.output_audio;
-  if (!audio) for (const st of (j.steps || [])) for (const c of (st.content || [])) if (c.type === 'audio') audio = c;
-  if (!audio || !audio.data) throw new Error('Google returned no audio' + (j.error ? ': ' + j.error.message : ''));
-  const bin = Uint8Array.from(atob(audio.data), c => c.charCodeAt(0)).buffer, { pcm, sr } = wavToFloat(bin);
-  return trimPcm(await to24k(pcm, sr));
-}
-async function gemVoiceName() {
-  if (VP.gemVoice === 'mine_free') return VP.gemBase || 'Charon';
-  if (VP.gemVoice !== 'mine') return VP.gemVoice;
-  if (VP.gemVoiceKey && VP.gemVoiceSig === gemSig()) return VP.gemVoiceKey;
-  return gemMakeVoice(true);
-}
-function gemAssemble(parts) {   // parts: Float32Array per chunk -> voiceover + chunk spans
-  const SR = 24000, gaps = parts.map((_, i) => (i < parts.length - 1 ? VP.sentPause * (0.9 + 0.2 * ((i * 7919) % 10) / 10) : 0));
-  const total = Math.round(SR * 0.3) + parts.reduce((a, p, i) => a + p.length + Math.round(SR * gaps[i]), 0) + Math.round(SR * 0.5);
-  const out = new Float32Array(total); let t = Math.round(SR * 0.3); const spans = [];
-  parts.forEach((p, i) => { out.set(p, t); spans.push([t / SR, (t + p.length) / SR]); t += p.length + Math.round(SR * gaps[i]); });
-  let pk = 0; for (const a of out) pk = Math.max(pk, Math.abs(a)); if (pk > 0) for (let i = 0; i < out.length; i++) out[i] *= 0.95 / pk;
-  return { out, spans };
-}
-// Sentence timings inside each spoken part, from the pauses in the audio (same method as Smart Sync).
-function gemGroupTimings(chunks, units) {
-  const groups = sentenceGroups(), w = S.segments.map(s => speechWeight(s.text)), gaps = (analysis && (analysis.gaps || analysis.pauses)) || [], res = [];
-  for (const ch of chunks) {
-    const G = ch.groups, [a, b] = [ch.start, ch.end];
-    if (G.length === 1) { res[G[0]] = { start: a, end: b }; continue; }
-    const gw = G.map(g => (groups[g] || []).reduce((x, i) => x + w[i], 0) || 1);
-    const inner = gaps.filter(x => x.start > a + 0.05 && x.end < b - 0.05).map(x => ({ ...x, bonus: x.dur >= 0.12 ? 1.2 * Math.min(x.dur, 0.7) + 0.4 * x.depth : 0.15 * x.depth }));
-    const C = withGrid(inner, a, b, 0.25, 0.9), rate = Math.max(0.005, (b - a - inner.filter(x => x.dur >= 0.1).reduce((x, y) => x + y.dur, 0)) / gw.reduce((x, y) => x + y, 0));
-    const pick = alignUnits(gw, C, a, b, rate);
-    if (pick) G.forEach((g, m) => { res[g] = { start: m === 0 ? a : C[pick[m - 1]].end, end: m === G.length - 1 ? b : C[pick[m]].start }; });
-    else { let acc = a; const tot = gw.reduce((x, y) => x + y, 0); G.forEach((g, m) => { const d = (b - a) * gw[m] / tot; res[g] = { start: acc, end: acc + d }; acc += d; }); }
-  }
-  return res.map((r, g) => ({ start: +r.start.toFixed(3), end: +r.end.toFixed(3), text: units[g] }));
-}
-async function gemFinish(out, chunks, units, msg) {
-  await setVoice(encodeWav(out, 24000), 'AI voiceover.wav');
-  const timings = gemGroupTimings(chunks, units);
-  ttsTiming(timings); segmentsChanged(true);
-  S.tts = { engine: 'gemini', timings, chunks: chunks.map(c => ({ mood: c.mood, groups: c.groups, text: c.text, start: c.start, end: c.end })) }; save(); renderTtsLines();
-  $('#ttsInfo').textContent = `${msg} · ${fmt(out.length / 24000, 0)} long. Scenes are synced to it.`;
-}
-async function gemGenerate() {
-  S.script = $('#script').value;
-  if (!S.segments.length) return toast('Press Create scenes first');
-  if ((VP.gemVoice === 'mine' || VP.gemVoice === 'mine_free') && (!VP.consent || !VP.slots.normal)) { renderSample(); $('#myVoice').open = true; return toast('For your own voice: tick the permission box and add your voice sample'); }
-  const units = sentenceGroups().map(g => g.map(i => S.segments[i].text.trim()).join(' ')), chunks = gemChunks(units);
-  gemStop = false; ttsBusy(true);
-  try {
-    gemStart('Preparing your voice');
-    await gemCheckVc();
-    const voice = await gemVoiceName(), parts = [];
-    gemStart(`Gemini is speaking: part 1 of ${chunks.length}`, chunks.length);
-    for (let i = 0; i < chunks.length; i++) {
-      if (gemStop) throw new Error('Stopped');
-      gemStatus.label = `Gemini is speaking: part ${i + 1} of ${chunks.length}`; gemShow();
-      parts.push(await gemPart(chunks[i].text, chunks[i].mood, voice, gemStatus.label));
-      gemStatus.done = i + 1; gemShow();
-    }
-    gemStatus.label = 'Putting the voiceover together'; gemShow();
-    const { out, spans } = gemAssemble(parts);
-    chunks.forEach((c, i) => { c.start = spans[i][0]; c.end = spans[i][1]; });
-    gemEnd(); await gemFinish(out, chunks, units, 'Voiceover ready');
-    toast('Voiceover ready and synced');
-  } catch (e) { gemEnd(); $('#ttsInfo').textContent = e.message; toast(e.message); }
-  ttsBusy(false);
-}
-// Redo: speak again the part that holds this sentence and put it in place of the old one.
-async function gemRedo(k) {
-  const t = S.tts; const ci = (t.chunks || []).findIndex(c => c.groups.includes(k)); if (ci < 0) return toast('Generate the voiceover again');
-  if (!S.audioBlob || S.audioName !== 'AI voiceover.wav') return toast('The current voiceover is not the AI one any more. Generate it again.');
-  gemStop = false; ttsBusy(true); gemStart(`Redoing part ${ci + 1} (it holds line ${k + 1})`);
-  try {
-    await gemCheckVc();
-    const voice = await gemVoiceName(), ch = t.chunks[ci];
-    let fresh = await gemPart(ch.text, ch.mood, voice, gemStatus.label); gemEnd();
-    const { pcm } = wavToFloat(await S.audioBlob.arrayBuffer()), SR = 24000, a = Math.round(ch.start * SR), b = Math.round(ch.end * SR);
-    const rms = x => { let s2 = 0, n = 0; for (const v of x) if (Math.abs(v) > 0.01) { s2 += v * v; n++; } return n ? Math.sqrt(s2 / n) : 0; };
-    const r0 = rms(pcm.subarray(a, b)), r1 = rms(fresh); if (r0 && r1) { const g = Math.min(2, Math.max(0.5, r0 / r1)); fresh = fresh.map(v => Math.max(-0.98, Math.min(0.98, v * g))); }
-    const out = new Float32Array(pcm.length - (b - a) + fresh.length); out.set(pcm.subarray(0, a), 0); out.set(fresh, a); out.set(pcm.subarray(b), a + fresh.length);
-    const delta = fresh.length / SR - (ch.end - ch.start); ch.end = ch.start + fresh.length / SR;
-    t.chunks.slice(ci + 1).forEach(c => { c.start += delta; c.end += delta; });
-    await gemFinish(out, t.chunks, t.timings.map(x => x.text), `Part ${ci + 1} redone`); playLine(k);
-  } catch (e) { gemEnd(); $('#ttsInfo').textContent = e.message; toast(e.message); }
-  ttsBusy(false);
-}
+
 
 let bootDone; const booted = new Promise(r => bootDone = r);
 const incoming = {};
@@ -4752,7 +4101,7 @@ function ytOpen(which) {
 }
 $('#ytLang').onchange = e => { S.settings.ytLang = e.target.value; save(); };
 $('#ytChannel').addEventListener('input', e => { S.settings.ytChannel = e.target.value; save(); });
-$('#ytGemKey').addEventListener('input', e => { VP.gemKey = e.target.value.trim(); saveVP(); RL.models = null; $('#lGemKey').value = VP.gemKey; $('#gemKey').value = VP.gemKey; });
+$('#ytGemKey').addEventListener('input', e => { VP.gemKey = e.target.value.trim(); saveVP(); RL.models = null; $('#lGemKey').value = VP.gemKey; });
 $('#lGemKey').addEventListener('input', e => { $('#ytGemKey').value = e.target.value.trim(); });
 $('#ytReq').onclick = () => { if (!S.segments.length) return toast('Create scenes first (step 1)'); copyText(ytPrompt()); $('#ytInfo').textContent = 'Request copied. Paste it into ChatGPT / Gemini / Claude, then paste the whole answer above and press Apply.'; };
 $('#ytApply').onclick = () => { try { ytApply(lParseJSON($('#ytReply').value)); ytRender(); $('#ytInfo').textContent = '✔ YouTube kit ready below.'; } catch (e) { $('#ytInfo').textContent = '⚠ ' + e.message; } };
@@ -4938,207 +4287,6 @@ $('#amMake').onclick = () => { if (S.autoMusic) S.autoMusic.seed = 0; amMake(fal
 $('#amAgain').onclick = () => { if (!S.autoMusic) return amMake(false); S.autoMusic.seed = (S.autoMusic.seed * 7 + 13) & 0xffffff || 1; amMake(true); };
 $('#amParts').addEventListener('change', e => { const i = e.target.dataset.ampart; if (i == null || !S.autoMusic) return; S.autoMusic.plan[+i].mood = e.target.value; amMake(true); });
 
-/* ============ offline voiceover: the phone's own speech engine, no API key, no internet ============
-   Every sentence is spoken separately by Android's text-to-speech (Google speech services has Hindi voices that
-   work offline), trimmed, given a natural pause and a little expression (questions rise, exclamations are livelier,
-   sad lines slower...), then joined into one voiceover. The sentence times are known exactly, so the scenes sync. */
-const OV = { state: APP && window.AndroidBridge && AndroidBridge.ttsStart ? 'off' : 'none', voices: [], pending: new Map(), seq: 0, stop: false };
-window.ssTtsState = s => { OV.state = s; ovLoadVoices(); };
-window.ssTtsDone = (id, ok, data) => { const p = OV.pending.get(id); if (!p) return; OV.pending.delete(id); clearTimeout(p.timer); ok ? p.res(data) : p.rej(new Error(data)); };
-function ovStart() {
-  if (OV.state === 'none') return;
-  try { OV.state = S.settings.ovEngine && AndroidBridge.ttsUseEngine ? AndroidBridge.ttsUseEngine(S.settings.ovEngine) : AndroidBridge.ttsStart(); } catch (_) { OV.state = 'failed'; }
-  if (OV.state === 'ready') ovLoadVoices(); else ovRefresh();
-}
-function ovLoadVoices() {
-  if (OV.state === 'ready') {
-    try { OV.voices = JSON.parse(AndroidBridge.ttsVoices() || '[]'); } catch (_) { OV.voices = []; }
-    try { OV.engines = AndroidBridge.ttsEngines ? JSON.parse(AndroidBridge.ttsEngines() || '[]') : []; } catch (_) { OV.engines = []; }
-    const es = $('#ovEngine'); es.innerHTML = '<option value="">Phone default</option>' + (OV.engines || []).map(e => `<option value="${esc(e.name)}">${esc(e.label)}${e.isDefault ? ' (default)' : ''}</option>`).join(''); es.value = S.settings.ovEngine || '';
-  }
-  ovRefresh();
-}
-function ovVoiceLabel(v, k) {
-  const hi = v.lang.toLowerCase().startsWith('hi'), m = v.name.match(/x-([a-z]{3})/i), code = m ? m[1].toUpperCase() : '';
-  return `${hi ? 'Hindi' : 'Indian English'} voice ${k + 1}${code ? ' (' + code + ')' : ''} · ${!v.offline ? '★ best quality · needs internet, no key' : v.installed ? 'offline' : 'offline, not downloaded'}`;
-}
-function ovRefresh() {
-  const sel = $('#ovVoice'), info = $('#ovState');
-  if (OV.state === 'none') { info.textContent = 'Works in the Android app (it uses the phone\'s own Hindi voice). In a browser, use your own recording.'; $('#ovGo').disabled = true; $('#ovTest').disabled = true; return; }
-  if (OV.state === 'off' || OV.state === 'starting') { info.textContent = 'Starting the phone\'s speech engine…'; return; }
-  if (OV.state === 'failed') { info.textContent = 'The phone has no speech engine. Install "Speech Recognition & Synthesis from Google" from the Play Store, then press Voice settings.'; return; }
-  let k = { hi: 0, en: 0 };
-  sel.innerHTML = OV.voices.length ? OV.voices.map(v => { const g = v.lang.toLowerCase().startsWith('hi') ? 'hi' : 'en'; return `<option value="${esc(v.name)}">${esc(ovVoiceLabel(v, k[g]++))}</option>`; }).join('') : '<option value="">Hindi (default voice)</option>';
-  const want = S.settings.ovVoice, okV = OV.voices.find(v => v.name === want) || OV.voices.find(v => v.lang.toLowerCase().startsWith('hi') && v.offline && v.installed) || OV.voices[0];
-  if (okV) sel.value = okV.name;
-  const hasHi = OV.voices.some(v => v.lang.toLowerCase().startsWith('hi') && v.offline && v.installed);
-  info.textContent = hasHi ? 'Ready: Hindi voice on this phone, works without internet.' : 'No offline Hindi voice downloaded yet: press "Voice settings" → Google → Install voice data → Hindi.';
-  $('#ovGo').disabled = false; $('#ovTest').disabled = false;
-}
-function ovSynth(text, rate, pitch) {
-  return new Promise((res, rej) => {
-    const id = 'ov' + (++OV.seq) + '_' + Date.now();
-    const timer = setTimeout(() => { OV.pending.delete(id); rej(new Error('The speech engine did not answer')); }, 60000);
-    OV.pending.set(id, { res, rej, timer });
-    let ok = false; try { ok = AndroidBridge.ttsSynth(id, text, $('#ovVoice').value || '', rate, pitch); } catch (e) { }
-    if (!ok) { clearTimeout(timer); OV.pending.delete(id); rej(new Error('The speech engine is not ready')); }
-  });
-}
-// base64 WAV from the engine -> trimmed 24 kHz mono samples
-async function ovDecode(b64) {
-  actxDecode = actxDecode || new (window.AudioContext || window.webkitAudioContext)();
-  const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-  const dec = await actxDecode.decodeAudioData(bytes.buffer);
-  const sr = 24000, oc = new OfflineAudioContext(1, Math.max(1, Math.ceil(dec.duration * sr)), sr), src = oc.createBufferSource();
-  src.buffer = dec; src.connect(oc.destination); src.start(); const d = (await oc.startRendering()).getChannelData(0);
-  let pk = 0; for (const x of d) pk = Math.max(pk, Math.abs(x)); const th = Math.max(0.004, pk * 0.02);
-  let a = 0, b = d.length - 1; while (a < b && Math.abs(d[a]) < th) a++; while (b > a && Math.abs(d[b]) < th) b--;
-  return d.slice(Math.max(0, a - sr * 0.03), Math.min(d.length, b + sr * 0.08));
-}
-// a little expression per sentence, from its punctuation and words
-function ovExpr(text, idx = 0) {
-  const hum = k => 1 + 0.022 * Math.sin(idx * 2.399 + k);   // a tiny natural change from line to line
-  const R = (kkOn() ? aiSpeed() : (S.settings.ovRate || 0.95)) * hum(0.7), P = (S.settings.ovPitch || 1) * hum(2.1);
-  if (S.settings.ovExpr === 'off') return { rate: R, pitch: P, pause: 0 };
-  const t = text.trim(), sc = amScore(t); let rate = R, pitch = P, pause = 0;
-  if (/\?["'”’)]*$/.test(t)) { pitch *= 1.05; pause += 0.1; }
-  if (/!["'”’)]*$/.test(t)) { rate *= 1.05; pitch *= 1.04; }
-  if (/(…|\.\.\.)["'”’)]*$/.test(t)) { rate *= 0.94; pause += 0.35; }
-  if (sc.sad >= 1) { rate *= 0.92; pitch *= 0.97; pause += 0.15; }
-  else if (sc.suspense >= 1.5) { rate *= 0.93; pause += 0.2; }
-  else if (sc.happy >= 1 || sc.funny >= 1) { rate *= 1.03; pitch *= 1.03; }
-  else if (sc.inspiring >= 1) { rate *= 0.98; pitch *= 1.02; }
-  return { rate: clamp(rate, 0.5, 2), pitch: clamp(pitch, 0.5, 2), pause };
-}
-// text the engine should read: no *stars*, no [tags]; [pause 1.5] becomes extra silence
-function ovHindiLetters() {
-  const v = kkOn() ? null : OV.voices.find(x => x.name === $('#ovVoice').value), hiVoice = !v || v.lang.toLowerCase().startsWith('hi');
-  return hiVoice && (S.settings.ovHi === 'on' || (S.settings.ovHi !== 'off' && looksHinglish(S.script || '')));
-}
-function ovText(units) {
-  const conv = ovHindiLetters();
-  const out = units.map(u => { const m = u.match(/\[\s*pause\s*([\d.]+)?\s*\]/i), t = plain(u).replace(/["“”]/g, ''); return { text: conv ? r2d(t) : t, extra: m ? (+m[1] || 0.8) : 0, lead: m ? /^\s*\[\s*pause/i.test(u) : false }; });
-  out.forEach((o, i) => { if (o.lead && i > 0) { out[i - 1].extra += o.extra; o.extra = 0; } });
-  return out;
-}
-function ovBusy(on) { $('#ovGo').disabled = on; $('#ovTest').disabled = on; $('#ovStop').hidden = !on; $('#ovProg').hidden = !on; }
-async function ovGenerate() {
-  S.script = $('#script').value;
-  if (!S.segments.length) return toast('Press Create scenes first');
-  if (!(await ovCanSpeak())) return;
-  S.settings.ovVoice = $('#ovVoice').value; save();
-  const units = sentenceGroups().map(g => g.map(i => S.segments[i].text.trim()).join(' ')), lines = ovText(units);
-  OV.stop = false; ovBusy(true); const parts = [], info = $('#ovInfo'), t0 = performance.now();
-  try {
-    for (let i = 0; i < lines.length; i++) {
-      if (OV.stop) throw new Error('Stopped');
-      const el = (performance.now() - t0) / 1000, left = i ? el / i * (lines.length - i) : 0;
-      info.textContent = `Speaking line ${i + 1} of ${lines.length}${left > 3 ? ` · about ${Math.ceil(left)} s left` : ''}`; $('#ovProg').value = i / lines.length;
-      const e = ovExpr(lines[i].text, i);
-      parts.push({ pcm: lines[i].text.replace(/[^\p{L}\p{N}]/gu, '') ? await ovSpeak(lines[i].text, e) : new Float32Array(0), pause: e.pause + lines[i].extra });
-    }
-    const SR = 24000, base = kkOn() ? (S.settings.kkPause ?? 0.35) : (S.settings.ovPause || 0.45);
-    const gaps = ovGaps(units, parts, base);
-    let pk = 0; for (const p of parts) for (const a of p.pcm) pk = Math.max(pk, Math.abs(a)); const k = pk > 0 ? 0.95 / pk : 1;
-    const total = Math.round(SR * 0.4) + parts.reduce((a, p, i) => a + p.pcm.length + Math.round(SR * gaps[i]), 0) + Math.round(SR * 0.6);
-    const out = new Float32Array(total); let t = Math.round(SR * 0.4); const timings = [], rnd = mulberry32(7);
-    parts.forEach((p, i) => {
-      // a soft breath before a new thought (after a real pause, or before a long line), as a narrator does
-      const words = units[i].split(/\s+/).length, room = i ? gaps[i - 1] : 0.4;
-      if (S.settings.ovBreath2 === 'on' && room >= 0.38 && (words >= 9 || i % 3 === 0)) ovBreath(out, t, SR, rnd, words >= 12 ? 1 : 0.7);
-      for (let j = 0; j < p.pcm.length; j++) out[t + j] += p.pcm[j] * k;
-      timings.push({ start: +(t / SR).toFixed(3), end: +((t + p.pcm.length) / SR).toFixed(3), text: units[i] }); t += p.pcm.length + Math.round(SR * gaps[i]);
-    });
-    if (S.settings.ovPolish !== 'off') ovRoomTone(out, SR);
-    const fin = S.settings.ovPolish === 'off' ? out : await ovPolish(out, SR);
-    await setVoice(encodeWav(fin, SR), 'Offline voiceover.wav');
-    ttsTiming(timings); segmentsChanged(true);
-    S.tts = { engine: 'offline', timings }; save();
-    info.textContent = `Voiceover ready · ${fmt(out.length / SR, 0)} long, scenes synced. Play it above. Not happy? Change speed or voice and make it again.` + (kkOn() ? '' : ' Try the AI voice for a more natural sound.');
-    toast('Offline voiceover ready and synced');
-  } catch (e) { info.textContent = e.message; toast(e.message); }
-  ovBusy(false);
-}
-$('#ovGo').onclick = ovGenerate;
-$('#ovStop').onclick = () => { OV.stop = true; };
-$('#ovTest').onclick = async () => {
-  if (!(await ovCanSpeak())) return;
-  S.settings.ovVoice = $('#ovVoice').value; save(); ovBusy(true);
-  try {
-    const line = plain((S.segments[0] && sentenceGroups()[0].map(i => S.segments[i].text).join(' ')) || 'Namaste! Yeh meri awaaz ka chhota sa test hai.');
-    const say = ovHindiLetters() ? r2d(line) : line, e = ovExpr(say), raw = await ovSpeak(say, e);
-    const pcm = S.settings.ovPolish === 'off' ? raw : await ovPolish(raw, 24000);
-    const a = new Audio(URL.createObjectURL(encodeWav(pcm, 24000))); a.play();
-  } catch (e) { toast(e.message); }
-  ovBusy(false);
-};
-$('#ovSettings').onclick = () => { try { AndroidBridge.ttsSettings(); } catch (_) { toast('Open phone Settings → Text-to-speech output'); } };
-$('#ovVoice').onchange = e => { S.settings.ovVoice = e.target.value; save(); };
-document.addEventListener('visibilitychange', () => { if (!document.hidden && OV.state === 'ready') ovLoadVoices(); });   // back from voice settings: new voices
-function ovToUI() { $('#ovKind').value = aiKind() || 'phone'; kkShow(); $('#ovBreathSel').value = S.settings.ovBreath2 || 'off'; $('#kkSpeed').value = aiSpeed(); $('#kkPause').value = S.settings.kkPause ?? 0.35; kkShowVals(); $('#ovHi').value = S.settings.ovHi || 'auto'; $('#ovPolish').value = S.settings.ovPolish || 'on'; $('#ovRate').value = S.settings.ovRate; $('#ovPitch').value = S.settings.ovPitch; $('#ovPause').value = S.settings.ovPause; $('#ovExprSel').value = S.settings.ovExpr; ovShowVals(); }
-function ovShowVals() { $('#ovRateV').textContent = (+S.settings.ovRate).toFixed(2) + '×'; $('#ovPitchV').textContent = (+S.settings.ovPitch).toFixed(2); $('#ovPauseV').textContent = (+S.settings.ovPause).toFixed(2) + ' s'; }
-[['ovRate', 'ovRate'], ['ovPitch', 'ovPitch'], ['ovPause', 'ovPause']].forEach(([id, k]) => $('#' + id).addEventListener('input', e => { S.settings[k] = +e.target.value; ovShowVals(); save(); }));
-$('#ovExprSel').onchange = e => { S.settings.ovExpr = e.target.value; save(); };
-$('#ovHi').onchange = e => { S.settings.ovHi = e.target.value; save(); };
-$('#ovPolish').onchange = e => { S.settings.ovPolish = e.target.value; save(); };
-$('#ovBreathSel').onchange = e => { S.settings.ovBreath2 = e.target.value; save(); };
-function kkShowVals() { $('#kkSpeedV').textContent = (+aiSpeed()).toFixed(2) + '×'; $('#kkPauseV').textContent = (+(S.settings.kkPause ?? 0.35)).toFixed(2) + ' s'; }
-$('#kkSpeed').addEventListener('input', e => { S.settings[aiKind() === 'indic' ? 'inSpeed' : 'kkSpeed'] = +e.target.value; kkShowVals(); save(); });
-$('#kkPause').addEventListener('input', e => { S.settings.kkPause = +e.target.value; kkShowVals(); save(); });
-$('#ovEngine').onchange = e => { S.settings.ovEngine = e.target.value; S.settings.ovVoice = ''; save(); try { OV.state = AndroidBridge.ttsUseEngine(e.target.value); } catch (_) { OV.state = 'failed'; } OV.voices = []; ovRefresh(); };
-// pauses like a narrator: short between joined thoughts, longer after a question, a paragraph or "…", never all the same
-function ovGaps(units, parts, base) {
-  const scr = (S.script || '').replace(/\r/g, ''), low = scr.toLowerCase(); let pos = 0;
-  return parts.map((p, i) => {
-    if (i === parts.length - 1) return 0;
-    const u = plain(units[i]).trim(), next = plain(units[i + 1] || '').trim().toLowerCase(), words = u.split(/\s+/).length;
-    // paragraph end: the script has an empty line or a line break right after this sentence
-    let para = false; const tail = u.slice(-12).toLowerCase(), at = tail ? low.indexOf(tail, pos) : -1;
-    if (at >= 0) { pos = at + tail.length; para = /^[\s"'”’)*]*\n/.test(scr.slice(pos, pos + 6)); }
-    let f = 1;
-    if (/\?["'”’)]*$/.test(u)) f = 1.25; else if (/!["'”’)]*$/.test(u)) f = 1.05;
-    if (/(…|\.\.\.)["'”’)]*$/.test(u)) f = 1.9;
-    if (para) f = Math.max(f, 1.8);
-    if (words <= 4) f *= 0.75;
-    if (/^(aur|or|par|lekin|phir|fir|to|toh|kyunki|but|and|so|then|और|पर|लेकिन|फिर|तो|क्योंकि)\b/.test(next)) f *= 0.8;
-    const jitter = 0.85 + 0.3 * (((i * 7919) % 13) / 13);
-    return base * f * jitter + p.pause;
-  });
-}
-// a breath: soft airy noise that swells and stops just before the line
-function ovBreath(out, at, sr, rnd, size) {
-  const dur = 0.28 + 0.12 * size, n = Math.round(sr * dur), st = at - n - Math.round(sr * 0.06); if (st < 0) return;
-  let lp = 0, lp2 = 0;
-  for (let i = 0; i < n; i++) {
-    const p = i / n, env = Math.pow(Math.sin(Math.PI * Math.min(1, p * 1.15)), 1.5) * (p > 0.87 ? (1 - p) / 0.13 : 1);
-    const w = rnd() * 2 - 1; lp += (w - lp) * 0.35; lp2 += (lp - lp2) * 0.35;   // band-limited "hhh"
-    out[st + i] += (lp - lp2) * env * 0.11 * size;
-  }
-}
-// very quiet room sound under everything, so the gaps are not dead digital silence
-function ovRoomTone(out, sr) {
-  const rnd = mulberry32(3); let b0 = 0, b1 = 0, b2 = 0;
-  for (let i = 0; i < out.length; i++) { const w = rnd() * 2 - 1; b0 = 0.997 * b0 + w * 0.029591; b1 = 0.985 * b1 + w * 0.032534; b2 = 0.95 * b2 + w * 0.048056; out[i] += (b0 + b1 + b2) * 0.0035; }
-}
-// a warmer, fuller voice: low cut, a little body and presence, gentle compression and a very small room
-async function ovPolish(pcm, sr) {
-  const oc = new OfflineAudioContext(1, pcm.length + Math.round(sr * 0.3), sr), b = oc.createBuffer(1, pcm.length, sr); b.copyToChannel(pcm, 0);
-  const src = oc.createBufferSource(); src.buffer = b;
-  const hp = oc.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 75;
-  const body = oc.createBiquadFilter(); body.type = 'peaking'; body.frequency.value = 180; body.Q.value = 0.8; body.gain.value = 2.5;
-  const mud = oc.createBiquadFilter(); mud.type = 'peaking'; mud.frequency.value = 450; mud.Q.value = 1.2; mud.gain.value = -1.5;
-  const pres = oc.createBiquadFilter(); pres.type = 'peaking'; pres.frequency.value = 3200; pres.Q.value = 0.9; pres.gain.value = 2;
-  const harsh = oc.createBiquadFilter(); harsh.type = 'highshelf'; harsh.frequency.value = 7500; harsh.gain.value = -3;
-  const comp = oc.createDynamicsCompressor(); comp.threshold.value = -22; comp.ratio.value = 2.5; comp.attack.value = 0.008; comp.release.value = 0.18; comp.knee.value = 8;
-  const rnd = mulberry32(5), ir = oc.createBuffer(1, Math.round(sr * 0.35), sr), d = ir.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (rnd() * 2 - 1) * Math.pow(1 - i / d.length, 4);
-  const room = oc.createConvolver(); room.buffer = ir; const wet = oc.createGain(); wet.gain.value = 0.05;
-  src.connect(hp).connect(body).connect(mud).connect(pres).connect(harsh).connect(comp);
-  comp.connect(oc.destination); comp.connect(room).connect(wet).connect(oc.destination);
-  src.start(); const o = (await oc.startRendering()).getChannelData(0).slice(0, pcm.length);
-  let pk = 0; for (const x of o) pk = Math.max(pk, Math.abs(x)); if (pk > 0) for (let i = 0; i < o.length; i++) o[i] *= 0.95 / pk;
-  return o;
-}
-
 /* ============ viewer hooks: camera punch-in, shake, flash, reaction doodles and sounds on the key words ============
    Found from the script by itself: shock words shake the screen with a boom, reveals flash with a riser (and the music
    dips just before), anger gets 💢, fear and sadness a slow push-in with a sweat drop / tear, success ✨ with a ding,
@@ -5285,445 +4433,6 @@ function fxBankAdd(actx, bank) {
   return bank;
 }
 
-/* ============ ideas and scripts: ready story ideas with a strong hook, written for narration ============
-   Offline: every idea has a hook, the story, extra scenes (used for longer videos) and an ending with a lesson.
-   Written in Hindi (देवनागरी, best for the offline voice); Hinglish is made from it letter by letter. For any topic
-   and any length, the AI prompt (ChatGPT / Gemini / Claude, free, no API key) writes a fresh script. */
-const IDEA_GENRES = { motivation: 'Motivation / success', family: 'Emotional family', suspense: 'Suspense / horror', funny: 'Funny', moral: 'Moral story', facts: 'Facts / explainer' };
-const IDEAS = [
-  { g: 'motivation', title: 'चाय वाले का बेटा जो अफ़सर बना',
-    hook: ['जिस लड़के का पूरा गाँव मज़ाक उड़ाता था, एक दिन वही गाँव उसे सलाम करने के लिए लाइन में खड़ा था।', 'पर ये हुआ कैसे?'],
-    main: ['रोहन के पापा स्टेशन पर चाय बेचते थे।', 'रोहन सुबह चार बजे उठता, पापा के साथ केतली उठाता, और फिर स्कूल भागता।', 'उसका एक ही सपना था, *अफ़सर* बनना।', 'लोग हँसते थे, कहते थे, चाय वाले का बेटा चाय ही बेचेगा।', 'पहली बार वो परीक्षा में फेल हो गया।', 'दूसरी बार भी नहीं हुआ।', 'रात को वो स्टेशन की पीली लाइट के नीचे बैठकर पढ़ता था।', 'पापा चुपचाप उसके पास गरम चाय रख जाते, और कुछ नहीं कहते।'],
-    extra: ['एक दिन पैसों की कमी से उसकी किताबें बिक गईं।', 'उसने लाइब्रेरी में बैठकर दूसरों की पुरानी किताबों से पढ़ाई की।', 'दोस्त घूमने जाते, रोहन कमरे में बैठा रहता।', 'कई बार उसका मन हुआ कि सब छोड़ दे।', 'पर हर बार उसे पापा के फटे हुए जूते याद आ जाते।', 'और वो फिर से किताब खोल लेता।'],
-    end: ['तीसरी बार, रिज़ल्ट आया।', 'रोहन का नाम लिस्ट में सबसे ऊपर था।', 'उस दिन पहली बार पापा रो पड़े, पर ये खुशी के आँसू थे।', 'याद रखना, लोग तुम्हारी शुरुआत देखते हैं, पर तुम्हारी कहानी का अंत तुम लिखते हो।'] },
-  { g: 'motivation', title: '100 बार रिजेक्ट हुई लड़की',
-    hook: ['सौ कंपनियों ने उसे *ना* कहा।', 'एक सौ एकवीं बार उसने जो किया, उसने सबको हैरान कर दिया।'],
-    main: ['प्रिया एक छोटे शहर की लड़की थी, जिसे खाना बनाना बहुत पसंद था।', 'उसका सपना था अपना छोटा सा *फ़ूड बिज़नेस* शुरू करना।', 'पर बैंक ने लोन देने से मना कर दिया।', 'रिश्तेदारों ने कहा, लड़कियाँ बिज़नेस नहीं करतीं।', 'उसने हर दुकान, हर ऑफ़िस में जाकर अपने टिफ़िन का सैंपल दिया।', 'कोई हँसता, कोई दरवाज़ा बंद कर देता।', 'उसने एक डायरी में हर ना लिखी, और गिनती करती रही।'],
-    extra: ['पचासवीं ना के बाद उसकी माँ ने कहा, बस कर बेटा।', 'प्रिया ने मुस्कुराकर कहा, बस पचास और।', 'उसने अपनी रेसिपी हर बार थोड़ी बेहतर की।', 'ग्राहकों से पूछा, क्या कमी है।', 'और हर कमी को अगले दिन ठीक किया।'],
-    end: ['एक सौ एकवें ऑफ़िस ने पचास टिफ़िन का ऑर्डर दिया।', 'आज प्रिया की रसोई से हर दिन दो हज़ार टिफ़िन जाते हैं।', 'हर ना तुम्हें हाँ के एक कदम पास ले जाती है।'] },
-  { g: 'motivation', title: 'आख़िरी बेंच वाला लड़का',
-    hook: ['क्लास का सबसे कमज़ोर लड़का, जिसे टीचर भी भूल चुके थे।', 'दस साल बाद उसी स्कूल में वो चीफ़ गेस्ट बनकर आया।'],
-    main: ['अमन हमेशा आख़िरी बेंच पर बैठता था।', 'उसे पढ़ाई समझ नहीं आती थी, तो वो चुप रहता था।', 'एक दिन टीचर ने सबके सामने कहा, तुमसे कुछ नहीं होगा।', 'उस रात अमन बहुत रोया।', 'फिर उसने खुद से एक वादा किया, रोज़ सिर्फ़ एक घंटा, बिना छुट्टी।', 'पहले महीने कुछ नहीं बदला।', 'तीसरे महीने उसके नंबर थोड़े बढ़े।'],
-    extra: ['उसने गणित को कहानियों की तरह समझना शुरू किया।', 'दोस्तों को पढ़ाने लगा, ताकि खुद भी समझ सके।', 'धीरे धीरे वही लड़का क्लास में हाथ उठाने लगा।', 'जिस टीचर ने ताना मारा था, वो भी हैरान थी।'],
-    end: ['आज अमन एक इंजीनियर है, और गरीब बच्चों के लिए फ़्री क्लास चलाता है।', 'स्टेज से उसने बस इतना कहा, रोज़ का एक घंटा ज़िंदगी बदल देता है।', 'छोटी आदतें, बड़ा बदलाव।'] },
-  { g: 'family', title: 'पापा की घड़ी का राज़',
-    hook: ['पापा ने अपनी सबसे प्यारी घड़ी कहाँ गायब कर दी?', 'जिस दिन रोहन को ये सच पता चला, उसकी आँखें भर आईं।'],
-    main: ['पापा के पास एक पुरानी घड़ी थी, जो दादाजी ने उन्हें दी थी।', 'वो उसे रोज़ साफ़ करते, और बड़े प्यार से पहनते।', 'एक दिन रोहन के कॉलेज की फ़ीस भरनी थी, और घर में पैसे नहीं थे।', 'अगले दिन फ़ीस भर गई।', 'और पापा की कलाई खाली हो गई।', 'रोहन ने पूछा, पापा घड़ी कहाँ है?', 'पापा हँसकर बोले, पुरानी हो गई थी, अब अच्छी नहीं लगती।'],
-    extra: ['रोहन ने बात मान ली, और कॉलेज चला गया।', 'सालों तक उसे कुछ पता नहीं चला।', 'पापा अब समय पूछने के लिए फ़ोन देखते थे।', 'पर कभी शिकायत नहीं की।'],
-    end: ['नौकरी लगने के बाद रोहन को घड़ी बेचने वाली दुकान की रसीद मिली।', 'उसने अपनी पहली सैलरी से वही घड़ी वापस खरीदी।', 'जब पापा ने वो घड़ी देखी, तो कुछ बोल नहीं पाए, बस गले लगा लिया।', 'माँ बाप अपनी खुशियाँ चुपचाप बेच देते हैं, ताकि हम मुस्कुरा सकें।'] },
-  { g: 'family', title: 'माँ का झूठ',
-    hook: ['माँ हर रात कहती थी, मुझे भूख नहीं है।', 'पर सच कुछ और था।'],
-    main: ['घर में खाना कम होता था।', 'माँ पहले बच्चों को खिलाती, फिर पापा को।', 'और खुद कहती, मैंने पहले ही खा लिया।', 'छोटी नेहा को लगता था, माँ को सच में भूख नहीं लगती।', 'एक रात नेहा पानी पीने उठी।', 'उसने देखा, माँ रसोई में बची हुई सूखी रोटी पानी के साथ खा रही थी।'],
-    extra: ['नेहा चुपचाप वापस बिस्तर पर आ गई।', 'उस रात वो सो नहीं पाई।', 'अगले दिन उसने अपनी आधी रोटी चुपके से माँ की थाली में रख दी।', 'माँ ने देखा, और मुस्कुरा दी।'],
-    end: ['आज नेहा डॉक्टर है, और हर रात माँ के साथ बैठकर खाना खाती है।', 'माँ अब भी कहती है, मुझे भूख नहीं है।', 'पर अब नेहा उनकी थाली भर देती है।', 'माँ का प्यार कभी अपनी भूख नहीं गिनता।'] },
-  { g: 'family', title: 'दादाजी की आख़िरी चिट्ठी',
-    hook: ['दादाजी के जाने के बाद उनकी अलमारी में एक बंद लिफ़ाफ़ा मिला।', 'उस पर लिखा था, सिर्फ़ अमन खोले।'],
-    main: ['अमन और दादाजी सबसे अच्छे दोस्त थे।', 'शाम को दोनों पार्क जाते, और दादाजी कहानियाँ सुनाते।', 'फिर अमन बड़ा हुआ, फ़ोन और दोस्तों में बिज़ी हो गया।', 'दादाजी रोज़ पूछते, आज पार्क चलेगा?', 'अमन कहता, कल दादाजी, कल पक्का।', 'और वो कल कभी नहीं आया।'],
-    extra: ['एक सुबह दादाजी बीमार पड़ गए।', 'हॉस्पिटल में उन्होंने अमन का हाथ पकड़ा, और मुस्कुराए।', 'कुछ दिन बाद दादाजी हमेशा के लिए चले गए।', 'अमन बहुत रोया, उसे हर वो कल याद आया।'],
-    end: ['लिफ़ाफ़े में लिखा था, बेटा, मैं नाराज़ नहीं हूँ, बस अपने पापा के साथ वो शामें मत खोना।', 'उस दिन अमन ने फ़ोन रखा, और पापा का हाथ पकड़कर पार्क चला गया।', 'जिनके पास वक़्त कम है, उन्हें अपना वक़्त दो।'] },
-  { g: 'suspense', title: 'रात 3 बजे का मिस्ड कॉल',
-    hook: ['हर रात ठीक तीन बजे एक ही नंबर से मिस्ड कॉल आता था।', 'और वो नंबर, रोहन के अपने फ़ोन का था।'],
-    main: ['रोहन नए शहर में अकेला रहता था।', 'पहली रात तीन बजे फ़ोन बजा, एक बार, फिर बंद।', 'उसने सोचा, कोई गलती से लगा होगा।', 'दूसरी रात फिर वही, ठीक तीन बजे।', 'तीसरी रात उसने नंबर देखा, और उसकी साँस रुक गई।', 'नंबर उसका अपना था।', 'कमरे में अचानक सन्नाटा छा गया।'],
-    extra: ['उसने सिम बदल दी, फ़ोन बंद कर दिया।', 'फिर भी तीन बजे बंद फ़ोन की स्क्रीन जल उठी।', 'उसकी धड़कन तेज़ हो गई, हाथ काँपने लगे।', 'खिड़की के बाहर किसी की परछाई हिली।'],
-    end: ['चौथी रात उसने कॉल उठा लिया।', 'दूसरी तरफ़ से उसकी अपनी आवाज़ आई, दरवाज़ा मत खोलना।', 'और उसी पल, दरवाज़े पर दस्तक हुई।', 'आगे क्या हुआ, कमेंट में बताओ, तुम दरवाज़ा खोलते?'] },
-  { g: 'suspense', title: 'खाली बस का आख़िरी स्टॉप',
-    hook: ['उस रात बस में सिर्फ़ दो लोग थे।', 'रोहन, और एक आदमी, जिसका चेहरा कभी दिखा ही नहीं।'],
-    main: ['ऑफ़िस से लौटते हुए रोहन की आख़िरी बस छूटने वाली थी।', 'वो भागकर चढ़ा, बस बिल्कुल खाली थी।', 'पीछे की सीट पर बस एक आदमी बैठा था, टोपी नीचे किए हुए।', 'बस ऐसे रास्ते पर मुड़ गई जो रोहन ने पहले कभी नहीं देखा था।', 'उसने ड्राइवर से पूछा, ये कौन सा रास्ता है?', 'ड्राइवर ने कोई जवाब नहीं दिया।'],
-    extra: ['बाहर घना अंधेरा था, कोई लाइट नहीं।', 'रोहन ने पीछे देखा, वो आदमी अब एक सीट आगे आ चुका था।', 'उसने फिर देखा, वो और पास था।', 'रोहन का दिल ज़ोर से धड़कने लगा।'],
-    end: ['अचानक बस रुकी, और दरवाज़ा अपने आप खुल गया।', 'रोहन कूदकर बाहर भागा, और पीछे मुड़कर देखा।', 'सड़क पर कोई बस थी ही नहीं।', 'तुम्हारे साथ कभी ऐसा कुछ अजीब हुआ है? कमेंट में लिखो।'] },
-  { g: 'funny', title: 'राजू और नया स्मार्टफ़ोन',
-    hook: ['राजू ने पहली बार स्मार्टफ़ोन खरीदा।', 'और एक ही दिन में पूरे मोहल्ले में हंगामा हो गया।'],
-    main: ['राजू बड़े गर्व से नया फ़ोन लेकर घर आया।', 'उसने फ़ोन से कहा, हेलो फ़ोन, चाय बनाओ।', 'फ़ोन ने जवाब दिया, मुझे समझ नहीं आया।', 'राजू को गुस्सा आ गया, बोला, इतना महँगा और चाय भी नहीं बनाता!', 'फिर उसने गलती से फ़ैमिली ग्रुप में वीडियो कॉल लगा दी।', 'स्क्रीन पर सत्ताईस रिश्तेदार, और राजू बनियान में।'],
-    extra: ['मौसी ने पूछा, राजू, ये पीछे भैंस क्यों बैठी है?', 'राजू बोला, मौसी, वो भैंस नहीं, मेरा भाई है।', 'पूरा ग्रुप हँस पड़ा, और भाई ने फ़ोन छीन लिया।', 'फिर राजू ने सेल्फ़ी ली, पर कैमरा उल्टा था।'],
-    end: ['शाम तक राजू का फ़ोन हैंग हो गया।', 'राजू ने उसे फ़्रिज में रख दिया, बोला, गर्मी लग रही होगी बेचारे को।', 'अगली बार राजू क्या करेगा, कमेंट में बताओ।'] },
-  { g: 'funny', title: 'जब पापा ने ऑनलाइन क्लास जॉइन की',
-    hook: ['पापा बोले, ऑनलाइन क्लास में क्या मुश्किल है?', 'पाँच मिनट बाद पूरी क्लास हँस रही थी।'],
-    main: ['अमन का नेटवर्क खराब था, तो पापा ने कहा, मैं संभाल लूँगा।', 'पापा ने लैपटॉप को टीवी की तरह दूर से देखना शुरू किया।', 'टीचर ने पूछा, अमन, जवाब बताओ।', 'पापा ज़ोर से बोले, अमन बाज़ार गया है, मैं बताऊँ?', 'फिर उन्होंने माइक बंद करने की जगह कैमरा बंद कर दिया।', 'और सबको उनकी आवाज़ आ रही थी, अरे अमन की माँ, चाय लाना!'],
-    extra: ['माँ ने पीछे से जवाब दिया, खुद बना लो, मैं सीरियल देख रही हूँ।', 'पूरी क्लास ने सब सुना।', 'टीचर भी अपनी हँसी नहीं रोक पाई।'],
-    end: ['अगले दिन अमन क्लास में गया, तो सब उसे चाय वाला अमन बुलाने लगे।', 'उस दिन से पापा ने कहा, ये टेक्नोलॉजी मेरे बस की नहीं।', 'तुम्हारे घर में ऐसा कौन है? उसे टैग करो।'] },
-  { g: 'moral', title: 'लालची दुकानदार और सोने का सिक्का',
-    hook: ['एक सोने के सिक्के ने एक लालची दुकानदार की पूरी दुकान डुबा दी।', 'कैसे? सुनो।'],
-    main: ['एक गाँव में मोहन नाम का दुकानदार था, जो हमेशा कम तौलता था।', 'एक दिन एक बूढ़ा आदमी आया, और गलती से सोने का सिक्का दे गया।', 'मोहन ने सोचा, किसी को पता नहीं चलेगा।', 'उसने सिक्का छुपा लिया।', 'अगले दिन बूढ़ा आदमी वापस आया, और पूछा, क्या मेरा सिक्का यहाँ गिरा था?', 'मोहन ने कहा, नहीं, मुझे कुछ नहीं पता।'],
-    extra: ['बूढ़े आदमी ने मुस्कुराकर कहा, कोई बात नहीं।', 'पर बाहर खड़े गाँव वालों ने सब देख लिया था।', 'बात पूरे गाँव में फैल गई।'],
-    end: ['असल में वो बूढ़ा आदमी गाँव का नया मुखिया था, जो ईमानदार दुकानदार ढूँढ रहा था।', 'मोहन के ग्राहक एक एक करके चले गए।', 'ईमानदारी का एक पल, लालच के सौ सिक्कों से ज़्यादा कीमती है।'] },
-  { g: 'moral', title: 'आलसी राजा और दो बीज',
-    hook: ['राजा ने दो लोगों को एक एक बीज दिया।', 'एक साल बाद, एक के पास पेड़ था, और दूसरे के पास बहाना।'],
-    main: ['एक राज्य में राजा को नया मंत्री चुनना था।', 'उसने दो युवकों को बुलाया, और दोनों को एक बीज दिया।', 'कहा, एक साल बाद जिसका पौधा अच्छा होगा, वही मंत्री बनेगा।', 'पहले युवक ने रोज़ पानी दिया, धूप दिखाई, मेहनत की।', 'दूसरे ने बीज गमले में डाला, और भूल गया।'],
-    extra: ['बारिश में पहले युवक ने पौधे को ढककर बचाया।', 'दूसरा कहता रहा, बीज खराब होगा, मेरी गलती नहीं।', 'महीने बीतते गए।'],
-    end: ['एक साल बाद एक के पास छोटा हरा पेड़ था, और दूसरे के पास खाली गमला।', 'राजा ने पहले युवक को मंत्री बना दिया।', 'किस्मत बीज देती है, पर पेड़ मेहनत उगाती है।'] }
-];
-const FACT_TOPICS = ['आसमान नीला क्यों दिखता है?', 'हम सपने क्यों देखते हैं?', 'पैसा असल में कैसे काम करता है?', 'मोबाइल फ़ोन हमारे दिमाग़ को कैसे बदल रहा है?', 'पिरामिड कैसे बने?', 'समुद्र खारा क्यों है?', 'हम बोर क्यों होते हैं?', 'ATM मशीन पैसे कैसे गिनती है?'];
-/* Devanagari -> Roman Hinglish (spoken style: mein, hai, kya…), letter by letter with schwa dropping */
-const HL_C = { 'क': 'k', 'ख': 'kh', 'ग': 'g', 'घ': 'gh', 'ङ': 'n', 'च': 'ch', 'छ': 'chh', 'ज': 'j', 'झ': 'jh', 'ञ': 'n', 'ट': 't', 'ठ': 'th', 'ड': 'd', 'ढ': 'dh', 'ण': 'n', 'त': 't', 'थ': 'th', 'द': 'd', 'ध': 'dh', 'न': 'n', 'प': 'p', 'फ': 'ph', 'ब': 'b', 'भ': 'bh', 'म': 'm', 'य': 'y', 'र': 'r', 'ल': 'l', 'व': 'w', 'श': 'sh', 'ष': 'sh', 'स': 's', 'ह': 'h', 'क़': 'q', 'ख़': 'kh', 'ग़': 'gh', 'ज़': 'z', 'फ़': 'f', 'ड़': 'd', 'ढ़': 'rh' };
-const HL_V = { 'अ': 'a', 'आ': 'aa', 'इ': 'i', 'ई': 'ee', 'उ': 'u', 'ऊ': 'oo', 'ए': 'e', 'ऐ': 'ai', 'ओ': 'o', 'औ': 'au', 'ऋ': 'ri', 'ऑ': 'o' };
-const HL_M = { 'ा': 'aa', 'ि': 'i', 'ी': 'ee', 'ु': 'u', 'ू': 'oo', 'े': 'e', 'ै': 'ai', 'ो': 'o', 'ौ': 'au', 'ृ': 'ri', 'ॉ': 'o' };
-const HL_WORDS = { 'पापा': 'papa', 'चाय': 'chai', 'फ़ोन': 'phone', 'कॉल': 'call', 'मिस्ड': 'missed', 'नंबर': 'number', 'लाइट': 'light', 'स्टेशन': 'station', 'रिज़ल्ट': 'result', 'कमेंट': 'comment', 'वीडियो': 'video', 'चैनल': 'channel', 'लाइक': 'like', 'सब्सक्राइब': 'subscribe', 'ऑफ़िस': 'office', 'स्कूल': 'school', 'कॉलेज': 'college', 'लिस्ट': 'list', 'सैलरी': 'salary', 'हॉस्पिटल': 'hospital', 'लाइब्रेरी': 'library', 'डॉक्टर': 'doctor', 'इंजीनियर': 'engineer', 'बिज़नेस': 'business', 'टिफ़िन': 'tiffin', 'ऑर्डर': 'order', 'लैपटॉप': 'laptop', 'टीवी': 'TV', 'टीचर': 'teacher', 'क्लास': 'class', 'ऑनलाइन': 'online', 'माइक': 'mic', 'कैमरा': 'camera', 'सेल्फ़ी': 'selfie', 'स्मार्टफ़ोन': 'smartphone', 'ग्रुप': 'group', 'हेलो': 'hello', 'फ़्रिज': 'fridge', 'टैग': 'tag', 'सीरियल': 'serial', 'नेटवर्क': 'network', 'स्टेज': 'stage', 'गेस्ट': 'guest', 'चीफ़': 'chief', 'सैंपल': 'sample', 'बैंक': 'bank', 'लोन': 'loan', 'फ़ूड': 'food', 'डायरी': 'diary', 'रेसिपी': 'recipe', 'फ़्री': 'free', 'फ़ैमिली': 'family', 'वीडियो': 'video', 'फ़ेल': 'fail', 'पास': 'paas', 'हम': 'hum', 'गई': 'gayi', 'गईं': 'gayin', 'गए': 'gaye', 'नए': 'naye', 'आई': 'aayi', 'हुई': 'hui', 'मज़ाक': 'mazaak', 'ज़िंदगी': 'zindagi', 'इंजीनियर': 'engineer', 'बनियान': 'baniyan', 'हैंग': 'hang', 'में': 'mein', 'है': 'hai', 'हैं': 'hain', 'मैं': 'main', 'नहीं': 'nahi', 'क्या': 'kya', 'क्यों': 'kyun', 'यह': 'yeh', 'ये': 'ye', 'वह': 'woh', 'वो': 'woh', 'और': 'aur', 'कि': 'ki', 'हूँ': 'hoon', 'हाँ': 'haan', 'माँ': 'maa', 'गाँव': 'gaon', 'पाँच': 'paanch', 'आँखें': 'aankhen', 'आँसू': 'aansu', 'कहाँ': 'kahan', 'यहाँ': 'yahan', 'वहाँ': 'wahan', 'दिमाग़': 'dimaag', 'रोहन': 'Rohan', 'प्रिया': 'Priya', 'अमन': 'Aman', 'नेहा': 'Neha', 'राजू': 'Raju', 'मोहन': 'Mohan' };
-const HL_W = new Map(Object.entries(HL_WORDS).map(([k, v]) => [k.normalize('NFD'), v]));
-function hinglish(text) {
-  return text.normalize('NFD').replace(/[\u0900-\u0963\u0966-\u097F]+/g, w => {
-    const fixed = HL_W.get(w); if (fixed) return fixed;
-    const ch = [...w], out = [];   // syllables: {s, schwa (inherent a), vowel (has a vowel), cons (starts with a consonant)}
-    for (let i = 0; i < ch.length; i++) {
-      let c = ch[i]; if (ch[i + 1] === '\u093C' && HL_C[c + '\u093C']) { c = c + '\u093C'; i++; }
-      if (HL_C[c]) {
-        const nx = ch[i + 1];
-        if (nx === '\u094D') { out.push({ s: HL_C[c], half: 1, cons: 1 }); i++; continue; }
-        if (HL_M[nx]) { out.push({ s: HL_C[c] + HL_M[nx], vowel: 1, cons: 1 }); i++; continue; }
-        out.push({ s: HL_C[c] + 'a', schwa: 1, vowel: 1, cons: 1 }); continue;
-      }
-      if (HL_V[c]) { out.push({ s: HL_V[c], vowel: 1 }); continue; }
-      if (c === '\u0902' || c === '\u0901') { if (out.length) out[out.length - 1].s += 'n'; continue; }
-      out.push({ s: c });
-    }
-    // the inherent "a" is not spoken at the end of a word, nor in the middle between two sounded syllables
-    const drop = o => { o.s = o.s.replace(/a(n?)$/, '$1'); o.schwa = 0; o.vowel = 0; o.dropped = 1; };
-    const last = out[out.length - 1]; if (out.length > 1 && last.schwa) drop(last);
-    for (let k = 1; k < out.length - 1; k++) { const p = out[k - 1], o = out[k], n = out[k + 1]; if (o.schwa && p.vowel && !p.dropped && n.cons && n.vowel) drop(o); }
-    return out.map(o => o.s).join('').replace(/aa$/, 'a').replace(/ee$/, 'i');
-  }).replace(/\u0964/g, '.').replace(/(^|[.!?]\s+|\n)([a-z])/g, (m, a, b) => a + b.toUpperCase());
-}
-const IDEA_WPM = 130;   // spoken words per minute for Hindi narration
-function ideaScript(idea, sec, lang) {
-  const want = Math.round(sec / 60 * IDEA_WPM), cta = ['अगर कहानी अच्छी लगी, तो वीडियो को लाइक करो और चैनल को सब्सक्राइब करो।'];
-  const wc = a => a.join(' ').split(/\s+/).length;
-  let body = [...idea.main]; const extra = [...idea.extra];
-  const base = () => [...idea.hook, ...body, ...idea.end, ...(sec >= 45 ? cta : [])];
-  // short videos: drop middle lines until it fits; long videos: add the extra scenes
-  while (wc(base()) > want * 1.15 && body.length > 3) body.splice(Math.floor(body.length / 2), 1);
-  while (wc(base()) < want * 0.9 && extra.length) body.push(extra.shift());
-  const lines = base(), words = wc(lines), short = words < want * 0.75;
-  const txt = lines.join('\n');
-  return { text: lang === 'hinglish' ? hinglish(txt) : txt, words, sec: Math.round(words / IDEA_WPM * 60), short };
-}
-function ideaPromptIdeas(genre, lang, sec, topic) {
-  return `You are a YouTube script writer for a Hindi stickman animation channel. Suggest 10 video ideas${genre ? ` in the genre "${IDEA_GENRES[genre]}"` : ''}${topic ? ` about: ${topic}` : ''} for videos of about ${ideaLen(sec)}.
-For each idea give: a title (max 60 characters), the first hook line the narrator says (must stop the scroll in 3 seconds: a shocking fact, a question, or the ending told first), and one line on the twist.
-Prefer ideas that are emotional, surprising and easy to draw with stickman characters. Write in ${ideaLangName(lang)}. Numbered list, no other text.`;
-}
-function ideaPromptScript(genre, lang, sec, topic) {
-  const words = Math.round(sec / 60 * IDEA_WPM);
-  return `Write a voiceover script for a Hindi stickman animation YouTube video${genre ? ` (genre: ${IDEA_GENRES[genre]})` : ''}.
-Topic / idea: ${topic || 'choose a strong, emotional, surprising story idea yourself'}
-Length: about ${words} words (${ideaLen(sec)} of narration).
-Language: ${ideaLangName(lang)}.
-
-RULES
-- First 2 lines = the HOOK: stop the scroll in 3 seconds (a shocking fact, a big question, or the ending told first). No greetings, no "aaj hum baat karenge".
-- Then the story with a clear problem, rising tension, an open loop ("par asli twist abhi baaki tha…") about every 30–40 seconds, a twist, and an emotional ending.
-- Last line: one simple lesson${sec >= 45 ? ', then one short line asking to like and subscribe' : ''}.
-- Short spoken sentences (6–14 words), one sentence per line, with commas where the narrator breathes. Use emotional words (achanak, sach, darr, khushi, aansu, jeet) where they fit.
-- Wrap 1–2 key words per paragraph in *stars* (they get highlighted).
-- Characters are simple stickman people with Indian names. Things must be easy to show as drawings.
-- Output ONLY the script text. No title, no headings, no scene numbers, no stage directions, no emojis.`;
-}
-const ideaLangName = l => l === 'hinglish' ? 'Hinglish (Hindi written in Roman letters)' : l === 'en' ? 'simple English' : 'Hindi in Devanagari script (keep common English words like phone, exam, office in Devanagari too)';
-const ideaLen = s => s < 60 ? s + ' seconds' : (s / 60) + (s === 60 ? ' minute' : ' minutes');
-let ideaPick = null;
-function ideaRender() {
-  const g = $('#ideaGenre').value, box = $('#ideaList');
-  if (g === 'facts') { box.innerHTML = `<p class="hint" style="margin:0">Facts need real information, so the app does not make them up: pick a topic, then use <b>Copy script prompt</b> (ChatGPT / Gemini / Claude).</p>` + FACT_TOPICS.map(t => `<button class="ideacard" data-ideatopic="${esc(t)}"><b>${esc(t)}</b></button>`).join(''); return; }
-  const list = IDEAS.filter(x => !g || x.g === g), L = $('#ideaLang').value, tx = s => L === 'hinglish' ? hinglish(s) : s;
-  box.innerHTML = list.map(x => { const k = IDEAS.indexOf(x); return `<button class="ideacard${ideaPick === k ? ' sel' : ''}" data-idea="${k}"><span class="chip">${esc(IDEA_GENRES[x.g])}</span><b>${esc(tx(x.title))}</b><span class="hint">${esc(tx(x.hook.join(' ')))}</span></button>`; }).join('');
-}
-function ideaWrite() {
-  if (ideaPick == null) return toast('Pick an idea first');
-  const sec = +$('#ideaDur').value, r = ideaScript(IDEAS[ideaPick], sec, $('#ideaLang').value);
-  $('#ideaOut').value = r.text;
-  $('#ideaInfo').textContent = `${r.words} words · about ${fmt(r.sec, 0)} of voice.` + (r.short ? ` This story is shorter than ${ideaLen(sec)}: for a longer video use "Copy script prompt" with this idea.` : '');
-}
-$('#ideaGenre').onchange = () => { ideaPick = null; ideaRender(); };
-$('#ideaLang').onchange = () => { ideaRender(); if (ideaPick != null) { ideaWrite(); const t = IDEAS[ideaPick].title; $('#ideaTopic').value = $('#ideaLang').value === 'hinglish' ? hinglish(t) : t; } };
-$('#ideaDur').onchange = () => { if (ideaPick != null) ideaWrite(); };
-$('#ideaList').addEventListener('click', e => {
-  const b = e.target.closest('.ideacard'); if (!b) return;
-  if (b.dataset.ideatopic) { $('#ideaTopic').value = b.dataset.ideatopic; toast('Topic set. Now press Copy script prompt'); return; }
-  ideaPick = +b.dataset.idea; ideaRender(); ideaWrite();
-  const t = IDEAS[ideaPick]; $('#ideaTopic').value = ($('#ideaLang').value === 'hinglish' ? hinglish(t.title) : t.title);
-});
-$('#ideaShuffle').onclick = () => { const g = $('#ideaGenre').value, list = IDEAS.filter(x => !g || x.g === g); if (!list.length) return; ideaPick = IDEAS.indexOf(list[Math.floor(Math.random() * list.length)]); ideaRender(); ideaWrite(); };
-$('#ideaCopyIdeas').onclick = () => copyText(ideaPromptIdeas($('#ideaGenre').value, $('#ideaLang').value, +$('#ideaDur').value, $('#ideaTopic').value.trim()));
-$('#ideaCopyScript').onclick = () => { copyText(ideaPromptScript($('#ideaGenre').value, $('#ideaLang').value, +$('#ideaDur').value, $('#ideaTopic').value.trim())); $('#ideaInfo').textContent = 'Prompt copied. Paste it into ChatGPT / Gemini / Claude, then paste the script below and press "Use this script".'; };
-$('#ideaPaste').onclick = async () => { try { $('#ideaOut').value = APP && AndroidBridge.clipboardText ? AndroidBridge.clipboardText() : await navigator.clipboard.readText(); } catch (_) { toast('Long-press in the box and Paste'); } };
-$('#ideaUse').onclick = () => {
-  const t = $('#ideaOut').value.trim(); if (!t) return toast('No script yet');
-  $('#script').value = t; S.script = t;
-  if (!S.settings.title && $('#ideaTopic').value.trim()) { S.settings.title = $('#ideaTopic').value.trim().slice(0, 80); $('#projTitle').value = S.settings.title; }
-  save(); showTab('script'); $('#splitBtn').click();
-  toast('Script added and scenes made. Next: make the voiceover');
-};
-
-/* ---- Hinglish (Roman) -> Devanagari, only for the voice: the Hindi voice pronounces Hindi script far better ----
-   Common words come from a list (that also fixes ट/ड words like beta, bada); other Hindi words are spelled by rules;
-   English words (phone, exam, result…) stay in Roman letters, so the voice says them the English way. */
-const R2D_WORDS = (`hai है|hain हैं|tha था|thi थी|the थे|thaa था|nahi नहीं|nahin नहीं|nhi नहीं|kya क्या|kyun क्यों|kyon क्यों|kyu क्यों|mein में|me में|main मैं|mai मैं|aur और|ki की|ka का|ke के|ko को|se से|par पर|pe पे|ye ये|yeh ये|woh वो|wo वो|vo वो|voh वो|ek एक|do दो|teen तीन|char चार|chaar चार|paanch पाँच|bhi भी|hi ही|to तो|toh तो|jab जब|tab तब|phir फिर|fir फिर|lekin लेकिन|magar मगर|bahut बहुत|bohot बहुत|bahot बहुत|sab सब|sabko सबको|sabse सबसे|kuch कुछ|kuchh कुछ|koi कोई|kaun कौन|kab कब|kahan कहाँ|kaha कहा|kaise कैसे|kaisa कैसा|kaisi कैसी|apna अपना|apni अपनी|apne अपने|uska उसका|uski उसकी|uske उसके|usne उसने|use उसे|usse उससे|unka उनका|unki उनकी|unke उनके|unhe उन्हें|unhone उन्होंने|iska इसका|iski इसकी|iske इसके|isse इससे|mera मेरा|meri मेरी|mere मेरे|mujhe मुझे|tera तेरा|teri तेरी|tere तेरे|tum तुम|tumhe तुम्हें|tumhara तुम्हारा|tumhari तुम्हारी|aap आप|aapka आपका|aapko आपको|hum हम|ham हम|hame हमें|hamein हमें|hamara हमारा|ghar घर|din दिन|raat रात|subah सुबह|shaam शाम|log लोग|logon लोगों|dost दोस्त|papa पापा|maa माँ|maa-baap माँ-बाप|baap बाप|beta बेटा|beti बेटी|bhai भाई|behen बहन|dada दादा|dadaji दादाजी|dadi दादी|nana नाना|nani नानी|chacha चाचा|paisa पैसा|paise पैसे|kaam काम|sapna सपना|sapne सपने|mehnat मेहनत|himmat हिम्मत|khush खुश|khushi खुशी|dukh दुख|darr डर|dar डर|sach सच|jhooth झूठ|pyaar प्यार|pyar प्यार|zindagi ज़िंदगी|duniya दुनिया|baat बात|waqt वक़्त|samay समय|achanak अचानक|gaya गया|gayi गई|gaye गए|hua हुआ|hui हुई|hue हुए|raha रहा|rahi रही|rahe रहे|karta करता|karti करती|karte करते|kar कर|karo करो|karna करना|karke करके|kiya किया|kiye किए|diya दिया|liya लिया|dekha देखा|dekho देखो|bola बोला|boli बोली|bole बोले|socha सोचा|laga लगा|lagi लगी|lage लगे|aaya आया|aayi आई|aaye आए|aata आता|aati आती|chala चला|chali चली|jaata जाता|jata जाता|jaati जाती|jaate जाते|jao जाओ|hota होता|hoti होती|hote होते|hona होना|ho हो|sakta सकता|sakti सकती|sakte सकते|chahiye चाहिए|chahta चाहता|wala वाला|wali वाली|wale वाले|waala वाला|waali वाली|waale वाले|liye लिए|saath साथ|baad बाद|pehle पहले|pahle पहले|andar अंदर|bahar बाहर|upar ऊपर|neeche नीचे|niche नीचे|aaj आज|kal कल|abhi अभी|yahan यहाँ|yaha यहाँ|wahan वहाँ|waha वहाँ|bas बस|sirf सिर्फ़|bilkul बिल्कुल|accha अच्छा|achha अच्छा|acha अच्छा|achchha अच्छा|theek ठीक|thik ठीक|haan हाँ|han हाँ|na न|mat मत|kabhi कभी|hamesha हमेशा|chhota छोटा|chhoti छोटी|chhote छोटे|chota छोटा|choti छोटी|chote छोटे|bada बड़ा|badi बड़ी|bade बड़े|ladka लड़का|ladki लड़की|ladke लड़के|ladkiyan लड़कियाँ|ghanta घंटा|ped पेड़|gaadi गाड़ी|gadi गाड़ी|sadak सड़क|ghadi घड़ी|toota टूटा|tooti टूटी|tuta टूटा|chhod छोड़|chhodo छोड़ो|chhoda छोड़ा|baitha बैठा|baithi बैठी|baith बैठ|utha उठा|uthi उठी|uthta उठता|padhai पढ़ाई|padhta पढ़ता|padh पढ़|padha पढ़ा|thanda ठंडा|pet पेट|daal दाल|dhadkan धड़कन|pada पड़ा|padi पड़ी|pade पड़े|ladai लड़ाई|jhagda झगड़ा|aankh आँख|aankhen आँखें|aansu आँसू|gaon गाँव|gaanv गाँव|shahar शहर|school स्कूल|exam एग्ज़ाम|phone फ़ोन|kitab किताब|kitaab किताब|naam नाम|man मन|dil दिल|sar सिर|haath हाथ|pair पैर|muh मुँह|munh मुँह|chehra चेहरा|awaaz आवाज़|aawaz आवाज़|awaz आवाज़|darwaza दरवाज़ा|darwaaza दरवाज़ा|darwaze दरवाज़े|pani पानी|paani पानी|khana खाना|roti रोटी|chai चाय|chaay चाय|ladkon लड़कों|bachcha बच्चा|bachche बच्चे|bacche बच्चे|baccha बच्चा|mazaak मज़ाक|mazak मज़ाक|raaz राज़|raz राज़|kahani कहानी|kahaani कहानी|zyada ज़्यादा|jyada ज़्यादा|kam कम|thoda थोड़ा|thodi थोड़ी|thode थोड़े|sabhi सभी|shuru शुरू|khatam ख़त्म|khatm ख़त्म|jeet जीत|jeeta जीता|haar हार|hara हारा|roya रोया|royi रोई|rona रोना|hasna हँसना|hansi हँसी|hasi हँसी|hans हँस|muskuraya मुस्कुराया|muskurayi मुस्कुराई|kaha कहा|kehte कहते|kahte कहते|kehta कहता|kahta कहता|kehti कहती|bolta बोलता|soch सोच|samajh समझ|samjha समझा|pata पता|chala चला|yaad याद|intezaar इंतज़ार|zaroor ज़रूर|zarur ज़रूर|zaroori ज़रूरी|lakh लाख|crore करोड़|karod करोड़|rupaye रुपये|rupee रुपये|hazaar हज़ार|hazar हज़ार|sau सौ|saal साल|mahina महीना|mahine महीने|hafte हफ़्ते|pal पल|baar बार|aakhir आख़िर|aakhirkaar आख़िरकार|asli असली|sachchai सच्चाई|kismat किस्मत|bhagwan भगवान|mandir मंदिर|maut मौत|jaan जान|rasta रास्ता|raasta रास्ता|manzil मंज़िल|safar सफ़र|safalta सफलता|kamyabi कामयाबी|koshish कोशिश|seekh सीख|seekha सीखा|galti ग़लती|galat ग़लत|sahi सही|uss उस|us उस|is इस|iss इस|un उन|in इन|jo जो|jis जिस|jise जिसे|jiske जिसके|jisne जिसने|tak तक|jaise जैसे|aisa ऐसा|aise ऐसे|waisa वैसा|kitna कितना|kitni कितनी|itna इतना|itni इतनी|kyunki क्योंकि|isliye इसलिए|warna वरना|agar अगर|tab तब|sabse सबसे|zaroorat ज़रूरत|madad मदद|rehta रहता|rehti रहती|rehte रहते|reh रह|rahta रहता|rahti रहती|rahte रहते|padhaai पढ़ाई|dhamaka धमाका|chillaya चिल्लाया|khidki खिड़की|mitti मिट्टी|garib ग़रीब|raaste रास्ते|raste रास्ते|mushkil मुश्किल|aankhon आँखों|sannata सन्नाटा|sannaata सन्नाटा|bhaga भागा|uthkar उठकर|baithkar बैठकर|dekhkar देखकर|sunkar सुनकर|sun सुन|suno सुनो|suna सुना|ab अब|jaldi जल्दी|dheere धीरे|zor ज़ोर|tez तेज़|khud ख़ुद|saamne सामने|samne सामने|peeche पीछे|piche पीछे|bachpan बचपन|budha बूढ़ा|boodha बूढ़ा|aadmi आदमी|aurat औरत|insaan इंसान|kisaan किसान|raja राजा|rani रानी|shaadi शादी|shadi शादी|biwi बीवी|pati पति|patni पत्नी|payega पाएगा|paayega पाएगा|paya पाया|paaya पाया|banega बनेगा|karega करेगा|hoga होगा|jayega जाएगा|jaayega जाएगा|milega मिलेगा|mila मिला|mili मिली|mile मिले|dekhega देखेगा|samjho समझो|bolo बोलो|chalo चलो|aao आओ|baitho बैठो|bhool भूल|bhoola भूला|maaf माफ़|maafi माफ़ी`).split('|').reduce((m, p) => { const k = p.indexOf(' '); m.set(p.slice(0, k), p.slice(k + 1)); return m; }, new Map());
-// English words that stay in Roman letters (the voice then says them in English)
-const R2D_EN = new Set(('phone mobile call exam result school college office doctor teacher class video job salary number message police hospital bus train time problem life sorry thank thanks please love friend friends game cricket india ok okay hello bye ' +
-  'boss team company business money market computer laptop internet online youtube channel subscribe like comment share bike car taxi station ticket hotel room party birthday gift cake card bank loan engineer pilot officer manager interview ' +
-  'the and you your is are was were of in on at to for with from this that it he she they we be have has had do does did not but or so if no yes my me what when where why who how can will just very really').split(' '));
-const R2D_C = [['chh', 'छ'], ['ch', 'च'], ['kh', 'ख'], ['gh', 'घ'], ['jh', 'झ'], ['th', 'थ'], ['dh', 'ध'], ['ph', 'फ'], ['bh', 'भ'], ['sh', 'श'], ['rh', 'ढ़'],
-  ['k', 'क'], ['g', 'ग'], ['c', 'क'], ['j', 'ज'], ['t', 'त'], ['d', 'द'], ['n', 'न'], ['p', 'प'], ['f', 'फ़'], ['b', 'ब'], ['m', 'म'], ['y', 'य'], ['r', 'र'], ['l', 'ल'], ['v', 'व'], ['w', 'व'], ['s', 'स'], ['h', 'ह'], ['z', 'ज़'], ['q', 'क़'], ['x', 'क्स']];
-const R2D_V = [['aa', 'आ', 'ा'], ['ai', 'ऐ', 'ै'], ['au', 'औ', 'ौ'], ['ee', 'ई', 'ी'], ['oo', 'ऊ', 'ू'], ['ii', 'ई', 'ी'], ['a', 'अ', ''], ['i', 'इ', 'ि'], ['u', 'उ', 'ु'], ['e', 'ए', 'े'], ['o', 'ओ', 'ो']];
-function r2dWord(w, force) {   // force: spell English words in Hindi letters too
-  const lw = w.toLowerCase(); if (R2D_WORDS.has(lw)) return R2D_WORDS.get(lw);
-  if ((!force && R2D_EN.has(lw)) || !/^[a-z]+$/.test(lw)) return w;
-  const parts = []; let i = 0;   // C or V pieces
-  while (i < lw.length) {
-    const c = R2D_C.find(([r]) => lw.startsWith(r, i)); if (c) { parts.push({ c: c[1], r: c[0] }); i += c[0].length; continue; }
-    const v = R2D_V.find(([r]) => lw.startsWith(r, i)); if (v) { parts.push({ v }); i += v[0].length; continue; }
-    parts.push({ x: lw[i] }); i++;
-  }
-  let out = '';
-  for (let k = 0; k < parts.length; k++) {
-    const p = parts[k], nx = parts[k + 1];
-    if (p.v) { out += k === parts.length - 1 && p.v[0] === 'i' ? 'ई' : p.v[1]; continue; }   // a vowel at the start or after a vowel: full letter
-    if (p.x) { out += p.x; continue; }
-    // n / m before another consonant = nasal dot
-    const STOP = /^(k|kh|g|gh|ch|chh|j|jh|t|th|d|dh|s|sh|z|p|ph|b|bh|f)$/;
-    if (k > 0 && parts[k - 1].v && nx && nx.c && nx.c !== p.c && ((p.c === 'न' && STOP.test(nx.r)) || (p.c === 'म' && /^(p|ph|b|bh)$/.test(nx.r)))) { out += 'ं'; continue; }
-    out += p.c;
-    if (nx && nx.v) { const last = k + 1 === parts.length - 1; out += !last ? nx.v[2] : nx.v[0] === 'a' ? 'ा' : nx.v[0] === 'i' ? 'ी' : nx.v[0] === 'u' ? 'ू' : nx.v[2]; k++; continue; }   // final a / i / u are long: sapna सपना, kursi कुर्सी
-    const first = parts.findIndex(q => q.c) === k, end = !nx, before = parts[k - 1], after = nx && nx.c;
-    // clusters: doubled letters, start of word (pr, tr, st…), the end of a word (dost, waqt)
-    if (after && (nx.c === p.c || (first && !before) || (parts[k + 2] === undefined))) out += '्';
-  }
-  return out.replace(/([ोेै])न$/, '$1ं');   // plural endings: aankhon आँखों, baaten बातें
-}
-function r2d(text) {
-  if (/[ऀ-ॿ]/.test(text) && !/[a-z]{3}/i.test(text.replace(/[ऀ-ॿ]/g, ''))) return text;   // already Hindi
-  return text.replace(/[A-Za-z]+/g, r2dWord).replace(/\.(?=\s|$)/g, '।');
-}
-const looksHinglish = t => { const w = (t.match(/[a-z]+/gi) || []).map(x => x.toLowerCase()); if (w.length < 3) return false; const hi = w.filter(x => R2D_WORDS.has(x)).length; return hi / w.length > 0.25; };
-
-
-/* ---- Kokoro voice: text -> phonemes -> model tokens ----
-   The Kokoro model reads espeak-style phonemes. 20 000 common Hindi words and 11 000 English words come
-   ready-made from espeak (kokoro-lex.json, made once with espeak-ng); any other Hindi word is spelled by the
-   rules below, Hinglish (Roman) words are turned into Hindi letters first, numbers become Hindi number words. */
-const KG = { lex: null, vocab: null };
-const KG_VOCAB = {";":1,":":2,",":3,".":4,"!":5,"?":6,"—":9,"…":10,"\"":11,"(":12,")":13,"“":14,"”":15," ":16,"̃":17,"ʣ":18,"ʥ":19,"ʦ":20,"ʨ":21,"ᵝ":22,"ꭧ":23,"A":24,"I":25,"O":31,"Q":33,"S":35,"T":36,"W":39,"Y":41,"ᵊ":42,"a":43,"b":44,"c":45,"d":46,"e":47,"f":48,"h":50,"i":51,"j":52,"k":53,"l":54,"m":55,"n":56,"o":57,"p":58,"q":59,"r":60,"s":61,"t":62,"u":63,"v":64,"w":65,"x":66,"y":67,"z":68,"ɑ":69,"ɐ":70,"ɒ":71,"æ":72,"β":75,"ɔ":76,"ɕ":77,"ç":78,"ɖ":80,"ð":81,"ʤ":82,"ə":83,"ɚ":85,"ɛ":86,"ɜ":87,"ɟ":90,"ɡ":92,"ɥ":99,"ɨ":101,"ɪ":102,"ʝ":103,"ɯ":110,"ɰ":111,"ŋ":112,"ɳ":113,"ɲ":114,"ɴ":115,"ø":116,"ɸ":118,"θ":119,"œ":120,"ɹ":123,"ɾ":125,"ɻ":126,"ʁ":128,"ɽ":129,"ʂ":130,"ʃ":131,"ʈ":132,"ʧ":133,"ʊ":135,"ʋ":136,"ʌ":138,"ɣ":139,"ɤ":140,"χ":142,"ʎ":143,"ʒ":147,"ʔ":148,"ˈ":156,"ˌ":157,"ː":158,"ʰ":162,"ʲ":164,"↓":169,"→":171,"↗":172,"↘":173,"ᵻ":177};
-const KG_C = { 'क': 'k', 'ख': 'kʰ', 'ग': 'ɡ', 'घ': 'ɡʰ', 'ङ': 'ŋ', 'च': 'c', 'छ': 'cʰ', 'ज': 'ɟ', 'झ': 'ɟʰ', 'ञ': 'ɲ', 'ट': 'ʈ', 'ठ': 'ʈʰ', 'ड': 'ɖ', 'ढ': 'ɖʰ', 'ण': 'ɳ', 'त': 't', 'थ': 'tʰ', 'द': 'd', 'ध': 'dʰ', 'न': 'n', 'प': 'p', 'फ': 'pʰ', 'ब': 'b', 'भ': 'bʰ', 'म': 'm', 'य': 'j', 'र': 'ɾ', 'ल': 'l', 'व': 'ʋ', 'श': 'ʃ', 'ष': 'ʂ', 'स': 's', 'ह': 'h',
-  'क़': 'q', 'ख़': 'x', 'ग़': 'ɣ', 'ज़': 'z', 'फ़': 'f', 'ड़': 'r.', 'ढ़': 'r.h', 'य़': 'j' };
-const KG_V = { 'अ': 'ə', 'आ': 'aː', 'इ': 'ɪ', 'ई': 'iː', 'उ': 'ʊ', 'ऊ': 'uː', 'ए': 'eː', 'ऐ': 'ɛː', 'ओ': 'oː', 'औ': 'ɔː', 'ऋ': 'ɾɪ', 'ऑ': 'ɔ', 'ऍ': 'ɛ' };
-const KG_M = { 'ा': 'aː', 'ि': 'ɪ', 'ी': 'iː', 'ु': 'ʊ', 'ू': 'uː', 'े': 'eː', 'ै': 'ɛː', 'ो': 'oː', 'ौ': 'ɔː', 'ृ': 'ɾɪ', 'ॉ': 'ɔ', 'ॅ': 'ɛ' };
-const KG_STOP = { 'k': 'ŋ', 'kʰ': 'ŋ', 'ɡ': 'ŋ', 'ɡʰ': 'ŋ', 'c': 'n', 'cʰ': 'n', 'ɟ': 'n', 'ɟʰ': 'n', 'ʈ': 'ɳ', 'ʈʰ': 'ɳ', 'ɖ': 'ɳ', 'ɖʰ': 'ɳ', 't': 'n', 'tʰ': 'n', 'd': 'n', 'dʰ': 'n', 'p': 'm', 'pʰ': 'm', 'b': 'm', 'bʰ': 'm' };
-const kgLong = v => /ː/.test(v);
-// a Hindi word that is not in the list: syllables, the silent "a", nasal sounds and the stress
-function kgRules(w) {
-  const ch = [...w.normalize('NFD')], syl = [];   // {c: consonant(s), v: vowel, nas, schwa}
-  let onset = '';
-  for (let i = 0; i < ch.length; i++) {
-    let c = ch[i]; if (ch[i + 1] === '़' && KG_C[c + '़']) { c += '़'; i++; }
-    if (KG_C[c]) {
-      const nx = ch[i + 1];
-      if (nx === '्') { onset += KG_C[c]; i++; continue; }
-      if (KG_M[nx]) { syl.push({ c: onset + KG_C[c], v: KG_M[nx] }); onset = ''; i++; continue; }
-      syl.push({ c: onset + KG_C[c], v: 'ə', schwa: 1 }); onset = ''; continue;
-    }
-    if (KG_V[c]) { syl.push({ c: onset, v: KG_V[c] }); onset = ''; continue; }
-    if ((c === 'ं' || c === 'ँ') && syl.length) { syl[syl.length - 1].nas = 1; continue; }
-    if (c === 'ः' && syl.length) { syl[syl.length - 1].v += 'h'; continue; }
-  }
-  if (onset && syl.length) syl[syl.length - 1].coda = (syl[syl.length - 1].coda || '') + onset;
-  if (!syl.length) return '';
-  // the inherent "a" is silent at the end and between two sounded syllables
-  const drop = s => { s.dropped = 1; s.v = ''; };
-  if (syl.length > 1 && syl[syl.length - 1].schwa) drop(syl[syl.length - 1]);
-  for (let k = 1; k < syl.length - 1; k++) { const p = syl[k - 1], o = syl[k], n = syl[k + 1]; if (o.schwa && !p.dropped && n.c && !n.dropped) drop(o); }
-  // a long final ई / ई-matra is said short in espeak (khaali -> kʰaːli)
-  const L = syl[syl.length - 1]; if (L.v === 'iː' && syl.length > 1) L.v = 'i';
-  // stress: the first long or closed syllable, else the first one
-  let st = syl.findIndex((s, k) => !s.dropped && (kgLong(s.v) || (syl[k + 1] && syl[k + 1].dropped)));
-  if (st < 0) st = 0;
-  let out = '';
-  syl.forEach((s, k) => {
-    let v = s.v; if (s.schwa && !s.dropped) v = k === st ? 'ʌ' : 'ə';
-    if (s.nas) {
-      const n = syl[k + 1], nc = n && n.c ? [...Object.keys(KG_STOP)].find(x => n.c.startsWith(x)) : null;
-      // before p/t/k-type sounds: a nasal consonant of the same place; else a nasal vowel (long a/i/u/o said short), and "n" before another consonant
-      if (nc) v += KG_STOP[nc];
-      else if (v) { const keep = /^[eɛ]/.test(v); v = v[0] + '̃' + (keep ? v.slice(1) : v.slice(1).replace('ː', '')); if (n && n.c) v += 'n'; }
-    }
-    out += (s.c || '') + (k === st ? 'ˈ' : '') + v;
-    if (s.coda) out += s.coda;
-  });
-  return out;
-}
-// numbers in Hindi words: 58 -> अट्ठावन, 1250 -> एक हज़ार दो सौ पचास
-function kgNumber(n) {
-  const L = KG.lex, num = k => L.num[String(k)] || '', w = x => L.hi[x] || kgRules(x);
-  n = Math.floor(+n); if (!isFinite(n)) return ''; if (n < 100) return num(n);
-  const parts = []; const cr = Math.floor(n / 1e7), lk = Math.floor(n % 1e7 / 1e5), th = Math.floor(n % 1e5 / 1000), hu = Math.floor(n % 1000 / 100), r = n % 100;
-  if (cr) parts.push(kgNumber(cr), w('करोड़')); if (lk) parts.push(num(lk), w('लाख')); if (th) parts.push(num(th), w('हज़ार')); if (hu) parts.push(num(hu), w('सौ')); if (r) parts.push(num(r));
-  return parts.join(' ');
-}
-function kgWord(w) {
-  const L = KG.lex;
-  if (/^\d+$/.test(w)) return kgNumber(w);
-  if (/[ऀ-ॿ]/.test(w)) { const k = w.normalize('NFC'); return L.hi[k] || L.hi[w] || kgRules(w); }
-  const lw = w.toLowerCase();
-  if (typeof R2D_WORDS !== 'undefined' && R2D_WORDS.has(lw)) { const d = R2D_WORDS.get(lw); return L.hi[d.normalize('NFC')] || kgRules(d); }   // Hinglish
-  if (L.en[lw]) return L.en[lw];
-  if (typeof r2dWord === 'function') { const d = r2dWord(lw); if (/[ऀ-ॿ]/.test(d)) return L.hi[d.normalize('NFC')] || kgRules(d); }
-  return lw.replace(/[^a-z]/g, '');
-}
-// a line of text -> phonemes, keeping the punctuation the model uses for pauses
-function kgPhonemes(text) {
-  const t = String(text).normalize('NFC').replace(/\*/g, '').replace(/।|॥/g, '.').replace(/\.\.\./g, '…').replace(/[‘’']/g, '').replace(/(\d)[,.](?=\d{3}\b)/g, '$1').replace(/(\d+)\s*%/g, '$1 प्रतिशत');
-  const out = [];
-  for (const m of t.matchAll(/(\d+|[\p{L}\p{M}]+)|([,.!?;:—…"“”()])/gu)) {
-    if (m[1]) { const p = m[1] === 'में' && out.length ? 'mẽː' : kgWord(m[1]); if (p) out.push({ p, w: 1 }); }   // में is unstressed inside a sentence
-    else out.push({ p: m[2], w: 0 });
-  }
-  let s = ''; out.forEach((o, k) => { s += (o.w && k ? ' ' : '') + o.p; });
-  return s.replace(/\s+([,.!?;:…])/g, '$1').trim();
-}
-function kgTokens(ph) { return [...ph].map(c => KG_VOCAB[c]).filter(x => x != null); }
-async function kgLoad() {
-  if (KG.lex) return KG.lex;
-  const r = await fetch('kokoro-lex.json'); if (!r.ok) throw new Error('the word list is missing');
-  KG.lex = await r.json(); return KG.lex;
-}
-
-/* ---- Indic-TTS Hindi voice: the model reads Hindi letters, so the text is made all-Hindi first ----
-   Numbers become Hindi number words, Hinglish (Roman) words become Hindi letters, English words are spelled in Hindi
-   letters from their pronunciation (the word list of the Kokoro voice), then the same clean-up as the model's training
-   (Coqui "multilingual_cleaners") and one id per character. */
-const IN_C2I = {"!":15,"¡":2,"'":3,"(":4,")":5,",":16,"-":17,".":18,":":21,";":22,"¿":11,"?":23," ":14,"2":19,"8":20," ":24,"ँ":25,"ं":26,"ः":27,"अ":28,"आ":29,"इ":30,"ई":31,"उ":32,"ऊ":33,"ऋ":34,"ए":35,"ऐ":36,"ऑ":37,"ओ":38,"औ":39,"क":40,"ख":41,"ग":42,"घ":43,"ङ":44,"च":45,"छ":46,"ज":47,"झ":48,"ञ":49,"ट":50,"ठ":51,"ड":52,"ढ":53,"ण":54,"त":55,"थ":56,"द":57,"ध":58,"न":59,"प":60,"फ":61,"ब":62,"भ":63,"म":64,"य":65,"र":66,"ऱ":67,"ल":68,"ळ":69,"व":70,"श":71,"ष":72,"स":73,"ह":74,"़":75,"ा":76,"ि":77,"ी":78,"ु":79,"ू":80,"ृ":81,"ॅ":82,"े":83,"ै":84,"ॉ":85,"ो":86,"ौ":87,"्":88,"क़":89,"ख़":90,"ग़":91,"ज़":92,"ड़":93,"ढ़":94,"फ़":95,"ॠ":96,"‍":97,"‎":98,"–":99};
-const IN_NUM = ('शून्य एक दो तीन चार पाँच छह सात आठ नौ दस ग्यारह बारह तेरह चौदह पंद्रह सोलह सत्रह अठारह उन्नीस बीस इक्कीस बाईस तेईस चौबीस पच्चीस छब्बीस सत्ताईस अट्ठाईस उनतीस तीस ' +
-  'इकतीस बत्तीस तैंतीस चौंतीस पैंतीस छत्तीस सैंतीस अड़तीस उनतालीस चालीस इकतालीस बयालीस तैंतालीस चवालीस पैंतालीस छियालीस सैंतालीस अड़तालीस उनचास पचास इक्यावन बावन तिरपन चौवन पचपन छप्पन ' +
-  'सत्तावन अट्ठावन उनसठ साठ इकसठ बासठ तिरसठ चौंसठ पैंसठ छियासठ सड़सठ अड़सठ उनहत्तर सत्तर इकहत्तर बहत्तर तिहत्तर चौहत्तर पचहत्तर छिहत्तर सतहत्तर अठहत्तर उनासी अस्सी इक्यासी बयासी तिरासी ' +
-  'चौरासी पचासी छियासी सत्तासी अट्ठासी नवासी नब्बे इक्यानवे बानवे तिरानवे चौरानवे पचानवे छियानवे सत्तानवे अट्ठानवे निन्यानवे').split(' ');
-function inNumber(n) {
-  n = Math.floor(+n); if (!isFinite(n) || n < 0) return ''; if (n < 100) return IN_NUM[n];
-  const p = [], cr = Math.floor(n / 1e7), lk = Math.floor(n % 1e7 / 1e5), th = Math.floor(n % 1e5 / 1000), hu = Math.floor(n % 1000 / 100), r = n % 100;
-  if (cr) p.push(inNumber(cr), 'करोड़'); if (lk) p.push(IN_NUM[lk], 'लाख'); if (th) p.push(IN_NUM[th], 'हज़ार'); if (hu) p.push(IN_NUM[hu], 'सौ'); if (r) p.push(IN_NUM[r]);
-  return p.join(' ');
-}
-// English pronunciation (espeak IPA from the word list) -> Hindi letters, the way Indians say English words
-const IN_IPA_C = [['tʃ', 'च'], ['dʒ', 'ज'], ['ŋɡ', 'ंग'], ['ŋk', 'ंक'], ['ŋ', 'ंग'], ['θ', 'थ'], ['ð', 'द'], ['ʃ', 'श'], ['ʒ', 'ज़'], ['p', 'प'], ['b', 'ब'], ['t', 'ट'], ['ɾ', 'ट'], ['d', 'ड'], ['k', 'क'], ['ɡ', 'ग'], ['f', 'फ़'], ['v', 'व'], ['s', 'स'], ['z', 'ज़'], ['h', 'ह'], ['m', 'म'], ['n', 'न'], ['l', 'ल'], ['ɹ', 'र'], ['r', 'र'], ['w', 'व'], ['j', 'य'], ['ʔ', '']];
-const IN_IPA_V = [['aɪ', 'आ', 'ा', 'इ'], ['aʊ', 'आ', 'ा', 'उ'], ['ɔɪ', 'ऑ', 'ॉ', 'य'], ['eɪ', 'ए', 'े', ''], ['oʊ', 'ओ', 'ो', ''], ['iː', 'ई', 'ी', ''], ['uː', 'ऊ', 'ू', ''], ['ɑː', 'आ', 'ा', ''], ['ɔː', 'ऑ', 'ॉ', ''], ['ɜː', 'अ', '', 'र'], ['ɚ', 'अ', '', 'र'],
-  ['i', 'इ', 'ि', ''], ['ɪ', 'इ', 'ि', ''], ['ᵻ', 'इ', 'ि', ''], ['e', 'ए', 'े', ''], ['ɛ', 'ए', 'े', ''], ['æ', 'ऐ', 'ै', ''], ['a', 'आ', 'ा', ''], ['ɑ', 'आ', 'ा', ''], ['ɒ', 'ऑ', 'ॉ', ''], ['ɔ', 'ऑ', 'ॉ', ''], ['o', 'ओ', 'ो', ''], ['ʊ', 'उ', 'ु', ''], ['u', 'ऊ', 'ू', ''], ['ʌ', 'अ', '', ''], ['ə', 'अ', '', ''], ['ɐ', 'अ', '', '']];
-function inFromIpa(ipa) {
-  const s = ipa.replace(/[ˈˌ]/g, ''); let out = '', i = 0, prevC = false;
-  while (i < s.length) {
-    const v = IN_IPA_V.find(([r]) => s.startsWith(r, i));
-    if (v) {
-      out += prevC ? v[2] : v[1]; prevC = false;
-      if (v[3] === 'र') { out += 'र'; prevC = true; } else if (v[3]) out += v[3];   // ɚ -> "र", aɪ -> "आइ"
-      i += v[0].length; continue;
-    }
-    const c = IN_IPA_C.find(([r]) => s.startsWith(r, i));
-    if (c) {
-      if (c[1] && !c[1].startsWith('ं') && prevC) out += '्';   // two consonants: join them (स्कूल)
-      out += c[1]; if (c[1]) prevC = true; i += c[0].length; continue;
-    }
-    i++;
-  }
-  return out;
-}
-const IN_EN = { subscribe: 'सब्सक्राइब', subscribers: 'सब्सक्राइबर्स', youtube: 'यूट्यूब', instagram: 'इंस्टाग्राम', whatsapp: 'व्हाट्सऐप', google: 'गूगल', facebook: 'फ़ेसबुक', mobile: 'मोबाइल', online: 'ऑनलाइन', offline: 'ऑफ़लाइन', ok: 'ओके', okay: 'ओके', bye: 'बाय', hello: 'हैलो', hi: 'हाय', sorry: 'सॉरी', thanks: 'थैंक्स', video: 'वीडियो', videos: 'वीडियोज़', share: 'शेयर', like: 'लाइक', comment: 'कमेंट', channel: 'चैनल', notification: 'नोटिफ़िकेशन', bell: 'बेल', icon: 'आइकन', link: 'लिंक', app: 'ऐप', internet: 'इंटरनेट', police: 'पुलिस', college: 'कॉलेज', exam: 'एग्ज़ाम', result: 'रिज़ल्ट' };
-function inLatinWord(w) {
-  const lw = w.toLowerCase();
-  if (IN_EN[lw]) return IN_EN[lw];
-  if (typeof R2D_WORDS !== 'undefined' && R2D_WORDS.has(lw)) return R2D_WORDS.get(lw);   // Hinglish
-  const L = (typeof KG !== 'undefined' && KG.lex) || null;
-  if (L && L.en[lw]) {                                                                      // English
-    let d = inFromIpa(L.en[lw]);
-    if (/o/.test(lw) && /ɑ/.test(L.en[lw])) d = d.replace(/आ/, 'ऑ').replace(/ा/, 'ॉ');      // doctor डॉक्टर, office ऑफ़िस: the Indian way
-    return d;
-  }
-  if (typeof r2dWord === 'function') { const d = r2dWord(lw, true); if (/[ऀ-ॿ]/.test(d)) return d; }
-  return lw;
-}
-function inPrepare(text) {
-  let t = String(text).normalize('NFC').replace(/\*/g, '').replace(/।|॥/g, '.').replace(/…|\.\.\./g, '.').replace(/[“”"«»]/g, '').replace(/[‘’]/g, "'");
-  t = t.replace(/(\d)[,](?=\d{3}\b)/g, '$1').replace(/(\d+)\s*%/g, '$1 प्रतिशत').replace(/₹\s*(\d+)/g, '$1 रुपये');
-  t = t.replace(/\d+/g, d => ' ' + inNumber(d) + ' ').replace(/[A-Za-z]+/g, inLatinWord);
-  // the model's own clean-up: NFC, lower case, ; and : to commas, - to a space, no brackets or quotes, single spaces
-  t = t.normalize('NFC').toLowerCase().replace(/;/g, ',').replace(/-/g, ' ').replace(/:/g, ',').replace(/[<>()[\]"]+/g, '').replace(/\s+/g, ' ').trim();
-  return t;
-}
-function inTokens(prepared) { const out = []; for (const ch of prepared) { const id = IN_C2I[ch]; if (id != null) out.push(id); } return out; }
-
-/* ---- AI voices (Indic-TTS Hindi, Kokoro): the text is prepared here, the speech is made natively by the app (onnxruntime) ---- */
-const AI = {
-  indic: { name: 'Hindi AI voice', size: '270 MB', bridge: 'indic', voices: [['male', 'Male (default)'], ['female', 'Female']], key: 'inVoice', def: 'male', speed: 'inSpeed', defSpeed: 1 },
-  kokoro: { name: 'Kokoro AI voice', size: '120 MB', bridge: 'kokoro', voices: [['hm_omega', 'Omega · male'], ['hm_psi', 'Psi · male'], ['hf_alpha', 'Alpha · female'], ['hf_beta', 'Beta · female']], key: 'kkVoice', def: 'hm_omega', speed: 'kkSpeed', defSpeed: 1.1 }
-};
-const kkAvail = () => APP && window.AndroidBridge && !!AndroidBridge.kokoroSynth;
-const aiKind = () => { if (!kkAvail()) return null; const k = S.settings.ovKind2 || 'indic'; if (k === 'indic' && !AndroidBridge.indicSynth) return 'kokoro'; return AI[k] ? k : null; };
-const kkOn = () => !!aiKind();
-const aiSpeed = () => { const k = aiKind() || 'kokoro'; return S.settings[AI[k].speed] || AI[k].defSpeed; };
-const KK = { ready: false, busy: false };
-function kkStatus() { const k = aiKind(); try { const j = JSON.parse(AndroidBridge[AI[k].bridge + 'Status']()); KK.ready = j.ready; KK.busy = j.downloading; } catch (_) { KK.ready = false; KK.busy = false; } return KK; }
-function kkShow() {
-  const k = aiKind(); $('#ovBox').dataset.kind = k || 'phone';
-  if (!kkAvail()) { $('#ovKind').value = 'phone'; $('#ovKind').disabled = true; $('#ovKind').title = 'The AI voices work in the Android app'; return; }
-  if (!k) return;
-  const A = AI[k], sel = $('#kkVoice');
-  sel.innerHTML = A.voices.map(([v, l]) => `<option value="${v}">${l}</option>`).join(''); sel.value = S.settings[A.key] || A.def;
-  $('#kkSpeed').value = aiSpeed(); kkShowVals();
-  kkStatus();
-  $('#kkGet').textContent = `⬇ Download ${A.name} (${A.size}, once)`; $('#kkDel').textContent = `Remove ${A.name}`;
-  $('#kkGet').hidden = KK.ready; $('#kkDel').hidden = !KK.ready; $('#kkGet').disabled = KK.busy;
-  $('#kkState').textContent = KK.ready ? `${A.name} ready: works without internet. Best in Hindi script (देवनागरी); Hinglish and English words work too.` : KK.busy ? `Downloading the ${A.name}…` : `Download the ${A.name} once (about ${A.size}, Wi-Fi recommended). After that it works offline.`;
-  if (KK.ready) { $('#ovGo').disabled = false; $('#ovTest').disabled = false; }
-}
-function aiProgress(kind) {
-  return (what, a, b) => {
-    if (aiKind() !== kind) { if (what === 'ready') toast(AI[kind].name + ' downloaded'); return; }
-    const p = $('#kkProg');
-    if (what === 'progress') { p.hidden = false; p.value = b ? a / b : 0; $('#kkState').textContent = `Downloading the ${AI[kind].name}… ${Math.round(a / 1048576)} / ${Math.round(b / 1048576)} MB`; return; }
-    p.hidden = true;
-    if (what === 'ready') { toast(AI[kind].name + ' downloaded: it now works offline'); kkShow(); }
-    else { $('#kkState').textContent = 'Download failed: ' + a + '. Check the internet and try again.'; $('#kkGet').disabled = false; }
-  };
-}
-window.ssKokoro = aiProgress('kokoro'); window.ssIndic = aiProgress('indic');
-$('#kkGet').onclick = () => { const A = AI[aiKind()]; if (!AndroidBridge[A.bridge + 'Download']()) return toast('Already downloading'); $('#kkGet').disabled = true; $('#kkProg').hidden = false; $('#kkProg').value = 0; $('#kkState').textContent = 'Starting the download…'; };
-$('#kkDel').onclick = () => { const A = AI[aiKind()]; if (!confirm(`Remove the ${A.name} from this phone? (${A.size}; you can download it again)`)) return; AndroidBridge[A.bridge + 'Delete'](); setTimeout(kkShow, 800); };
-$('#ovKind').onchange = e => { S.settings.ovKind2 = e.target.value; save(); kkShow(); if (!kkOn()) ovStart(); };
-$('#kkVoice').onchange = e => { S.settings[AI[aiKind()].key] = e.target.value; save(); };
-async function ovCanSpeak() {
-  const k = aiKind();
-  if (k) {
-    if (!kkStatus().ready) { toast(KK.busy ? `The ${AI[k].name} is still downloading` : `First download the ${AI[k].name} (button above), or choose another voice type`); return false; }
-    try { await kgLoad(); } catch (e) { if (k === 'kokoro') { toast('AI voice: ' + e.message); return false; } }   // the word list also gives English words their sound
-    return true;
-  }
-  if (OV.state !== 'ready') { ovStart(); toast('The speech engine is starting, try again in a moment'); return false; }
-  return true;
-}
-function aiSynth(tokens, speed) {
-  return new Promise((res, rej) => {
-    const k = aiKind(), id = 'ai' + (++OV.seq) + '_' + Date.now();
-    const timer = setTimeout(() => { OV.pending.delete(id); rej(new Error('The AI voice did not answer')); }, 180000);
-    OV.pending.set(id, { res, rej, timer });
-    let ok = false;
-    try { ok = k === 'indic' ? AndroidBridge.indicSynth(id, tokens.join(','), (S.settings.inVoice || 'male') === 'female' ? 0 : 1, speed) : AndroidBridge.kokoroSynth(id, tokens.join(','), S.settings.kkVoice || 'hm_omega', speed); } catch (_) {}
-    if (!ok) { clearTimeout(timer); OV.pending.delete(id); rej(new Error('The AI voice is not downloaded')); }
-  });
-}
-// split a long line at commas (and, if needed, at spaces) so each piece stays a comfortable size for the model
-function aiPieces(text, size, max) {
-  if (size(text) <= max) return [text];
-  const out = []; let cur = '';
-  for (const bit of text.split(/(?<=[,;:])\s+/)) { if (cur && size(cur + ' ' + bit) > max) { out.push(cur); cur = bit; } else cur = cur ? cur + ' ' + bit : bit; }
-  if (cur) out.push(cur);
-  return out.flatMap(x => { if (size(x) <= max) return [x]; const w = x.split(' '), r = []; let c = ''; for (const y of w) { if (c && size(c + ' ' + y) > max) { r.push(c); c = y; } else c = c ? c + ' ' + y : y; } if (c) r.push(c); return r; });
-}
-// one sentence -> samples
-async function ovSpeak(text, e) {
-  const k = aiKind();
-  if (!k) return ovDecode(await ovSynth(text, e.rate, e.pitch));
-  const pieces = k === 'indic' ? aiPieces(inPrepare(text), x => x.length, 300).map(inTokens) : aiPieces(kgPhonemes(text), x => kgTokens(x).length, 480).map(kgTokens);
-  const out = [];
-  for (const tk of pieces) { if (!tk.length) continue; out.push(await ovDecode(await aiSynth(tk, clamp(e.rate, 0.5, 2)))); }
-  if (!out.length) return new Float32Array(0);
-  if (out.length === 1) return out[0];
-  const gap = Math.round(24000 * 0.15), all = new Float32Array(out.reduce((a, x) => a + x.length + gap, 0)); let t = 0; for (const x of out) { all.set(x, t); t += x.length + gap; }
-  return all;
-}
 /* ============ Gemini watermark: removes the small visible sparkle mark that Gemini puts in the bottom-right corner of its images.
    The corner is searched for a small, compact star-shaped spot that is lighter (or darker) than its surroundings;
    if one is found, only those pixels are filled in from the pixels around them. Nothing else in the picture changes. */
@@ -5792,7 +4501,7 @@ async function cleanMark(blob) {
 (async function boot() {
   sizePreview();
   try { await DB.open(); } catch (_) {}
-  await loadVP(); vpToUI(); $('#lGemKey').value = VP.gemKey || ''; $('#ytGemKey').value = VP.gemKey || '';
+  await loadVP(); $('#lGemKey').value = VP.gemKey || ''; $('#ytGemKey').value = VP.gemKey || '';
   await libLoad();
   let p = null; try { p = await DB.get('project'); } catch (_) {}
   if (p && (p.script || (p.segments && p.segments.length))) await restore(p);
@@ -5804,7 +4513,6 @@ async function cleanMark(blob) {
   let tab = 'script'; try { tab = localStorage.getItem('ss-tab') || 'script'; } catch (_) {}
   showTab(tab);
   document.fonts && document.fonts.ready.then(() => { drawPreview(); });
-  ovToUI(); ovStart();
   bootDone();
   if (APP) { console.log('SSAPP-READY scenes=' + S.segments.length + ' idb=' + !!DB.db); if (location.hash === '#selftest') ssSelfTest(); }
 })();

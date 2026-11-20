@@ -16,8 +16,6 @@ android {
         targetSdk = 34
         versionCode = buildNumber
         versionName = "1.0.$buildNumber"
-        // the Kokoro AI voice runs with onnxruntime: phones (arm) and the CI emulator (x86_64)
-        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
     }
 
     // Signing key comes from the CI secrets (never from the repository). Without it the build is
@@ -64,5 +62,4 @@ dependencies {
     implementation("androidx.webkit:webkit:1.11.0")
     implementation("androidx.activity:activity-ktx:1.9.1")
     implementation("androidx.core:core-ktx:1.13.1")
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
 }

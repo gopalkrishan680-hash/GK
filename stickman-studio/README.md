@@ -3,9 +3,9 @@
 An app for turning a script + voiceover into a stickman video. It is a single file (`index.html`) with nothing to install.
 Open it in **Chrome or Edge** (double-click the file). Everything runs locally on your computer.
 
-> **Simple mode (current):** the app takes your script, your voiceover and your images, and makes the video.
-> The AI voice panel and the drawn stickman scenes are switched off and not shown; the sections about them below
-> describe code that stays in the file, inactive.
+> **Simple mode (current):** the app takes your script, your own voiceover file and your images, and makes the video.
+> The app does not make voiceovers (record or generate it elsewhere and upload it in **Script + Voice**), and has no
+> Idea + Script tab. The drawn stickman scenes are switched off and not shown.
 
 ## Layered explainer (default for new projects)
 Step 1 has a **Video style** choice. *Layered explainer* makes the paper-cut-out explainer look: an old-paper
@@ -32,47 +32,12 @@ by one on the word where they are spoken. The screen clears at every new **board
 4. **Preview + Export:** the same exact-frame MP4 export. Sound effects (pop, whoosh, swish, ding, buzz) are made
    in the app and placed on every entrance; background music gets quieter under the voice and fades in/out.
 
-## Idea + Script tab (first tab)
-Ready story ideas (motivation, emotional family, suspense, funny, moral) with a strong hook, and a **video length**
-choice (30 s to 8 min). Tap an idea and the app writes its script offline in Hindi (देवनागरी, best for the offline
-voice) or Hinglish; longer lengths add more scenes. Ready stories go up to about 2 minutes. For your own topic or
-a longer video, **Copy script prompt** into ChatGPT / Gemini / Claude (free, no API key), paste the reply and press
-**Use this script**: it goes into the Script tab and the scenes are made. Facts topics always use the prompt, so
-nothing is made up.
-
 ## Gemini watermark
 Gemini puts a small ✦ sparkle in the bottom-right corner of its images. With **Script + Voice → Gemini watermark:
 Remove automatically** (the default), every new picture (grid image, sticker sheet, single picture, a scene's own
 picture) is checked: if the corner holds a small star-shaped spot, only those pixels are filled in from the pixels
 around them; nothing else changes. **Keep** leaves pictures as they are. The invisible SynthID mark that Google adds
 is not touched.
-
-## Hindi AI voice: Indic-TTS (Android app, default)
-**Script + Voice → 🎙 Make the voiceover → Voice type: Hindi AI voice (Indic-TTS).** AI4Bharat's Indic-TTS Hindi
-(FastPitch + HiFiGAN, trained only on native Hindi speech, CC-BY-4.0) runs on the phone with onnxruntime. Male is
-the default, female is the other voice. Download it once (about 270 MB, from this repository's `indic-tts-hi-v1`
-release, made by `tools/indic-tts/export.py` through the "Indic-TTS Hindi model" workflow); after that it works
-with no internet and no API key. The model reads Hindi letters, so the app turns numbers into Hindi number words,
-Hinglish into Hindi letters and English words into Hindi letters from their pronunciation. Speed and pause can be
-set; pauses, polish and the scene sync are the same as for the other voices.
-
-## AI voice: Kokoro (Android app)
-**Script + Voice → 🎙 Make the voiceover → Voice type: AI voice (Kokoro).** Kokoro is a small open AI voice model
-(Apache-2.0) that runs on the phone with onnxruntime: four Hindi voices (Omega and Psi male, Alpha and Beta female;
-Omega is the default). Download it once (about 120 MB, from the kokoro-onnx GitHub release); after that it works with
-no internet and no API key. The app turns the text into the model's sounds itself: `kokoro-lex.json` holds about
-20 000 common Hindi words and 11 000 English words prepared with espeak-ng, other Hindi words are spelled by rules,
-Hinglish (Roman) words are converted, and numbers become Hindi number words. Pauses, breaths, studio polish and
-the scene sync are the same as for the phone voice. It is much more natural than the phone voice, but still not
-as expressive as Gemini's Puck / Orus.
-
-## Offline voiceover (Android app)
-**Script + Voice → 🎙 Make the voiceover from the script.** Uses the phone's own text-to-speech (Google speech
-engine, Hindi voice). No API key, no internet once the Hindi voice is downloaded (**Voice settings** → Install voice
-data → Hindi). Each sentence is spoken separately with a natural pause, questions rise, sad lines are slower and
-happy lines livelier; `[pause 1.5]` adds silence. The scenes are synced to it automatically. Speed, pitch and pause
-can be set. The phone voice is clear and natural for Hindi, but not as expressive as Gemini's AI Studio voices,
-which need the internet and a key.
 
 ## Viewer hooks (Preview + Export)
 Found in the script by itself: shock words shake the screen with a boom, a reveal flashes with a riser and the music
@@ -130,7 +95,8 @@ idle motion, camera, captions, effects volume) are in the Layers tab.
    - *AI Scene Director:* give ChatGPT one prompt covering the whole script and it writes a visual for every scene.
      Paste the reply back and press **Apply** to get better prompts.
 3. **Grid Upload:** Drop all grid images at once. The app finds the lines between panels and cuts each
-   panel out. If a cut looks wrong, turn off *Auto-detect* or increase *Trim*.
+   panel out. If a cut looks wrong, turn off *Auto-detect* or increase *Trim*. **Auto-detect lines – all images** at
+   the top turns it on or off for every image at once.
    If one panel is bad, use **Single image** to replace just that scene.
 4. **Voice Sync:**
    - **Smart Sync:** finds the pauses in the voiceover and changes scenes there.
