@@ -80,6 +80,7 @@ header.top { background: var(--surface); }
 .chip { font-family: var(--font-mono); font-size: 11.5px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
 .chip.ok { border-color: var(--good); color: var(--good); }
 .chip.wait { border-color: var(--warn); color: var(--warn); }
+.chip.bad { border-color: var(--bad); color: var(--bad); }
 nav.tabs { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 0; }
 nav.tabs button { background: none; border: 0; border-bottom: 3px solid transparent; padding: 8px 12px; font: 600 14px var(--font-body); color: var(--muted); cursor: pointer; white-space: nowrap; }
 nav.tabs button .n { font-family: var(--font-mono); font-size: 12px; margin-right: 6px; }
@@ -647,7 +648,7 @@ html:not(.mode-layers) .layers-only { display: none !important; }
 <section class="step" data-panel="yt" hidden>
   <div>
     <h2>YouTube kit</h2>
-    <p class="lead">From your script: <b>3 thumbnail prompts</b> (make all three, keep the best), <b>5 titles</b>, a <b>description</b> with chapters, <b>tags</b> and hashtags.</p>
+    <p class="lead">From your script: <b>3 thumbnail prompts</b> (make all three, keep the best), <b>5 titles</b>, an <b>English description</b> with chapters, <b>tags</b> in Hindi + Hinglish + English, lowercase <b>hashtags</b> and a <b>pinned comment</b>.</p>
   </div>
   <div class="cols">
     <div class="panel">
@@ -662,7 +663,8 @@ html:not(.mode-layers) .layers-only { display: none !important; }
     </div>
     <div class="panel">
       <h3>Settings</h3>
-      <label class="f">Language <select id="ytLang"><option value="auto">Auto (like the script)</option><option value="hinglish">Hinglish (Roman)</option><option value="hi">Hindi (देवनागरी)</option><option value="en">English</option></select></label>
+      <label class="f">Titles + pinned comment language <select id="ytLang"><option value="auto">Auto (like the script)</option><option value="hinglish">Hinglish (Roman)</option><option value="hi">Hindi (देवनागरी)</option><option value="en">English</option></select></label>
+      <p class="hint" style="margin:0">The description is always in English; tags are a mix of Hindi, Hinglish and English; hashtags are all lowercase.</p>
       <label class="f">Channel name (optional) <input type="text" id="ytChannel" placeholder="e.g. Stickman Gyaan"></label>
       <h3 style="margin-top:6px">B · Auto with Gemini</h3>
       <div class="row"><input type="password" id="ytGemKey" placeholder="Gemini API key (free: aistudio.google.com/apikey)" aria-label="Gemini API key" autocomplete="off" style="flex:1 1 200px"><button class="btn" id="ytGem">Make with Gemini</button></div>
@@ -3948,6 +3950,16 @@ S.yt = S.yt || null;
 const ytDeva = s => /[ऀ-ॿ]/.test(s || '');
 const ytTokens = s => String(s || '').split(/\s+/).filter(w => /[\p{L}\p{N}]/u.test(w));
 const ytClean = w => w.replace(/[^\p{L}\p{N}\p{M}-]/gu, '');
+// hashtags: one word, no spaces or signs, all lowercase (#Motivation -> #motivation)
+const ytHash = h => { const w = String(h || '').replace(/^#+/, '').normalize('NFC').toLowerCase().replace(/[^\p{L}\p{N}\p{M}_]/gu, ''); return w ? '#' + w : ''; };
+const ytHashText = t => String(t || '').replace(/#[\p{L}\p{N}\p{M}_]+/gu, m => m.toLowerCase());
+// tags: no "#", no < >, no duplicates (any case), each under 100 characters, all together under 500
+function ytTagList(list) {
+  const seen = new Set(), out = [];
+  for (let t of list || []) { t = String(t || '').replace(/^#+/, '').replace(/[<>"]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100); const k = t.toLowerCase(); if (t && !seen.has(k)) { seen.add(k); out.push(t); } }
+  while (out.length && out.join(', ').length > 490) out.pop();
+  return out;
+}
 function ytLangName() {
   const v = S.settings.ytLang || 'auto';
   if (v === 'en') return 'English';
@@ -3985,14 +3997,16 @@ Return ONLY a JSON object (no explanation, no markdown fences) in exactly this s
  ],
  "description": "...",
  "tags": ["...", "..."],
- "hashtags": ["#...", "#..."]}
+ "hashtags": ["#...", "#..."],
+ "pinned_comment": "..."}
 
 RULES
 - titles: 5 options, at most 70 characters each, curiosity + clarity, honest (no false claims), main keyword near the start, in ${L}.
 - thumbnails: 3 clearly DIFFERENT concepts — (1) the stickman character close-up with one strong emotion (shock, fear, joy) and the key object of the story, (2) a contrast / before-after / split composition, (3) a mystery: one key object or place with a red arrow or red circle. "text" = the big thumbnail words (2–4 words, UPPERCASE, in ${L === 'English' ? 'English' : 'English or short Hinglish'}; never repeat the title). "prompt" = an English prompt for an AI image generator: ${ytShape()}, one clear focal point, high contrast, bold and readable at small size, ${ytStyle()}, the words "<text>" written in huge bold clean letters with a thick outline in the free side of the picture, no other text, no logos, no watermark.
-- description: 1200–2500 characters in ${L}: first two lines = a strong hook with the main keywords (they show in search); then a short summary of what the viewer learns; then "Chapters" with timestamps taken from the script times (first one 0:00, 5–10 chapters, each at least 10 seconds long, short chapter names)${S.settings.aspect === '9:16' ? ' — skip the chapters for a Short' : ''}; then one line asking to like and subscribe${ch ? ` to ${ch}` : ''}; then the hashtags on the last line.
-- tags: 25–35 search tags people really type (mix English and Hindi/Hinglish), no "#", together under 480 characters.
-- hashtags: 3–5, the first one is the main topic${S.settings.aspect === '9:16' ? ', include #shorts' : ''}.
+- description: 1200–2500 characters, ALWAYS in clear, simple ENGLISH (even though the script is in another language; translate the meaning, do not transliterate): first two lines = a strong hook with the main keywords (they show in search); then a short summary of what the viewer learns; then "Chapters" with timestamps taken from the script times (first one 0:00, 5–10 chapters, each at least 10 seconds long, short chapter names)${S.settings.aspect === '9:16' ? ' — skip the chapters for a Short' : ''}; then one line asking to like and subscribe${ch ? ` to ${ch}` : ''}; then the hashtags on the last line.
+- tags: 25–35 search tags people really type, a MIX of three kinds, about one third each and mixed together in the list: English ("${'why we procrastinate'}"), Hinglish in Roman letters ("${'aalas kaise khatam kare'}") and Hindi in Devanagari ("${'आलस कैसे दूर करें'}"). Short and long phrases, the main topic first. No "#", together under 480 characters.
+- hashtags: 3–5, ALL LOWERCASE, one word each with no spaces (e.g. #motivation #hindikahani), the first one is the main topic${S.settings.aspect === '9:16' ? ', include #shorts' : ''}. Use the same lowercase hashtags on the last line of the description.
+- pinned_comment: one short comment to pin under the video (in ${L}): a question that makes viewers reply about the story, plus one emoji. No links.
 
 VIDEO
 - Length: ${fmt(D, 0)}${S.settings.title ? `\n- Working title: ${S.settings.title}` : ''}
@@ -4007,7 +4021,10 @@ function ytApply(p) {
   const thumbs = (p.thumbnails || p.thumbs || []).slice(0, 3).map(t => typeof t === 'string' ? { idea: '', text: '', prompt: t } : { idea: str(t.idea || t.concept), text: str(t.text || t.title), prompt: str(t.prompt) }).filter(t => t.prompt);
   let tags = p.tags || []; if (typeof tags === 'string') tags = tags.split(',');
   let hs = p.hashtags || []; if (typeof hs === 'string') hs = hs.split(/\s+/);
-  const y = { titles: (p.titles || []).map(str).filter(Boolean).slice(0, 8), thumbs, description: str(p.description), tags: tags.map(t => str(t).replace(/^#/, '')).filter(Boolean), hashtags: hs.map(h => '#' + str(h).replace(/^#+/, '').replace(/\s+/g, '')).filter(h => h.length > 1) };
+  const hashtags = [...new Set(hs.map(ytHash).filter(Boolean))].slice(0, 15);
+  let description = ytHashText(str(p.description));
+  if (hashtags.length && !/#[\p{L}\p{N}]/u.test(description)) description += (description ? '\n\n' : '') + hashtags.join(' ');
+  const y = { titles: (p.titles || []).map(str).filter(Boolean).slice(0, 8), thumbs, description, tags: ytTagList(tags.map(str)), hashtags, pinned: str(p.pinned_comment || p.pinnedComment || p.comment) };
   if (!y.titles.length && !y.thumbs.length && !y.description) throw new Error('The reply has no titles, thumbnails or description');
   S.yt = y; save(); return y;
 }
@@ -4059,18 +4076,28 @@ function ytQuick() {
   ];
   const full = sents.filter(s => /[.!?।]["'”’)]*$/.test(s) && wordCount(s) >= 6), pool = full.length >= 4 ? full : sents;
   const pick = [...new Set([0.2, 0.4, 0.6, 0.8].map(f => pool[Math.min(pool.length - 1, Math.floor(pool.length * f))]))];
-  const hashtags = [main, second, kws[2]].filter(Boolean).map(k => '#' + k.replace(/\s+/g, '')).slice(0, 3).concat(shorts ? ['#shorts'] : ['#stickman']);
+  const hashtags = [...new Set([main, second, kws[2]].filter(Boolean).map(ytHash).filter(Boolean).slice(0, 3).concat(shorts ? ['#shorts', '#stickman'] : ['#stickman', '#hindikahani']))];
   const chapters = shorts ? '' : `Chapters\n${ytChapters().map(c => `${ytTime(c.t)} ${c.name}`).join('\n')}\n\n`;
-  const description = `${title}\n\n${sents.slice(0, 2).join(' ')}\n\nIs video mein:\n${pick.map(s => '• ' + s).join('\n')}\n\n${chapters}${ch ? `Aisi aur videos ke liye ${ch} ko subscribe karein.` : 'Aisi aur videos ke liye channel ko subscribe karein.'}\n\n${hashtags.join(' ')}`;
-  const tags = [...new Set([main, second, ...kws.slice(2, 30), `${main} explained`, `${main} in hindi`, `${main} story`, 'stickman animation', 'stickman story hindi', 'animated story hindi'].filter(Boolean).map(t => t.toLowerCase()))];
-  while (tags.join(', ').length > 480) tags.pop();
+  const topic = second ? `${main} and ${second}` : main;
+  // offline the app cannot translate, so the description is a clear English frame around the script's keywords
+  const description = `${title}\n\nWhat really happened with ${topic}? This animated stickman ${shorts ? 'short' : 'video'} tells the whole story in simple Hindi, step by step, so it is easy to follow and easy to remember.\n\nIn this video:\n• The story of ${main}, from the very beginning\n${second ? `• How ${second} changes everything\n` : ''}• The turning point you will not expect\n• The lesson at the end, in one simple line\n\n${chapters}If you liked it, like the video, share it with a friend and subscribe${ch ? ` to ${ch}` : ''} for more animated stories every week.\n\n${hashtags.join(' ')}`;
+  const deva = ytDeva(S.script), kwDeva = kws.filter(ytDeva), kwRoman = kws.filter(k => !ytDeva(k));
+  const en = [`${main} explained`, `${main} story`, 'stickman animation', 'animated story', 'stickman story', 'story with a lesson', 'moral story'];
+  const hl = [`${main} ki kahani`, 'hindi kahani', 'stickman kahani', 'animated kahani', 'nayi kahani', 'kahani in hindi'];
+  const hi = [...kwDeva.slice(0, 8), 'हिंदी कहानी', 'स्टिकमैन एनिमेशन', 'एनिमेटेड कहानी', 'नई कहानी', 'सीख वाली कहानी'];
+  const mixed = [];   // one of each kind in turn, so the 500-character limit keeps all three
+  for (let k = 0; k < 10; k++) for (const g of [en, deva ? [] : kwRoman.slice(2, 12), hl, hi]) if (g[k]) mixed.push(g[k]);
+  const tags = ytTagList([main, second, ...mixed].filter(Boolean).map(t => ytDeva(t) ? t : t.toLowerCase()));
   const titles = [...new Set([title, `${main} Ki Asli Kahani${second ? ' | ' + second : ''}`, `${main}: Jo Aapko Kisi Ne Nahi Bataya`, `${second || main} Ne Sab Kuch Kaise Badal Diya?`, `${main} Explained in Hindi${second ? ' | ' + second : ''}`])];
-  S.yt = { titles, thumbs, description, tags, hashtags }; save(); return S.yt;
+  const langEn = (S.settings.ytLang || 'auto') === 'en' || ytLangName() === 'English';
+  const pinned = langEn ? `What would you have done in this story? Tell me in the comments 👇` : `Aap is kahani mein hote to kya karte? Comment mein zaroor batayein 👇`;
+  S.yt = { titles, thumbs, description, tags, hashtags, pinned }; save(); return S.yt;
 }
 
 /* ---- screen ---- */
 function ytRender() {
   const box = $('#ytOut'), y = S.yt;
+  if (y) { y.hashtags = [...new Set((y.hashtags || []).map(ytHash).filter(Boolean))]; y.description = ytHashText(y.description || ''); }
   if (!y) { box.innerHTML = '<div class="panel"><p class="hint" style="margin:0">Nothing made yet. Use A, B or C above.</p></div>'; return; }
   const cpy = (id, label = 'Copy') => `<button class="btn small" data-ycopy="${id}">${label}</button>`;
   const opn = '<button class="btn small" data-ytopen="gemini">Gemini</button><button class="btn small" data-ytopen="chatgpt">ChatGPT</button>';
@@ -4080,19 +4107,27 @@ function ytRender() {
       <div class="yt-thumbs">${(y.thumbs || []).map((t, i) => `<div class="yt-thumb"><b>${i + 1}. ${esc(t.idea || 'Thumbnail idea')}</b>${t.text ? `<span class="yt-text">${esc(t.text)}</span>` : ''}
         <textarea data-yedit="thumb:${i}" rows="6">${esc(t.prompt)}</textarea>
         <div class="row">${cpy('thumb:' + i, 'Copy prompt')}${opn}</div></div>`).join('')}</div></div>
-    <div class="panel"><h3>✏ Titles</h3>${(y.titles || []).map((t, i) => `<div class="yt-title"><input type="text" data-yedit="title:${i}" value="${esc(t)}"><span class="hint" data-ytn="${i}">${t.length}/100</span>${cpy('title:' + i)}</div>`).join('')}</div>
+    <div class="panel"><h3>✏ Titles</h3><p class="hint" style="margin:0">Under 70 characters shows in full in search; 100 is YouTube's limit.</p>${(y.titles || []).map((t, i) => `<div class="yt-title"><input type="text" data-yedit="title:${i}" value="${esc(t)}"><span class="chip ${ytLenCls(t.length, 70, 100)}" data-ytn="${i}">${t.length}</span>${cpy('title:' + i)}</div>`).join('')}</div>
     <div class="panel"><h3>📝 Description</h3><textarea data-yedit="description" rows="14">${esc(y.description)}</textarea>
-      <div class="row">${cpy('description', 'Copy description')}<span class="hint" id="ytDescN">${y.description.length} / 5000 characters</span></div></div>
-    <div class="panel"><h3>🏷 Tags</h3><textarea data-yedit="tags" rows="4">${esc((y.tags || []).join(', '))}</textarea>
-      <div class="row">${cpy('tags', 'Copy tags')}<span class="hint" id="ytTagN">${(y.tags || []).join(', ').length} / 500 characters</span></div>
-      <h3>#️⃣ Hashtags</h3><input type="text" data-yedit="hashtags" value="${esc((y.hashtags || []).join(' '))}">
-      <div class="row">${cpy('hashtags', 'Copy hashtags')}</div></div>`;
+      <div class="row">${cpy('description', 'Copy description')}<span class="chip ${ytLenCls(y.description.length, 4500, 5000)}" id="ytDescN">${y.description.length} / 5000</span></div></div>
+    <div class="panel"><h3>🏷 Tags</h3><p class="hint" style="margin:0">Hindi + Hinglish + English, separated by commas.</p><textarea data-yedit="tags" rows="4">${esc((y.tags || []).join(', '))}</textarea>
+      <div class="row">${cpy('tags', 'Copy tags')}<span class="chip ${ytLenCls((y.tags || []).join(', ').length, 470, 500)}" id="ytTagN">${(y.tags || []).join(', ').length} / 500</span></div>
+      <h3>#️⃣ Hashtags</h3><p class="hint" style="margin:0">All lowercase. The first 3 show above the title; at most 15.</p><input type="text" data-yedit="hashtags" value="${esc((y.hashtags || []).join(' '))}">
+      <div class="row">${cpy('hashtags', 'Copy hashtags')}</div></div>
+    <div class="panel"><h3>📌 Pinned comment</h3><p class="hint" style="margin:0">Post it under the video right after upload and pin it: a question gets people replying.</p><textarea data-yedit="pinned" rows="2">${esc(y.pinned || '')}</textarea>
+      <div class="row">${cpy('pinned', 'Copy comment')}</div></div>
+    <div class="panel"><div class="row"><button class="btn primary" data-ycopy="all">Copy everything</button><button class="btn" id="ytDl">⬇ Download kit (.txt)</button><span class="hint">Title, description, tags, hashtags and pinned comment in one go.</span></div></div>`;
+}
+const ytLenCls = (n, warn, max) => n > max ? 'bad' : n > warn ? 'wait' : 'ok';
+function ytAll() {
+  const y = S.yt; if (!y) return '';
+  return `TITLE\n${(y.titles || [])[0] || ''}\n\nOTHER TITLES\n${(y.titles || []).slice(1).join('\n')}\n\nDESCRIPTION\n${y.description}\n\nTAGS\n${(y.tags || []).join(', ')}\n\nHASHTAGS\n${(y.hashtags || []).join(' ')}\n\nPINNED COMMENT\n${y.pinned || ''}\n\nTHUMBNAIL PROMPTS\n${(y.thumbs || []).map((t, i) => `${i + 1}. ${t.idea}${t.text ? ' [' + t.text + ']' : ''}\n${t.prompt}`).join('\n\n')}\n`;
 }
 function ytShow() { $('#ytLang').value = S.settings.ytLang || 'auto'; $('#ytChannel').value = S.settings.ytChannel || ''; ytRender(); }
 function ytValue(id) {
   const y = S.yt, [k, i] = id.split(':');
   if (k === 'thumb') return y.thumbs[+i].prompt; if (k === 'title') return y.titles[+i];
-  if (k === 'tags') return y.tags.join(', '); if (k === 'hashtags') return y.hashtags.join(' '); return y.description;
+  if (k === 'tags') return y.tags.join(', '); if (k === 'hashtags') return y.hashtags.join(' '); if (k === 'pinned') return y.pinned || ''; if (k === 'all') return ytAll(); return y.description;
 }
 const YT_SITES = { chatgpt: 'https://chatgpt.com/', gemini: 'https://gemini.google.com/app', claude: 'https://claude.ai/new' };
 function ytOpen(which) {
@@ -4124,14 +4159,26 @@ $('#ytGem').onclick = async () => {
   btn.disabled = false;
 };
 document.addEventListener('click', e => { const b = e.target.closest('[data-ytopen]'); if (b) ytOpen(b.dataset.ytopen); });
-$('#ytOut').addEventListener('click', e => { const b = e.target.closest('[data-ycopy]'); if (b && S.yt) copyText(ytValue(b.dataset.ycopy)); });
+$('#ytOut').addEventListener('click', e => {
+  if (e.target.closest('#ytDl') && S.yt) return download(new Blob([ytAll()], { type: 'text/plain;charset=utf-8' }), `${safeName()}-youtube-kit.txt`);
+  const b = e.target.closest('[data-ycopy]'); if (b && S.yt) copyText(ytValue(b.dataset.ycopy));
+});
+// when a field is left: hashtags become lowercase one-word tags, tags are cleaned (the typing itself is never disturbed)
+$('#ytOut').addEventListener('change', e => {
+  const id = e.target.dataset.yedit; if (!S.yt) return;
+  if (id === 'hashtags') e.target.value = S.yt.hashtags.join(' ');
+  if (id === 'description') { const v = ytHashText(e.target.value); if (v !== e.target.value) { e.target.value = v; S.yt.description = v; save(); } }
+  if (id === 'tags') { S.yt.tags = ytTagList(S.yt.tags); e.target.value = S.yt.tags.join(', '); const n = e.target.value.length; $('#ytTagN').textContent = n + ' / 500'; $('#ytTagN').className = 'chip ' + ytLenCls(n, 470, 500); save(); }
+});
 $('#ytOut').addEventListener('input', e => {
   const id = e.target.dataset.yedit; if (!id || !S.yt) return; const [k, i] = id.split(':'), v = e.target.value;
   if (k === 'thumb') S.yt.thumbs[+i].prompt = v;
-  else if (k === 'title') { S.yt.titles[+i] = v; const n = document.querySelector(`[data-ytn="${i}"]`); if (n) n.textContent = v.length + '/100'; }
-  else if (k === 'tags') { S.yt.tags = v.split(',').map(x => x.trim()).filter(Boolean); $('#ytTagN').textContent = v.length + ' / 500 characters'; }
-  else if (k === 'hashtags') S.yt.hashtags = v.split(/\s+/).filter(Boolean);
-  else { S.yt.description = v; $('#ytDescN').textContent = v.length + ' / 5000 characters'; }
+  else if (k === 'title') { S.yt.titles[+i] = v; const n = document.querySelector(`[data-ytn="${i}"]`); if (n) { n.textContent = v.length; n.className = 'chip ' + ytLenCls(v.length, 70, 100); } }
+  else if (k === 'title') {}
+  else if (k === 'tags') { S.yt.tags = v.split(',').map(x => x.trim()).filter(Boolean); const n = v.length; $('#ytTagN').textContent = n + ' / 500'; $('#ytTagN').className = 'chip ' + ytLenCls(n, 470, 500); }
+  else if (k === 'hashtags') S.yt.hashtags = v.split(/\s+/).map(ytHash).filter(Boolean);
+  else if (k === 'pinned') S.yt.pinned = v;
+  else { S.yt.description = v; $('#ytDescN').textContent = v.length + ' / 5000'; $('#ytDescN').className = 'chip ' + ytLenCls(v.length, 4500, 5000); }
   save();
 });
 
