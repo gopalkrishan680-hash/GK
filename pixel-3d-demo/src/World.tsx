@@ -140,18 +140,18 @@ const Hero: React.FC<{ start: number }> = ({ start }) => {
   );
 };
 
-const CameraRig: React.FC = () => {
+const CameraRig: React.FC<{ zoom: number; lookY: number }> = ({ zoom, lookY }) => {
   const frame = useCurrentFrame();
   const { camera } = useThree();
   const angle = 0.7 + frame * 0.006;
-  const radius = interpolate(frame, [0, 120, 900], [52, 42, 36], { extrapolateRight: "clamp" });
-  const height = interpolate(frame, [0, 120, 900], [34, 26, 22], { extrapolateRight: "clamp" });
+  const radius = interpolate(frame, [0, 120, 900], [52, 42, 36], { extrapolateRight: "clamp" }) * zoom;
+  const height = interpolate(frame, [0, 120, 900], [34, 26, 22], { extrapolateRight: "clamp" }) * zoom;
   camera.position.set(Math.cos(angle) * radius, height, Math.sin(angle) * radius);
-  camera.lookAt(0, 4, 0);
+  camera.lookAt(0, lookY, 0);
   return null;
 };
 
-export const World: React.FC = () => {
+export const World: React.FC<{ zoom?: number; lookY?: number }> = ({ zoom = 1, lookY = 4 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const blocks = useTerrain();
@@ -165,7 +165,7 @@ export const World: React.FC = () => {
 
   return (
     <>
-      <CameraRig />
+      <CameraRig zoom={zoom} lookY={lookY} />
       <ambientLight intensity={ambient} color={lightColor} />
       <directionalLight position={sunPos} intensity={1.6} color={lightColor} />
       <hemisphereLight args={["#bfe6ff", "#5a3d1e", 0.3]} />

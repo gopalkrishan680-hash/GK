@@ -19,25 +19,20 @@ loadFont({ family: fontFamily, url: staticFile("PressStart2P.woff2") });
 
 // Render the 3D scene at low resolution, then upscale with nearest-neighbour for a true pixel look.
 const PIXEL = 3;
-const W = 1080;
-const H = 1920;
 
 export const MyComposition = () => {
   return (
-    <Composition
-      id="PixelWorld"
-      component={MyComponent}
-      durationInFrames={900}
-      fps={30}
-      width={W}
-      height={H}
-    />
+    <>
+      <Composition id="PixelWorld" component={MyComponent} durationInFrames={900} fps={30} width={1080} height={1920} />
+      <Composition id="PixelWorldWide" component={MyComponent} durationInFrames={900} fps={30} width={1920} height={1080} />
+    </>
   );
 };
 
 const Caption: React.FC<{ title: string; sub?: string; big?: boolean }> = ({ title, sub, big }) => {
   const frame = useCurrentFrame();
-  const { fps, durationInFrames } = useVideoConfig();
+  const { fps, durationInFrames, width, height } = useVideoConfig();
+  const wide = width > height;
   const pop = spring({ frame, fps, config: { damping: 11 } });
   const out = interpolate(frame, [durationInFrames - 12, durationInFrames], [1, 0], {
     extrapolateLeft: "clamp",
@@ -45,12 +40,12 @@ const Caption: React.FC<{ title: string; sub?: string; big?: boolean }> = ({ tit
   });
   const shadow = "6px 6px 0 #1b1b2f, -2px -2px 0 #1b1b2f, 2px -2px 0 #1b1b2f, -2px 2px 0 #1b1b2f";
   return (
-    <AbsoluteFill style={{ alignItems: "center", paddingTop: big ? 360 : 220, opacity: out }}>
+    <AbsoluteFill style={{ alignItems: "center", paddingTop: wide ? (big ? 120 : 70) : big ? 360 : 220, opacity: out }}>
       <div
         style={{
           fontFamily,
           color: "#fff",
-          fontSize: big ? 104 : 64,
+          fontSize: wide ? (big ? 96 : 56) : big ? 104 : 64,
           lineHeight: 1.35,
           textAlign: "center",
           textShadow: shadow,
@@ -64,7 +59,7 @@ const Caption: React.FC<{ title: string; sub?: string; big?: boolean }> = ({ tit
         <div
           style={{
             fontFamily,
-            marginTop: 40,
+            marginTop: wide ? 24 : 40,
             fontSize: 36,
             color: "#ffe066",
             textShadow: "4px 4px 0 #1b1b2f",
@@ -83,6 +78,8 @@ const Caption: React.FC<{ title: string; sub?: string; big?: boolean }> = ({ tit
 
 export const MyComponent: React.FC = () => {
   const frame = useCurrentFrame();
+  const { width: W, height: H } = useVideoConfig();
+  const wide = W > H;
   const sunsetT = interpolate(frame, [600, 780], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const skyTop = interpolateColors(sunsetT, [0, 1], ["#4fa3ff", "#3a1c71"]);
   const skyBottom = interpolateColors(sunsetT, [0, 1], ["#bfe9ff", "#ff8a4c"]);
@@ -100,7 +97,7 @@ export const MyComponent: React.FC = () => {
             camera={{ fov: 40, position: [30, 20, 30] }}
             gl={{ antialias: false }}
           >
-            <World />
+            <World zoom={wide ? 0.62 : 1} lookY={wide ? 3.5 : 4} />
           </ThreeCanvas>
         </div>
       </AbsoluteFill>
