@@ -760,6 +760,7 @@ html:not(.mode-layers) .layers-only { display: none !important; }
 
     <div class="panel">
       <h3>🖼 Pictures and thumbnail</h3>
+      <label class="f">Video style<select id="apVmode"><option value="grid">Grid images: one full picture per scene (3×3 grid sheets)</option><option value="layers">Layered explainer: paper cut-outs and keywords</option></select></label>
       <label class="f">Make the pictures with<select id="apImg"><option value="flow">Flow app on this phone (automatic, no key)</option><option value="gemini">Gemini API (Gemini key)</option></select></label>
       <label class="row"><input type="checkbox" id="apImgFallback"> If Flow fails, use Gemini instead</label>
       <div id="apFlowBox" class="ap-sub">
@@ -4744,7 +4745,7 @@ Kuber ne Lanka kaise khoyi?
 Arjun aur Hanuman ka mukabla: dhwaj par Hanuman kyun?
 Krishna ki Dwarka samudra mein kaise doobi?
 Pandavon ki swarg yatra: sirf Yudhishthira kyun pahuche?`;
-const AP_DEF = { writer: 'gemini', model: 'claude-opus-5-5', len: 8, lang: 'hinglish', channel: '', check: true,
+const AP_DEF = { vmode: 'grid', writer: 'gemini', model: 'claude-opus-5-5', len: 8, lang: 'hinglish', channel: '', check: true,
   ttsModel: 'gemini-2.5-pro-preview-tts', voice: 'Orus', style: 'Promo/Hype', pace: 'Natural', accent: 'Neutral',
   img: 'flow', imgFallback: true, publish: '17:00', cat: '27', approve: true, comment: true, start: '13:00', daily: false };
 const AP = { claudeKey: '', s: { ...AP_DEF }, topics: [], log: [] };
@@ -4790,7 +4791,7 @@ $('#apTopics').addEventListener('click', e => {
 });
 
 /* ---- settings UI ---- */
-const AP_BIND = { apWriter: 'writer', apModel: 'model', apLen: 'len', apLang: 'lang', apChannel: 'channel', apCheck: 'check', apTtsModel: 'ttsModel', apVoice: 'voice', apStyle: 'style', apPace: 'pace', apAccent: 'accent',
+const AP_BIND = { apVmode: 'vmode', apWriter: 'writer', apModel: 'model', apLen: 'len', apLang: 'lang', apChannel: 'channel', apCheck: 'check', apTtsModel: 'ttsModel', apVoice: 'voice', apStyle: 'style', apPace: 'pace', apAccent: 'accent',
   apImg: 'img', apImgFallback: 'imgFallback', apPublish: 'publish', apCat: 'cat', apApproveOn: 'approve', apComment: 'comment', apStart: 'start', apDaily: 'daily' };
 function apShow() {
   for (const [id, k] of Object.entries(AP_BIND)) { const el = $('#' + id); if (el.type === 'checkbox') el.checked = !!AP.s[k]; else el.value = AP.s[k]; }
@@ -5118,7 +5119,7 @@ async function apRun(trigger) {
     apLog(`▶ ${trigger === 'alarm' ? 'Daily run' : 'Run'}: "${topic.t}"`); P(0.01);
     // keep the open project, then start a clean one
     try { await DB.put('project:before-autopilot', snapshot()); } catch (_) {}
-    await restore({ settings: { ...S.settings, title: topic.t, mode: 'layers' }, script: '', segments: [], starts: [], grids: [], overrides: {} });
+    await restore({ settings: { ...S.settings, title: topic.t, mode: AP.s.vmode === 'layers' ? 'layers' : 'grid' }, script: '', segments: [], starts: [], grids: [], overrides: {} });
     S.yt = null; S.autoMusic = null; amShowPlan();
 
     const who = AP.s.writer === 'claude' ? 'Claude' : 'Gemini';
@@ -5135,21 +5136,43 @@ async function apRun(trigger) {
     const st = S.settings; setSegmentsFromTexts(splitScript(S.script, st.splitLevel, +st.minWords || 1, +st.maxWords || 14));
     if (!S.segments.length) throw new Error('the script made no scenes');
 
-    apLog(`4/9 Gemini is planning ${S.segments.length} scenes…`); P(0.24);
-    let planInfo; try { planInfo = await lApplyPlanLib(lParseJSON(await apGemText(lPlanPrompt(), { responseMimeType: 'application/json', temperature: 0.6 }, 'flash', 'Plan'))); } catch (e) { apLog('Plan reply was not usable (' + e.message + '), using the quick plan'); planInfo = await lApplyPlanLib(lQuickPlan()); }
-    apLog('Plan: ' + planInfo);
+    if (isLayers()) {
+      apLog(`4/9 Gemini is planning ${S.segments.length} scenes…`); P(0.24);
+      let planInfo; try { planInfo = await lApplyPlanLib(lParseJSON(await apGemText(lPlanPrompt(), { responseMimeType: 'application/json', temperature: 0.6 }, 'flash', 'Plan'))); } catch (e) { apLog('Plan reply was not usable (' + e.message + '), using the quick plan'); planInfo = await lApplyPlanLib(lQuickPlan()); }
+      apLog('Plan: ' + planInfo);
 
-    for (let round = 0; round < 2; round++) {
-      const todo = lSheets().filter(s => !lSheetDone(s)), all = lSheets().length;
-      for (const sh of todo) {
-        apCheckStop(); const label = `5/9 Picture sheet ${sh.index + 1} of ${all}`;
-        apLog(label + '…'); P(0.28 + 0.4 * sh.index / Math.max(1, all));
-        try { await lPlaceSheet(sh.index, await apImage(lSheetPrompt(sh), sh.ids.length === 1 ? '1:1' : '3:2', label)); }
-        catch (e) { if (apStopFlag) throw e; apLog(`${label} failed: ${e.message}`); }
+      for (let round = 0; round < 2; round++) {
+        const todo = lSheets().filter(s => !lSheetDone(s)), all = lSheets().length;
+        for (const sh of todo) {
+          apCheckStop(); const label = `5/9 Picture sheet ${sh.index + 1} of ${all}`;
+          apLog(label + '…'); P(0.28 + 0.4 * sh.index / Math.max(1, all));
+          try { await lPlaceSheet(sh.index, await apImage(lSheetPrompt(sh), sh.ids.length === 1 ? '1:1' : '3:2', label)); }
+          catch (e) { if (apStopFlag) throw e; apLog(`${label} failed: ${e.message}`); }
+        }
       }
+      const missing = S.layers.assets.filter(a => !a.png).length;
+      if (missing) apLog(`${missing} pictures are still missing (they stay empty in the video)`);
+    } else {
+      // GRID IMAGES: a short picture description per scene, then one 3×3 grid image per 9 scenes
+      apLog(`4/9 Gemini is describing the pictures for ${S.segments.length} scenes…`); P(0.24);
+      try {
+        const txt = await apGemText(directorPrompt(), { temperature: 0.7, maxOutputTokens: 16000 }, 'flash', 'Scenes');
+        let c = 0;
+        txt.split('\n').forEach(l => { const mm = l.match(/^\s*(?:scene\s*)?(\d+)\s*[:.)\-–]\s*(.+)$/i); if (mm) { const k = +mm[1] - 1; if (S.segments[k]) { S.segments[k].visual = mm[2].trim().replace(/^["']|["']$/g, ''); c++; } } });
+        apLog(`Picture descriptions for ${c} of ${S.segments.length} scenes`); renderScenes(); renderPrompts(); save();
+      } catch (e) { if (apStopFlag) throw e; apLog('Scene descriptions failed (' + e.message + '); the grids use the narration lines'); }
+      for (let round = 0; round < 2; round++) {
+        const all = batches().length, todo = batches().filter(b => !S.grids[b.index]);
+        for (const b of todo) {
+          apCheckStop(); const label = `5/9 Grid image ${b.index + 1} of ${all} (scenes ${b.start + 1}–${b.start + b.count})`;
+          apLog(label + '…'); P(0.28 + 0.4 * b.index / Math.max(1, all));
+          try { await placeGrid(b.index, await apImage(buildPrompt(b), S.settings.aspect || '16:9', label)); }
+          catch (e) { if (apStopFlag) throw e; apLog(`${label} failed: ${e.message}`); }
+        }
+      }
+      const missing = batches().filter(b => !S.grids[b.index]).length;
+      if (missing) apLog(`${missing} grid images are still missing (those scenes show "image missing")`);
     }
-    const missing = S.layers.assets.filter(a => !a.png).length;
-    if (missing) apLog(`${missing} pictures are still missing (they stay empty in the video)`);
     if (APP) await sleep(1500);   // back in the app after Flow
 
     apLog('6/9 Making the background music…'); P(0.7); try { await amMake(false); } catch (e) { apLog('Music skipped: ' + e.message); }
