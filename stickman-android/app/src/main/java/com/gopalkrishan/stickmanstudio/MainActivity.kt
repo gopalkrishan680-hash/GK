@@ -491,7 +491,7 @@ class MainActivity : ComponentActivity() {
         }
 
         @JavascriptInterface
-        fun flowDebug(): String = FlowService.prefs(this@MainActivity).getString("flowDump", "") ?: ""
+        fun flowDebug(): String = FlowService.prefs(this@MainActivity).let { (it.getString("flowDump", "") ?: "") + "\n\n" + (it.getString("flowDumpComposer", "") ?: "") }.trim()
 
         @JavascriptInterface
         fun flowApps(): String = FlowService.apps(this@MainActivity)

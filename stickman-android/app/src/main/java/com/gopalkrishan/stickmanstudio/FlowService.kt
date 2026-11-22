@@ -87,6 +87,7 @@ class FlowService : AccessibilityService() {
         val src = e.source ?: return
         if (step == "prompt" && !src.isEditable && findEditable(src) == null) return
         if (step != "prompt" && src.isEditable) return   // tapping the prompt box again while typing
+        if (step != "prompt" && (isNav(src.contentDescription?.toString() ?: "") || isNav(src.text?.toString() ?: ""))) return   // Close / Back while getting there
         learned.put(step, describe(src))
         nextLearnStep()
     }
@@ -176,6 +177,8 @@ class FlowService : AccessibilityService() {
         val pkg = flowPackage(this)
         if (pkg.isEmpty()) throw IllegalStateException("Pick the Flow app in Auto Pilot settings first")
         val sel = try { JSONObject(prefs(this).getString("flowLearned", "{}") ?: "{}") } catch (_: Exception) { JSONObject() }
+        // a Close / Back tap recorded while teaching is not a real step
+        for (k in listOf("generate", "image", "download")) sel.optJSONObject(k)?.let { if (isNav(it.optString("desc")) || isNav(it.optString("text"))) sel.remove(k) }
         val minWait = prefs(this).getInt("flowMinWait", 20) * 1000L
         val maxWait = prefs(this).getInt("flowMaxWait", 240) * 1000L
 
@@ -187,11 +190,20 @@ class FlowService : AccessibilityService() {
         // 1. prompt box
         cb.progress("Typing the prompt…")
         val promptSel = sel.optJSONObject("prompt")
-        var box = waitFor(5000) { findBySelector(promptSel, editable = true) ?: findAnyEditable() }
-        if (box == null) {
-            // Flow opens on the project page: the prompt box comes with its Create button
-            findByLabel(OPEN_WORDS)?.let { cb.progress("Opening Flow's Create…"); click(it, null); Thread.sleep(2000) }
-            box = waitFor(6000) { findBySelector(promptSel, editable = true) ?: findAnyEditable() }
+        var box = waitFor(4000) { findBySelector(promptSel, editable = true) ?: findAnyEditable() }
+        // Flow comes back where it was left (a picture, the project page…): go back to its Create screen
+        var step = 0
+        while (box == null && step++ < 7) {
+            val create = findByLabelExact(OPEN_WORDS)
+            if (create != null) { cb.progress("Opening Flow's Create…"); click(create, null) }
+            else {
+                cb.progress("Going back to Flow's Create screen…")
+                val close = findByLabelExact(NAV_WORDS)
+                if (close != null) click(close, null) else performGlobalAction(GLOBAL_ACTION_BACK)
+            }
+            Thread.sleep(1800)
+            if (root()?.packageName?.toString() != pkg) { launch(pkg); Thread.sleep(2500) }
+            box = waitFor(2500) { findBySelector(promptSel, editable = true) ?: findAnyEditable() }
         }
         if (box == null && promptSel != null) {
             // tap where the box was while teaching, then use whatever got the keyboard focus
@@ -221,12 +233,14 @@ class FlowService : AccessibilityService() {
         }
         if (!typed) throw IllegalStateException("Could not type into Flow's prompt box")
 
+        saveDump("Create screen after typing", "flowDumpComposer")
+
         // 2. generate
         cb.progress("Pressing Generate…")
         val before = imageSignature()
         val dlSel = sel.optJSONObject("download")
         val dlBefore = downloadVisible(dlSel)
-        val gen = findBySelector(sel.optJSONObject("generate")) ?: findByLabel(GENERATE_WORDS)
+        val gen = findBySelector(sel.optJSONObject("generate")) ?: findByLabelExact(GENERATE_WORDS) ?: findByLabel(GENERATE_WORDS)
         if (gen == null || !click(gen, sel.optJSONObject("generate"))) {
             if (!tapSaved(sel.optJSONObject("generate"))) throw saveDump("generate not found").let { IllegalStateException("Could not find Flow's Generate button. Run \"Teach Flow\" again.") }
         }
@@ -327,7 +341,18 @@ class FlowService : AccessibilityService() {
     }
 
     /** A short text picture of the screen, kept for "Copy Flow report". */
-    private fun saveDump(why: String) {
+    private fun isNav(t: String) = t.isNotBlank() && NAV_WORDS.any { t.trim().equals(it, true) }
+
+    private fun findByLabelExact(words: List<String>): AccessibilityNodeInfo? {
+        val r = root() ?: return null
+        for (w in words) {
+            findFirst(r) { n -> n.isVisibleToUser && (n.isClickable || n.parent?.isClickable == true) &&
+                listOfNotNull(n.text, n.contentDescription).any { it.toString().trim().equals(w, true) } }?.let { return it }
+        }
+        return null
+    }
+
+    private fun saveDump(why: String, key: String = "flowDump") {
         val sb = StringBuilder("Flow report: $why\nlearned: ").append(prefs(this).getString("flowLearned", "")).append('\n')
         val dm = resources.displayMetrics
         var lines = 0
@@ -345,7 +370,7 @@ class FlowService : AccessibilityService() {
                 lines++
             }
         }
-        prefs(this).edit().putString("flowDump", sb.toString().take(12000)).apply()
+        prefs(this).edit().putString(key, sb.toString().take(12000)).apply()
     }
 
     private fun describe(n: AccessibilityNodeInfo): JSONObject {
@@ -548,6 +573,7 @@ class FlowService : AccessibilityService() {
         @Volatile var instance: FlowService? = null
         private val STEPS = listOf("prompt", "generate", "image", "download")
         private val OPEN_WORDS = listOf("Create", "New project", "New", "बनाएं")
+        private val NAV_WORDS = listOf("Close", "Back", "Navigate up", "Done", "बंद करें", "वापस")
         private val GENERATE_WORDS = listOf("Generate", "Create", "Send", "Submit", "Make", "Run", "बनाएं", "भेजें")
         private val DOWNLOAD_WORDS = listOf("Download", "Save to device", "Save image", "Save", "डाउनलोड")
         private val MENU_WORDS = listOf("Original size", "Full size", "Download image", "2K", "1K", "PNG", "Download")
