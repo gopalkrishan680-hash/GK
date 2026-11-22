@@ -167,7 +167,7 @@ class FlowService : AccessibilityService() {
     fun generate(prompt: String, cb: Callback) {
         if (busy) { cb.failed("Flow is already making a picture"); return }
         busy = true
-        prefs(this).edit().remove("flowDump").remove("flowDumpComposer").remove("flowDumpAspect").apply()
+        prefs(this).edit().remove("flowDump").remove("flowDumpComposer").remove("flowDumpAspect").remove("flowDumpReady").remove("flowDumpDownload").apply()
         worker.execute {
             try { cb.done(runGeneration(prompt, cb)) }
             catch (e: Exception) {
@@ -282,12 +282,14 @@ class FlowService : AccessibilityService() {
         Thread.sleep(1500)
 
         // 4. open the picture (if taught), then download it
+        if (rootInActiveWindow?.packageName?.toString() != pkg) { launch(pkg); Thread.sleep(2500) }
+        saveDump("ready to download", "flowDumpReady")
         cb.progress("Downloading the picture…")
         if (!downloadVisible(dlSel)) {
             // open the new picture: its tile is named after the prompt, else what was taught
             val tile = promptTile(prompt)
             if (tile != null) { click(tile, null); Thread.sleep(2000) }
-            else sel.optJSONObject("image")?.let { s -> findBySelector(s)?.let { click(it, s) } ?: tapSaved(s); Thread.sleep(2000) }
+            else sel.optJSONObject("image")?.takeIf { !isConfirm(it.optString("desc") + it.optString("text")) }?.let { s -> findBySelector(s)?.let { click(it, s) } ?: tapSaved(s); Thread.sleep(2000) }
         }
         val since = System.currentTimeMillis() / 1000 - 5
         val dl = findBySelector(sel.optJSONObject("download")) ?: findByLabel(DOWNLOAD_WORDS)
@@ -295,7 +297,10 @@ class FlowService : AccessibilityService() {
         if (clicked) {
             Thread.sleep(1500)
             // a size / format menu may open: take the first download-like choice
-            findByLabel(MENU_WORDS)?.let { click(it, null) }
+            findByLabel(MENU_WORDS)?.let { click(it, null); Thread.sleep(1200) }
+            // a confirm dialog (OK / Allow / Save) may follow
+            findByLabelExact(CONFIRM_WORDS)?.let { click(it, null); Thread.sleep(1200) }
+            saveDump("after Download", "flowDumpDownload")
             val file = waitFor(45000) { newestImage(since) }
             if (file != null) return file
         }
@@ -404,6 +409,8 @@ class FlowService : AccessibilityService() {
         return true
     }
 
+    private fun isConfirm(t: String) = CONFIRM_WORDS.any { t.trim().equals(it, true) }
+
     private fun isNav(t: String) = t.isNotBlank() && NAV_WORDS.any { t.trim().equals(it, true) }
 
     private fun findByLabelExact(words: List<String>): AccessibilityNodeInfo? {
@@ -423,6 +430,7 @@ class FlowService : AccessibilityService() {
         var lines = 0
         for (r in roots()) {
             sb.append("== window ").append(r.packageName).append('\n')
+            if (r.packageName?.contains("inputmethod") == true) { sb.append("(keyboard)\n"); continue }
             walk(r) { n ->
                 if (lines > 160 || !n.isVisibleToUser) return@walk
                 val t = listOfNotNull(n.text, n.contentDescription).joinToString(" | ").replace('\n', ' ').take(40)
@@ -532,6 +540,8 @@ class FlowService : AccessibilityService() {
 
     private fun tapSaved(s: JSONObject?): Boolean {
         if (s == null || !s.has("x")) return false
+        // never tap blind outside Flow (it could hit the launcher or the navigation bar)
+        if (root()?.packageName?.toString() != flowPackage(this) || rootInActiveWindow?.packageName?.toString() != flowPackage(this)) return false
         val dm = resources.displayMetrics
         return tap((s.optDouble("x") * dm.widthPixels).toFloat(), (s.optDouble("y") * dm.heightPixels).toFloat())
     }
@@ -552,11 +562,14 @@ class FlowService : AccessibilityService() {
 
     // ---------- getting the picture ----------
 
-    private fun newestImage(sinceSec: Long): Result? {
-        val uri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+    private fun newestImage(sinceSec: Long): Result? = newestIn(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, sinceSec)
+        ?: if (Build.VERSION.SDK_INT >= 29) newestIn(MediaStore.Downloads.EXTERNAL_CONTENT_URI, sinceSec, imagesOnly = true) else null
+
+    private fun newestIn(uri: android.net.Uri, sinceSec: Long, imagesOnly: Boolean = false): Result? {
         val cols = arrayOf(MediaStore.Images.Media._ID, MediaStore.Images.Media.MIME_TYPE, MediaStore.Images.Media.SIZE)
         return try {
-            contentResolver.query(uri, cols, "${MediaStore.Images.Media.DATE_ADDED} >= ?", arrayOf(sinceSec.toString()),
+            val where = "${MediaStore.Images.Media.DATE_ADDED} >= ?" + if (imagesOnly) " AND ${MediaStore.MediaColumns.MIME_TYPE} LIKE 'image/%'" else ""
+            contentResolver.query(uri, cols, where, arrayOf(sinceSec.toString()),
                 "${MediaStore.Images.Media.DATE_ADDED} DESC")?.use { c ->
                 if (!c.moveToFirst()) return null
                 if (c.getLong(2) <= 0) return null   // still being written
@@ -638,6 +651,7 @@ class FlowService : AccessibilityService() {
         @Volatile var instance: FlowService? = null
         private val STEPS = listOf("prompt", "generate", "image", "download")
         private val OPEN_WORDS = listOf("Create", "New project", "New", "बनाएं")
+        private val CONFIRM_WORDS = listOf("OK", "Allow", "Save", "Continue", "Got it", "Download")
         private val NAV_WORDS = listOf("Close", "Back", "Navigate up", "Done", "बंद करें", "वापस")
         private val GENERATE_WORDS = listOf("Generate", "Create", "Send", "Submit", "Make", "Run", "बनाएं", "भेजें")
         private val DOWNLOAD_WORDS = listOf("Download", "Save to device", "Save image", "Save", "डाउनलोड")
