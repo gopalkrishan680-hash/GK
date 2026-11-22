@@ -292,8 +292,9 @@ class FlowService : AccessibilityService() {
             val secs = (System.currentTimeMillis() - t0) / 1000
             cb.progress("Flow is drawing… ${secs}s")
             val loading = isLoading()
-            noteTilesIfNone()
-            val ready = (if (!dlBefore) downloadVisible(dlSel) else imageSignature() != before) || newTile() != null
+            // tiles seen only after Generate are not "before": then any tile on the (new) project page counts
+            val ready = (if (!dlBefore) downloadVisible(dlSel) else imageSignature() != before) || newTile() != null ||
+                (tilesBefore == null && tiles().isNotEmpty())
             calm = if (!loading && ready) calm + 1 else 0
             if (calm >= 2) break
             Thread.sleep(3000)
@@ -307,7 +308,10 @@ class FlowService : AccessibilityService() {
         if (!downloadVisible(dlSel)) {
             // open the new picture: its tile is named after the prompt, else what was taught
             // newest tile is the first one (top left); used when the tiles before Generate are not known
-            val tile = promptTile(prompt) ?: newTile() ?: if (tilesBefore == null) tiles().minByOrNull { val b = Rect(); it.getBoundsInScreen(b); b.top * 10 + b.left / 100 } else null
+            val first = tiles().minByOrNull { val b = Rect(); it.getBoundsInScreen(b); b.top * 10 + b.left / 100 }
+            val fresh = newTile()
+            val tile = fresh ?: promptTile(prompt) ?: first
+            if (fresh == null && tile != null) cb.progress("Taking the first picture of the project")
             if (tile != null) {
                 cb.progress("Opening the new picture…")
                 click(tile, null); Thread.sleep(2500)
