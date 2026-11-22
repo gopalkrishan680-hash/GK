@@ -16,7 +16,8 @@ cannot do on its own:
   noticed when you switch back to the app.
 
 ## Auto Pilot (★ tab)
-Makes one video a day from the **Mythology Roadmap** topic list: Claude writes the script (and checks the facts),
+Makes one video a day from the **Mythology Roadmap** topic list: Gemini (free key, default) or Claude (API key)
+writes the script and checks the facts,
 Gemini TTS speaks it (default `gemini-2.5-pro-preview-tts`, voice Orus, Promo/Hype, Natural pace, Neutral accent;
 falls back to a Flash TTS model when Pro has no free quota), Gemini plans the boards, the pictures and the thumbnail
 are made in the **Flow app** (or with the Gemini API), the app adds music, renders the MP4, writes the YouTube kit and
