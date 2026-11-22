@@ -195,12 +195,12 @@ class FlowService : AccessibilityService() {
     }
 
     private fun runGeneration(prompt: String, cb: Callback): Result {
-        tilesBefore = null
+        tilesBefore = null; projectBefore = null; countBefore = 0
         val pkg = flowPackage(this)
         if (pkg.isEmpty()) throw IllegalStateException("Pick the Flow app in Auto Pilot settings first")
         val sel = try { JSONObject(prefs(this).getString("flowLearned", "{}") ?: "{}") } catch (_: Exception) { JSONObject() }
         // a Close / Back tap recorded while teaching is not a real step
-        for (k in listOf("generate", "image", "download")) sel.optJSONObject(k)?.let { if (isNav(it.optString("desc")) || isNav(it.optString("text")) || isChip(it.optString("desc") + it.optString("text")) || (k == "generate" && it.optString("desc").equals("Download", true))) sel.remove(k) }
+        for (k in listOf("generate", "image", "download")) sel.optJSONObject(k)?.let { if (isNav(it.optString("desc")) || isNav(it.optString("text")) || isChip(it.optString("desc") + it.optString("text")) || (k != "download" && it.optString("desc").equals("Download", true))) sel.remove(k) }
         val minWait = prefs(this).getInt("flowMinWait", 20) * 1000L
         val maxWait = prefs(this).getInt("flowMaxWait", 240) * 1000L
 
@@ -302,7 +302,7 @@ class FlowService : AccessibilityService() {
 
         // 4. open the picture (if taught), then download it
         if (root()?.packageName?.toString() != pkg) { launch(pkg); Thread.sleep(2500) }
-        saveDump("ready to download after ${(System.currentTimeMillis() - t0) / 1000}s; tiles before: $tilesBefore", "flowDumpReady")
+        saveDump("ready to download after ${(System.currentTimeMillis() - t0) / 1000}s; before: $projectBefore $tilesBefore", "flowDumpReady")
         cb.progress("Downloading the picture…")
         if (!downloadVisible(dlSel)) {
             // open the new picture: its tile is named after the prompt, else what was taught
@@ -386,14 +386,35 @@ class FlowService : AccessibilityService() {
         walk(root()) { n -> if (n.isVisibleToUser && n.isClickable && TILE.containsMatchIn(n.contentDescription?.toString() ?: "")) out.add(n) }
         return out
     }
+    private var projectBefore: String? = null
+    private var countBefore = 0
     private fun tileKeys() = tiles().map { it.contentDescription.toString() }.toSet()
-    private fun noteTiles() { val k = tileKeys(); if (k.isNotEmpty()) tilesBefore = k }
+
+    /** The project page's title at the top ("Nov 22, 07:28 pm"): Flow makes a new project for a new Create. */
+    private fun projectTitle(): String? {
+        val h = resources.displayMetrics.heightPixels
+        return findFirst(root()) { n ->
+            val b = Rect(); n.getBoundsInScreen(b)
+            n.isVisibleToUser && !n.isClickable && b.exactCenterY() < h * 0.15f &&
+                listOfNotNull(n.text, n.contentDescription).any { it.isNotBlank() } && !TILE.containsMatchIn(n.contentDescription?.toString() ?: "")
+        }?.let { listOfNotNull(it.text, it.contentDescription).first().toString() }
+    }
+
+    private fun noteTiles() {
+        val t = tiles(); if (t.isEmpty()) return
+        tilesBefore = t.map { it.contentDescription.toString() }.toSet(); countBefore = t.size; projectBefore = projectTitle()
+    }
     private fun noteTilesIfNone() { if (tilesBefore == null) noteTiles() }
 
     /** A tile that was not there before Generate (new picture, or more items in a tile). */
     private fun newTile(): AccessibilityNodeInfo? {
         val before = tilesBefore ?: return null
-        return tiles().filter { it.contentDescription.toString() !in before }
+        val now = tiles(); if (now.isEmpty()) return null
+        val first = now.minByOrNull { val b = Rect(); it.getBoundsInScreen(b); b.top * 10 + b.left / 100 }
+        val title = projectTitle()
+        // a new project (Flow made one for this Create), or one more tile in the same project: the newest is first
+        if ((title != null && projectBefore != null && title != projectBefore) || now.size > countBefore) return first
+        return now.filter { it.contentDescription.toString() !in before }
             .minByOrNull { val b = Rect(); it.getBoundsInScreen(b); b.top * 10 + b.left / 100 }
     }
 
