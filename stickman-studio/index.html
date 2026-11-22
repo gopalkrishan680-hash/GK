@@ -4927,7 +4927,7 @@ async function apTTS(script, onPart) {
     for (;;) {
       try { j = await apGem(`/models/${models[mi]}:generateContent`, body, 300); break; }
       catch (e) {
-        if ((e.quota || /not found|not supported|does not exist/i.test(e.message)) && mi + 1 < models.length) { apLog(`Voice: ${models[mi]} ${e.quota ? 'has no free quota' : 'is not available'}, using ${models[mi + 1]}`); mi++; continue; }
+        if (!apStopFlag && !/Stopped|internet|in time/i.test(e.message) && mi + 1 < models.length) { apLog(`Voice: ${models[mi]} ${e.quota ? 'has no free quota' : 'is not available'}, using ${models[mi + 1]}`); mi++; continue; }
         throw e;
       }
     }
@@ -4970,23 +4970,32 @@ async function apImage(prompt, aspect, label) {
 
 /* ---- Claude ---- */
 /* script by Gemini: the newest Pro text model, then Flash when Pro has no free quota */
-async function apGeminiWrite(prompt) {
+/* Gemini text: tries models in order, skipping any that Google refuses for this key
+   (no free quota, "no longer available to new users", not found…), and remembers the refused ones */
+const apBadModels = new Set();
+async function apGemText(prompt, cfg, prefer, label) {
   const ver = n => { const m = n.match(/(\d+(?:\.\d+)?)/); return m ? +m[1] : 0; };
   const text = (await apModels()).filter(n => /^gemini/i.test(n) && !/tts|image|embed|aqa|live|audio|native|robotics|computer|learnlm|lite/i.test(n));
-  const order = (re) => text.filter(n => re.test(n)).sort((a, b) => ver(b) - ver(a) || (/preview|exp/.test(a) - /preview|exp/.test(b)));
-  const models = [...new Set([...order(/pro/i), ...order(/flash/i)])];
-  if (!models.length) throw new Error('no Gemini text model for this key');
+  const order = re => text.filter(n => re.test(n)).sort((a, b) => ver(b) - ver(a) || (/preview|exp/.test(a) - /preview|exp/.test(b)));
+  const pro = order(/pro/i), flash = order(/flash/i);
+  const models = [...new Set(prefer === 'pro' ? [...pro, ...flash] : [...flash, ...pro])].filter(m => !apBadModels.has(m));
+  if (!models.length) throw new Error('no Gemini text model works for this key');
+  let last;
   for (let i = 0; i < models.length; i++) {
     try {
-      const j = await apGem(`/models/${models[i]}:generateContent`, { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.9, maxOutputTokens: 16000 } }, 300);
+      const j = await apGem(`/models/${models[i]}:generateContent`, { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: cfg }, 300);
       const t = lGemText(j).trim(); if (!t) throw new Error('empty answer');
-      apLog(`Written by ${models[i]}`, false); return t;
+      apLog(`${label}: ${models[i]}`, false); return t;
     } catch (e) {
-      if (apStopFlag || i + 1 >= models.length || !(e.quota || /not found|not supported|empty answer/i.test(e.message))) throw e;
-      apLog(`Script: ${models[i]} ${e.quota ? 'has no free quota' : 'did not work'}, using ${models[i + 1]}`);
+      last = e;
+      if (apStopFlag || /Stopped|internet|in time/i.test(e.message)) throw e;
+      apBadModels.add(models[i]);
+      if (i + 1 < models.length) apLog(`${label}: ${models[i]} ${e.quota ? 'has no free quota' : 'refused (' + e.message.slice(0, 80) + ')'}, trying ${models[i + 1]}`);
     }
   }
+  throw last;
 }
+const apGeminiWrite = prompt => apGemText(prompt, { temperature: 0.9, maxOutputTokens: 16000 }, 'pro', 'Script');
 const apWrite = prompt => AP.s.writer === 'claude' ? apClaude(prompt) : apGeminiWrite(prompt);
 async function apClaude(prompt, maxTokens = 16000) {
   const key = (AP.claudeKey || '').trim(); if (!key) throw new Error('Paste the Claude API key in Auto Pilot → Script');
@@ -5127,9 +5136,7 @@ async function apRun(trigger) {
     if (!S.segments.length) throw new Error('the script made no scenes');
 
     apLog(`4/9 Gemini is planning ${S.segments.length} scenes…`); P(0.24);
-    const m = await lGemModel('text');
-    const pj = await apGem(`/models/${m}:generateContent`, { contents: [{ role: 'user', parts: [{ text: lPlanPrompt() }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.6 } }, 300);
-    let planInfo; try { planInfo = await lApplyPlanLib(lParseJSON(lGemText(pj))); } catch (e) { apLog('Plan reply was not usable (' + e.message + '), using the quick plan'); planInfo = await lApplyPlanLib(lQuickPlan()); }
+    let planInfo; try { planInfo = await lApplyPlanLib(lParseJSON(await apGemText(lPlanPrompt(), { responseMimeType: 'application/json', temperature: 0.6 }, 'flash', 'Plan'))); } catch (e) { apLog('Plan reply was not usable (' + e.message + '), using the quick plan'); planInfo = await lApplyPlanLib(lQuickPlan()); }
     apLog('Plan: ' + planInfo);
 
     for (let round = 0; round < 2; round++) {
@@ -5148,7 +5155,7 @@ async function apRun(trigger) {
     apLog('6/9 Making the background music…'); P(0.7); try { await amMake(false); } catch (e) { apLog('Music skipped: ' + e.message); }
 
     apLog('7/9 Writing the YouTube kit…'); P(0.72);
-    try { const yj = await apGem(`/models/${m}:generateContent`, { contents: [{ role: 'user', parts: [{ text: ytPrompt() }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.8 } }, 240); ytApply(lParseJSON(lGemText(yj))); }
+    try { ytApply(lParseJSON(await apGemText(ytPrompt(), { responseMimeType: 'application/json', temperature: 0.8 }, 'flash', 'YouTube kit'))); }
     catch (e) { apLog('Kit by Gemini failed (' + e.message + '), using the quick kit'); ytQuick(); }
     if (AP.s.channel && !S.settings.ytChannel) S.settings.ytChannel = AP.s.channel;
     let thumb = null;
