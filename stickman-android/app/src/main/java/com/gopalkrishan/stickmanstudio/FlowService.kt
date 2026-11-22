@@ -167,9 +167,14 @@ class FlowService : AccessibilityService() {
     fun generate(prompt: String, cb: Callback) {
         if (busy) { cb.failed("Flow is already making a picture"); return }
         busy = true
+        prefs(this).edit().remove("flowDump").remove("flowDumpComposer").remove("flowDumpAspect").apply()
         worker.execute {
             try { cb.done(runGeneration(prompt, cb)) }
-            catch (e: Exception) { Log.w(TAG, "flow failed", e); cb.failed(e.message ?: e.toString()) }
+            catch (e: Exception) {
+                Log.w(TAG, "flow failed", e)
+                if (!prefs(this).contains("flowDump")) try { saveDump(e.message ?: e.toString()) } catch (_: Exception) {}
+                cb.failed(e.message ?: e.toString())
+            }
             finally { busy = false; backToApp() }
         }
     }
@@ -403,7 +408,9 @@ class FlowService : AccessibilityService() {
     }
 
     private fun saveDump(why: String, key: String = "flowDump") {
-        val sb = StringBuilder("Flow report: $why\nlearned: ").append(prefs(this).getString("flowLearned", "")).append('\n')
+        val ver = try { packageManager.getPackageInfo(packageName, 0).versionName } catch (_: Exception) { "?" }
+        val now = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(java.util.Date())
+        val sb = StringBuilder("Flow report ($now, app $ver): $why\nlearned: ").append(prefs(this).getString("flowLearned", "")).append('\n')
         val dm = resources.displayMetrics
         var lines = 0
         for (r in roots()) {
