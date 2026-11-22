@@ -187,7 +187,12 @@ class FlowService : AccessibilityService() {
         // 1. prompt box
         cb.progress("Typing the prompt…")
         val promptSel = sel.optJSONObject("prompt")
-        var box = waitFor(8000) { findBySelector(promptSel, editable = true) ?: findAnyEditable() }
+        var box = waitFor(5000) { findBySelector(promptSel, editable = true) ?: findAnyEditable() }
+        if (box == null) {
+            // Flow opens on the project page: the prompt box comes with its Create button
+            findByLabel(OPEN_WORDS)?.let { cb.progress("Opening Flow's Create…"); click(it, null); Thread.sleep(2000) }
+            box = waitFor(6000) { findBySelector(promptSel, editable = true) ?: findAnyEditable() }
+        }
         if (box == null && promptSel != null) {
             // tap where the box was while teaching, then use whatever got the keyboard focus
             cb.progress("Tapping the prompt box…")
@@ -219,21 +224,24 @@ class FlowService : AccessibilityService() {
         // 2. generate
         cb.progress("Pressing Generate…")
         val before = imageSignature()
+        val dlSel = sel.optJSONObject("download")
+        val dlBefore = downloadVisible(dlSel)
         val gen = findBySelector(sel.optJSONObject("generate")) ?: findByLabel(GENERATE_WORDS)
         if (gen == null || !click(gen, sel.optJSONObject("generate"))) {
             if (!tapSaved(sel.optJSONObject("generate"))) throw saveDump("generate not found").let { IllegalStateException("Could not find Flow's Generate button. Run \"Teach Flow\" again.") }
         }
         val t0 = System.currentTimeMillis()
 
-        // 3. wait until the picture is ready: nothing is loading and the image area changed
+        // 3. wait until the picture is ready: nothing is loading and a Download button appeared
+        //    (or, when one was already there, the pictures on screen changed)
         Thread.sleep(minWait)
         var calm = 0
         while (System.currentTimeMillis() - t0 < maxWait) {
             val secs = (System.currentTimeMillis() - t0) / 1000
             cb.progress("Flow is drawing… ${secs}s")
             val loading = isLoading()
-            val changed = imageSignature() != before
-            calm = if (!loading && changed) calm + 1 else 0
+            val ready = if (!dlBefore) downloadVisible(dlSel) else imageSignature() != before
+            calm = if (!loading && ready) calm + 1 else 0
             if (calm >= 2) break
             Thread.sleep(3000)
         }
@@ -241,7 +249,12 @@ class FlowService : AccessibilityService() {
 
         // 4. open the picture (if taught), then download it
         cb.progress("Downloading the picture…")
-        sel.optJSONObject("image")?.let { s -> findBySelector(s)?.let { click(it, s) } ?: tapSaved(s); Thread.sleep(2000) }
+        if (!downloadVisible(dlSel)) {
+            // open the new picture: its tile is named after the prompt, else what was taught
+            val tile = promptTile(prompt)
+            if (tile != null) { click(tile, null); Thread.sleep(2000) }
+            else sel.optJSONObject("image")?.let { s -> findBySelector(s)?.let { click(it, s) } ?: tapSaved(s); Thread.sleep(2000) }
+        }
         val since = System.currentTimeMillis() / 1000 - 5
         val dl = findBySelector(sel.optJSONObject("download")) ?: findByLabel(DOWNLOAD_WORDS)
         val clicked = if (dl != null) click(dl, sel.optJSONObject("download")) else tapSaved(sel.optJSONObject("download"))
@@ -275,6 +288,26 @@ class FlowService : AccessibilityService() {
 
     private fun editableLike(n: AccessibilityNodeInfo) =
         n.isVisibleToUser && (n.isEditable || (n.className?.toString() ?: "").contains("EditText"))
+
+    private fun downloadVisible(s: JSONObject?): Boolean {
+        val desc = s?.optString("desc").orEmpty(); val text = s?.optString("text").orEmpty()
+        val r = root() ?: return false
+        return findFirst(r) { n ->
+            n.isVisibleToUser && listOfNotNull(n.text, n.contentDescription).map { it.toString().trim() }.any {
+                it.equals("Download", true) || it.equals("डाउनलोड", true) || (desc.isNotEmpty() && it == desc) || (text.isNotEmpty() && it == text)
+            }
+        } != null
+    }
+
+    private fun promptTile(prompt: String): AccessibilityNodeInfo? {
+        val key = prompt.lowercase().replace(Regex("\\s+"), " ").trim().take(24)
+        if (key.length < 6) return null
+        val r = root() ?: return null
+        return findFirst(r) { n ->
+            n.isVisibleToUser && n.isClickable && !n.isEditable &&
+                (n.contentDescription?.toString()?.lowercase()?.replace(Regex("\\s+"), " ")?.contains(key) == true)
+        }
+    }
 
     private fun findAnyEditable(): AccessibilityNodeInfo? {
         val pkg = flowPackage(this)
@@ -514,6 +547,7 @@ class FlowService : AccessibilityService() {
         private const val TAG = "SSAPP"
         @Volatile var instance: FlowService? = null
         private val STEPS = listOf("prompt", "generate", "image", "download")
+        private val OPEN_WORDS = listOf("Create", "New project", "New", "बनाएं")
         private val GENERATE_WORDS = listOf("Generate", "Create", "Send", "Submit", "Make", "Run", "बनाएं", "भेजें")
         private val DOWNLOAD_WORDS = listOf("Download", "Save to device", "Save image", "Save", "डाउनलोड")
         private val MENU_WORDS = listOf("Original size", "Full size", "Download image", "2K", "1K", "PNG", "Download")
