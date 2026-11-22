@@ -87,6 +87,7 @@ class FlowService : AccessibilityService() {
         val src = e.source ?: return
         if (step == "prompt" && !src.isEditable && findEditable(src) == null) return
         if (step != "prompt" && src.isEditable) return   // tapping the prompt box again while typing
+        if (step == "generate" && isChip((src.contentDescription ?: "").toString() + (src.text ?: ""))) return   // the model chip, not Generate
         if (step != "prompt" && (isNav(src.contentDescription?.toString() ?: "") || isNav(src.text?.toString() ?: ""))) return   // Close / Back while getting there
         learned.put(step, describe(src))
         nextLearnStep()
@@ -178,7 +179,7 @@ class FlowService : AccessibilityService() {
         if (pkg.isEmpty()) throw IllegalStateException("Pick the Flow app in Auto Pilot settings first")
         val sel = try { JSONObject(prefs(this).getString("flowLearned", "{}") ?: "{}") } catch (_: Exception) { JSONObject() }
         // a Close / Back tap recorded while teaching is not a real step
-        for (k in listOf("generate", "image", "download")) sel.optJSONObject(k)?.let { if (isNav(it.optString("desc")) || isNav(it.optString("text"))) sel.remove(k) }
+        for (k in listOf("generate", "image", "download")) sel.optJSONObject(k)?.let { if (isNav(it.optString("desc")) || isNav(it.optString("text")) || isChip(it.optString("desc") + it.optString("text"))) sel.remove(k) }
         val minWait = prefs(this).getInt("flowMinWait", 20) * 1000L
         val maxWait = prefs(this).getInt("flowMaxWait", 240) * 1000L
 
@@ -240,7 +241,7 @@ class FlowService : AccessibilityService() {
         val before = imageSignature()
         val dlSel = sel.optJSONObject("download")
         val dlBefore = downloadVisible(dlSel)
-        val gen = findBySelector(sel.optJSONObject("generate")) ?: findByLabelExact(GENERATE_WORDS) ?: findByLabel(GENERATE_WORDS)
+        val gen = findBySelector(sel.optJSONObject("generate")) ?: findByLabelExact(listOf("Generate", "Send", "Submit")) ?: sendButton(edit)
         if (gen == null || !click(gen, sel.optJSONObject("generate"))) {
             if (!tapSaved(sel.optJSONObject("generate"))) throw saveDump("generate not found").let { IllegalStateException("Could not find Flow's Generate button. Run \"Teach Flow\" again.") }
         }
@@ -341,6 +342,25 @@ class FlowService : AccessibilityService() {
     }
 
     /** A short text picture of the screen, kept for "Copy Flow report". */
+    /** Model / shape / count chips ("Nano Banana Pro x1"), never the Generate button. */
+    private fun isChip(t: String) = Regex("nano banana|imagen|veo|\\bx\\d\\b|\\d+:\\d+|tab \\d+ of", RegexOption.IGNORE_CASE).containsMatchIn(t)
+
+    /** The send arrow: the right-most clickable button level with or below the prompt box. */
+    private fun sendButton(edit: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val eb = Rect(); edit.getBoundsInScreen(eb)
+        val w = resources.displayMetrics.widthPixels
+        var best: AccessibilityNodeInfo? = null; var bx = -1f
+        walk(root()) { n ->
+            if (!n.isVisibleToUser || !n.isClickable || !n.isEnabled || n.isEditable) return@walk
+            val t = listOfNotNull(n.text, n.contentDescription).joinToString(" ")
+            if (isChip(t) || isNav(t) || t.trim() == "+" || t.contains("add", true) || t.contains("attach", true)) return@walk
+            val b = Rect(); n.getBoundsInScreen(b)
+            if (b.exactCenterY() < eb.top - 10 || b.exactCenterX() < w * 0.7f || b.width() > w * 0.4f) return@walk
+            if (b.exactCenterX() > bx) { bx = b.exactCenterX(); best = n }
+        }
+        return best
+    }
+
     private fun isNav(t: String) = t.isNotBlank() && NAV_WORDS.any { t.trim().equals(it, true) }
 
     private fun findByLabelExact(words: List<String>): AccessibilityNodeInfo? {
