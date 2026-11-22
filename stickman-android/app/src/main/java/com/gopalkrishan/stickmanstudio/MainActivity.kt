@@ -536,20 +536,7 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface
         fun flowGenerate(id: String, prompt: String): Boolean {
             val svc = FlowService.instance ?: return false
-            svc.generate(prompt, object : FlowService.Callback {
-                override fun progress(msg: String) { js("window.ssFlowProgress && ssFlowProgress('$id', ${JSONObject.quote(msg)})") }
-                override fun failed(msg: String) { js("window.ssFlowFail && ssFlowFail('$id', ${JSONObject.quote(msg)})") }
-                override fun done(r: FlowService.Result) {
-                    val CH = 768 * 1024
-                    var o = 0
-                    while (o < r.bytes.size) {
-                        val n = minOf(CH, r.bytes.size - o)
-                        js("window.ssFlowChunk && ssFlowChunk('$id','${Base64.encodeToString(r.bytes, o, n, Base64.NO_WRAP)}')")
-                        o += n
-                    }
-                    js("window.ssFlowEnd && ssFlowEnd('$id', ${JSONObject.quote(r.mime)})")
-                }
-            })
+            svc.generate(prompt, flowCallback(id, svc, retried = false))
             return true
         }
 
@@ -617,6 +604,53 @@ class MainActivity : ComponentActivity() {
             }
             return true
         }
+    }
+
+    /** Sends Flow's picture to the page; a copied picture is read from the clipboard once this app is in front. */
+    private fun flowCallback(id: String, svc: FlowService, retried: Boolean): FlowService.Callback = object : FlowService.Callback {
+        override fun progress(msg: String) { js("window.ssFlowProgress && ssFlowProgress('$id', ${JSONObject.quote(msg)})") }
+        override fun failed(msg: String) { js("window.ssFlowFail && ssFlowFail('$id', ${JSONObject.quote(msg)})") }
+        override fun done(r: FlowService.Result) {
+            if (r.mime != FlowService.CLIPBOARD) { sendFlowImage(id, r.bytes, r.mime); return }
+            val h = android.os.Handler(mainLooper); val t0 = System.currentTimeMillis()
+            val poll = object : Runnable {
+                override fun run() {
+                    if (!hasWindowFocus() && System.currentTimeMillis() - t0 < 10_000) { h.postDelayed(this, 300); return }
+                    val img = readClipImage()
+                    if (img != null) { progress("Picture taken from the clipboard"); Thread { sendFlowImage(id, img.second, img.first) }.start() }
+                    else if (!retried) { progress("Clipboard empty: downloading instead…"); svc.downloadCurrent(flowCallback(id, svc, retried = true)) }
+                    else failed("Could not get the picture from Flow")
+                }
+            }
+            h.postDelayed(poll, 600)
+        }
+    }
+
+    private fun readClipImage(): Pair<String, ByteArray>? {
+        val cm = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = try { cm.primaryClip } catch (_: Exception) { null } ?: return null
+        val copyAt = FlowService.prefs(this).getLong("copyAt", 0)
+        val stamp = cm.primaryClipDescription?.timestamp ?: 0
+        if (stamp in 1 until copyAt - 3000) return null   // copied before this picture
+        for (i in 0 until clip.itemCount) {
+            val uri = clip.getItemAt(i).uri ?: continue
+            val mime = try { contentResolver.getType(uri) } catch (_: Exception) { null } ?: "image/png"
+            if (!mime.startsWith("image/")) continue
+            val bytes = try { contentResolver.openInputStream(uri)?.use { it.readBytes() } } catch (_: Exception) { null } ?: continue
+            if (bytes.size > 1000) return mime to bytes
+        }
+        return null
+    }
+
+    private fun sendFlowImage(id: String, bytes: ByteArray, mime: String) {
+        val CH = 768 * 1024
+        var o = 0
+        while (o < bytes.size) {
+            val n = minOf(CH, bytes.size - o)
+            js("window.ssFlowChunk && ssFlowChunk('$id','${Base64.encodeToString(bytes, o, n, Base64.NO_WRAP)}')")
+            o += n
+        }
+        js("window.ssFlowEnd && ssFlowEnd('$id', ${JSONObject.quote(mime)})")
     }
 
     private fun withToken(cb: (String?, String?) -> Unit) {

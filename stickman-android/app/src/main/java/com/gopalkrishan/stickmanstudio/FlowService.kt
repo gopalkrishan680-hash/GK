@@ -179,6 +179,21 @@ class FlowService : AccessibilityService() {
         }
     }
 
+    /** Second try when the copied picture could not be read: Flow is still on the picture, so Download it. */
+    fun downloadCurrent(cb: Callback) {
+        if (busy) { cb.failed("Flow is busy"); return }
+        busy = true
+        worker.execute {
+            try {
+                val pkg = flowPackage(this)
+                launch(pkg); Thread.sleep(2500)
+                val sel = try { JSONObject(prefs(this).getString("flowLearned", "{}") ?: "{}") } catch (_: Exception) { JSONObject() }
+                cb.done(downloadFromHere(sel, sel.optJSONObject("download"), cb))
+            } catch (e: Exception) { cb.failed(e.message ?: e.toString()) }
+            finally { busy = false; backToApp() }
+        }
+    }
+
     private fun runGeneration(prompt: String, cb: Callback): Result {
         tilesBefore = null
         val pkg = flowPackage(this)
@@ -301,6 +316,20 @@ class FlowService : AccessibilityService() {
             }
             else sel.optJSONObject("image")?.takeIf { !isConfirm(it.optString("desc") + it.optString("text")) }?.let { s -> findBySelector(s)?.let { click(it, s) } ?: tapSaved(s); Thread.sleep(2000) }
         }
+        // quickest: ⋮ → Copy puts the picture on the clipboard; Stickman Studio reads it once it is in front
+        findByLabelExact(listOf("Copy", "Copy image"))?.let { cp ->
+            cb.progress("Copying the picture…")
+            // so an older picture on the clipboard can never be taken by mistake
+            prefs(this).edit().putLong("copyAt", System.currentTimeMillis()).apply()
+            if (click(cp, null)) { Thread.sleep(1500); return Result(ByteArray(0), CLIPBOARD) }
+        }
+        return downloadFromHere(sel, dlSel, cb)
+    }
+
+    /** The picture page is open (maybe with its ⋮ menu): Download it and read the file, else a screenshot. */
+    private fun downloadFromHere(sel: JSONObject, dlSel: JSONObject?, cb: Callback): Result {
+        cb.progress("Downloading the picture…")
+        if (!downloadVisible(dlSel) && tiles().isEmpty()) findByLabelExact(listOf("More options", "More"))?.let { click(it, null); Thread.sleep(1500) }
         val since = System.currentTimeMillis() / 1000 - 5
         val dl = findBySelector(sel.optJSONObject("download")) ?: findByLabel(DOWNLOAD_WORDS)
         val clicked = if (dl != null) click(dl, sel.optJSONObject("download")) else tapSaved(sel.optJSONObject("download"))
@@ -679,6 +708,7 @@ class FlowService : AccessibilityService() {
     companion object {
         private const val TAG = "SSAPP"
         @Volatile var instance: FlowService? = null
+        const val CLIPBOARD = "clipboard"
         private val STEPS = listOf("prompt", "generate", "image", "download")
         private val OPEN_WORDS = listOf("Create", "New project", "New", "बनाएं")
         private val CONFIRM_WORDS = listOf("OK", "Allow", "Save", "Continue", "Got it", "Download")
