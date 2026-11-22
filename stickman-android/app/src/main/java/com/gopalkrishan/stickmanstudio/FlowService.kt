@@ -186,8 +186,19 @@ class FlowService : AccessibilityService() {
 
         // 1. prompt box
         cb.progress("Typing the prompt…")
-        val box = waitFor(10000) { findBySelector(sel.optJSONObject("prompt"), editable = true) ?: findFirst(root()) { it.isEditable && it.isVisibleToUser } }
-            ?: throw IllegalStateException("Could not find Flow's prompt box. Run \"Teach Flow\" again.")
+        val promptSel = sel.optJSONObject("prompt")
+        var box = waitFor(8000) { findBySelector(promptSel, editable = true) ?: findAnyEditable() }
+        if (box == null && promptSel != null) {
+            // tap where the box was while teaching, then use whatever got the keyboard focus
+            cb.progress("Tapping the prompt box…")
+            tapSaved(promptSel)
+            Thread.sleep(1500)
+            box = waitFor(4000) { focusedInput() ?: findAnyEditable() }
+        }
+        if (box == null) {
+            saveDump("prompt box not found")
+            throw IllegalStateException("Could not find Flow's prompt box (is Flow on its prompt screen?). Press \"Copy Flow report\" and send it.")
+        }
         box.performAction(AccessibilityNodeInfo.ACTION_CLICK)
         box.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
         Thread.sleep(400)
@@ -210,7 +221,7 @@ class FlowService : AccessibilityService() {
         val before = imageSignature()
         val gen = findBySelector(sel.optJSONObject("generate")) ?: findByLabel(GENERATE_WORDS)
         if (gen == null || !click(gen, sel.optJSONObject("generate"))) {
-            if (!tapSaved(sel.optJSONObject("generate"))) throw IllegalStateException("Could not find Flow's Generate button. Run \"Teach Flow\" again.")
+            if (!tapSaved(sel.optJSONObject("generate"))) throw saveDump("generate not found").let { IllegalStateException("Could not find Flow's Generate button. Run \"Teach Flow\" again.") }
         }
         val t0 = System.currentTimeMillis()
 
@@ -243,12 +254,66 @@ class FlowService : AccessibilityService() {
         }
         // 5. fallback: cut the picture out of a screenshot
         cb.progress("Download not found: taking the picture from the screen…")
-        return screenshotPicture() ?: throw IllegalStateException("The picture could not be saved from Flow. Run \"Teach Flow\" again.")
+        return screenshotPicture() ?: throw saveDump("picture not saved").let { IllegalStateException("The picture could not be saved from Flow. Run \"Teach Flow\" again.") }
     }
 
     // ---------- finding things on screen ----------
 
-    private fun root(): AccessibilityNodeInfo? = rootInActiveWindow
+    /** Flow's own window (dialogs, keyboards and toasts can be the "active" window instead). */
+    private fun root(): AccessibilityNodeInfo? {
+        val pkg = flowPackage(this)
+        val rs = roots()
+        return rs.firstOrNull { it.packageName?.toString() == pkg } ?: rootInActiveWindow ?: rs.firstOrNull()
+    }
+
+    private fun roots(): List<AccessibilityNodeInfo> {
+        val out = ArrayList<AccessibilityNodeInfo>()
+        try { windows.forEach { w -> w.root?.let { out.add(it) } } } catch (_: Exception) {}
+        rootInActiveWindow?.let { a -> if (out.none { it == a }) out.add(0, a) }
+        return out
+    }
+
+    private fun editableLike(n: AccessibilityNodeInfo) =
+        n.isVisibleToUser && (n.isEditable || (n.className?.toString() ?: "").contains("EditText"))
+
+    private fun findAnyEditable(): AccessibilityNodeInfo? {
+        val pkg = flowPackage(this)
+        for (r in roots()) {
+            if (r.packageName?.toString() != pkg) continue
+            findFirst(r) { editableLike(it) }?.let { return it }
+        }
+        return null
+    }
+
+    private fun focusedInput(): AccessibilityNodeInfo? {
+        for (r in roots()) {
+            val f = r.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: continue
+            if (f.packageName?.toString() == flowPackage(this)) return f
+        }
+        return null
+    }
+
+    /** A short text picture of the screen, kept for "Copy Flow report". */
+    private fun saveDump(why: String) {
+        val sb = StringBuilder("Flow report: $why\nlearned: ").append(prefs(this).getString("flowLearned", "")).append('\n')
+        val dm = resources.displayMetrics
+        var lines = 0
+        for (r in roots()) {
+            sb.append("== window ").append(r.packageName).append('\n')
+            walk(r) { n ->
+                if (lines > 160 || !n.isVisibleToUser) return@walk
+                val t = listOfNotNull(n.text, n.contentDescription).joinToString(" | ").replace('\n', ' ').take(40)
+                val flags = (if (n.isEditable) "E" else "") + (if (n.isClickable) "C" else "") + (if (n.isFocused) "F" else "")
+                if (t.isEmpty() && flags.isEmpty()) return@walk
+                val b = Rect(); n.getBoundsInScreen(b)
+                sb.append((n.className ?: "").toString().substringAfterLast('.')).append(' ').append(flags)
+                    .append(" @").append("%.2f,%.2f".format(b.exactCenterX() / dm.widthPixels, b.exactCenterY() / dm.heightPixels))
+                    .append(' ').append(n.viewIdResourceName?.substringAfterLast('/') ?: "").append(" \"").append(t).append("\"\n")
+                lines++
+            }
+        }
+        prefs(this).edit().putString("flowDump", sb.toString().take(12000)).apply()
+    }
 
     private fun describe(n: AccessibilityNodeInfo): JSONObject {
         val r = Rect(); n.getBoundsInScreen(r)

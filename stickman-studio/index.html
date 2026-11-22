@@ -770,6 +770,7 @@ html:not(.mode-layers) .layers-only { display: none !important; }
           <button class="btn small" id="apPerms">2. Allow photos + notifications</button>
           <button class="btn small" id="apFlowLearn">3. Teach Flow (once)</button>
           <button class="btn small" id="apFlowTest">Test Flow</button>
+          <button class="btn small" id="apFlowReport">Copy Flow report</button>
         </div>
         <div class="row">
           <label class="f">Wait at least (s)<input type="number" id="apFlowMin" min="5" max="300"></label>
@@ -4859,9 +4860,10 @@ function apFlowImage(prompt, onMsg) {
 $('#apFlowTest').onclick = async () => {
   const img = $('#apFlowImg');
   try { const b = await apFlowImage('A simple hand-drawn doodle of a smiling stickman holding a diya lamp, black ink on a plain white background', m => $('#apFlowStatus').textContent = m); img.src = URL.createObjectURL(b); img.hidden = false; toast(`Flow works ✔ (${Math.round(b.size / 1024)} KB)`); }
-  catch (e) { toast(e.message); }
+  catch (e) { toast(e.message); apLog('Test Flow: ' + e.message); }
   apFlowRefresh();
 };
+$('#apFlowReport').onclick = () => { let r = ''; try { r = AndroidBridge.flowDebug(); } catch (_) {} if (!r) return toast('No Flow report yet: run Test Flow first'); copyText(r); toast('Flow report copied: paste it in the chat'); };
 
 /* ---- Gemini helpers ---- */
 async function apGem(path, body, timeoutSec = 300) {
