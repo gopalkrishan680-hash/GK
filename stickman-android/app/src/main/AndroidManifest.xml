@@ -6,6 +6,13 @@
     <!-- record your own voice / laugh for voice cloning -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- Auto Pilot: daily alarm, status notifications, waking the screen, finding the picture Flow downloaded -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 
     <!-- so "Open ChatGPT / Open Gemini" can find the installed apps -->
     <queries>
@@ -15,6 +22,11 @@
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="https" />
+        </intent>
+        <!-- Auto Pilot lists the installed apps so the Flow app can be picked -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
         </intent>
     </queries>
 
@@ -62,5 +74,24 @@
                 <data android:mimeType="image/*" />
             </intent-filter>
         </activity>
+
+        <!-- Auto Pilot: uses the Flow app (types the prompt, presses Generate, downloads the picture) -->
+        <service
+            android:name=".FlowService"
+            android:exported="false"
+            android:label="@string/flow_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/flow_service" />
+        </service>
+
+        <receiver android:name=".AutoPilotReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="com.gopalkrishan.stickmanstudio.AUTOPILOT_RUN" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

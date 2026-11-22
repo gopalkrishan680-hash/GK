@@ -6,6 +6,7 @@ on:
       - main
       - claude/stickman-video-voiceover-sync-ivss4s
       - ccr-cf402e99-zfb3al
+      - claude/mythology-video-automation-android-i8lpza
     paths:
       - 'stickman-studio/**'
       - 'stickman-android/**'
@@ -31,11 +32,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
-      # Without the signing secrets, keep the runner's debug key between builds so updates still install.
+      # Without the signing secrets, keep one generated key between builds so updates install and the
+      # SHA-1 registered for YouTube sign-in stays the same. (The SS_KEYSTORE_* secrets are the lasting option.)
       - uses: actions/cache@v4
         with:
-          path: ~/.android/debug.keystore
-          key: stickman-debug-keystore
+          path: ~/.stickman-signing/app.jks
+          key: stickman-signing-key-v1
       - name: Build APK
         env:
           SS_KEYSTORE_BASE64: ${{ secrets.SS_KEYSTORE_BASE64 }}
@@ -46,8 +48,16 @@ jobs:
             export SS_KEYSTORE_FILE="$RUNNER_TEMP/release.jks"
             echo "Signing with the release key from secrets"
           else
-            echo "No SS_KEYSTORE_BASE64 secret: signing with the cached debug key"
+            mkdir -p ~/.stickman-signing
+            if [ ! -f ~/.stickman-signing/app.jks ]; then
+              keytool -genkeypair -keystore ~/.stickman-signing/app.jks -alias stickman -storepass stickman -keypass stickman \
+                -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Stickman Studio"
+              echo "Made a new signing key (cached for later builds)"
+            fi
+            export SS_KEYSTORE_FILE=~/.stickman-signing/app.jks SS_KEYSTORE_PASSWORD=stickman
+            echo "No SS_KEYSTORE_BASE64 secret: signing with the cached key"
           fi
+          keytool -list -v -keystore "$SS_KEYSTORE_FILE" -storepass "$SS_KEYSTORE_PASSWORD" | grep -E "SHA1:" || true
           gradle -p stickman-android :app:assembleRelease --no-daemon --stacktrace
       - name: Name the APK
         run: cp stickman-android/app/build/outputs/apk/release/app-release.apk StickmanStudio.apk

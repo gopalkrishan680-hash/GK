@@ -31,6 +31,15 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.IntentSenderRequest
+import android.app.KeyguardManager
+import android.provider.Settings
+import com.google.android.gms.auth.api.identity.AuthorizationRequest
+import com.google.android.gms.auth.api.identity.AuthorizationResult
+import com.google.android.gms.auth.api.identity.Identity
+import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.common.api.Scope
+import java.security.MessageDigest
 import androidx.webkit.WebViewAssetLoader
 import org.json.JSONObject
 import java.io.InputStream
@@ -50,6 +59,22 @@ class MainActivity : ComponentActivity() {
     private var pendingLink: String? = null
     private var lastClipStamp = -1L
     private var pageReady = false
+    private var pendingAuto: String? = null
+    private var pendingTab: String? = null
+    private var tokenWaiter: ((String?, String?) -> Unit)? = null
+
+    private val perms = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { r ->
+        js("window.ssPermsDone && ssPermsDone(" + JSONObject.quote(JSONObject(r.mapValues { it.value }).toString()) + ")")
+    }
+
+    // Google sign-in for YouTube: the consent screen comes back here
+    private val googleAuth = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { res ->
+        val w = tokenWaiter; tokenWaiter = null
+        try {
+            val r = Identity.getAuthorizationClient(this).getAuthorizationResultFromIntent(res.data)
+            w?.invoke(r.accessToken, if (r.accessToken == null) "No access was given" else null)
+        } catch (e: Exception) { w?.invoke(null, "Google sign-in cancelled (${e.message})") }
+    }
 
     private var saveStream: OutputStream? = null
     private var saveUri: Uri? = null
@@ -119,6 +144,7 @@ class MainActivity : ComponentActivity() {
                 pageReady = true
                 flushShares()
                 flushLink()
+                flushAuto()
             }
         }
 
@@ -187,6 +213,19 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
     }
 
+    /** Wake the screen and show over a swipe lock screen for a scheduled run. */
+    private fun wakeForAutoPilot() {
+        setShowWhenLocked(true); setTurnScreenOn(true)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        try { (getSystemService(KEYGUARD_SERVICE) as KeyguardManager).requestDismissKeyguard(this, null) } catch (_: Exception) {}
+    }
+
+    private fun flushAuto() {
+        if (!pageReady) return
+        pendingTab?.let { pendingTab = null; js("window.ssOpenTab && ssOpenTab(" + JSONObject.quote(it) + ")") }
+        pendingAuto?.let { pendingAuto = null; js("window.ssAutoPilotStart && ssAutoPilotStart(" + JSONObject.quote(it) + ")") }
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleIntent(intent)
@@ -202,6 +241,9 @@ class MainActivity : ComponentActivity() {
 
     private fun handleIntent(i: Intent?) {
         if (i == null) return
+        i.getStringExtra(EXTRA_OPEN_TAB)?.let { pendingTab = it; i.removeExtra(EXTRA_OPEN_TAB) }
+        if (i.getBooleanExtra(EXTRA_AUTOPILOT, false)) { i.removeExtra(EXTRA_AUTOPILOT); pendingAuto = "alarm"; wakeForAutoPilot() }
+        flushAuto()
         // stickmanstudio://connect?url=https://….trycloudflare.com from the voice notebook's button
         if (i.action == Intent.ACTION_VIEW && i.data?.scheme == "stickmanstudio") {
             pendingLink = i.data?.getQueryParameter("url") ?: return
@@ -426,6 +468,137 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // ---------- Auto Pilot ----------
+
+        @JavascriptInterface
+        fun flowStatus(): String {
+            val p = FlowService.prefs(this@MainActivity)
+            val pkg = FlowService.flowPackage(this@MainActivity)
+            val label = try { if (pkg.isEmpty()) "" else packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString() } catch (_: Exception) { "" }
+            val photoPerm = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_IMAGES else Manifest.permission.READ_EXTERNAL_STORAGE
+            val am = getSystemService(ALARM_SERVICE) as android.app.AlarmManager
+            return JSONObject()
+                .put("service", FlowService.instance != null)
+                .put("pkg", pkg).put("label", label)
+                .put("learned", (p.getString("flowLearned", "") ?: "").length > 5)
+                .put("photos", checkSelfPermission(photoPerm) == PackageManager.PERMISSION_GRANTED)
+                .put("notify", Build.VERSION.SDK_INT < 33 || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)
+                .put("exact", Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms())
+                .put("daily", p.getBoolean("daily", false)).put("hour", p.getInt("hour", 13)).put("minute", p.getInt("minute", 0))
+                .put("nextRun", p.getLong("nextRun", 0))
+                .put("minWait", p.getInt("flowMinWait", 20)).put("maxWait", p.getInt("flowMaxWait", 240))
+                .toString()
+        }
+
+        @JavascriptInterface
+        fun flowApps(): String = FlowService.apps(this@MainActivity)
+
+        @JavascriptInterface
+        fun flowSetApp(pkg: String) {
+            FlowService.prefs(this@MainActivity).edit().putString("flowPkg", pkg).remove("flowLearned").apply()
+        }
+
+        @JavascriptInterface
+        fun flowSetWaits(min: Int, max: Int) {
+            FlowService.prefs(this@MainActivity).edit().putInt("flowMinWait", min.coerceIn(5, 300)).putInt("flowMaxWait", max.coerceIn(30, 900)).apply()
+        }
+
+        @JavascriptInterface
+        fun openAccessibility() { runOnUiThread { try { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) } catch (_: Exception) {} } }
+
+        @JavascriptInterface
+        fun openExactAlarm() {
+            runOnUiThread {
+                try { startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:$packageName"))) }
+                catch (_: Exception) { toast("Allow \"Alarms & reminders\" for Stickman Studio in Settings") }
+            }
+        }
+
+        @JavascriptInterface
+        fun requestPerms() {
+            val list = ArrayList<String>()
+            list.add(if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_IMAGES else Manifest.permission.READ_EXTERNAL_STORAGE)
+            if (Build.VERSION.SDK_INT >= 33) list.add(Manifest.permission.POST_NOTIFICATIONS)
+            runOnUiThread { perms.launch(list.toTypedArray()) }
+        }
+
+        @JavascriptInterface
+        fun flowLearn(): Boolean {
+            val svc = FlowService.instance ?: return false
+            runOnUiThread { svc.startLearning { res -> js("window.ssFlowLearned && ssFlowLearned(" + JSONObject.quote(res) + ")") } }
+            return true
+        }
+
+        /** Makes one picture in Flow; the page gets ssFlowProgress / ssFlowChunk / ssFlowEnd / ssFlowFail. */
+        @JavascriptInterface
+        fun flowGenerate(id: String, prompt: String): Boolean {
+            val svc = FlowService.instance ?: return false
+            svc.generate(prompt, object : FlowService.Callback {
+                override fun progress(msg: String) { js("window.ssFlowProgress && ssFlowProgress('$id', ${JSONObject.quote(msg)})") }
+                override fun failed(msg: String) { js("window.ssFlowFail && ssFlowFail('$id', ${JSONObject.quote(msg)})") }
+                override fun done(r: FlowService.Result) {
+                    val CH = 768 * 1024
+                    var o = 0
+                    while (o < r.bytes.size) {
+                        val n = minOf(CH, r.bytes.size - o)
+                        js("window.ssFlowChunk && ssFlowChunk('$id','${Base64.encodeToString(r.bytes, o, n, Base64.NO_WRAP)}')")
+                        o += n
+                    }
+                    js("window.ssFlowEnd && ssFlowEnd('$id', ${JSONObject.quote(r.mime)})")
+                }
+            })
+            return true
+        }
+
+        @JavascriptInterface
+        fun notify(title: String, text: String) { AutoPilot.notify(this@MainActivity, AutoPilot.NOTE_STATUS, title, text) }
+
+        @JavascriptInterface
+        fun setSchedule(on: Boolean, hour: Int, minute: Int): String {
+            FlowService.prefs(this@MainActivity).edit().putBoolean("daily", on).putInt("hour", hour).putInt("minute", minute).apply()
+            AutoPilot.schedule(this@MainActivity)
+            return flowStatus()
+        }
+
+        /** The SHA-1 of the app's signing key, needed for the Android OAuth client in Google Cloud. */
+        @JavascriptInterface
+        fun appSha1(): String = try {
+            val info = packageManager.getPackageInfo(packageName, PackageManager.GET_SIGNING_CERTIFICATES)
+            val cert = info.signingInfo!!.apkContentsSigners[0].toByteArray()
+            MessageDigest.getInstance("SHA-1").digest(cert).joinToString(":") { "%02X".format(it) }
+        } catch (e: Exception) { "" }
+
+        @JavascriptInterface
+        fun packageId(): String = packageName
+
+        /** Sign in to YouTube (once); later calls get a fresh token silently. Answers with ssYtAuth(ok, msg). */
+        @JavascriptInterface
+        fun ytConnect() {
+            withToken { t, err -> js("window.ssYtAuth && ssYtAuth(${t != null}, ${JSONObject.quote(err ?: "")})") }
+        }
+
+        /** Uploads the video saved last (Movies/Stickman Studio). Answers with ssYtProgress / ssYtDone / ssYtFail. */
+        @JavascriptInterface
+        fun ytUpload(meta: String, thumbB64: String) {
+            val video = lastSaved
+            if (video == null) { js("window.ssYtFail && ssYtFail('Export the video first')"); return }
+            val thumb = if (thumbB64.isEmpty()) null else Base64.decode(thumbB64, Base64.DEFAULT)
+            withToken { token, err ->
+                if (token == null) { js("window.ssYtFail && ssYtFail(${JSONObject.quote(err ?: "Not signed in")})"); return@withToken }
+                Thread {
+                    try {
+                        val out = YouTube.upload(this@MainActivity, token, video, JSONObject(meta), thumb, object : YouTube.Progress {
+                            override fun update(msg: String, frac: Double) { js("window.ssYtProgress && ssYtProgress(${JSONObject.quote(msg)}, $frac)") }
+                        })
+                        js("window.ssYtDone && ssYtDone(${JSONObject.quote(out.toString())})")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "upload", e)
+                        js("window.ssYtFail && ssYtFail(${JSONObject.quote(e.message ?: e.toString())})")
+                    }
+                }.start()
+            }
+        }
+
         /** Share the last exported video (WhatsApp, YouTube, Drive...). */
         @JavascriptInterface
         fun shareLast(): Boolean {
@@ -443,7 +616,29 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun withToken(cb: (String?, String?) -> Unit) {
+        val req = AuthorizationRequest.builder().setRequestedScopes(YouTube.SCOPES.map { Scope(it) }).build()
+        runOnUiThread {
+            Identity.getAuthorizationClient(this).authorize(req)
+                .addOnSuccessListener { r: AuthorizationResult ->
+                    val pi = r.pendingIntent
+                    if (r.hasResolution() && pi != null) {
+                        tokenWaiter = cb
+                        try { googleAuth.launch(IntentSenderRequest.Builder(pi.intentSender).build()) }
+                        catch (e: Exception) { tokenWaiter = null; cb(null, "Could not open Google sign-in: ${e.message}") }
+                    } else cb(r.accessToken, if (r.accessToken == null) "No access token" else null)
+                }
+                .addOnFailureListener { e ->
+                    val code = (e as? ApiException)?.statusCode
+                    cb(null, if (code == 10) "Google says this app is not registered (DEVELOPER_ERROR). Add an Android OAuth client with package $packageName and the SHA-1 shown in Auto Pilot, in the same Google Cloud project where YouTube Data API v3 is on."
+                    else "Google sign-in failed: ${e.message}")
+                }
+        }
+    }
+
     companion object {
+        const val EXTRA_AUTOPILOT = "autopilot"
+        const val EXTRA_OPEN_TAB = "openTab"
         private const val HOST = "appassets.androidplatform.net"
         private const val TAG = "SSAPP"
     }

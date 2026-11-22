@@ -230,6 +230,22 @@ html:not(.mode-layers) .layers-only { display: none !important; }
 .litem .tc { font-size: 11px; }
 .litem .x { border: 0; background: none; color: var(--bad); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 5px; }
 #lPlanReply, #lJson { font: 12.5px/1.5 var(--font-mono); }
+/* Auto Pilot */
+.ap-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); align-items: start; }
+.ap-log { max-height: 260px; overflow: auto; white-space: pre-wrap; font-size: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px; margin: 6px 0 0; }
+.ap-topics { display: grid; gap: 4px; max-height: 360px; overflow: auto; }
+.ap-topic { display: flex; gap: 6px; align-items: center; padding: 4px 6px; border-radius: 8px; border: 1px solid var(--line); }
+.ap-topic.next { border-color: var(--accent, #f08a3c); }
+.ap-topic.done .ap-t { opacity: .55; text-decoration: line-through; }
+.ap-topic small { display: block; font-size: 11px; text-decoration: none; }
+.ap-topic small.bad { color: #d33; }
+.ap-n { min-width: 24px; font-size: 12px; color: var(--muted); text-align: right; }
+.ap-t { flex: 1; min-width: 0; font-size: 14px; overflow-wrap: anywhere; }
+.ap-grid label.row { flex-wrap: nowrap; font-size: 14px; }
+.ap-grid label.row input[type=checkbox] { width: auto; flex: none; margin: 0; }
+.ap-sub { display: grid; gap: 10px; border-top: 1px dashed var(--line); padding-top: 10px; }
+.ap-steps { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 6px; }
+.ap-steps code { overflow-wrap: anywhere; }
 </style>
 </head>
 <body>
@@ -261,6 +277,7 @@ html:not(.mode-layers) .layers-only { display: none !important; }
       <button role="tab" data-tab="sync" aria-selected="false"><span class="n">4</span>Voice Sync</button>
       <button role="tab" data-tab="video" aria-selected="false"><span class="n">5</span>Preview + Export</button>
       <button role="tab" data-tab="yt" aria-selected="false"><span class="n">6</span>YouTube Kit</button>
+      <button role="tab" data-tab="auto" aria-selected="false"><span class="n">★</span>Auto Pilot</button>
     </nav>
   </div>
 </div>
@@ -676,6 +693,122 @@ html:not(.mode-layers) .layers-only { display: none !important; }
   <p id="ytInfo" class="hint"></p>
   <div id="ytOut" style="display:grid;gap:14px"></div>
 </section>
+
+<!-- AUTO PILOT -->
+<section class="step" data-panel="auto" hidden>
+  <div>
+    <h2>Auto Pilot</h2>
+    <p class="hint">Every day by itself: the next <b>Mythology Roadmap</b> topic → script by <b>Claude</b> → voice by <b>Gemini TTS</b> → plan → pictures in <b>Flow</b> (or Gemini) → music → video → YouTube kit + thumbnail → upload to YouTube, scheduled for <b>5 pm</b>. Set it up once below, then press <b>Run now</b> to test.</p>
+  </div>
+  <div class="ap-grid">
+    <div class="panel">
+      <h3>▶ Today's video</h3>
+      <div class="row"><button class="btn primary" id="apRun">Run now</button><button class="btn" id="apStopBtn" hidden>Stop</button><span class="chip" id="apState">Idle</span></div>
+      <progress id="apProg" value="0" max="1" hidden></progress>
+      <div class="hint" id="apNow">Next topic: –</div>
+      <details><summary class="hint">Log</summary><pre id="apLog" class="ap-log"></pre></details>
+      <div class="row"><button class="btn small" id="apRestore">Open my project from before the last run</button></div>
+    </div>
+
+    <div class="panel" id="apApprove" hidden>
+      <h3>✅ Check before upload</h3>
+      <p class="hint" style="margin:0">Watch a bit of the video and check the title and thumbnail. <b>Approve</b> uploads it and schedules it; <b>Skip</b> keeps the topic for the next run.</p>
+      <video id="apVideo" controls playsinline style="width:100%;max-height:260px;background:#000;border-radius:8px"></video>
+      <img id="apThumb" alt="Thumbnail" style="width:100%;max-width:420px;border-radius:8px">
+      <label class="f">Title <input type="text" id="apTitle" maxlength="100"></label>
+      <div class="row"><button class="btn primary" id="apOk">Approve and upload</button><button class="btn" id="apSkip">Skip</button></div>
+    </div>
+
+    <div class="panel">
+      <h3>🗺 Mythology Roadmap</h3>
+      <div class="hint" id="apCount"></div>
+      <div id="apTopics" class="ap-topics"></div>
+      <label class="f">Add topics (one per line; the order is the upload order)<textarea id="apAdd" rows="4" placeholder="Karna ne Duryodhan ka saath kyun nahi chhoda?"></textarea></label>
+      <div class="row"><button class="btn" id="apAddBtn">Add</button><button class="btn small" id="apDefaults">Add the 60 starter topics</button><button class="btn small" id="apClearDone">Remove done topics</button></div>
+    </div>
+
+    <div class="panel">
+      <h3>✍ Script (Claude)</h3>
+      <label class="f">Claude API key (console.anthropic.com → API keys; stays on this phone)<input type="password" id="apClaudeKey" autocomplete="off" placeholder="sk-ant-..."></label>
+      <div class="row">
+        <label class="f">Model<select id="apModel"><option value="claude-opus-5-5">Claude Opus 5.5 (best)</option><option value="claude-sonnet-5-5">Claude Sonnet 5.5 (cheaper)</option><option value="claude-haiku-5-5">Claude Haiku 5.5 (cheapest)</option></select></label>
+        <label class="f">Video length<select id="apLen"><option>5</option><option>6</option><option>7</option><option selected>8</option><option>10</option><option>12</option></select></label>
+        <label class="f">Language<select id="apLang"><option value="hinglish">Hinglish (Roman)</option><option value="hindi">Hindi (Devanagari)</option><option value="english">English</option></select></label>
+      </div>
+      <label class="f">Channel name (optional)<input type="text" id="apChannel"></label>
+      <label class="row"><input type="checkbox" id="apCheck"> Fact-check the script against the scriptures (a second Claude pass)</label>
+    </div>
+
+    <div class="panel">
+      <h3>🎙 Voice (Gemini TTS)</h3>
+      <label class="f">Gemini API key (free: aistudio.google.com/apikey; also used for the plan and the YouTube kit)<input type="password" id="apGemKey" autocomplete="off"></label>
+      <div class="row">
+        <label class="f">Model<input type="text" id="apTtsModel"></label>
+        <label class="f">Voice<input type="text" id="apVoice"></label>
+      </div>
+      <div class="row">
+        <label class="f">Style<input type="text" id="apStyle"></label>
+        <label class="f">Pace<input type="text" id="apPace"></label>
+        <label class="f">Accent<input type="text" id="apAccent"></label>
+      </div>
+      <div class="row"><button class="btn small" id="apTtsTest">Test the voice</button><span class="hint" id="apTtsInfo"></span></div>
+      <audio id="apTtsAudio" controls hidden style="width:100%"></audio>
+    </div>
+
+    <div class="panel">
+      <h3>🖼 Pictures and thumbnail</h3>
+      <label class="f">Make the pictures with<select id="apImg"><option value="flow">Flow app on this phone (automatic, no key)</option><option value="gemini">Gemini API (Gemini key)</option></select></label>
+      <label class="row"><input type="checkbox" id="apImgFallback"> If Flow fails, use Gemini instead</label>
+      <div id="apFlowBox" class="ap-sub">
+        <div class="hint" id="apFlowStatus">Flow helper: checking…</div>
+        <label class="f">Flow app<select id="apFlowApp"><option value="">Pick the app…</option></select></label>
+        <div class="row">
+          <button class="btn small" id="apFlowAcc">1. Turn on the Flow helper</button>
+          <button class="btn small" id="apPerms">2. Allow photos + notifications</button>
+          <button class="btn small" id="apFlowLearn">3. Teach Flow (once)</button>
+          <button class="btn small" id="apFlowTest">Test Flow</button>
+        </div>
+        <div class="row">
+          <label class="f">Wait at least (s)<input type="number" id="apFlowMin" min="5" max="300"></label>
+          <label class="f">Give up after (s)<input type="number" id="apFlowMax" min="30" max="900"></label>
+        </div>
+        <img id="apFlowImg" alt="" hidden style="width:100%;max-width:420px;border-radius:8px">
+        <p class="hint" style="margin:0">In Flow, choose the image model and the picture shape once (landscape works best for sheets). During a run the phone must stay unlocked and on charge: Auto Pilot opens Flow, types, waits and downloads by itself.</p>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>📺 YouTube upload</h3>
+      <div class="row"><button class="btn" id="apYtConnect">Connect YouTube</button><span class="chip" id="apYtState">Not connected</span></div>
+      <div class="row">
+        <label class="f">Publish every day at (India time)<input type="time" id="apPublish"></label>
+        <label class="f">Category<select id="apCat"><option value="27">Education</option><option value="24">Entertainment</option><option value="22">People &amp; Blogs</option></select></label>
+      </div>
+      <label class="row"><input type="checkbox" id="apApproveOn"> Ask me before uploading (notification + Approve button)</label>
+      <label class="row"><input type="checkbox" id="apComment"> Post the pinned-comment text as the first comment (pin it yourself)</label>
+      <details><summary class="hint">One-time Google setup (about 10 minutes)</summary>
+        <ol class="hint ap-steps">
+          <li>Open <b>console.cloud.google.com</b> → create a project (any name).</li>
+          <li><b>APIs &amp; Services → Library</b> → turn on <b>YouTube Data API v3</b>.</li>
+          <li><b>OAuth consent screen</b> → External → app name, your email → add yourself under <b>Test users</b> (or press Publish app).</li>
+          <li><b>Credentials → Create credentials → OAuth client ID → Android</b>. Package name: <code id="apPkg">–</code>. SHA-1: <code id="apSha">–</code> <button class="btn small" id="apShaCopy">Copy</button></li>
+          <li>Back here: <b>Connect YouTube</b> and allow access.</li>
+          <li>YouTube keeps videos uploaded by a new, unverified Google project <b>private</b>. To let them go public at 5 pm, fill in Google's <b>YouTube API audit</b> form for the project (free). Until it is approved, open YouTube Studio and press Schedule on the uploaded video.</li>
+        </ol>
+      </details>
+    </div>
+
+    <div class="panel">
+      <h3>⏰ Every day</h3>
+      <label class="row"><input type="checkbox" id="apDaily"> Run Auto Pilot by itself every day</label>
+      <label class="f">Start at (gives time to finish before the publish time)<input type="time" id="apStart"></label>
+      <div class="hint" id="apNext"></div>
+      <div class="row"><button class="btn small" id="apExact" hidden>Allow exact alarms</button></div>
+      <p class="hint" style="margin:0">Keep the phone on charge with the screen lock set to <b>Swipe</b> or <b>None</b> at that time (Android cannot unlock a PIN by itself). Turn off battery saving for Stickman Studio.</p>
+    </div>
+  </div>
+</section>
+
 </main>
 <audio id="music" loop preload="auto" hidden></audio>
 <button class="pastebadge" id="pasteBadge" hidden title="Scroll to this card"></button>
@@ -2601,7 +2734,7 @@ async function mixAudio(sr) {
 }
 // Renders every frame at its exact time (frame k = k / fps seconds) and writes a normal, seekable MP4.
 // Returns false if this browser cannot encode, so the caller can fall back to live recording.
-async function exportOffline() {
+async function exportOffline(opt = {}) {
   const [W, H] = exportDims(), fps = +S.settings.fps, sr = 48000;
   const vc = await pickVideoCodec(W, H, fps, W * H >= 1900 * 1000 ? 6e6 : 3.5e6), ac = await pickAudioCodec(sr);
   if (!vc || !ac) return false;
@@ -2648,7 +2781,8 @@ async function exportOffline() {
   if (APP) try { AndroidBridge.keepAwake(false); } catch (_) {}
   const cancelled = exporting.cancelled; exporting = null; ui.btn.disabled = false; ui.cancel.hidden = true; ui.prog.hidden = true; drawPreview();
   if (cancelled) { ui.info.textContent = 'Export cancelled.'; return true; }
-  if (!result) { ui.info.textContent = 'Export failed: ' + errMsg + '. Trying live recording instead…'; return false; }
+  if (!result) { ui.info.textContent = 'Export failed: ' + errMsg + (opt.keep ? '' : '. Trying live recording instead…'); return false; }
+  if (opt.keep) { window.ssLastExport = result; ui.info.textContent = `Video rendered (${(result.size / 1048576).toFixed(1)} MB, ${W}×${H}).`; return true; }
   download(result, `${safeName()}.mp4`);
   ui.info.innerHTML = `Video ready: <b>${safeName()}.mp4</b> (${(result.size / 1048576).toFixed(1)} MB, ${W}×${H}) ${APP ? 'saved to your gallery (Movies/Stickman Studio)' : 'downloaded'} in ${Math.round((performance.now() - t0) / 1000)}s.${APP ? ' <button class="btn small" data-sharelast>Share video</button>' : ''}`;
   return true;
@@ -3674,7 +3808,7 @@ function lApplyMode() {
   const L = isLayers(); document.documentElement.classList.toggle('mode-layers', L);
   $$('input[name=vmode]').forEach(r => r.checked = r.value === (L ? 'layers' : 'grid'));
   const order = L ? ['script', 'layers', 'sync', 'video', 'yt'] : ['script', 'prompts', 'grids', 'sync', 'video', 'yt'];
-  $$('nav.tabs button').forEach(b => { const k = order.indexOf(b.dataset.tab); b.hidden = k < 0; const n = b.querySelector('.n'); if (n && k >= 0) n.textContent = k + 1; });
+  $$('nav.tabs button').forEach(b => { if (b.dataset.tab === 'auto') return; const k = order.indexOf(b.dataset.tab); b.hidden = k < 0; const n = b.querySelector('.n'); if (n && k >= 0) n.textContent = k + 1; });
   $('#lBgRow').hidden = S.settings.lBg !== 'custom';
 }
 function lThumb(cv, id) {
@@ -4542,6 +4676,504 @@ async function cleanGeminiMark(blob) {
 async function cleanMark(blob) {
   try { const r = await cleanGeminiMark(blob); if (r.removed) toast('Gemini ✦ mark removed from the corner'); return r.blob || blob; } catch (_) { return blob; }
 }
+
+/* ============ AUTO PILOT: roadmap topic -> Claude script -> Gemini voice -> plan -> pictures (Flow / Gemini)
+   -> music -> video -> YouTube kit + thumbnail -> upload, scheduled. Native parts (Flow helper, daily alarm,
+   notifications, YouTube upload) are in the Android app; in a browser "Run now" makes and downloads the video. ============ */
+const AP_TOPICS = `Karna ne Duryodhan ka saath kyun nahi chhoda?
+Bhishma ne apni hi pratigya ki keemat kaise chukayi?
+Draupadi ke paanch pati kyun the?
+Ekalavya ne apna angutha kyun diya?
+Ashwatthama aaj bhi zinda hai?
+Abhimanyu chakravyuh se bahar kyun nahi nikal paya?
+Krishna ne Mahabharata ka yuddh kyun nahi roka?
+Barbarik: woh yoddha jo 1 minute mein yuddh khatam kar sakta tha
+Shakuni ne Kauravon ka vinash kyun chaha?
+Yudhishthira ne Draupadi ko jue mein kyun haara?
+Arjun ko Urvashi ka shaap kyun mila?
+Gandhari ne aankhon par patti kyun baandhi?
+Ghatotkach ki maut par Krishna khush kyun the?
+Vidur ne Hastinapur kyun chhoda?
+Dronacharya ki maut ka sach
+Ravan ke 10 sir ka asli matlab
+Lakshman Rekha ki kahani Valmiki Ramayana mein hai ya nahi?
+Hanuman ji ne Lanka kyun jalayi?
+Kumbhakarna 6 mahine kyun sota tha?
+Vibhishan ne Ravan ka saath kyun chhoda?
+Shabari ke jhoothe ber ka sach
+Sita ji ki agni pariksha kyun hui?
+Bharat ne Ram ki khadau se raj kyun kiya?
+Surpanakha ki naak kyun kati?
+Ram Setu kaise bana?
+Lav aur Kush ne Ram ki sena ko kaise haraya?
+Shiv ji ne Ganesh ji ka sir kyun kaata?
+Samudra Manthan: amrit aur vish ki kahani
+Neelkanth: Shiv ji ne vish kyun piya?
+Bhagirath Ganga ko dharti par kaise laaye?
+Sati ne yagya mein apne pran kyun diye?
+Kamdev ko Shiv ji ne bhasm kyun kiya?
+Narasimha avatar: Hiranyakashipu ka ant
+Vaman avatar ne Raja Bali se teen pag kyun maange?
+Parshuram ne 21 baar Kshatriyon ka vinash kyun kiya?
+Matsya avatar aur pralay ki kahani
+Dhruv tara kaise bana?
+Prahlad ko aag kyun nahi jala payi?
+Markandeya ne Yamraj ko kaise haraya?
+Savitri ne Yamraj se Satyavan ke pran kaise wapas liye?
+Nachiketa aur Yamraj ka samvad
+Raja Harishchandra ki satya pariksha
+Kartikeya aur Ganesh ki prithvi parikrama ki daud
+Durga Maa ne Mahishasur ka vadh kaise kiya?
+Kaali Maa ki jeebh bahar kyun hai?
+Indra ki pooja kyun nahi hoti?
+Brahma ji ki pooja kyun nahi hoti?
+Narad Muni ko kisne shaap diya?
+Vishwamitra: raja se brahmarishi kaise bane?
+Rishi Durvasa ka gussa aur Shakuntala ka shaap
+Kaliyug kab khatam hoga? Puranon ka jawab
+Kalki avatar kab aur kahan aayenge?
+Garud Puran ke anusaar mrityu ke baad kya hota hai?
+Yamraj aur Chitragupt ka hisaab kitaab
+Hanuman ji ko apni shakti bhoolne ka shaap kyun mila?
+Shani dev ki drishti se sab kyun darte hain?
+Kuber ne Lanka kaise khoyi?
+Arjun aur Hanuman ka mukabla: dhwaj par Hanuman kyun?
+Krishna ki Dwarka samudra mein kaise doobi?
+Pandavon ki swarg yatra: sirf Yudhishthira kyun pahuche?`;
+const AP_DEF = { model: 'claude-opus-5-5', len: 8, lang: 'hinglish', channel: '', check: true,
+  ttsModel: 'gemini-2.5-pro-preview-tts', voice: 'Orus', style: 'Promo/Hype', pace: 'Natural', accent: 'Neutral',
+  img: 'flow', imgFallback: true, publish: '17:00', cat: '27', approve: true, comment: true, start: '13:00', daily: false };
+const AP = { claudeKey: '', s: { ...AP_DEF }, topics: [], log: [] };
+let apRunning = false, apStopFlag = false, apApproveWait = null;
+const apSave = () => DB.put('autopilot', { claudeKey: AP.claudeKey, s: AP.s, topics: AP.topics, log: AP.log.slice(-300) }).catch(() => {});
+async function apLoad() { try { const v = await DB.get('autopilot'); if (v) { AP.claudeKey = v.claudeKey || ''; AP.s = { ...AP_DEF, ...(v.s || {}) }; AP.topics = v.topics || []; AP.log = v.log || []; } } catch (_) {} }
+const apNext = () => AP.topics.find(t => t.s !== 'done');
+function apLog(msg, keep = true) {
+  const line = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '  ' + msg;
+  if (keep) { AP.log.push(new Date().toLocaleDateString() + ' ' + line); AP.log = AP.log.slice(-300); apSave(); }
+  $('#apNow').textContent = msg; const el = $('#apLog'); el.textContent = AP.log.slice(-120).join('\n'); el.scrollTop = el.scrollHeight;
+  console.log('SSAPP-AUTO ' + msg);
+}
+function apState(t, cls = '') { const c = $('#apState'); c.textContent = t; c.className = 'chip ' + cls; }
+function apCheckStop() { if (apStopFlag) throw new Error('Stopped'); }
+const apNotify = (title, text) => { if (APP) try { AndroidBridge.notify(title, text); } catch (_) {} };
+
+/* ---- roadmap ---- */
+function apRenderTopics() {
+  const done = AP.topics.filter(t => t.s === 'done').length, nx = apNext();
+  $('#apCount').innerHTML = `<b>${done} / ${AP.topics.length}</b> videos made${nx ? ` · next: <b>${esc(nx.t)}</b>` : ''}`;
+  $('#apTopics').innerHTML = AP.topics.length ? AP.topics.map((t, i) => `<div class="ap-topic ${t.s === 'done' ? 'done' : ''}${t === nx ? ' next' : ''}">
+    <span class="ap-n">${i + 1}</span><span class="ap-t">${esc(t.t)}${t.s === 'done' ? `<small>${esc(t.d || '')}${t.url ? ` · <a href="${esc(t.url)}" target="_blank" rel="noopener">video</a>` : ''}</small>` : t.err ? `<small class="bad">${esc(t.err)}</small>` : ''}</span>
+    <button class="btn small" data-aptog="${i}" title="Mark done / not done">${t.s === 'done' ? '↺' : '✓'}</button><button class="btn small" data-apup="${i}" title="Move up">↑</button><button class="btn small" data-apdel="${i}" title="Delete">✕</button></div>`).join('')
+    : '<p class="hint" style="margin:0">No topics yet. Add your roadmap topics below, or add the 60 starter topics.</p>';
+  if (!apRunning) $('#apNow').textContent = nx ? 'Next topic: ' + nx.t : 'All topics are done. Add more topics.';
+}
+function apAddTopics(text) {
+  const have = new Set(AP.topics.map(t => t.t.toLowerCase()));
+  const add = text.split('\n').map(x => x.replace(/^\s*(\d+[.)]|[-*•])\s*/, '').trim()).filter(x => x.length > 3 && !have.has(x.toLowerCase()));
+  add.forEach(t => AP.topics.push({ t, s: 'todo' })); apSave(); apRenderTopics(); return add.length;
+}
+$('#apAddBtn').onclick = () => { const n = apAddTopics($('#apAdd').value); $('#apAdd').value = ''; toast(n + ' topics added'); };
+$('#apDefaults').onclick = () => toast(apAddTopics(AP_TOPICS) + ' starter topics added');
+$('#apClearDone').onclick = () => { AP.topics = AP.topics.filter(t => t.s !== 'done'); apSave(); apRenderTopics(); };
+$('#apTopics').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return; const d = b.dataset;
+  if (d.aptog != null) { const t = AP.topics[+d.aptog]; t.s = t.s === 'done' ? 'todo' : 'done'; if (t.s === 'done') t.d = t.d || new Date().toLocaleDateString(); }
+  else if (d.apup != null && +d.apup > 0) { const i = +d.apup; [AP.topics[i - 1], AP.topics[i]] = [AP.topics[i], AP.topics[i - 1]]; }
+  else if (d.apdel != null) AP.topics.splice(+d.apdel, 1);
+  else return;
+  apSave(); apRenderTopics();
+});
+
+/* ---- settings UI ---- */
+const AP_BIND = { apModel: 'model', apLen: 'len', apLang: 'lang', apChannel: 'channel', apCheck: 'check', apTtsModel: 'ttsModel', apVoice: 'voice', apStyle: 'style', apPace: 'pace', apAccent: 'accent',
+  apImg: 'img', apImgFallback: 'imgFallback', apPublish: 'publish', apCat: 'cat', apApproveOn: 'approve', apComment: 'comment', apStart: 'start', apDaily: 'daily' };
+function apShow() {
+  for (const [id, k] of Object.entries(AP_BIND)) { const el = $('#' + id); if (el.type === 'checkbox') el.checked = !!AP.s[k]; else el.value = AP.s[k]; }
+  $('#apClaudeKey').value = AP.claudeKey; $('#apGemKey').value = VP.gemKey || '';
+  $('#apFlowBox').hidden = AP.s.img !== 'flow';
+  apRenderTopics(); apLog(AP.log.length ? AP.log[AP.log.length - 1].replace(/^\S+ \S+\s+/, '') : 'Ready', false); apRenderTopics();
+  if (APP) { apFlowRefresh(); try { $('#apPkg').textContent = AndroidBridge.packageId(); $('#apSha').textContent = AndroidBridge.appSha1() || '–'; } catch (_) {} }
+  else { $('#apFlowStatus').textContent = 'The Flow helper, the daily schedule and the YouTube upload work in the Android app. In this browser, Run now makes the video and downloads it (pictures with Gemini).'; }
+}
+for (const [id, k] of Object.entries(AP_BIND)) $('#' + id).addEventListener('change', e => {
+  const el = e.target; AP.s[k] = el.type === 'checkbox' ? el.checked : el.type === 'number' || k === 'len' ? +el.value : el.value; apSave();
+  if (k === 'img') $('#apFlowBox').hidden = AP.s.img !== 'flow';
+  if ((k === 'daily' || k === 'start') && APP) apSchedule();
+});
+$('#apClaudeKey').addEventListener('change', e => { AP.claudeKey = e.target.value.trim(); apSave(); });
+$('#apGemKey').addEventListener('change', e => { VP.gemKey = e.target.value.trim(); saveVP(); $('#lGemKey').value = $('#ytGemKey').value = VP.gemKey; });
+function apSchedule() {
+  const [h, m] = (AP.s.start || '13:00').split(':').map(Number);
+  try { const st = JSON.parse(AndroidBridge.setSchedule(!!AP.s.daily, h || 0, m || 0)); apShowSchedule(st); } catch (e) { toast('Could not set the alarm: ' + e.message); }
+}
+function apShowSchedule(st) {
+  $('#apNext').textContent = st.daily && st.nextRun ? 'Next run: ' + new Date(st.nextRun).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (st.exact ? '' : ' (may start a few minutes late)') : 'Daily run is off.';
+  $('#apExact').hidden = !st.daily || st.exact;
+}
+$('#apExact').onclick = () => AndroidBridge.openExactAlarm();
+
+/* ---- Flow helper (Android) ---- */
+let apApps = null;
+function apFlowRefresh() {
+  let st; try { st = JSON.parse(AndroidBridge.flowStatus()); } catch (_) { return; }
+  if (!apApps) { try { apApps = JSON.parse(AndroidBridge.flowApps()); } catch (_) { apApps = []; }
+    $('#apFlowApp').innerHTML = '<option value="">Pick the app…</option>' + apApps.map(a => `<option value="${esc(a.pkg)}">${esc(a.label)}</option>`).join(''); }
+  $('#apFlowApp').value = st.pkg || '';
+  const ok = v => v ? '✔' : '✖';
+  $('#apFlowStatus').innerHTML = `${ok(st.pkg)} App: <b>${esc(st.label || 'not picked')}</b> · ${ok(st.service)} Helper ${st.service ? 'on' : 'off'} · ${ok(st.photos)} Photos · ${ok(st.notify)} Notifications · ${ok(st.learned)} ${st.learned ? 'Taught' : 'Not taught yet'}`;
+  $('#apFlowMin').value = st.minWait; $('#apFlowMax').value = st.maxWait;
+  apShowSchedule(st);
+  return st;
+}
+$('#apFlowApp').onchange = e => { AndroidBridge.flowSetApp(e.target.value); apFlowRefresh(); };
+$('#apFlowAcc').onclick = () => { toast('Find "Stickman Studio Auto Pilot (Flow helper)" and turn it on'); AndroidBridge.openAccessibility(); };
+$('#apPerms').onclick = () => AndroidBridge.requestPerms();
+window.ssPermsDone = () => apFlowRefresh();
+$('#apFlowMin').onchange = $('#apFlowMax').onchange = () => AndroidBridge.flowSetWaits(+$('#apFlowMin').value || 20, +$('#apFlowMax').value || 240);
+$('#apFlowLearn').onclick = () => {
+  const st = apFlowRefresh(); if (!st) return;
+  if (!st.pkg) return toast('Pick the Flow app first');
+  if (!st.service) return toast('Turn on the Flow helper first (button 1)');
+  toast('Flow opens now: follow the dark bar at the bottom'); AndroidBridge.flowLearn();
+};
+window.ssFlowLearned = res => { try { const r = JSON.parse(res); toast(r.ok ? 'Flow learned ✔' : 'Teaching cancelled'); } catch (_) {} apFlowRefresh(); };
+const FLOWJ = {};
+window.ssFlowProgress = (id, msg) => { const j = FLOWJ[id]; if (j) { j.last = Date.now(); if (j.onMsg) j.onMsg(msg); } };
+window.ssFlowChunk = (id, b64) => { const j = FLOWJ[id]; if (j) { j.chunks.push(Uint8Array.from(atob(b64), c => c.charCodeAt(0))); j.last = Date.now(); } };
+window.ssFlowEnd = (id, mime) => { const j = FLOWJ[id]; if (!j) return; delete FLOWJ[id]; clearInterval(j.timer); j.res(new Blob(j.chunks, { type: mime || 'image/png' })); };
+window.ssFlowFail = (id, msg) => { const j = FLOWJ[id]; if (!j) return; delete FLOWJ[id]; clearInterval(j.timer); j.rej(new Error('Flow: ' + msg)); };
+function apFlowImage(prompt, onMsg) {
+  return new Promise((res, rej) => {
+    const id = 'f' + Date.now();
+    const j = FLOWJ[id] = { chunks: [], res, rej, onMsg, last: Date.now() };
+    j.timer = setInterval(() => { if (Date.now() - j.last > 12 * 60e3) window.ssFlowFail(id, 'no answer for 12 minutes'); }, 10e3);
+    let ok = false; try { ok = AndroidBridge.flowGenerate(id, prompt); } catch (e) { }
+    if (!ok) { delete FLOWJ[id]; clearInterval(j.timer); rej(new Error('Flow helper is off: turn it on in Auto Pilot → Pictures')); }
+  });
+}
+$('#apFlowTest').onclick = async () => {
+  const img = $('#apFlowImg');
+  try { const b = await apFlowImage('A simple hand-drawn doodle of a smiling stickman holding a diya lamp, black ink on a plain white background', m => $('#apFlowStatus').textContent = m); img.src = URL.createObjectURL(b); img.hidden = false; toast(`Flow works ✔ (${Math.round(b.size / 1024)} KB)`); }
+  catch (e) { toast(e.message); }
+  apFlowRefresh();
+};
+
+/* ---- Gemini helpers ---- */
+async function apGem(path, body, timeoutSec = 300) {
+  // like gemFetch, but stops at once when a model has no free quota ("limit: 0"), so another model can be tried
+  for (let attempt = 0; attempt < 5; attempt++) {
+    apCheckStop();
+    const ctl = new AbortController(); gemAbort = ctl; const timer = setTimeout(() => ctl.abort(), timeoutSec * 1000);
+    let r, j;
+    try { r = await fetch(GEM_BASE + path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': (VP.gemKey || '').trim() }, body: JSON.stringify(body), signal: ctl.signal }); j = await r.json().catch(() => ({})); }
+    catch (e) { if (apStopFlag) throw new Error('Stopped'); throw new Error(ctl.signal.aborted ? 'Google did not answer in time' : 'Could not reach Google (internet?)'); }
+    finally { clearTimeout(timer); gemAbort = null; }
+    const msg = (j.error && j.error.message) || '';
+    if (r.status === 429 && /limit: ?0\b|free_tier|billing/i.test(msg)) { const e = new Error('no free quota for this model'); e.quota = true; throw e; }
+    if (r.status === 429 || r.status === 503 || r.status === 500) {
+      let wait = 25; const d = ((j.error && j.error.details) || []).find(x => x.retryDelay); if (d) wait = parseFloat(d.retryDelay) || wait;
+      wait = Math.min(90, Math.ceil(wait)); apLog(`Google is busy, trying again in ${wait} s`, false);
+      for (let w = wait; w > 0; w--) { apCheckStop(); await sleep(1000); } continue;
+    }
+    if (!r.ok) throw new Error('Google: ' + (msg || 'error ' + r.status));
+    return j;
+  }
+  throw new Error('Google kept refusing (rate limit). Try again later.');
+}
+async function apModels() { if (!RL.models) await lGemModel('text'); return RL.models || []; }
+async function apTtsModels() {
+  const all = (await apModels()).filter(n => /tts/i.test(n)), want = (AP.s.ttsModel || '').trim();
+  const ver = s => { const m = s.match(/(\d+(?:\.\d+)?)/); return m ? +m[1] : 0; };
+  const pro = all.filter(n => /pro/i.test(n)).sort((a, b) => ver(b) - ver(a)), flash = all.filter(n => /flash/i.test(n)).sort((a, b) => ver(b) - ver(a));
+  return [...new Set([want, ...pro, ...flash].filter(Boolean))];
+}
+function apChunks(text, max = 1100) {
+  const paras = text.split(/\n\s*\n/).map(p => p.replace(/\s+/g, ' ').trim()).filter(Boolean), out = [];
+  let cur = '';
+  const push = s => { if (cur && (cur.length + s.length + 1) > max) { out.push(cur); cur = ''; } cur += (cur ? '\n\n' : '') + s; };
+  for (const p of paras) {
+    if (p.length <= max) { push(p); continue; }
+    for (const s of p.match(/[^.!?।]+[.!?।]+["')]*\s*|[^.!?।]+$/g) || [p]) push(s.trim());
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+function apWav(pcm, rate) {
+  const n = pcm.length, b = new ArrayBuffer(44 + n * 2), v = new DataView(b);
+  const w = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+  new Int16Array(b, 44).set(pcm); return new Blob([b], { type: 'audio/wav' });
+}
+function apTtsText(chunk) {
+  const lang = AP.s.lang === 'english' ? 'English' : AP.s.lang === 'hindi' ? 'Hindi' : 'Hinglish (Hindi written in Roman letters; pronounce it as natural spoken Hindi)';
+  return `Read the following narration aloud as one narrator, in ${lang}. Style: ${AP.s.style || 'Promo/Hype'} — energetic, gripping and confident, like a trailer narrator. Pace: ${AP.s.pace || 'Natural'}. Accent: ${AP.s.accent || 'Neutral'}. Read only the narration text:\n\n${chunk}`;
+}
+async function apTTS(script, onPart) {
+  const chunks = apChunks(script), models = await apTtsModels();
+  if (!models.length) throw new Error('This Gemini key has no TTS model');
+  let mi = 0, rate = 24000; const parts = [];
+  for (let i = 0; i < chunks.length; i++) {
+    apCheckStop(); onPart && onPart(i, chunks.length, models[mi]);
+    const body = { contents: [{ role: 'user', parts: [{ text: apTtsText(chunks[i]) }] }], generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: AP.s.voice || 'Orus' } } } } };
+    let j;
+    for (;;) {
+      try { j = await apGem(`/models/${models[mi]}:generateContent`, body, 300); break; }
+      catch (e) {
+        if ((e.quota || /not found|not supported|does not exist/i.test(e.message)) && mi + 1 < models.length) { apLog(`Voice: ${models[mi]} ${e.quota ? 'has no free quota' : 'is not available'}, using ${models[mi + 1]}`); mi++; continue; }
+        throw e;
+      }
+    }
+    const d = (j.candidates?.[0]?.content?.parts || []).map(p => p.inlineData || p.inline_data).find(x => x && x.data);
+    if (!d) throw new Error(`no audio came back for part ${i + 1}`);
+    const m = String(d.mimeType || d.mime_type || '').match(/rate=(\d+)/); if (m) rate = +m[1];
+    const bin = atob(d.data), u8 = new Uint8Array(bin.length); for (let k = 0; k < bin.length; k++) u8[k] = bin.charCodeAt(k);
+    parts.push(new Int16Array(u8.buffer, 0, u8.length >> 1));
+    parts.push(new Int16Array(Math.round(rate * 0.35)));   // short breath between parts
+  }
+  const total = parts.reduce((s, p) => s + p.length, 0), pcm = new Int16Array(total); let o = 0;
+  for (const p of parts) { pcm.set(p, o); o += p.length; }
+  return { blob: apWav(pcm, rate), model: models[mi] };
+}
+$('#apTtsTest').onclick = async () => {
+  if (!(VP.gemKey || '').trim()) return toast('Paste the Gemini API key first');
+  const info = $('#apTtsInfo'); info.textContent = 'Making a sample…'; apStopFlag = false;
+  try { const r = await apTTS(AP.s.lang === 'english' ? 'What if I told you that the greatest warrior of the Mahabharata knew he was on the wrong side... and still never left?' : 'Kya aap jaante hain... Mahabharata ka sabse bada yoddha jaanta tha ki woh galat taraf hai... phir bhi usne saath kyun nahi chhoda?');
+    const a = $('#apTtsAudio'); a.src = URL.createObjectURL(r.blob); a.hidden = false; a.play().catch(() => {}); info.textContent = 'Voice by ' + r.model; }
+  catch (e) { info.textContent = '⚠ ' + e.message; }
+};
+async function apGeminiImage(prompt, aspect) {
+  const m = await lGemModel('image');
+  const body = { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { responseModalities: ['TEXT', 'IMAGE'], imageConfig: { aspectRatio: aspect } } };
+  let j; try { j = await apGem(`/models/${m}:generateContent`, body, 300); } catch (e) { if (!/imageConfig|aspect/i.test(e.message)) throw e; delete body.generationConfig.imageConfig; j = await apGem(`/models/${m}:generateContent`, body, 300); }
+  const d = (j.candidates?.[0]?.content?.parts || []).map(p => p.inlineData || p.inline_data).find(x => x && /^image\//.test(x.mimeType || x.mime_type || ''));
+  if (!d) throw new Error('Gemini sent no picture');
+  return new Blob([Uint8Array.from(atob(d.data), c => c.charCodeAt(0))], { type: d.mimeType || d.mime_type });
+}
+async function apImage(prompt, aspect, label) {
+  if (AP.s.img === 'flow' && APP) {
+    try { return await apFlowImage(prompt + (aspect === '16:9' ? '\n\nLandscape 16:9 picture.' : ''), m => apLog(`${label}: ${m}`, false)); }
+    catch (e) {
+      if (apStopFlag || !AP.s.imgFallback || !(VP.gemKey || '').trim()) throw e;
+      apLog(`${label}: ${e.message} → trying Gemini`);
+    }
+  }
+  return apGeminiImage(prompt, aspect);
+}
+
+/* ---- Claude ---- */
+async function apClaude(prompt, maxTokens = 16000) {
+  const key = (AP.claudeKey || '').trim(); if (!key) throw new Error('Paste the Claude API key in Auto Pilot → Script');
+  for (let attempt = 0; attempt < 4; attempt++) {
+    apCheckStop();
+    const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 8 * 60e3); let r, j;
+    try {
+      r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', signal: ctl.signal,
+        headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2026-10-21', 'anthropic-beta': 'server-side-fallback-2026-07-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+        body: JSON.stringify({ model: AP.s.model || 'claude-opus-5-5', max_tokens: maxTokens, thinking: { type: 'adaptive' }, output_config: { effort: 'medium' }, fallbacks: 'default', messages: [{ role: 'user', content: prompt }] }) });
+      j = await r.json().catch(() => ({}));
+    } catch (e) { clearTimeout(timer); if (attempt < 3 && !apStopFlag) { await sleep(5000); continue; } throw new Error(ctl.signal.aborted ? 'Claude did not answer in time' : 'Could not reach Claude (internet?)'); }
+    clearTimeout(timer);
+    if (r.status === 429 || r.status === 529 || r.status >= 500) { const w = Math.min(60, +(r.headers.get('retry-after') || 20)); apLog(`Claude is busy, trying again in ${w} s`, false); await sleep(w * 1000); continue; }
+    if (!r.ok) throw new Error('Claude: ' + ((j.error && j.error.message) || 'error ' + r.status));
+    if (j.stop_reason === 'refusal') throw new Error('Claude declined this topic' + (j.stop_details && j.stop_details.explanation ? ': ' + j.stop_details.explanation : ''));
+    const text = (j.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim();
+    if (!text) throw new Error('Claude sent an empty answer');
+    if (j.stop_reason === 'max_tokens') apLog('Claude hit the length limit; the script may end early');
+    return text;
+  }
+  throw new Error('Claude stayed busy. Try again later.');
+}
+function apLangRule() {
+  return AP.s.lang === 'english' ? 'Simple spoken English.'
+    : AP.s.lang === 'hindi' ? 'Simple spoken Hindi in Devanagari script (common Urdu/English words are fine, the way people really talk).'
+    : 'Hinglish: Hindi written in Roman (English) letters, the way people type on WhatsApp — e.g. "Karna jaanta tha ki woh galat taraf hai". No Devanagari.';
+}
+function apScriptPrompt(topic) {
+  const min = +AP.s.len || 8, words = min * 140;
+  return `You are the scriptwriter of a Hindi YouTube channel about Indian mythology${AP.s.channel ? ` called "${AP.s.channel}"` : ''} (narrated stickman animation, one narrator voice).
+Write the complete voiceover script for the video: "${topic}".
+
+LENGTH: about ${min} minutes = about ${words} words (narration at ~140 words per minute). Stay within ±10%.
+LANGUAGE: ${apLangRule()} Conversational, like a gripping storyteller talking to friends — not a textbook.
+
+STRUCTURE (5 steps; do NOT write the step names or any headings):
+1. HOOK (first 15–20 seconds): a shocking question, a surprising fact or the most dramatic moment of the story, so the viewer stays. No "namaskar doston" intro and no channel plug here.
+2. BACKGROUND: who the characters are, where and when this happens — just enough context.
+3. THE STORY: the events in order, with tension, short dialogues and emotions, building up to the key moment.
+4. THE TWIST / DEEPER MEANING: the real answer to the title's question, what the scriptures actually say (name the text, e.g. Mahabharata – which Parva, Valmiki Ramayana – which Kanda, which Purana), and the popular myth versus the original.
+5. LESSON + ENDING: what this teaches us today in 2–3 lines, one question for the comments, then a short ask to like and subscribe.
+
+RULES
+- Stay faithful to the original texts. Where versions differ (Valmiki vs Tulsidas, regional versions, later additions, TV serials), say so in one line instead of stating one version as fact. Never invent verses, numbers or quotes.
+- Respectful towards every deity, character and tradition; no mockery, no political or caste commentary.
+- Short sentences (8–14 words), easy to speak aloud. Use "..." for a dramatic pause, sparingly.
+- No stage directions, no [music], no emojis, no headings, no bullet points, no word counts, no notes.
+
+OUTPUT: only the narration, in plain paragraphs with one blank line between paragraphs.`;
+}
+function apCheckPrompt(topic, script) {
+  return `You are a careful editor for an Indian mythology YouTube channel. Below is the narration script for the video "${topic}".
+Check it against the original scriptures (Mahabharata, Valmiki Ramayana, the Puranas, the Upanishads) and fix:
+- factual mistakes (names, relations, events, order of events, which text or Parva/Kanda),
+- invented quotes, verses or numbers,
+- one version of a disputed story presented as the only truth (add a short line that versions differ),
+- anything disrespectful.
+Keep everything else exactly as it is: the same language and script (${apLangRule()}), the same style, structure, hook, ending and about the same length. Do not add headings or notes.
+
+Return ONLY the full corrected script, in plain paragraphs. If nothing needs fixing, return the script unchanged.
+
+SCRIPT:
+${script}`;
+}
+const apClean = t => t.replace(/^```[a-z]*\n?|```$/g, '').replace(/^\s*(script|narration)\s*:\s*/i, '').trim();
+
+/* ---- YouTube ---- */
+let apYt = null;
+window.ssYtAuth = (ok, msg) => { const c = $('#apYtState'); c.textContent = ok ? 'Connected ✔' : 'Not connected'; c.className = 'chip ' + (ok ? 'ok' : 'bad'); if (!ok && msg) toast(msg); if (apYt && apYt.auth) { const a = apYt; apYt = null; ok ? a.res() : a.rej(new Error(msg || 'YouTube not connected')); } };
+window.ssYtProgress = (msg, f) => { apLog(msg, false); $('#apProg').value = 0.9 + 0.1 * (f || 0); };
+window.ssYtDone = out => { const a = apYt; apYt = null; if (a) a.res(JSON.parse(out)); };
+window.ssYtFail = msg => { const a = apYt; apYt = null; if (a) a.rej(new Error('YouTube: ' + msg)); };
+$('#apYtConnect').onclick = () => { if (!APP) return toast('YouTube upload works in the Android app'); $('#apYtState').textContent = 'Connecting…'; AndroidBridge.ytConnect(); };
+$('#apShaCopy').onclick = () => copyText($('#apSha').textContent);
+function apPublishAt() {
+  const [h, m] = (AP.s.publish || '17:00').split(':').map(Number), IST = 5.5 * 3600e3;
+  const ist = new Date(Date.now() + IST);
+  let t = Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate(), h || 0, m || 0) - IST;
+  if (t < Date.now() + 30 * 60e3) t += 24 * 3600e3;   // too late for today: tomorrow
+  return new Date(t).toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+function apUpload(meta, thumbB64) {
+  return new Promise((res, rej) => { apYt = { res, rej }; AndroidBridge.ytUpload(JSON.stringify(meta), thumbB64 || ''); });
+}
+async function apThumbJpeg(blob) {
+  const bmp = await createImageBitmap(blob), W = 1280, H = 720, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d'), s = Math.max(W / bmp.width, H / bmp.height); x.fillStyle = '#fff'; x.fillRect(0, 0, W, H);
+  x.drawImage(bmp, (W - bmp.width * s) / 2, (H - bmp.height * s) / 2, bmp.width * s, bmp.height * s); try { bmp.close(); } catch (_) {}
+  for (const q of [0.92, 0.85, 0.75, 0.6]) { const b = await new Promise(r => c.toBlob(r, 'image/jpeg', q)); if (b.size < 1.9e6) return b; }
+  throw new Error('thumbnail too big');
+}
+
+/* ---- the run ---- */
+$('#apRun').onclick = () => apRun('button');
+$('#apStopBtn').onclick = () => { apStopFlag = true; gemStop = true; try { gemAbort && gemAbort.abort(); } catch (_) {} if (exporting) exporting.cancelled = true; if (apApproveWait) apApproveWait(false); apLog('Stopping…'); };
+$('#apOk').onclick = () => apApproveWait && apApproveWait(true);
+$('#apSkip').onclick = () => apApproveWait && apApproveWait(false);
+$('#apRestore').onclick = async () => { const p = await DB.get('project:before-autopilot').catch(() => null); if (!p) return toast('No saved project'); await restore(p); save(); toast('Your earlier project is open again'); showTab('script'); };
+window.ssOpenTab = name => showTab(name);
+window.ssAutoPilotStart = async trigger => {
+  await booted; showTab('auto');
+  if (trigger === 'alarm') {
+    const today = new Date().toLocaleDateString();
+    if (AP.topics.some(t => t.s === 'done' && t.d === today)) return apLog('Today\'s video is already done');
+    setTimeout(() => apRun('alarm'), 4000);
+  }
+};
+async function apRun(trigger) {
+  if (apRunning) return toast('Auto Pilot is already running');
+  const topic = apNext(); if (!topic) return toast('No topic left in the roadmap: add topics first');
+  if (!(AP.claudeKey || '').trim()) { showTab('auto'); $('#apClaudeKey').focus(); return toast('Paste the Claude API key first'); }
+  if (!(VP.gemKey || '').trim()) { showTab('auto'); $('#apGemKey').focus(); return toast('Paste the Gemini API key first'); }
+  apRunning = true; apStopFlag = false; gemStop = false; topic.err = '';
+  $('#apRun').disabled = true; $('#apStopBtn').hidden = false; $('#apProg').hidden = false; apState('Running', 'wait');
+  if (APP) try { AndroidBridge.keepAwake(true); } catch (_) {}
+  const P = v => { $('#apProg').value = v; };
+  const t0 = performance.now();
+  try {
+    apLog(`▶ ${trigger === 'alarm' ? 'Daily run' : 'Run'}: "${topic.t}"`); P(0.01);
+    // keep the open project, then start a clean one
+    try { await DB.put('project:before-autopilot', snapshot()); } catch (_) {}
+    await restore({ settings: { ...S.settings, title: topic.t, mode: 'layers' }, script: '', segments: [], starts: [], grids: [], overrides: {} });
+    S.yt = null; S.autoMusic = null; amShowPlan();
+
+    apLog('1/9 Claude is writing the script…'); P(0.03);
+    let script = apClean(await apClaude(apScriptPrompt(topic.t)));
+    apLog(`Script: ${script.split(/\s+/).length} words`);
+    if (AP.s.check) { apLog('2/9 Claude is checking the facts…'); P(0.08); const fixed = apClean(await apClaude(apCheckPrompt(topic.t, script))); if (fixed.split(/\s+/).length > script.split(/\s+/).length * 0.6) script = fixed; }
+    S.script = script; $('#script').value = script; save();
+
+    apLog('3/9 Gemini is speaking the voiceover…'); P(0.12);
+    const tts = await apTTS(script, (i, n, m) => { apLog(`3/9 Voiceover part ${i + 1} of ${n} (${m})`, false); P(0.12 + 0.1 * i / n); });
+    await setVoice(tts.blob, safeName() + '-voice.wav'); apCheckStop();
+    apLog(`Voice ready: ${fmt(audioBuf ? audioBuf.duration : 0, 0)} (${tts.model})`);
+    const st = S.settings; setSegmentsFromTexts(splitScript(S.script, st.splitLevel, +st.minWords || 1, +st.maxWords || 14));
+    if (!S.segments.length) throw new Error('the script made no scenes');
+
+    apLog(`4/9 Gemini is planning ${S.segments.length} scenes…`); P(0.24);
+    const m = await lGemModel('text');
+    const pj = await apGem(`/models/${m}:generateContent`, { contents: [{ role: 'user', parts: [{ text: lPlanPrompt() }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.6 } }, 300);
+    let planInfo; try { planInfo = await lApplyPlanLib(lParseJSON(lGemText(pj))); } catch (e) { apLog('Plan reply was not usable (' + e.message + '), using the quick plan'); planInfo = await lApplyPlanLib(lQuickPlan()); }
+    apLog('Plan: ' + planInfo);
+
+    for (let round = 0; round < 2; round++) {
+      const todo = lSheets().filter(s => !lSheetDone(s)), all = lSheets().length;
+      for (const sh of todo) {
+        apCheckStop(); const label = `5/9 Picture sheet ${sh.index + 1} of ${all}`;
+        apLog(label + '…'); P(0.28 + 0.4 * sh.index / Math.max(1, all));
+        try { await lPlaceSheet(sh.index, await apImage(lSheetPrompt(sh), sh.ids.length === 1 ? '1:1' : '3:2', label)); }
+        catch (e) { if (apStopFlag) throw e; apLog(`${label} failed: ${e.message}`); }
+      }
+    }
+    const missing = S.layers.assets.filter(a => !a.png).length;
+    if (missing) apLog(`${missing} pictures are still missing (they stay empty in the video)`);
+    if (APP) await sleep(1500);   // back in the app after Flow
+
+    apLog('6/9 Making the background music…'); P(0.7); try { await amMake(false); } catch (e) { apLog('Music skipped: ' + e.message); }
+
+    apLog('7/9 Writing the YouTube kit…'); P(0.72);
+    try { const yj = await apGem(`/models/${m}:generateContent`, { contents: [{ role: 'user', parts: [{ text: ytPrompt() }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.8 } }, 240); ytApply(lParseJSON(lGemText(yj))); }
+    catch (e) { apLog('Kit by Gemini failed (' + e.message + '), using the quick kit'); ytQuick(); }
+    if (AP.s.channel && !S.settings.ytChannel) S.settings.ytChannel = AP.s.channel;
+    let thumb = null;
+    const tp = S.yt && S.yt.thumbs && S.yt.thumbs[0];
+    if (tp) { try { apLog('7/9 Making the thumbnail…'); thumb = await apThumbJpeg(await apImage(tp.prompt, '16:9', '7/9 Thumbnail')); } catch (e) { if (apStopFlag) throw e; apLog('Thumbnail failed: ' + e.message); } }
+    if (thumb && !APP) download(thumb, safeName() + '-thumbnail.jpg');
+
+    apLog('8/9 Rendering the video…'); P(0.76); showTab('video');
+    const ok = await exportOffline({ keep: true }); apCheckStop();
+    const video = window.ssLastExport; window.ssLastExport = null;
+    if (!ok || !video) throw new Error('the video export failed (' + ($('#exportInfo').textContent || 'unknown') + ')');
+    const name = `${safeName()}.mp4`;
+    if (APP) await saveInApp(video, name); else download(video, name);
+    apLog(`Video ready: ${(video.size / 1048576).toFixed(1)} MB`); P(0.88); showTab('auto');
+
+    const y = S.yt || {}; let title = (y.titles && y.titles[0]) || topic.t;
+    if (AP.s.approve && APP) {
+      apNotify('Video ready – please check', `"${topic.t}" is ready. Open Stickman Studio and press Approve to upload it.`);
+      $('#apVideo').src = URL.createObjectURL(video); $('#apThumb').src = thumb ? URL.createObjectURL(thumb) : ''; $('#apThumb').hidden = !thumb; $('#apTitle').value = title;
+      $('#apApprove').hidden = false; $('#apApprove').scrollIntoView({ behavior: 'smooth' }); apState('Waiting for you', 'wait'); apLog('Waiting for your Approve…');
+      const yes = await new Promise(r => apApproveWait = r); apApproveWait = null; $('#apApprove').hidden = true; $('#apVideo').pause();
+      title = $('#apTitle').value.trim() || title;
+      if (!yes) { apCheckStop(); apLog('Skipped: the topic stays for the next run'); apState('Skipped'); return; }
+    }
+
+    if (APP) {
+      const publishAt = apPublishAt();
+      apLog('9/9 Uploading to YouTube…'); P(0.9); apState('Uploading', 'wait');
+      const meta = { title, description: y.description || topic.t, tags: y.tags || [], categoryId: AP.s.cat || '27', publishAt, language: AP.s.lang === 'english' ? 'en' : 'hi', pinned: AP.s.comment ? (y.pinned || '') : '' };
+      const out = await apUpload(meta, thumb ? await blobB64(thumb) : '');
+      topic.url = out.url; topic.vid = out.id;
+      const when = new Date(publishAt).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+      apLog(`✔ Uploaded: ${out.url} · scheduled for ${when}${out.thumbnail && out.thumbnail !== 'ok' ? ' · thumbnail: ' + out.thumbnail : ''}`);
+      apNotify('Today\'s video is scheduled ✅', `"${title}" goes live ${when}. ${out.url}`);
+    } else apLog('✔ Video and thumbnail downloaded (upload works in the Android app)');
+    topic.s = 'done'; topic.d = new Date().toLocaleDateString(); apSave(); P(1); apState('Done ✔', 'ok');
+    apLog(`Finished in ${Math.round((performance.now() - t0) / 60000)} min`);
+  } catch (e) {
+    const msg = e && e.message ? e.message : String(e);
+    topic.err = msg; apSave(); apState(apStopFlag ? 'Stopped' : 'Failed', 'bad'); apLog('✖ ' + msg);
+    if (!apStopFlag) apNotify('Auto Pilot stopped', `"${topic.t}": ${msg}`);
+    showTab('auto');
+  } finally {
+    apRunning = false; apApproveWait = null; $('#apRun').disabled = false; $('#apStopBtn').hidden = true; $('#apProg').hidden = true;
+    if (APP) try { AndroidBridge.keepAwake(false); } catch (_) {}
+    apRenderTopics();
+  }
+}
+const apInit = (async () => { await booted; await apLoad(); apShow(); if (APP) { try { apSchedule(); } catch (_) {} } })();
+
+document.addEventListener('visibilitychange', () => { if (!document.hidden && curTab === 'auto' && APP) apFlowRefresh(); });
 
 (async function boot() {
   sizePreview();

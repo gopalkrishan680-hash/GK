@@ -62,4 +62,6 @@ dependencies {
     implementation("androidx.webkit:webkit:1.11.0")
     implementation("androidx.activity:activity-ktx:1.9.1")
     implementation("androidx.core:core-ktx:1.13.1")
+    // Google sign-in for the YouTube upload (Auto Pilot)
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
 }

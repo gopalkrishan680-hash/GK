@@ -15,6 +15,23 @@ cannot do on its own:
   server link (`stickmanstudio://connect?url=…`); the app asks before connecting. A copied server link is
   noticed when you switch back to the app.
 
+## Auto Pilot (★ tab)
+Makes one video a day from the **Mythology Roadmap** topic list: Claude writes the script (and checks the facts),
+Gemini TTS speaks it (default `gemini-2.5-pro-preview-tts`, voice Orus, Promo/Hype, Natural pace, Neutral accent;
+falls back to a Flash TTS model when Pro has no free quota), Gemini plans the boards, the pictures and the thumbnail
+are made in the **Flow app** (or with the Gemini API), the app adds music, renders the MP4, writes the YouTube kit and
+uploads the video to YouTube as private with `publishAt` = the publish time (default 5 pm India time).
+
+- **Flow helper** is an accessibility service (*Settings → Accessibility → Stickman Studio Auto Pilot*). *Teach Flow*
+  records once which prompt box, Generate button, picture and Download button to use. It only acts during a run or
+  while teaching. The downloaded picture is read from the gallery (photos permission); if that fails it is cut out of a
+  screenshot.
+- **Daily run**: an alarm at the start time opens the app (screen lock must be Swipe/None, phone on charge).
+- **YouTube**: Google sign-in through an *Android OAuth client* (package `com.gopalkrishan.stickmanstudio` + the SHA-1
+  shown in the tab) in a Google Cloud project with *YouTube Data API v3* on. Videos from an unaudited API project stay
+  private until Google's YouTube API audit is approved.
+- Keys (Claude, Gemini) are stored only in the app on the phone.
+
 ## Install
 Every push that changes the app builds a new APK on GitHub Actions and publishes it as the
 `android-latest` release:
@@ -37,8 +54,9 @@ stored in this repository. CI signs with:
 1. **Your own key**, if the repository has the secrets `SS_KEYSTORE_BASE64` (the keystore file,
    base64-encoded) and `SS_KEYSTORE_PASSWORD` (key alias `stickman`). Add them under
    *Settings → Secrets and variables → Actions*. This is the reliable option.
-2. Otherwise **the build machine's debug key**, kept in the Actions cache. GitHub drops caches that
-   are unused for 7 days; after that the next APK has a new key and Android refuses to update it.
+2. Otherwise **a key made on the first build and kept in the Actions cache** (`stickman-signing-key-v1`). GitHub
+   drops caches that are unused for 7 days; after that the next APK has a new key, Android refuses to update it and
+   the SHA-1 for YouTube sign-in changes.
    Then use *Project save* to back up, uninstall, install the new APK and *Project open*.
 
 Do not switch between the two after installing: an APK signed with the other key will not update the app.
