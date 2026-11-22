@@ -180,6 +180,7 @@ class FlowService : AccessibilityService() {
     }
 
     private fun runGeneration(prompt: String, cb: Callback): Result {
+        tilesBefore = null
         val pkg = flowPackage(this)
         if (pkg.isEmpty()) throw IllegalStateException("Pick the Flow app in Auto Pilot settings first")
         val sel = try { JSONObject(prefs(this).getString("flowLearned", "{}") ?: "{}") } catch (_: Exception) { JSONObject() }
@@ -200,6 +201,7 @@ class FlowService : AccessibilityService() {
         // Flow comes back where it was left (a picture, the project page…): go back to its Create screen
         var step = 0
         while (box == null && step++ < 7) {
+            noteTiles()
             val create = findByLabelExact(OPEN_WORDS)
             if (create != null) { cb.progress("Opening Flow's Create…"); click(create, null) }
             else {
@@ -256,6 +258,7 @@ class FlowService : AccessibilityService() {
         saveDump("Create screen after typing", "flowDumpComposer")
 
         // 2. generate
+        noteTiles()
         cb.progress("Pressing Generate…")
         val before = imageSignature()
         val dlSel = sel.optJSONObject("download")
@@ -274,7 +277,8 @@ class FlowService : AccessibilityService() {
             val secs = (System.currentTimeMillis() - t0) / 1000
             cb.progress("Flow is drawing… ${secs}s")
             val loading = isLoading()
-            val ready = if (!dlBefore) downloadVisible(dlSel) else imageSignature() != before
+            noteTilesIfNone()
+            val ready = (if (!dlBefore) downloadVisible(dlSel) else imageSignature() != before) || newTile() != null
             calm = if (!loading && ready) calm + 1 else 0
             if (calm >= 2) break
             Thread.sleep(3000)
@@ -282,13 +286,17 @@ class FlowService : AccessibilityService() {
         Thread.sleep(1500)
 
         // 4. open the picture (if taught), then download it
-        if (rootInActiveWindow?.packageName?.toString() != pkg) { launch(pkg); Thread.sleep(2500) }
-        saveDump("ready to download", "flowDumpReady")
+        if (root()?.packageName?.toString() != pkg) { launch(pkg); Thread.sleep(2500) }
+        saveDump("ready to download after ${(System.currentTimeMillis() - t0) / 1000}s; tiles before: $tilesBefore", "flowDumpReady")
         cb.progress("Downloading the picture…")
         if (!downloadVisible(dlSel)) {
             // open the new picture: its tile is named after the prompt, else what was taught
-            val tile = promptTile(prompt)
-            if (tile != null) { click(tile, null); Thread.sleep(2000) }
+            val tile = promptTile(prompt) ?: newTile()
+            if (tile != null) {
+                cb.progress("Opening the new picture…")
+                click(tile, null); Thread.sleep(2500)
+                if (!downloadVisible(dlSel)) findByLabelExact(listOf("More options", "More"))?.let { click(it, null); Thread.sleep(1500) }
+            }
             else sel.optJSONObject("image")?.takeIf { !isConfirm(it.optString("desc") + it.optString("text")) }?.let { s -> findBySelector(s)?.let { click(it, s) } ?: tapSaved(s); Thread.sleep(2000) }
         }
         val since = System.currentTimeMillis() / 1000 - 5
@@ -336,6 +344,26 @@ class FlowService : AccessibilityService() {
                 it.equals("Download", true) || it.equals("डाउनलोड", true) || (desc.isNotEmpty() && it == desc) || (text.isNotEmpty() && it == text)
             }
         } != null
+    }
+
+    // ---- the project page: one tile per generation, e.g. "Stickman holding diya lamp, 1 item" ----
+    private var tilesBefore: Set<String>? = null
+    private val TILE = Regex(",\\s*\\d+\\s+items?$", RegexOption.IGNORE_CASE)
+
+    private fun tiles(): List<AccessibilityNodeInfo> {
+        val out = ArrayList<AccessibilityNodeInfo>()
+        walk(root()) { n -> if (n.isVisibleToUser && n.isClickable && TILE.containsMatchIn(n.contentDescription?.toString() ?: "")) out.add(n) }
+        return out
+    }
+    private fun tileKeys() = tiles().map { it.contentDescription.toString() }.toSet()
+    private fun noteTiles() { val k = tileKeys(); if (k.isNotEmpty()) tilesBefore = k }
+    private fun noteTilesIfNone() { if (tilesBefore == null) noteTiles() }
+
+    /** A tile that was not there before Generate (new picture, or more items in a tile). */
+    private fun newTile(): AccessibilityNodeInfo? {
+        val before = tilesBefore ?: return null
+        return tiles().filter { it.contentDescription.toString() !in before }
+            .minByOrNull { val b = Rect(); it.getBoundsInScreen(b); b.top * 10 + b.left / 100 }
     }
 
     private fun promptTile(prompt: String): AccessibilityNodeInfo? {
