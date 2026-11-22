@@ -217,6 +217,12 @@ class FlowService : AccessibilityService() {
             saveDump("prompt box not found")
             throw IllegalStateException("Could not find Flow's prompt box (is Flow on its prompt screen?). Press \"Copy Flow report\" and send it.")
         }
+        // Flow starts every time at 9:16: switch it to 16:9 in the model chip first
+        if (setAspect("16:9", cb)) {
+            box = waitFor(4000) { findBySelector(promptSel, editable = true) ?: findAnyEditable() }
+                ?: run { findByLabelExact(OPEN_WORDS)?.let { click(it, null); Thread.sleep(2000) }; waitFor(4000) { findAnyEditable() } }
+                ?: throw saveDump("prompt box gone after 16:9").let { IllegalStateException("Flow's prompt box was lost after choosing 16:9. Press \"Copy Flow report\" and send it.") }
+        }
         box.performAction(AccessibilityNodeInfo.ACTION_CLICK)
         box.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
         Thread.sleep(400)
@@ -359,6 +365,30 @@ class FlowService : AccessibilityService() {
             if (b.exactCenterX() > bx) { bx = b.exactCenterX(); best = n }
         }
         return best
+    }
+
+    /** Opens the model chip, taps the wanted shape and closes the panel. True when the shape was tapped. */
+    private fun setAspect(ratio: String, cb: Callback): Boolean {
+        val chip = findFirst(root()) { n -> n.isVisibleToUser && (n.isClickable || n.parent?.isClickable == true) &&
+            Regex("nano banana|imagen|\\bx\\d\\b", RegexOption.IGNORE_CASE).containsMatchIn(listOfNotNull(n.text, n.contentDescription).joinToString(" ")) }
+            ?: return false.also { cb.progress("Shape chip not found, keeping Flow's shape") }
+        cb.progress("Choosing $ratio in Flow…")
+        click(chip, null)
+        Thread.sleep(1500)
+        val opt = waitFor(4000) {
+            findFirst(root()) { n -> n.isVisibleToUser && listOfNotNull(n.text, n.contentDescription).any { it.toString().trim().startsWith(ratio) } }
+        }
+        if (opt == null) {
+            saveDump("$ratio option not found", "flowDumpAspect")
+            performGlobalAction(GLOBAL_ACTION_BACK); Thread.sleep(1200)
+            cb.progress("$ratio not found in Flow's panel, keeping Flow's shape")
+            return false
+        }
+        click(opt, null)
+        Thread.sleep(900)
+        // close the panel if it is still open (the prompt box is hidden behind it)
+        if (findAnyEditable() == null) { performGlobalAction(GLOBAL_ACTION_BACK); Thread.sleep(1200) }
+        return true
     }
 
     private fun isNav(t: String) = t.isNotBlank() && NAV_WORDS.any { t.trim().equals(it, true) }
