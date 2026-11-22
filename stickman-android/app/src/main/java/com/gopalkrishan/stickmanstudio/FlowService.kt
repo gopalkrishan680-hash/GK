@@ -291,11 +291,13 @@ class FlowService : AccessibilityService() {
         cb.progress("Downloading the picture…")
         if (!downloadVisible(dlSel)) {
             // open the new picture: its tile is named after the prompt, else what was taught
-            val tile = promptTile(prompt) ?: newTile()
+            // newest tile is the first one (top left); used when the tiles before Generate are not known
+            val tile = promptTile(prompt) ?: newTile() ?: if (tilesBefore == null) tiles().minByOrNull { val b = Rect(); it.getBoundsInScreen(b); b.top * 10 + b.left / 100 } else null
             if (tile != null) {
                 cb.progress("Opening the new picture…")
                 click(tile, null); Thread.sleep(2500)
-                if (!downloadVisible(dlSel)) findByLabelExact(listOf("More options", "More"))?.let { click(it, null); Thread.sleep(1500) }
+                // the picture page has Download in its ⋮ menu (only opened after a tile, never on the project page)
+                if (!downloadVisible(dlSel) && tiles().isEmpty()) findByLabelExact(listOf("More options", "More"))?.let { click(it, null); Thread.sleep(1500) }
             }
             else sel.optJSONObject("image")?.takeIf { !isConfirm(it.optString("desc") + it.optString("text")) }?.let { s -> findBySelector(s)?.let { click(it, s) } ?: tapSaved(s); Thread.sleep(2000) }
         }
