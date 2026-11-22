@@ -184,7 +184,7 @@ class FlowService : AccessibilityService() {
         if (pkg.isEmpty()) throw IllegalStateException("Pick the Flow app in Auto Pilot settings first")
         val sel = try { JSONObject(prefs(this).getString("flowLearned", "{}") ?: "{}") } catch (_: Exception) { JSONObject() }
         // a Close / Back tap recorded while teaching is not a real step
-        for (k in listOf("generate", "image", "download")) sel.optJSONObject(k)?.let { if (isNav(it.optString("desc")) || isNav(it.optString("text")) || isChip(it.optString("desc") + it.optString("text"))) sel.remove(k) }
+        for (k in listOf("generate", "image", "download")) sel.optJSONObject(k)?.let { if (isNav(it.optString("desc")) || isNav(it.optString("text")) || isChip(it.optString("desc") + it.optString("text")) || (k == "generate" && it.optString("desc").equals("Download", true))) sel.remove(k) }
         val minWait = prefs(this).getInt("flowMinWait", 20) * 1000L
         val maxWait = prefs(this).getInt("flowMaxWait", 240) * 1000L
 
@@ -233,17 +233,25 @@ class FlowService : AccessibilityService() {
         Thread.sleep(400)
         val edit = findEditable(box) ?: box
         val args = Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, prompt) }
-        var typed = edit.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
-        Thread.sleep(500)
-        edit.refresh()
-        if (!typed || (edit.text?.length ?: 0) < minOf(20, prompt.length)) {
-            // some apps ignore SET_TEXT: paste from the clipboard instead
-            main.post { (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("prompt", prompt)) }
-            Thread.sleep(400)
-            typed = edit.performAction(AccessibilityNodeInfo.ACTION_PASTE)
-            Thread.sleep(600)
+        // Flow does not always report success, so look at what the box holds instead
+        val head = prompt.replace(Regex("\\s+"), " ").trim().take(15).lowercase()
+        fun boxHasPrompt(): Boolean {
+            val n = findAnyEditable() ?: edit.also { it.refresh() }
+            return (n.text?.toString() ?: "").replace(Regex("\\s+"), " ").trim().lowercase().startsWith(head)
         }
-        if (!typed) throw IllegalStateException("Could not type into Flow's prompt box")
+        edit.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+        Thread.sleep(700)
+        if (!boxHasPrompt()) {
+            // some apps ignore SET_TEXT: empty the box and paste from the clipboard instead
+            edit.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "") })
+            main.post { (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("prompt", prompt)) }
+            Thread.sleep(500)
+            (findAnyEditable() ?: edit).performAction(AccessibilityNodeInfo.ACTION_PASTE)
+            Thread.sleep(900)
+        }
+        if (!boxHasPrompt()) throw IllegalStateException("Could not type into Flow's prompt box")
+        // make sure Flow is making an image (not a video)
+        findFirst(root()) { it.isVisibleToUser && it.viewIdResourceName?.endsWith("creation_mode_image") == true }?.let { if (!it.isChecked) { click(it, null); Thread.sleep(600) } }
 
         saveDump("Create screen after typing", "flowDumpComposer")
 
@@ -252,7 +260,7 @@ class FlowService : AccessibilityService() {
         val before = imageSignature()
         val dlSel = sel.optJSONObject("download")
         val dlBefore = downloadVisible(dlSel)
-        val gen = findBySelector(sel.optJSONObject("generate")) ?: findByLabelExact(listOf("Generate", "Send", "Submit")) ?: sendButton(edit)
+        val gen = findByLabelExact(listOf("Generate", "Send", "Submit")) ?: findBySelector(sel.optJSONObject("generate")) ?: sendButton(edit)
         if (gen == null || !click(gen, sel.optJSONObject("generate"))) {
             if (!tapSaved(sel.optJSONObject("generate"))) throw saveDump("generate not found").let { IllegalStateException("Could not find Flow's Generate button. Run \"Teach Flow\" again.") }
         }
