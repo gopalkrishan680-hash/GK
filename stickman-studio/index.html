@@ -467,8 +467,12 @@ html:not(.mode-layers) .layers-only { display: none !important; }
     </div>
     <div class="panel">
       <h3>AI Scene Director (optional, best result)</h3>
-      <p class="hint">Want a good visual description for every scene? Give this prompt to ChatGPT/Gemini, paste the reply below and press <b>Apply</b>. Each scene's "Visual" field gets filled in.</p>
-      <div class="row"><button class="btn" id="copyDirector">Copy director prompt</button></div>
+      <p class="hint">Want a good visual description for every scene? Give this prompt to ChatGPT/Gemini, paste the reply below and press <b>Apply</b>. Each scene's "Visual" field gets filled in. Long scripts are split into parts (AI chats stop writing after ~200 lines) — copy Part 1, paste the reply, Apply, then Part 2, and so on. Works up to 1000+ scenes.</p>
+      <div class="row"><label class="f" for="dirPer" style="margin:0">Scenes per part</label>
+        <select id="dirPer" style="width:auto"><option value="50">50</option><option value="80">80</option><option value="100">100</option><option value="150">150</option><option value="200">200</option></select>
+        <span class="chip wait" id="dirDone"></span></div>
+      <div class="row" id="dirParts"><button class="btn" id="copyDirector">Copy director prompt</button></div>
+      <div class="row"><button class="btn small" id="copyDirMissing">Copy prompt for scenes still missing</button></div>
       <textarea id="directorReply" rows="5" placeholder="1: Rohan sits alone on a bench at night, wide shot&#10;2: close-up of Rohan's sad face..."></textarea>
       <div class="row"><button class="btn primary" id="applyDirector">Apply</button><span class="hint" id="dirInfo"></span></div>
     </div>
@@ -744,7 +748,7 @@ const isOldSample = p => /^It was Rohan's result day\./.test(String(p.script || 
 /* ============ state ============ */
 const DEFAULTS = { title: '', aspect: '16:9', grid: 3, style: 'stickman', styleText: STYLES.stickman.text, characters: '', gutter: 'auto',
   splitLevel: 'all', minWords: 2, maxWords: 14, captions: 'bar', fit: 'auto', enhance: 'on', v: 3, capSize: 1, motion: 6, transition: 'fade', transDur: 0.15, res: 1080, fps: 30, musicVol: 0.12, anim: 'on', animAmt: 1, capWords: 'on', pics: 'images', skStyle: 'chibi', lPer: 9, lLib: 'on',
-  gemMark: 'auto', fx: 'on', fxAmt: 1, fxDoodle: 'on', fxSfx: 'on', fxVol: 0.6, gridAuto: true, mode: 'layers', lBg: 'parchment', lEnter: 'auto', lTrans: 'cut', lIdle: 'subtle', lCam: 'on', lCaps: 'off', sfx: 'on', sfxVol: 0.5, duck: 'on' };
+  gemMark: 'auto', fx: 'on', fxAmt: 1, fxDoodle: 'on', fxSfx: 'on', fxVol: 0.6, gridAuto: true, mode: 'layers', lBg: 'parchment', lEnter: 'auto', lTrans: 'cut', lIdle: 'subtle', lCam: 'on', lCaps: 'off', sfx: 'on', sfxVol: 0.5, duck: 'on', dirPer: 100 };
 try { if (matchMedia('(pointer: coarse)').matches) DEFAULTS.res = 720; } catch (_) {}   // phones: smaller, faster export
 const S = { settings: { ...DEFAULTS }, script: '', segments: [], starts: [], grids: [], overrides: {}, audioBlob: null, audioName: '', musicBlob: null, musicName: '' };
 let uid = 1;
@@ -1029,18 +1033,39 @@ PANELS (left to right, top to bottom):
 ${lines.join('\n')}`;
 }
 function singlePrompt(i) { return buildPrompt({ start: i, count: 1, rows: 1, cols: 1 }); }
-function directorPrompt() {
-  const scenes = S.segments.map((s, i) => `${i + 1}: "${plain(s.text).trim()}"`).join('\n');
-  return `You are a storyboard director for a stickman story video. Below is a voiceover script split into ${S.segments.length} numbered scenes. Each scene is shown on screen for only 1-3 seconds, so each needs ONE clear, simple image.
+function dirParts() {
+  const per = Math.max(20, +S.settings.dirPer || 100), n = S.segments.length, out = [];
+  for (let s = 0; s < n; s += per) out.push({ start: s, end: Math.min(n, s + per) });
+  return out;
+}
+function dirFilled(a, b) { let c = 0; for (let i = a; i < b; i++) if ((S.segments[i].visual || '').trim()) c++; return c; }
+function directorPrompt(idx) {
+  // idx: undefined = everything, a number list = only those scenes (0-based)
+  const all = S.segments.length, list = idx || S.segments.map((_, i) => i);
+  const scenes = list.map(i => `${i + 1}: "${plain(S.segments[i].text).trim()}"`).join('\n');
+  const first = list[0], last = list[list.length - 1], partial = list.length < all;
+  let ctx = '';
+  if (partial && first > 0) {
+    const prev = [];
+    for (let i = Math.max(0, first - 4); i < first; i++) prev.push(`${i + 1}: "${plain(S.segments[i].text).trim()}"${(S.segments[i].visual || '').trim() ? ` → ${S.segments[i].visual.trim()}` : ''}`);
+    ctx = `\nThis is only a PART of a longer video (${all} scenes in total). For continuity, the scenes just before this part were:\n${prev.join('\n')}\n`;
+  }
+  const head = partial
+    ? `Below are scenes ${first + 1} to ${last + 1} (${list.length} scenes) of a voiceover script split into ${all} numbered scenes.`
+    : `Below is a voiceover script split into ${all} numbered scenes.`;
+  return `You are a storyboard director for a stickman story video. ${head} Each scene is shown on screen for only 1-3 seconds, so each needs ONE clear, simple image.
+${ctx}
+IMPORTANT: write a line for EVERY scene listed below (${list.length} lines), keep the scene numbers exactly as given, do not skip, merge or stop early.
 
 For EACH scene write one short visual description in English (max 25 words): who is in the frame, what they are doing, their emotion, the setting and the camera shot (wide / medium / close-up). Show the meaning, never write text in the image. Keep characters consistent and vary the shots so it never feels repetitive.
 
 Art style: ${(S.settings.styleText || '').trim()}
 ${charBlock()}
 Reply ONLY in this exact format, one line per scene, nothing else:
-1: description
-2: description
+${first + 1}: description
+${first + 2 <= last + 1 ? first + 2 : first + 1}: description
 ...
+${last + 1}: description
 
 SCENES:
 ${scenes}`;
@@ -1049,6 +1074,7 @@ const TOUCH = matchMedia('(pointer: coarse)').matches, PK = TOUCH ? 'Paste' : 'C
 let pasteTarget = null;   // batch index whose prompt was copied last
 function nextPending() { const b = batches().find(b => !S.grids[b.index]); return b ? b.index : null; }
 function renderPrompts() {
+  try { renderDirector(); } catch (_) {}
   const bs = batches(), per = (+S.settings.grid) ** 2;
   const done = bs.filter(b => S.grids[b.index]).length;
   $('#promptInfo').textContent = bs.length ? `${S.segments.length} scenes → ${bs.length} image${bs.length > 1 ? 's' : ''} (up to ${per} scenes each)` : 'Create scenes in Step 1 first';
@@ -2519,12 +2545,47 @@ setupDrop($('#bulkDrop'), async files => {
 }, $('#bulkFile'), true);
 
 /* ============ director ============ */
-$('#copyDirector').onclick = () => { if (!S.segments.length) return toast('Create scenes first'); copyText(directorPrompt()); };
+function renderDirector() {
+  const n = S.segments.length, box = $('#dirParts'), sel = $('#dirPer');
+  if (sel) sel.value = String(S.settings.dirPer || 100);
+  if (!n) { box.innerHTML = '<button class="btn" data-dirpart="-1">Copy director prompt</button>'; $('#dirDone').textContent = ''; return; }
+  const parts = dirParts(), filled = dirFilled(0, n);
+  $('#dirDone').textContent = `${filled} / ${n} scenes have visuals`; $('#dirDone').className = 'chip ' + (filled === n ? 'ok' : 'wait');
+  box.innerHTML = parts.length === 1
+    ? `<button class="btn" data-dirpart="0">Copy director prompt (${n} scenes)${filled === n ? ' ✓' : ''}</button>`
+    : parts.map((p, k) => { const f = dirFilled(p.start, p.end), ok = f === p.end - p.start;
+        return `<button class="btn${ok ? '' : (f ? '' : '')}" data-dirpart="${k}" title="Scenes ${p.start + 1}-${p.end}">Part ${k + 1}: ${p.start + 1}–${p.end}${ok ? ' ✓' : f ? ` (${f}/${p.end - p.start})` : ''}</button>`; }).join('');
+}
+$('#dirParts').addEventListener('click', e => {
+  const b = e.target.closest('[data-dirpart]'); if (!b) return;
+  if (!S.segments.length) return toast('Create scenes first');
+  const k = +b.dataset.dirpart, parts = dirParts();
+  if (k < 0 || parts.length === 1) { copyText(directorPrompt()); return; }
+  const p = parts[k], idx = []; for (let i = p.start; i < p.end; i++) idx.push(i);
+  copyText(directorPrompt(idx));
+  $('#dirInfo').textContent = `Part ${k + 1} of ${parts.length} copied (scenes ${p.start + 1}–${p.end}). Paste the AI reply below and press Apply.`;
+});
+$('#copyDirMissing').onclick = () => {
+  if (!S.segments.length) return toast('Create scenes first');
+  const per = Math.max(20, +S.settings.dirPer || 100), miss = [];
+  S.segments.forEach((s, i) => { if (!(s.visual || '').trim()) miss.push(i); });
+  if (!miss.length) return toast('Every scene already has a visual');
+  const idx = miss.slice(0, per); copyText(directorPrompt(idx));
+  $('#dirInfo').textContent = `Copied ${idx.length} missing scenes (${idx[0] + 1}…${idx[idx.length - 1] + 1})${miss.length > per ? `, ${miss.length - per} more after this` : ''}.`;
+};
+$('#dirPer').addEventListener('change', e => { S.settings.dirPer = +e.target.value; renderDirector(); save(); });
 $('#applyDirector').onclick = () => {
-  const txt = $('#directorReply').value; let c = 0;
-  txt.split('\n').forEach(l => { const m = l.match(/^\s*(?:scene\s*)?(\d+)\s*[:.)\-–]\s*(.+)$/i); if (m) { const i = +m[1] - 1; if (S.segments[i]) { S.segments[i].visual = m[2].trim().replace(/^["']|["']$/g, ''); c++; } } });
-  $('#dirInfo').textContent = c ? `Filled visuals for ${c} scenes` : 'No lines in "1: ..." format found';
-  if (c) { renderScenes(); renderPrompts(); save(); }
+  const txt = $('#directorReply').value; let c = 0, lo = Infinity, hi = 0;
+  txt.split('\n').forEach(l => {
+    const m = l.replace(/[*_`#>]/g, '').match(/^\s*[-•]?\s*(?:scene\s*)?(\d+)\s*[:.)\-–—]\s*(.+)$/i);
+    if (m) { const i = +m[1] - 1, v = m[2].trim().replace(/^["']|["']$/g, ''); if (S.segments[i] && v) { S.segments[i].visual = v; c++; lo = Math.min(lo, i + 1); hi = Math.max(hi, i + 1); } }
+  });
+  if (!c) { $('#dirInfo').textContent = 'No lines in "1: ..." format found'; return; }
+  const n = S.segments.length, filled = dirFilled(0, n), parts = dirParts();
+  const nextP = parts.findIndex(p => dirFilled(p.start, p.end) < p.end - p.start);
+  $('#dirInfo').textContent = `Filled visuals for ${c} scenes (${lo}–${hi}). ${filled} / ${n} done.` + (nextP >= 0 && parts.length > 1 ? ` Next: copy Part ${nextP + 1}.` : filled === n ? ' All scenes done!' : '');
+  $('#directorReply').value = '';
+  renderScenes(); renderPrompts(); save();
 };
 $('#copyNext').onclick = () => { const nx = nextPending(); if (nx == null) return toast('All grid images are done'); copyBatch(nx); const el = document.getElementById('batch-' + nx); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); };
 $('#copyAll').onclick = () => { const bs = batches(); if (!bs.length) return toast('Create scenes first'); copyText(bs.map(b => `===== IMAGE ${b.index + 1} (Scenes ${b.start + 1}-${b.start + b.count}) =====\n${buildPrompt(b)}`).join('\n\n')); };
