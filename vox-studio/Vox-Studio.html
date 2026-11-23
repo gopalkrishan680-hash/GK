@@ -236,7 +236,7 @@ pre.mono { background: #faf6ec; border: 1px solid var(--line); border-radius: 8p
       <h2>Visual plan</h2>
       <p class="hint">The plan decides what is on screen for every part of the narration: photos, zooms, maps, quotes, numbers, timelines, chapter cards… and writes a picture prompt for each.</p>
       <div class="card style-pick">
-        <label class="inline">Video style <select id="mode"><option value="collage">Layered collage (cut-outs, torn paper, tags) — like the reference</option><option value="modern">Modern collage (white paper, B&amp;W + one red-orange part, circles, tape, stop-motion)</option><option value="classic">Classic Vox shots (photo, zoom, map, quote, number…)</option></select></label>
+        <label class="inline">Video style <select id="mode"><option value="collage">Layered collage (cut-outs, torn paper, tags) — like the reference</option><option value="modern">Modern collage (white paper, B&amp;W + one red-orange part, circles, tape, stop-motion)</option><option value="classic">Classic Vox shots (photo, zoom, map, quote, number…)</option><option value="myth">🕉️ Mythology / Divine (dark temple, gold frames, glowing figures, mandala, embers)</option></select></label>
         <label class="inline">Animations <select id="animVar"><option value="mixed">Mixed (all animations)</option><option value="wild">Wild (more motion)</option><option value="calm">Calm (few, gentle)</option><option value="unique">✨ Unique (bounce, jelly, iris, blinds, tiles, glitch, swirl…)</option></select></label>
       </div>
       <div class="row wrap-row">
@@ -286,6 +286,7 @@ pre.mono { background: #faf6ec; border: 1px solid var(--line); border-radius: 8p
         <button class="btn ghost small" data-open="gemini">Gemini</button><button class="btn ghost small" data-open="chatgpt">ChatGPT</button>
       </div>
       <p id="picInfo" class="info"></p>
+      <div id="sheetTools" class="row" style="flex-wrap:wrap;gap:6px;margin:6px 0"></div>
       <div id="slots" class="slots"></div>
       <div class="next"><button class="btn primary" data-go="edit">Next: Edit →</button></div>
     </div>
@@ -339,12 +340,13 @@ pre.mono { background: #faf6ec; border: 1px solid var(--line); border-radius: 8p
       <div class="card">
         <h3>Look</h3>
         <div class="form">
-          <label>Background <select id="theme"><option value="parchment">Old parchment</option><option value="paper">Paper (cream)</option><option value="graph">Graph paper</option><option value="news">Newsprint (grey)</option><option value="dark">Dark</option><option value="clean">Clean white crumpled paper (modern)</option></select></label>
-          <label>Photos <select id="photo"><option value="bw">Black &amp; white print</option><option value="warm">Sepia / warm vintage</option><option value="duo">Duotone (accent colour)</option><option value="color">Original colours</option><option value="spot">B&amp;W halftone + one red-orange part (modern)</option></select></label>
+          <label>Background <select id="theme"><option value="parchment">Old parchment</option><option value="paper">Paper (cream)</option><option value="graph">Graph paper</option><option value="news">Newsprint (grey)</option><option value="dark">Dark</option><option value="clean">Clean white crumpled paper (modern)</option><option value="temple">🕉️ Temple night (dark maroon, gold jali)</option><option value="cosmos">🕉️ Cosmic (deep blue, stars)</option></select></label>
+          <label>Photos <select id="photo"><option value="bw">Black &amp; white print</option><option value="warm">Sepia / warm vintage</option><option value="duo">Duotone (accent colour)</option><option value="color">Original colours</option><option value="spot">B&amp;W halftone + one red-orange part (modern)</option><option value="myth">🕉️ Mythic colour (rich, warm, golden light)</option><option value="gold">🕉️ Gold duotone</option></select></label>
           <label>Accent colour <input type="color" id="accent"></label>
           <label>Transitions <select id="trans"><option value="auto">Mixed (auto)</option><option value="peel">Page peel</option><option value="tear">Paper tear</option><option value="scatter">Scatter</option><option value="push">Push up</option><option value="zoomthrough">Zoom through</option><option value="slide">Paper slide</option><option value="cut">Cut</option><option value="whip">Whip pan</option><option value="zoom">Zoom</option><option value="drop">Drop</option><option value="fade">Fade</option><option value="iris">✨ Iris circle</option><option value="blinds">✨ Blinds</option><option value="spin">✨ Spin away</option><option value="flipcard">✨ Card flip</option><option value="glitch">✨ Glitch</option><option value="split">✨ Split open</option><option value="slices">✨ Slices</option><option value="shutter">✨ Shutter</option></select></label>
           <label>Camera motion <input type="range" id="motion" min="0" max="1.6" step="0.1"></label>
           <label>Film grain <input type="range" id="grain" min="0" max="0.15" step="0.01"></label>
+          <label>Picture edges <select id="edges"><option value="auto">By style (torn paper in collage)</option><option value="clean">Clean (no torn edges)</option></select></label>
           <label>Vignette <select id="vignette"><option value="on">On</option><option value="off">Off</option></select></label>
           <label>Captions <select id="captions"><option value="words">Word by word (Shorts style)</option><option value="on">Full subtitles</option><option value="off">Off</option></select></label>
           <label>Caption position <select id="capPos"><option value="mid">Middle (like the reference)</option><option value="low">Low</option></select></label>
@@ -493,7 +495,7 @@ const DEFAULTS = {
   title: '', aspect: '16:9', res: TOUCH ? 720 : 1080, fps: 30,
   mode: 'collage', split: 'sentence', pace: 'normal', textLang: 'auto', look: 'sepia', perImage: 6, animVar: 'mixed', decor: 'on', dust: 'on', stopmo: 'off', safe: 'on', gemMark: 'auto', capPos: 'mid', capColor: '#a6ff1a',
   theme: 'parchment', photo: 'warm', grain: 0.05, vignette: 'on', captions: 'words', watermark: '', accent: '#f5d327',
-  trans: 'auto', motion: 1, sfx: 'on', sfxVol: 0.5, whooshVol: 0.25, musicVol: 0.14, duck: 'on', endFade: 'on', sv: 2,
+  trans: 'auto', motion: 1, sfx: 'on', sfxVol: 0.5, whooshVol: 0.25, musicVol: 0.14, duck: 'on', endFade: 'on', edges: 'auto', sv: 2,
   hook: 'off', hookText: '', depth: 'on', shortEnd: '', shortCaps: 'off'
 };
 // projects saved by older versions: the fast-cut hook is no longer on by default, whoosh is quieter
@@ -517,7 +519,7 @@ const DB = {
   put(k, v) { return this.db ? this.tx('readwrite', s => s.put(v, k)) : Promise.resolve(); },
   get(k) { return this.db ? this.tx('readonly', s => s.get(k)) : Promise.resolve(null); }
 };
-function snapshot() { return { v: 1, settings: S.settings, script: S.script, segments: S.segments, starts: S.starts, timing: S.timing, srtCues: S.srtCues || null, shots: S.shots, assets: S.assets || [], yt: S.yt || null, images: S.images, audioBlob: S.audioBlob, audioName: S.audioName, musicBlob: S.musicBlob, musicName: S.musicName, uid: S.uid }; }
+function snapshot() { return { v: 1, settings: S.settings, script: S.script, segments: S.segments, starts: S.starts, timing: S.timing, srtCues: S.srtCues || null, shots: S.shots, assets: S.assets || [], yt: S.yt || null, images: S.images, sheetCuts: S.sheetCuts || {}, audioBlob: S.audioBlob, audioName: S.audioName, musicBlob: S.musicBlob, musicName: S.musicName, uid: S.uid }; }
 let saveT;
 function save() { clearTimeout(saveT); $('#saved') && ($('#saved').textContent = 'Saving…'); saveT = setTimeout(() => { DB.put('project', snapshot()).then(() => { $('#saved') && ($('#saved').textContent = 'Saved'); }).catch(e => { $('#saved') && ($('#saved').textContent = 'Not saved: ' + (e && e.name || 'error')); }); }, 500); }
 
@@ -737,7 +739,9 @@ const THEMES = {
   news: { bg: '#dcd9d0', ink: INK, sub: '#55524b', fiber: 'rgba(80,80,80,', grid: 0 },
   parchment: { bg: '#d6c4a0', ink: INK, sub: '#5d4f3a', fiber: 'rgba(110,80,40,', grid: 0, parch: true },
   dark: { bg: '#1d1c1a', ink: '#f2ede1', sub: '#aaa292', fiber: 'rgba(255,240,210,', grid: 0 },
-  clean: { bg: '#f4f4f1', ink: INK, sub: '#55524b', fiber: 'rgba(90,90,90,', grid: 0, crumple: true }
+  clean: { bg: '#f4f4f1', ink: INK, sub: '#55524b', fiber: 'rgba(90,90,90,', grid: 0, crumple: true },
+  temple: { bg: '#170b07', ink: '#f8e7bf', sub: '#d8b56e', fiber: 'rgba(255,190,110,', grid: 0, temple: true },
+  cosmos: { bg: '#0a0b1c', ink: '#f2ecff', sub: '#b9b0e8', fiber: 'rgba(190,180,255,', grid: 0, temple: true, cosmic: true }
 };
 const TYPES = {
   photo: { name: 'Photo', img: 'need', help: 'Photo print + caption tag; text strip and red circle on the cue word' },
@@ -754,6 +758,8 @@ const TYPES = {
   collage: { name: 'Collage board', img: 'none', help: 'Layered collage: pictures, tags, stamps, notes, arrows appear one by one on their words' }
 };
 const accent = () => S.settings.accent || '#f5d327';
+const isMyth = () => S.settings.mode === 'myth';
+const GOLD = '#f0c35e';
 const theme = () => THEMES[S.settings.theme] || THEMES.paper;
 
 /* ============ images ============ */
@@ -790,6 +796,7 @@ function filtered(key, mode) {
   const ck = key + '|' + mode + (mode === 'duo' || mode === 'spot' ? accent() : '');
   let c = R.filt.get(ck); if (c) return c;
   if (mode === 'spot') { c = spotTone(src); R.filt.set(ck, c); return c; }
+  if (mode === 'myth' || mode === 'gold') { c = tone(src, mode); R.filt.set(ck, c); return c; }
   c = document.createElement('canvas'); c.width = src.width; c.height = src.height;
   const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(src, 0, 0);
   const id = x.getImageData(0, 0, c.width, c.height), d = id.data;
@@ -839,6 +846,14 @@ function paperBg(W, H, key = S.settings.theme) {
     const fold = (x0, y0, x1, y1) => { x.lineWidth = 7 * s; x.strokeStyle = 'rgba(255,248,228,0.22)'; x.beginPath(); x.moveTo(x0, y0); x.lineTo(x1, y1); x.stroke(); x.lineWidth = 2.5 * s; x.strokeStyle = 'rgba(90,60,25,0.16)'; x.beginPath(); x.moveTo(x0 + 3 * s, y0 + 3 * s); x.lineTo(x1 + 3 * s, y1 + 3 * s); x.stroke(); };
     fold(W * 0.5 + 6 * s, 0, W * 0.5 - 4 * s, H); fold(0, H * 0.5 - 5 * s, W, H * 0.5 + 8 * s); if (H > W) fold(0, H * 0.25, W, H * 0.25 - 6 * s); else fold(W * 0.25, 0, W * 0.25 + 5 * s, H);
     for (let i = 0; i < 7; i++) { const gx = r() * W, gy = r() * H, gr = (40 + r() * 140) * s; const g = x.createRadialGradient(gx, gy, gr * 0.6, gx, gy, gr); g.addColorStop(0, 'rgba(120,85,35,0.05)'); g.addColorStop(0.9, 'rgba(110,70,25,0.10)'); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(gx - gr, gy - gr, gr * 2, gr * 2); }
+  }
+  if (T.temple) {   // mythology: warm light in the middle, carved jali pattern, dark edges
+    const gl = x.createRadialGradient(W / 2, H * 0.45, 0, W / 2, H * 0.45, Math.hypot(W, H) * 0.55);
+    gl.addColorStop(0, T.cosmic ? 'rgba(90,70,170,0.55)' : 'rgba(150,62,20,0.60)'); gl.addColorStop(0.45, T.cosmic ? 'rgba(40,30,90,0.35)' : 'rgba(90,30,12,0.35)'); gl.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gl; x.fillRect(0, 0, W, H);
+    x.strokeStyle = T.cosmic ? 'rgba(200,190,255,0.05)' : 'rgba(240,190,100,0.055)'; x.lineWidth = Math.max(1, 1.4 * s); const g = 64 * s;
+    for (let gy = -g; gy < H + g; gy += g) for (let gx = -g; gx < W + g; gx += g) { const ox = (Math.round(gy / g) % 2) * g / 2; x.beginPath(); x.moveTo(gx + ox, gy - g * 0.35); x.lineTo(gx + ox + g * 0.35, gy); x.lineTo(gx + ox, gy + g * 0.35); x.lineTo(gx + ox - g * 0.35, gy); x.closePath(); x.stroke(); x.beginPath(); x.arc(gx + ox, gy, g * 0.08, 0, 6.283); x.stroke(); }
+    if (T.cosmic) for (let i = 0; i < 260 * (W * H) / (1920 * 1080); i++) { x.fillStyle = `rgba(255,255,255,${0.15 + r() * 0.6})`; x.beginPath(); x.arc(r() * W, r() * H, (0.4 + r() * 1.6) * s, 0, 6.283); x.fill(); }
+    const e = x.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.hypot(W, H) * 0.6); e.addColorStop(0, 'rgba(0,0,0,0)'); e.addColorStop(1, 'rgba(0,0,0,0.72)'); x.fillStyle = e; x.fillRect(0, 0, W, H);
   }
   if (T.grid) { x.strokeStyle = T.grid; x.lineWidth = Math.max(1, 1.2 * s); const g = 54 * s; x.beginPath(); for (let gx = (W % g) / 2; gx < W; gx += g) { x.moveTo(gx, 0); x.lineTo(gx, H); } for (let gy = (H % g) / 2; gy < H; gy += g) { x.moveTo(0, gy); x.lineTo(W, gy); } x.stroke(); }
   R.paper.set(ck, c); return c;
@@ -1047,7 +1062,7 @@ function enterOf(sh, k, all) {
     if (pv.exit && pv.exit !== 'auto' && TRANS_DUR[pv.exit] != null) return pv.exit;
     if (sh.enter && sh.enter !== 'auto') return sh.enter;
     if (S.settings.trans !== 'auto') return S.settings.trans;
-    const pool = S.settings.animVar === 'unique' ? NEW_EXITS : isMod() ? ['push', 'iris', 'whip', 'slide', 'split', 'scatter', 'blinds', 'zoomthrough', 'flipcard', 'slices'] : S.settings.animVar === 'calm' ? ['peel', 'slide', 'fade', 'push', 'iris'] : BOARD_EXITS; let pick = pool[Math.floor(rnd(sh, 5)() * pool.length)];
+    const pool = isMyth() && S.settings.animVar !== 'unique' ? MYTH_EXITS : S.settings.animVar === 'unique' ? NEW_EXITS : isMod() ? ['push', 'iris', 'whip', 'slide', 'split', 'scatter', 'blinds', 'zoomthrough', 'flipcard', 'slices'] : S.settings.animVar === 'calm' ? ['peel', 'slide', 'fade', 'push', 'iris'] : BOARD_EXITS; let pick = pool[Math.floor(rnd(sh, 5)() * pool.length)];
     if (k > 1 && all[k - 1].enter === pick) pick = pool[(pool.indexOf(pick) + 1 + (k % 3)) % pool.length];
     return pick;
   }
@@ -1296,7 +1311,7 @@ function drawFrame(ctx, W, H, t) {
       if (EXIT_DUR[o.enter]) boardExit(ctx, o.enter, A, B, p, W, H, prev, t - prev.t0); else switch (o.enter) {
         case 'slide': { ctx.save(); ctx.translate(-e * W * 0.18, 0); ctx.drawImage(A, 0, 0); ctx.restore(); ctx.fillStyle = `rgba(0,0,0,${0.18 * e})`; ctx.fillRect(0, 0, W, H); const x = (1 - easeOutCubic(p)) * W * 1.03; ctx.save(); ctx.translate(x + W / 2, H / 2); ctx.rotate((1 - easeOutCubic(p)) * 0.06); shadowOn(ctx, s, 1.4); ctx.fillStyle = '#000'; ctx.fillRect(-W / 2, -H / 2, W, H); shadowOff(ctx); ctx.drawImage(B, -W / 2, -H / 2); ctx.restore(); break; }
         case 'drop': { ctx.drawImage(A, 0, 0); ctx.fillStyle = `rgba(0,0,0,${0.2 * e})`; ctx.fillRect(0, 0, W, H); const y = -(1 - easeOutBack(p)) * H * 1.02; ctx.save(); ctx.translate(W / 2, y + H / 2); ctx.rotate(-(1 - easeOutCubic(p)) * 0.04); shadowOn(ctx, s, 1.4); ctx.fillStyle = '#000'; ctx.fillRect(-W / 2, -H / 2, W, H); shadowOff(ctx); ctx.drawImage(B, -W / 2, -H / 2); ctx.restore(); break; }
-        case 'whip': { const off = e * W, bl = Math.sin(p * Math.PI) * 14 * s; ctx.save(); if (bl > 0.5) ctx.filter = `blur(${bl.toFixed(1)}px)`; ctx.drawImage(A, -off, 0); ctx.drawImage(B, W - off, 0); ctx.restore(); break; }
+        case 'whip': { const off = e * W, bl = Math.sin(p * Math.PI) * 5 * s; ctx.save(); if (bl > 0.5) ctx.filter = `blur(${bl.toFixed(1)}px)`; ctx.drawImage(A, -off, 0); ctx.drawImage(B, W - off, 0); ctx.restore(); break; }
         case 'zoom': { ctx.save(); ctx.translate(W / 2, H / 2); ctx.scale(1 + 0.35 * e, 1 + 0.35 * e); ctx.drawImage(A, -W / 2, -H / 2); ctx.restore(); ctx.save(); ctx.globalAlpha = e; ctx.translate(W / 2, H / 2); const z = 0.86 + 0.14 * easeOutCubic(p); ctx.scale(z, z); ctx.drawImage(B, -W / 2, -H / 2); ctx.restore(); break; }
         default: { ctx.drawImage(A, 0, 0); ctx.globalAlpha = e; ctx.drawImage(B, 0, 0); ctx.globalAlpha = 1; }
       }
@@ -1342,7 +1357,7 @@ function sfxEvents() {
   hookSfx(add);
   for (const o of resolve().shots) {
     const b = o.b, t0 = o.t0, sh = o.sh;
-    if (o.k > 0) add(t0, { slide: 'paper', drop: 'paper', whip: 'whoosh', zoom: 'soft', fade: 'soft', peel: 'rip', tear: 'rip', push: 'whoosh', scatter: 'whoosh', zoomthrough: 'whoosh', iris: 'soft', blinds: 'paper', spin: 'whoosh', flipcard: 'paper', glitch: 'glitch', split: 'rip', slices: 'swish', shutter: 'paper' }[o.enter] || 'thump', o.enter === 'cut' ? 0.5 : 1);
+    if (o.k > 0) add(t0, { slide: 'paper', drop: 'paper', whip: 'whoosh', zoom: 'soft', fade: 'soft', peel: 'rip', tear: 'rip', push: 'whoosh', scatter: 'whoosh', zoomthrough: 'whoosh', iris: 'soft', blinds: 'paper', spin: 'whoosh', flipcard: 'paper', glitch: 'glitch', split: 'rip', slices: 'swish', shutter: 'paper', lightburst: 'bell', smoke: 'soft', mandala: 'chime' }[o.enter] || 'thump', o.enter === 'cut' ? 0.5 : 1);
     if (sh.type === 'collage') { collageSfx(o, add); continue; }
     if (sh.title && ['photo', 'zoom', 'text'].includes(sh.type)) add(t0 + b.tag, 'tick', 0.6);
     switch (sh.type) {
@@ -1370,6 +1385,11 @@ function sfxBank(actx) {
     whoosh: buf(0.5, (t) => { const n = noise(); const f = 0.03 + 0.16 * Math.sin(Math.PI * t / 0.5); lp2 += (n - lp2) * f; return lp2 * 1.0 * Math.sin(Math.PI * t / 0.5) ** 2; }),
     // short airy swish for a single picture flying in (much lighter than a whoosh)
     swish: (() => { let a = 0; return buf(0.28, (t) => { const n = noise(); a += (n - a) * (0.08 + 0.3 * t / 0.28); return a * 0.6 * Math.sin(Math.PI * t / 0.28) ** 2; }); })(),
+    // temple bell: inharmonic partials with a long decay
+    bell: buf(2.2, (t) => [[1, 1], [2.76, 0.5], [5.4, 0.25], [8.93, 0.12]].reduce((a, [m, g]) => a + Math.sin(2 * Math.PI * 520 * m * t) * g * Math.exp(-t * (1.6 + m * 0.5)), 0) * 0.32 * Math.min(1, t * 400)),
+    // small bright chime / ghungroo shimmer
+    chime: buf(0.9, (t) => (Math.sin(2 * Math.PI * 1568 * t) * 0.5 + Math.sin(2 * Math.PI * 2349 * t) * 0.3 + Math.sin(2 * Math.PI * 3136 * t) * 0.15) * Math.exp(-t * 5) * 0.22 * Math.min(1, t * 300)),
+    shimmer: (() => { let a = 0; return buf(1.0, (t) => { const n = noise(); a += (n - a) * 0.6; const q = t / 1.0; return ((n - a) * 0.18 + Math.sin(2 * Math.PI * (1200 + 900 * q) * t) * 0.06) * Math.sin(Math.PI * q) ** 2; }); })(),
     // soft cartoon boing for bounce / jelly
     boing: buf(0.35, (t) => Math.sin(2 * Math.PI * (180 + 90 * Math.sin(t * 38)) * t) * Math.exp(-t * 9) * 0.32),
     // digital glitch: short bit-crushed buzz bursts
@@ -1429,7 +1449,7 @@ const ANIMS = {
   wipe:    { d: 0.6, kinds: 'pst', f: p => ({ clip: 'wipe', e: easeInOut(p) }) },
   unroll:  { d: 0.7, kinds: 'ps', f: p => ({ clip: 'unroll', e: easeOutCubic(p) }) },
   tearin:  { d: 0.7, kinds: 'ps', f: p => ({ clip: 'tear', e: easeInOut(p) }) },
-  develop: { d: 1.1, kinds: 'psc', f: p => ({ alpha: clamp(p * 2.2, 0, 1), develop: 1 - easeInOut(p), sx: 1.04 - 0.04 * easeOutCubic(p), sy: 1.04 - 0.04 * easeOutCubic(p) }) },
+  develop: { d: 0.7, kinds: 'psc', f: p => ({ alpha: clamp(p * 3, 0, 1), develop: 0.7 * (1 - easeInOut(p)), sx: 1.04 - 0.04 * easeOutCubic(p), sy: 1.04 - 0.04 * easeOutCubic(p) }) },
   rise:    { d: 0.65, kinds: 'cpst', f: (p, pc, W, H) => { const e = easeOutCubic(p); return { dy: (1 - e) * H * 0.25, alpha: clamp(p * 2, 0, 1) }; } },
   stamp:   { d: 0.35, kinds: 't', f: p => { const k = 1 + 1.3 * Math.pow(1 - easeOutCubic(p), 2); return { sx: k, sy: k, alpha: clamp(p * 4, 0, 1) }; } },
   swing:   { d: 1.3, kinds: 't', f: p => ({ rot: Math.sin(p * Math.PI * 3.2) * 0.5 * Math.pow(1 - p, 1.6), pivotTop: true, alpha: clamp(p * 6, 0, 1), dy: -(1 - easeOutCubic(clamp(p * 3, 0, 1))) * 60 }) },
@@ -1451,15 +1471,24 @@ const ANIMS = {
   slam:    { d: 0.6, kinds: 'cpt', f: p => { const e = easeOutCubic(clamp(p / 0.45, 0, 1)), k = 1 + 1.6 * Math.pow(1 - e, 2), sh = p > 0.45 ? Math.sin((p - 0.45) * 70) * 10 * (1 - p) : 0; return { sx: k, sy: k, dx: sh, dy: sh * 0.6, rot: (1 - e) * 0.15, alpha: clamp(p * 5, 0, 1) }; } },
   flipup:  { d: 0.65, kinds: 'cpst', f: p => { const e = easeOutBack(p); return { sy: Math.max(0.02, Math.abs(Math.cos((1 - clamp(e, 0, 1.2)) * Math.PI / 2))), shade: 1 - clamp(p * 1.4, 0, 1) }; } }
 };
+// divine (mythology) entrances
+Object.assign(ANIMS, {
+  divine:  { d: 1.0, kinds: 'cpst', f: p => { const e = easeOutCubic(p), k = 0.92 + 0.08 * e; return { sx: k, sy: k, alpha: clamp(p * 2.5, 0, 1), bloom: Math.pow(1 - p, 1.4) }; } },
+  ascend:  { d: 1.0, kinds: 'cpst', f: (p, pc, W, H) => { const e = easeOutCubic(p); return { dy: (1 - e) * H * 0.18, alpha: clamp(p * 2, 0, 1), bloom: (1 - e) * 0.6 }; } },
+  emerge:  { d: 1.0, kinds: 'cps', f: p => { const e = easeOutCubic(p), k = 1.08 - 0.08 * e; return { blur: (1 - e) * 22, sx: k, sy: k, alpha: clamp(p * 1.8, 0, 1) }; } },
+  mist:    { d: 1.2, kinds: 'cps', f: (p, pc) => { const e = easeInOut(p); return { blur: (1 - e) * 14, dx: (pc.fx || 1) * (1 - e) * 60, alpha: e, bloom: (1 - e) * 0.3 }; } }
+});
+const MYTH_ANIMS = ['divine', 'ascend', 'emerge', 'mist', 'iris', 'rise', 'zoomin', 'diamond', 'fold', 'pop'];
 const UNIQUE_ANIMS = ['bounce', 'jelly', 'swirl', 'iris', 'blinds', 'curtain', 'diamond', 'tiles', 'fold', 'zip', 'tilt', 'pendulum', 'glitch', 'slam', 'flipup'];
 const ANIM_POOL = { calm: ['slide', 'pop', 'wipe', 'develop', 'rise', 'iris', 'fold'], mixed: Object.keys(ANIMS), wild: Object.keys(ANIMS), unique: UNIQUE_ANIMS };
 const NEW_EXITS = ['iris', 'blinds', 'spin', 'flipcard', 'glitch', 'split', 'slices', 'shutter'];
-const BOARD_EXITS = ['peel', 'slide', 'push', 'tear', 'scatter', 'zoomthrough', 'whip', 'fade', 'drop', ...NEW_EXITS];
-const EXIT_DUR = { peel: 0.75, push: 0.55, tear: 0.7, scatter: 0.6, zoomthrough: 0.55, iris: 0.7, blinds: 0.7, spin: 0.65, flipcard: 0.7, glitch: 0.45, split: 0.6, slices: 0.7, shutter: 0.65 };
+const MYTH_EXITS = ['lightburst', 'smoke', 'mandala', 'lightburst', 'iris', 'smoke', 'zoomthrough', 'mandala'];
+const BOARD_EXITS = ['peel', 'slide', 'push', 'tear', 'scatter', 'zoomthrough', 'whip', 'fade', 'drop', ...NEW_EXITS, 'lightburst', 'smoke', 'mandala'];
+const EXIT_DUR = { peel: 0.75, push: 0.55, tear: 0.7, scatter: 0.6, zoomthrough: 0.55, iris: 0.7, blinds: 0.7, spin: 0.65, flipcard: 0.7, glitch: 0.45, split: 0.6, slices: 0.7, shutter: 0.65, lightburst: 0.8, smoke: 0.9, mandala: 0.85 };
 Object.assign(TRANS_DUR, EXIT_DUR);
 function animFor(it, kindLetter, used, seed) {
   if (it.anim && ANIMS[it.anim] && ANIMS[it.anim].kinds.includes(kindLetter)) return it.anim;
-  const pool = (ANIM_POOL[S.settings.animVar] || ANIM_POOL.mixed).filter(a => ANIMS[a].kinds.includes(kindLetter));
+  const pool = (isMyth() && ['mixed', 'calm'].includes(S.settings.animVar) ? MYTH_ANIMS : (ANIM_POOL[S.settings.animVar] || ANIM_POOL.mixed)).filter(a => ANIMS[a] && ANIMS[a].kinds.includes(kindLetter));
   const r = mulberry32(seed); let pick = pool[Math.floor(r() * pool.length)];
   for (let k = 0; k < 6 && used.has(pick); k++) pick = pool[Math.floor(r() * pool.length)];
   used.add(pick); return pick;
@@ -1471,6 +1500,7 @@ function tone(src, mode) {
   if (mode === 'color') return c;
   if (mode === 'spot') return spotTone(c);
   const id = x.getImageData(0, 0, c.width, c.height), d = id.data, ac = hexRgb(accent()), ink = [24, 22, 20];
+  if (mode === 'myth' || mode === 'gold') { mythTone(d, mode); x.putImageData(id, 0, 0); return c; }
   for (let i = 0; i < d.length; i += 4) {
     if (!d[i + 3]) continue; let l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]; l = clamp((l - 128) * 1.1 + 132, 0, 255);
     if (mode === 'bw') { d[i] = l * 1.015; d[i + 1] = l; d[i + 2] = l * 0.955; }
@@ -1478,6 +1508,18 @@ function tone(src, mode) {
     else { d[i] = clamp(l * 1.05 + 16, 0, 255); d[i + 1] = clamp(l * 0.94 + 8, 0, 255); d[i + 2] = l * 0.74; }   // warm sepia
   }
   x.putImageData(id, 0, 0); return c;
+}
+// mythology looks: 'myth' = rich warm cinematic colour (deeper reds, golden highlights), 'gold' = dark-brown to gold duotone
+function mythTone(d, mode) {
+  const sc = v => { const q = v / 255; return 255 * (q < 0.5 ? 2 * q * q * 0.9 + q * 0.1 : 1 - 2 * (1 - q) * (1 - q) * 0.9 - (1 - q) * 0.1); };   // soft S-curve
+  for (let i = 0; i < d.length; i += 4) {
+    if (!d[i + 3]) continue; const r = d[i], g = d[i + 1], b = d[i + 2], l = 0.299 * r + 0.587 * g + 0.114 * b;
+    if (mode === 'gold') { const q = clamp((l - 20) / 220, 0, 1), k = q * q * (3 - 2 * q); d[i] = lerp(32, 255, k); d[i + 1] = lerp(14, 212, Math.pow(k, 1.15)); d[i + 2] = lerp(8, 140, Math.pow(k, 1.6)); continue; }
+    const sat = 1.18, hi = clamp((l - 150) / 105, 0, 1);
+    let R2 = l + (r - l) * sat, G2 = l + (g - l) * sat, B2 = l + (b - l) * sat;
+    R2 = sc(clamp(R2 * 1.05 + 6 + hi * 10, 0, 255)); G2 = sc(clamp(G2 * 1.0 + 2 + hi * 6, 0, 255)); B2 = sc(clamp(B2 * 0.86 - 2, 0, 255));
+    d[i] = R2; d[i + 1] = G2; d[i + 2] = B2;
+  }
 }
 function borderStats(d, w, h) {
   const bs = []; for (let i = 0; i < w; i++) bs.push(i, (h - 1) * w + i); for (let j = 1; j < h - 1; j++) bs.push(j * w, j * w + w - 1);
@@ -1509,10 +1551,16 @@ function cutout(src, maxSide = 1000) {
 }
 // cut-out + white sticker outline + soft shadow, baked once (drawing it later is a plain drawImage)
 function sticker(key, mode) {
-  const mod = isMod(), ck = key + '|st|' + mode + (mode === 'duo' || mode === 'spot' ? accent() : '') + (mod ? '|m' : ''); let c = R.filt.get(ck); if (c) return c;
+  const mod = isMod(), ck = key + '|st|' + mode + (mode === 'duo' || mode === 'spot' ? accent() : '') + (mod ? '|m' : '') + (isMyth() ? '|y' : ''); let c = R.filt.get(ck); if (c) return c;
   const src = R.img[key]; if (!src) return null;
   const cut = tone(cutout(src), mode); const r = Math.max(4, Math.round(Math.max(cut.width, cut.height) * 0.014)), sh = r * 2.2, pad = r + sh * 2;
   c = cv(cut.width + pad * 2, cut.height + pad * 2); const x = c.getContext('2d');
+  if (isMyth()) {   // mythology: thin gold outline + warm divine glow behind the figure
+    const gold = cv(cut.width, cut.height), gx = gold.getContext('2d'); gx.drawImage(cut, 0, 0); gx.globalCompositeOperation = 'source-in'; gx.fillStyle = '#f3c75f'; gx.fillRect(0, 0, gold.width, gold.height);
+    x.save(); x.globalAlpha = 0.55; x.filter = `blur(${Math.round(sh * 2.4)}px)`; x.drawImage(gold, pad, pad); x.drawImage(gold, pad, pad); x.restore();
+    for (let a = 0; a < 16; a++) x.drawImage(gold, pad + Math.cos(a / 16 * 6.283) * r * 0.5, pad + Math.sin(a / 16 * 6.283) * r * 0.5);
+    x.drawImage(cut, pad, pad); c.pad = pad; R.filt.set(ck, c); return c;
+  }
   if (mod) {   // modern: clean cut, no white outline, soft shadow down-right
     const dark = cv(cut.width, cut.height), dx = dark.getContext('2d'); dx.drawImage(cut, 0, 0); dx.globalCompositeOperation = 'source-in'; dx.fillStyle = 'rgba(0,0,0,0.30)'; dx.fillRect(0, 0, dark.width, dark.height);
     x.save(); x.filter = `blur(${Math.round(sh * 1.1)}px)`; x.drawImage(dark, pad + sh * 0.5, pad + sh * 0.9); x.restore();
@@ -1526,7 +1574,7 @@ function sticker(key, mode) {
   R.filt.set(ck, c); return c;
 }
 function toned(key, mode) { const ck = key + '|tn|' + mode + (mode === 'duo' || mode === 'spot' ? accent() : ''); let c = R.filt.get(ck); if (c) return c; const src = R.img[key]; if (!src) return null; c = tone(src, mode); R.filt.set(ck, c); return c; }
-const assetMode = (a, it) => (it && it.look) || (it && it.full ? (isMod() ? 'spot' : 'color') : null) || (a && a.look) || (S.settings.photo === 'bw' && S.settings.mode === 'collage' ? 'warm' : S.settings.photo);
+const assetMode = (a, it) => (it && it.look) || (it && it.full ? (isMod() ? 'spot' : isMyth() ? 'myth' : 'color') : null) || (a && a.look) || (S.settings.photo === 'bw' && S.settings.mode === 'collage' ? 'warm' : S.settings.photo);
 
 /* ============ cutting a sheet of 4 / 6 pictures ============ */
 function bestCut(prof, ex, rad) {
@@ -1556,10 +1604,12 @@ function pickCuts(zero, cover, len, n, minFrac = 0.12) {
     for (let i = start; i < C.length; i++) { idx.push(i); rec(i + 1); idx.pop(); }
   };
   rec(0);
+  if (best) best.ps.sc = best.sc;
   return best ? best.ps : null;
 }
-async function splitGrid(blob, cols, rows) {
-  const bmp = await createImageBitmap(blob), W0 = bmp.width, H0 = bmp.height;
+// where the cuts of a cols × rows sheet are (as fractions of the picture), with a score of how sure we are
+function gridCuts(bmp, cols, rows) {
+  const W0 = bmp.width, H0 = bmp.height;
   const s = Math.min(1, 480 / Math.max(W0, H0)), w0 = Math.max(8, Math.round(W0 * s)), h0 = Math.max(8, Math.round(H0 * s));
   const c = cv(w0, h0), x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(bmp, 0, 0, w0, h0);
   const D = x.getImageData(0, 0, w0, h0).data, L = new Float32Array(w0 * h0), INK = new Uint8Array(w0 * h0);
@@ -1570,44 +1620,62 @@ async function splitGrid(blob, cols, rows) {
   let top = 0, bot = h0 - 1, lef = 0, rig = w0 - 1;
   while (top < h0 * 0.4 && flatRow(top)) top++; while (bot > h0 * 0.6 && flatRow(bot)) bot--; while (lef < w0 * 0.4 && flatCol(lef)) lef++; while (rig > w0 * 0.6 && flatCol(rig)) rig--;
   const w = rig - lef + 1, h = bot - top + 1, at = (xx, y) => (y + top) * w0 + xx + lef;
+  const dif = (p, q) => { const a = p * 4, b = q * 4; return Math.abs(D[a] - D[b]) + Math.abs(D[a + 1] - D[b + 1]) + Math.abs(D[a + 2] - D[b + 2]) > 60; };   // colour jump (borderless sheets)
   // 2. rows: white gaps across the whole width, else long horizontal edges
   const rowZero = new Uint8Array(h), rowCover = new Float32Array(h);
-  for (let y = 0; y < h; y++) { let ink = 0, ed = 0; for (let xx = 0; xx < w; xx++) { ink += INK[at(xx, y)]; if (y > 0 && Math.abs(L[at(xx, y)] - L[at(xx, y - 1)]) > 38) ed++; } rowZero[y] = ink <= w * 0.012 ? 1 : 0; rowCover[y] = ed / w; }
-  const ys = [0, ...(pickCuts(rowZero, rowCover, h, rows) || Array.from({ length: rows - 1 }, (_, i) => h * (i + 1) / rows)), h];
+  for (let y = 0; y < h; y++) { let ink = 0, ed = 0; for (let xx = 0; xx < w; xx++) { ink += INK[at(xx, y)]; if (y > 0 && dif(at(xx, y), at(xx, y - 1))) ed++; } rowZero[y] = ink <= w * 0.012 ? 1 : 0; rowCover[y] = ed / w; }
+  let sc = 0; const rc = pickCuts(rowZero, rowCover, h, rows); if (rows > 1) sc += rc ? rc.sc : -1.5;
+  const ys = [0, ...(rc || Array.from({ length: rows - 1 }, (_, i) => h * (i + 1) / rows)), h];
   // 3. columns: found again in every row, because the cells of each row can have different widths
   const xsOf = (y0, y1) => {
     const zero = new Uint8Array(w), cover = new Float32Array(w), bh = Math.max(1, Math.round(y1 - y0));
-    for (let xx = 0; xx < w; xx++) { let ink = 0, ed = 0; for (let y = Math.round(y0); y < Math.round(y1); y++) { ink += INK[at(xx, y)]; if (xx > 0 && Math.abs(L[at(xx, y)] - L[at(xx - 1, y)]) > 38) ed++; } zero[xx] = ink <= bh * 0.012 ? 1 : 0; cover[xx] = ed / bh; }
-    return [0, ...(pickCuts(zero, cover, w, cols) || Array.from({ length: cols - 1 }, (_, i) => w * (i + 1) / cols)), w];
+    for (let xx = 0; xx < w; xx++) { let ink = 0, ed = 0; for (let y = Math.round(y0); y < Math.round(y1); y++) { ink += INK[at(xx, y)]; if (xx > 0 && dif(at(xx, y), at(xx - 1, y))) ed++; } zero[xx] = ink <= bh * 0.012 ? 1 : 0; cover[xx] = ed / bh; }
+    const cc = pickCuts(zero, cover, w, cols); if (cols > 1) sc += (cc ? cc.sc : -1.5) / rows;
+    return [0, ...(cc || Array.from({ length: cols - 1 }, (_, i) => w * (i + 1) / cols)), w];
   };
+  const xsR = []; for (let rr = 0; rr < rows; rr++) { const pad = (ys[rr + 1] - ys[rr]) * 0.06; xsR.push(xsOf(ys[rr] + pad, ys[rr + 1] - pad)); }
+  return { cols, rows, sc, ys: ys.map(v => (v + top) / h0), xs: xsR.map(xs => xs.map(v => (v + lef) / w0)) };
+}
+// cut a sheet with given cuts g = {cols, rows, ys: [0..1], xs: [[0..1] per row]}; trim = remove white edges of each cell
+async function cutCells(bmp, g, trim = true) {
+  const W0 = bmp.width, H0 = bmp.height, cols = g.cols, rows = g.rows;
   const out = [];
   for (let rr = 0; rr < rows; rr++) {
-    const pad = (ys[rr + 1] - ys[rr]) * 0.06, xs = xsOf(ys[rr] + pad, ys[rr + 1] - pad);
+    const xs = g.xs[rr] || g.xs[0];
     for (let cc = 0; cc < cols; cc++) {
-      const x0 = (xs[cc] + lef) / s, x1 = (xs[cc + 1] + lef) / s, y0 = (ys[rr] + top) / s, y1 = (ys[rr + 1] + top) / s;
+      const x0 = xs[cc] * W0, x1 = xs[cc + 1] * W0, y0 = g.ys[rr] * H0, y1 = g.ys[rr + 1] * H0;
       const cw = Math.max(4, Math.round(x1 - x0)), ch = Math.max(4, Math.round(y1 - y0)), tc = cv(cw, ch), tx = tc.getContext('2d', { willReadFrequently: true }); tx.drawImage(bmp, x0, y0, cw, ch, 0, 0, cw, ch);
       const id = tx.getImageData(0, 0, cw, ch).data; const white = (xx, yy) => { const i = (yy * cw + xx) * 4; return Math.min(id[i], id[i + 1], id[i + 2]) > 232; };
       const colW = xx => { let n = 0, m = 0; for (let yy = 0; yy < ch; yy += 3) { n += white(xx, yy); m++; } return n / m > 0.96; };
       const rowW = yy => { let n = 0, m = 0; for (let xx = 0; xx < cw; xx += 3) { n += white(xx, yy); m++; } return n / m > 0.96; };
       let l = 0, r = cw - 1, tp = 0, b = ch - 1;
+      if (trim) {
       while (l < cw * 0.25 && colW(l)) l++; while (r > cw * 0.75 && colW(r)) r--; while (tp < ch * 0.25 && rowW(tp)) tp++; while (b > ch * 0.75 && rowW(b)) b--;
       // a thin line of the next picture can sit inside the white gap (white | line | white | picture): cut past it too
       const deep = (len, isW, from, dir) => { let cut = from - dir, dark = 0; for (let k = 0; k < len * 0.22; k++) { const i = from + dir * k; if (isW(i)) cut = i; else if (++dark > Math.max(3, len * 0.025)) break; } return cut; };
       l = Math.max(l, deep(cw, colW, 0, 1) + 1); r = Math.min(r, deep(cw, colW, cw - 1, -1) - 1); tp = Math.max(tp, deep(ch, rowW, 0, 1) + 1); b = Math.min(b, deep(ch, rowW, ch - 1, -1) - 1);
       if (r - l < cw * 0.5) { l = 0; r = cw - 1; } if (b - tp < ch * 0.5) { tp = 0; b = ch - 1; }
-      const m = 3, o = cv(Math.max(4, r - l + 1 - m * 2), Math.max(4, b - tp + 1 - m * 2)); o.getContext('2d').drawImage(tc, l + m, tp + m, o.width, o.height, 0, 0, o.width, o.height);
+      }
+      const m = trim ? 3 : 0, o = cv(Math.max(4, r - l + 1 - m * 2), Math.max(4, b - tp + 1 - m * 2)); o.getContext('2d').drawImage(tc, l + m, tp + m, o.width, o.height, 0, 0, o.width, o.height);
       out.push(await new Promise(res => o.toBlob(res, 'image/jpeg', 0.93)));
     }
   }
-  bmp.close && bmp.close(); return out;
+  return out;
+}
+async function splitGrid(blob, cols, rows) { const bmp = await createImageBitmap(blob); try { return await cutCells(bmp, gridCuts(bmp, cols, rows)); } finally { bmp.close && bmp.close(); } }
+// try the layouts an image maker may have used (Flow / Gemini sometimes make 2 × 3 instead of 3 × 2) and keep the clearest one
+function bestGrid(bmp, n) {
+  const opts = n === 6 ? [[3, 2], [2, 3]] : n === 2 ? [[2, 1], [1, 2]] : [sheetGrid(n, false)], land = bmp.width >= bmp.height * 1.1, tall = bmp.height >= bmp.width * 1.1;
+  let best = null; for (const [c, r] of opts) { const g = gridCuts(bmp, c, r); g.sc += land ? (c > r ? 0.8 : c < r ? -0.8 : 0) : tall ? (r > c ? 0.8 : r < c ? -0.8 : 0) : 0; if (!best || g.sc > best.sc) best = g; }
+  return best;
 }
 
 /* ============ the AI request + reply ============ */
 function collagePrompt() {
   const D = duration(), sec = { calm: 7, normal: 5, fast: 3.8 }[S.settings.pace] || 5, boards = clamp(Math.round(D / sec), 2, 140), nAssets = clamp(Math.round(D / 3.2), 4, 260);
   const scenes = S.segments.map((s, i) => `${i + 1} [${fmt(S.starts[i] || 0, 0)}]: ${plain(s.text)}`).join('\n'), M = isMod();
-  const intro = M ? MOD_INTRO : `You are the visual director of a documentary explainer video in the "layered paper collage" style: an aged parchment background; vintage pictures appear one by one, exactly on the word where the narrator mentions them — as cut-out stickers (a person, a bust, a statue, an object, a building) or as torn-paper pieces of a scene — plus short bold labels on torn paper tags, red stamps, arrows and circles. Every few seconds the page is cleared (page peel, tear, scatter…) and a new collage "board" builds up.`;
-  const assetRule = M
+  const intro = isMyth() ? MYTH_INTRO : M ? MOD_INTRO : `You are the visual director of a documentary explainer video in the "layered paper collage" style: an aged parchment background; vintage pictures appear one by one, exactly on the word where the narrator mentions them — as cut-out stickers (a person, a bust, a statue, an object, a building) or as torn-paper pieces of a scene — plus short bold labels on torn paper tags, red stamps, arrows and circles. Every few seconds the page is cleared (page peel, tear, scatter…) and a new collage "board" builds up.`;
+  const assetRule = isMyth() ? MYTH_ASSETS : M
     ? `- kind "cutout": ONE subject alone (person, object, building, hand, animal). It will be cut out and placed on the paper. kind "scene": a flat picture that fills its frame (a row of houses, a document, a chart, a street) — shown as a paper print.
 - prompt: English, concrete: subject, action, view. Name the ONE part that is red-orange ("a small house with a red-orange roof", "a red-orange dollar balloon"). Prefer surprising visual metaphors that show the idea. Do NOT describe an art style. No text or letters in the picture.`
     : `- kind "cutout": ONE subject alone (person, bust, statue, animal, object, building, vehicle). It will be cut out and shown as a sticker. kind "scene": a full scene or landscape that fills its picture (shown as a torn-paper piece).
@@ -1624,7 +1692,7 @@ function collagePrompt() {
   "route": {"from": "Italy", "to": "New Delhi"} — a dotted travel line with a little plane between two places; optional "title". Use it when someone moves or travels.
   "number": a big number that counts up ("145"), with an optional short "label" ("seats").
 - Optional on a board: "exit" (how this board leaves): push, slide, iris, split, blinds, slices, flipcard, scatter, zoomthrough, whip, glitch, shutter, spin. Vary them, use whip rarely.`
-    : `  "pic": an asset id. Optional "anim" (how it enters): slide, drop, pop, spin, toss, zoomin, flip, wipe, unroll, tearin, develop, rise, bounce, jelly, swirl, iris, blinds, curtain, diamond, tiles, fold, zip, tilt, pendulum, glitch, slam, flipup. Optional "shape" for scenes: torn, tape, band. Optional "full": true.
+    : `  "pic": an asset id. Optional "anim" (how it enters): ${isMyth() ? 'divine, ascend, emerge, mist, ' : ''}slide, drop, pop, spin, toss, zoomin, flip, wipe, unroll, tearin, develop, rise, bounce, jelly, swirl, iris, blinds, curtain, diamond, tiles, fold, zip, tilt, pendulum, glitch, slam, flipup. Optional "shape" for scenes: torn, tape, band. Optional "full": true.
   "tag": a 1–3 word label on a torn paper tag (UPPERCASE where the language has capitals). Optional "on": the asset id it sticks to. Optional "count": true when it holds a number that should count up. Optional "anim": pop, stamp, swing, type, wipe, drop, rise, bounce, jelly, zip, glitch, slam, flipup.
   "stamp": a 1–2 word red rubber stamp ("WARNING", "NO PROOF", "MYTH?", "TRUE").
   "note": a short handwritten note on a yellow sticky note (2–5 words).
@@ -1634,7 +1702,7 @@ function collagePrompt() {
   "chart": a list of 2–6 [label, number] pairs ([["2004", 145], ["2009", 206]]) with a "title" ("Lok Sabha seats") — an animated bar chart. Use it when the narration compares numbers. Only real numbers from the narration.
   "route": {"from": "Italy", "to": "New Delhi"} — a dotted travel line with a little plane between two places; optional "title". Use it when someone moves or travels.
   "number": a big number that counts up ("145"), with an optional short "label" ("seats").
-- Optional on a board: "exit" (how this board leaves): peel, slide, push, tear, scatter, zoomthrough, whip, fade, drop, iris, blinds, spin, flipcard, glitch, split, slices, shutter. Vary them.`;
+- Optional on a board: "exit" (how this board leaves): ${isMyth() ? 'lightburst, smoke, mandala, iris, zoomthrough, fade. Use lightburst at big divine moments, smoke for sad or mysterious moments' : 'peel, slide, push, tear, scatter, zoomthrough, whip, fade, drop, iris, blinds, spin, flipcard, glitch, split, slices, shutter. Vary them'}.`;
   return `${intro}
 
 The narration is split into ${S.segments.length} numbered scenes with their start times; the video is ${fmt(D, 0)} long.
@@ -1717,7 +1785,7 @@ function applyCollagePlan(p) {
   if (!shots.length) throw new Error('The plan has no usable boards');
   shots[0].seg = S.segments[0].id;
   const order = [...given.keys()]; assets.sort((a, b) => { const x = order.indexOf(a.id), y = order.indexOf(b.id); return (x < 0 ? 1e4 : x) - (y < 0 ? 1e4 : y); });
-  if (S.settings.decor !== 'off' && !isMod()) for (const d of DECOR) assets.push({ ...d });
+  if (S.settings.decor !== 'off' && !isMod() && !isMyth()) for (const d of DECOR) assets.push({ ...d });
   const images = {}; let kept = 0; for (const a of assets) { const b = oldImg.get((a.prompt || '').trim()); if (b) { images[assetKey(a.id)] = b; kept++; } }
   S.assets = assets; S.shots = shots; S.images = images; R.img = {}; R.filt.clear(); touch();
   return { shots: shots.length, dropped: 0, kept };
@@ -1826,6 +1894,12 @@ function placeTags(pieces, tags, W, H, s, port) {
   tags.forEach((t, i) => { t.x = pick.pos[i].x; t.y = pick.pos[i].y; t.align = 'center'; delete t._p; });
   return pick.bad;
 }
+// keep a picture fully on screen, also with the slow camera push and drift (otherwise it looks cut at the frame edge)
+function safeRect(rect, W, H, s) {
+  const mx = W * 0.045 + 24 * s, my = H * 0.05 + 18 * s, aw = W - mx * 2, ah = H - my * 2; let { x, y, w, h } = rect;
+  if (w > aw || h > ah) { const k = Math.min(aw / w, ah / h), cx = x + w / 2, cy = y + h / 2; w *= k; h *= k; x = cx - w / 2; y = cy - h / 2; }
+  return { x: clamp(x, mx, W - mx - w), y: clamp(y, my, H - my - h), w, h };
+}
 function collageLayout(o, W, H) {
   const ck = o.sh.id + ':' + W + 'x' + H + ':' + R.ver; R.lay = R.lay || new Map(); let L = R.lay.get(ck); if (L) return L;
   if (R.lay.size > 400) R.lay.clear();
@@ -1842,12 +1916,13 @@ function collageLayout(o, W, H) {
     if (kind === 'gfx') { const k = 0.94; rect = fitRect(asp, { x: reg.x + reg.w * (1 - k) / 2, y: reg.y + reg.h * (1 - k) / 2, w: reg.w * k, h: reg.h * k }); const minW = W * (port ? 0.86 : 0.5); if (rect.w < minW) { const c = rect.x + rect.w / 2, cy0 = rect.y + rect.h / 2, w2 = Math.min(minW, W * 0.94), h2 = w2 / asp; rect = { x: clamp(c - w2 / 2, W * 0.03, W * 0.97 - w2), y: clamp(cy0 - h2 / 2, H * 0.03, H * 0.97 - h2), w: w2, h: h2 }; }
       if (S.settings.captions === 'words') { const capTop = H * (S.settings.capPos === 'low' ? (port ? 0.8 : 0.86) : (port ? 0.42 : 0.82)) - (port ? 80 : 62) * s * 0.9; if (capTop > H * 0.6 && rect.y + rect.h > capTop) { const room = capTop - H * 0.04; if (rect.h > room) { const k2 = room / rect.h; rect = { x: rect.x + rect.w * (1 - k2) / 2, y: rect.y, w: rect.w * k2, h: room }; } rect.y = Math.max(H * 0.04, capTop - rect.h); } } }
     else if (kind === 'scene') {
-      shape = it.shape || (isMod() ? (reg.w >= W * 0.8 && r() < 0.5 ? 'band' : r() < 0.5 ? 'plain' : r() < 0.6 ? 'tape' : 'torn') : (reg.w >= W * 0.8 && r() < 0.6 ? 'band' : r() < 0.55 ? 'torn' : 'tape'));
+      shape = it.shape || (isMyth() ? (reg.w >= W * 0.8 && r() < 0.4 ? 'band' : 'frame') : S.settings.edges === 'clean' ? (reg.w >= W * 0.8 && r() < 0.5 ? 'band' : r() < 0.5 ? 'plain' : 'tape') : isMod() ? (reg.w >= W * 0.8 && r() < 0.5 ? 'band' : r() < 0.5 ? 'plain' : r() < 0.6 ? 'tape' : 'torn') : (reg.w >= W * 0.8 && r() < 0.6 ? 'band' : r() < 0.55 ? 'torn' : 'tape'));
       // the whole picture must show: the frame on screen has the picture's own shape (no cropping).
       // A full-width band only works for wide pictures; a square / tall picture becomes a normal print.
-      if (shape === 'band') { const bw = W * 1.06, bh = bw / asp; if (bh <= reg.h * 1.15 && bh <= H * 0.8) rect = { x: -W * 0.03, y: clamp(reg.y + (reg.h - bh) / 2, 0, H - bh), w: bw, h: bh }; else shape = isMod() ? 'tape' : 'torn'; }
+      if (shape === 'band') { const bw = W * 1.06, bh = bw / asp; if (bh <= reg.h * 1.15 && bh <= H * 0.8) rect = { x: -W * 0.03, y: clamp(reg.y + (reg.h - bh) / 2, 0, H - bh), w: bw, h: bh }; else shape = isMyth() ? 'frame' : isMod() || S.settings.edges === 'clean' ? 'tape' : 'torn'; }
       if (!rect) { const k = 0.94; rect = fitRect(asp, { x: reg.x + reg.w * (1 - k) / 2, y: reg.y + reg.h * (1 - k) / 2, w: reg.w * k, h: reg.h * k }); }
     } else rect = fitRect(asp, { x: reg.x + reg.w * 0.03, y: reg.y + reg.h * 0.03, w: reg.w * 0.94, h: reg.h * 0.94 });
+    if (shape !== 'band' && kind !== 'gfx') rect = safeRect(rect, W, H, s);
     const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
     const dl = cx, dr = W - cx, dt = cy, db = H - cy, m = Math.min(dl, dr, dt * 1.3, db * 1.3);
     const fx = m === dl ? -1 : m === dr ? 1 : 0, fy = fx ? 0 : (m === dt * 1.3 ? -1 : 1);
@@ -1877,7 +1952,7 @@ function collageLayout(o, W, H) {
   const textBad = placeTags(pieces, tags, W, H, s, port) || 0;
   // decor behind (only if those pictures exist)
   const decor = []; const dl = (S.assets || []).filter(a => a.kind === 'decor' && R.img[assetKey(a.id)]);
-  if (dl.length && S.settings.decor !== 'off' && n <= 3 && !isMod()) {
+  if (dl.length && S.settings.decor !== 'off' && n <= 3 && !isMod() && !isMyth()) {
     const k = 1 + (rnd0() < 0.5 ? 1 : 0), spots = port ? [{ x: .55, y: -.04, w: .55, h: .3 }, { x: -.12, y: .72, w: .55, h: .3 }] : [{ x: .72, y: -.08, w: .34, h: .5 }, { x: -.08, y: .6, w: .34, h: .48 }];
     for (let q = 0; q < k; q++) { const a = dl[(hashStr(sh.id + 'd' + q)) % dl.length]; const sp = spots[(q + (mirror ? 1 : 0)) % 2]; const reg = { x: sp.x * W, y: sp.y * H, w: sp.w * W, h: sp.h * H }; const key = assetKey(a.id); const st = sticker(key, assetMode(a)); const rect = fitRect(st ? st.width / st.height : 1, reg);
       decor.push({ a, key, rect, rot: (rnd0() - 0.5) * 0.4, depth: 0.6, kind: 'decor', fx: rect.x + rect.w / 2 < W / 2 ? -1 : 1, fy: 0, dist: W * 0.6, anim: 'slide', phase: rnd0() * 6, seed: q }); }
@@ -1903,7 +1978,8 @@ function drawScenePiece(ctx, pc, x, y, w, h, s, lt, tr) {
   else if (pc.shape === 'torn') { outer = tornPoly(pc.seed, w + pad * 2, h + pad * 2, s, 10, 22).map(([a, b]) => [a - pad, b - pad]); inner = tornPoly(pc.seed + 3, w, h, s, 7, 18); }
   const M = isMod();
   ctx.save();
-  if (outer) { shadowOn(ctx, s, M ? 0.45 : 0.6); ctx.fillStyle = M ? '#fdfdfc' : '#efe4c9'; polyPath(ctx, outer, x, y); ctx.fill(); shadowOff(ctx); }
+  if (pc.shape === 'frame') mythFrame(ctx, x, y, w, h, s);
+  else if (outer) { shadowOn(ctx, s, M ? 0.45 : 0.6); ctx.fillStyle = M ? '#fdfdfc' : '#efe4c9'; polyPath(ctx, outer, x, y); ctx.fill(); shadowOff(ctx); }
   else { const b = pc.shape === 'plain' ? 0 : 7 * s; shadowOn(ctx, s, M ? 0.45 : 0.7); ctx.fillStyle = M ? '#ffffff' : '#f3ead6'; ctx.fillRect(x - b, y - b, w + b * 2, h + b * 2); shadowOff(ctx); }
   ctx.save();
   if (inner) { polyPath(ctx, inner, x, y); ctx.clip(); } else { ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip(); }
@@ -1915,6 +1991,14 @@ function drawScenePiece(ctx, pc, x, y, w, h, s, lt, tr) {
   ctx.restore();
   if (pc.shape === 'tape') { const tw = Math.min(150 * s, w * 0.28), th = (M ? 30 : 40) * s; [[0.08, -0.6], [0.92, 0.6]].forEach(([fx, rr]) => { ctx.save(); ctx.translate(x + w * fx, y + 4 * s); ctx.rotate(rr); ctx.fillStyle = M ? MOD.tape : 'rgba(236,224,186,0.8)'; ctx.fillRect(-tw / 2, -th / 2, tw, th); ctx.restore(); }); }
   ctx.restore();
+}
+function mythFrame(ctx, x, y, w, h, s) {   // ornate gold frame with a dark inner line and corner jewels
+  const b = Math.max(6, Math.min(w, h) * 0.035), o = b + 3 * s;
+  const g = ctx.createLinearGradient(x - o, y - o, x + w + o, y + h + o); g.addColorStop(0, '#7a4a10'); g.addColorStop(0.22, '#f8dc8c'); g.addColorStop(0.45, '#a8701c'); g.addColorStop(0.7, '#ffe8a6'); g.addColorStop(1, '#6e420e');
+  ctx.save(); ctx.shadowColor = 'rgba(255,170,60,0.45)'; ctx.shadowBlur = 40 * s; ctx.fillStyle = g; ctx.fillRect(x - o, y - o, w + o * 2, h + o * 2); ctx.restore();
+  ctx.strokeStyle = 'rgba(60,30,5,0.65)'; ctx.lineWidth = Math.max(1, 1.5 * s); ctx.strokeRect(x - o + b * 0.35, y - o + b * 0.35, w + o * 2 - b * 0.7, h + o * 2 - b * 0.7);
+  ctx.fillStyle = '#2a1405'; ctx.fillRect(x - 3 * s, y - 3 * s, w + 6 * s, h + 6 * s);
+  const j = b * 0.9; [[x - o, y - o], [x + w + o, y - o], [x - o, y + h + o], [x + w + o, y + h + o]].forEach(([cx, cy]) => { ctx.save(); ctx.translate(cx, cy); ctx.rotate(Math.PI / 4); ctx.fillStyle = '#ffe7a0'; ctx.fillRect(-j, -j, j * 2, j * 2); ctx.fillStyle = '#b3261e'; ctx.fillRect(-j * 0.45, -j * 0.45, j * 0.9, j * 0.9); ctx.restore(); });
 }
 function shine(ctx, x, y, w, h, t) {   // a light sweep over a picture right after it lands
   if (t < 0 || t > 0.7) return; const p = t / 0.7, cx = x - w * 0.3 + (w * 1.6) * p;
@@ -2017,6 +2101,7 @@ function drawPiece(ctx, pc, lt, t0p, W, H, s, cam, exitE) {
   if (tr.pivotTop) { ctx.translate(0, -r.h / 2); ctx.rotate(rot); ctx.translate(0, r.h / 2); } else ctx.rotate(rot);
   if (tr.kx || tr.ky) ctx.transform(1, tr.ky || 0, tr.kx || 0, 1, 0, 0);
   ctx.scale(tr.sx, tr.sy);
+  if (tr.blur > 0.5) ctx.filter = `blur(${(tr.blur * s).toFixed(1)}px)`;
   const x = -r.w / 2, y = -r.h / 2;
   if (tr.clip && tr.p < 1) { ctx.beginPath(); const e = tr.e, m = 40 * s;
     if (tr.clip === 'wipe') ctx.rect(x - m, y - m, (r.w + 2 * m) * e, r.h + 2 * m);
@@ -2041,12 +2126,15 @@ function drawPiece(ctx, pc, lt, t0p, W, H, s, cam, exitE) {
     if (st) { ctx.drawImage(st, x, y, r.w, r.h); if (tr.develop > 0 || tr.shade > 0) { /* stickers just fade */ } }
     else drawMissing(ctx, x, y, r.w, r.h, s, (R.slotN || {})[pc.key]);
   }
+  ctx.filter = 'none';
+  if (tr.bloom > 0.02) { const R2 = Math.hypot(r.w, r.h) * 0.6, gg = ctx.createRadialGradient(0, 0, 0, 0, 0, R2); gg.addColorStop(0, `rgba(255,236,180,${0.85 * tr.bloom})`); gg.addColorStop(0.5, `rgba(255,190,90,${0.35 * tr.bloom})`); gg.addColorStop(1, 'rgba(255,170,60,0)'); ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = gg; ctx.fillRect(-R2, -R2, R2 * 2, R2 * 2); ctx.restore(); }
   if (tr.rgb > 0.04) { const rg = mulberry32(pc.seed + Math.floor(tr.p * 24)); ctx.save(); for (let k = 0; k < 3; k++) { const sy = y + rg() * r.h, sh = (6 + rg() * 26) * s, off = (rg() - 0.5) * 60 * s * tr.rgb; ctx.fillStyle = k % 2 ? 'rgba(0,235,255,0.45)' : 'rgba(255,40,100,0.45)'; ctx.fillRect(x + off, sy, r.w, sh); } ctx.restore(); }
   ctx.restore();
 }
 function drawCTag(ctx, tg, lt, t0p, s, exitE, W, H) {
   if (lt < t0p) return; const it = tg.it, A = ANIMS[tg.anim] || ANIMS.pop, p = clamp((Math.max(t0p, qT(lt)) - t0p) / A.d, 0, 1), tr = { dx: 0, dy: 0, rot: 0, sx: 1, sy: 1, alpha: 1, ...A.f(p, tg, W, H) };
   if (tg.bold) { ctx.save(); drawBoldTag(ctx, tg, lt, t0p, s, exitE, W, H, tr); ctx.restore(); return; }
+  if (isMyth()) { ctx.save(); drawMythTag(ctx, tg, lt, t0p, s, exitE, W, H, tr); ctx.restore(); return; }
   let text = upper(it.tag); if (it.count) text = countText(text, clamp((lt - t0p) / 1.3, 0, 1));
   if (tr.typeP != null) { const chars = [...text]; text = chars.slice(0, Math.max(1, Math.ceil(chars.length * tr.typeP))).join(''); }
   const full = upper(it.tag), style = tg.style, size = tg.size;
@@ -2080,16 +2168,18 @@ function drawCollage(ctx, o, lt, W, H, exitE = 0) {
   const tx = last ? (last.rect.x + last.rect.w / 2 - W / 2) * 0.06 : 0, ty = last ? (last.rect.y + last.rect.h / 2 - H / 2) * 0.06 : 0;
   const z = 1 + 0.05 * mo * easeInOut(lt / Math.max(d, 1)); const cam = { px: Math.sin(lt * 0.25) * 18 * s * mo, py: Math.cos(lt * 0.2) * 10 * s * mo };
   ctx.save(); ctx.translate(W / 2, H / 2); ctx.scale(z, z); ctx.translate(-W / 2 - tx * mo, -H / 2 - ty * mo);
+  if (isMyth()) drawMythBack(ctx, W, H, o.t0 + lt, s);
   drawModLayer(ctx, L, 'back', lt, s, W, H, cam, b, exitE);
   drawModLayer(ctx, L, 'mid', lt, s, W, H, cam, b, exitE);
   L.decor.forEach(pc => drawPiece(ctx, pc, lt, 0.05, W, H, s, cam, exitE));
   L.pieces.forEach(pc => drawPiece(ctx, pc, lt, b.items[pc.j], W, H, s, cam, exitE));
   drawModLayer(ctx, L, 'front', lt, s, W, H, cam, b, exitE);
-  const pieceOf = id => L.pieces.find(p => p.a && p.a.id === id), M = isMod(), mc = M ? MOD.ink : RED, mlw = (M ? 4 : 9) * s;
+  if (isMyth()) drawMythFront(ctx, W, H, o.t0 + lt, s);
+  const pieceOf = id => L.pieces.find(p => p.a && p.a.id === id), M = isMod(), mc = isMyth() ? GOLD : M ? MOD.ink : RED, mlw = (M ? 4 : 9) * s;
   o.sh.items.forEach((it, j) => {
     const t0p = b.items[j]; if (lt < t0p) return; const pp = clamp((qT(lt) - t0p) / 0.6, 0, 1);
     if (it.arrow) { const A = pieceOf(it.arrow), B = pieceOf(it.to); if (!A || !B) return; const ax = A.rect.x + A.rect.w / 2, ay = A.rect.y + A.rect.h / 2, bx = B.rect.x + B.rect.w / 2, by = B.rect.y + B.rect.h / 2; drawArrow(ctx, lerp(ax, bx, 0.3), lerp(ay, by, 0.3), lerp(ax, bx, 0.72), lerp(ay, by, 0.72), easeOutCubic(pp), mlw, mc); }
-    if (it.circle) { const A = pieceOf(it.circle); if (!A) return; drawCircle(ctx, A.rect.x + A.rect.w / 2, A.rect.y + A.rect.h / 2, A.rect.w * 0.55, A.rect.h * 0.55, pp, mlw, A.seed, M ? accent() : RED); }
+    if (it.circle) { const A = pieceOf(it.circle); if (!A) return; drawCircle(ctx, A.rect.x + A.rect.w / 2, A.rect.y + A.rect.h / 2, A.rect.w * 0.55, A.rect.h * 0.55, pp, mlw, A.seed, isMyth() ? GOLD : M ? accent() : RED); }
   });
   L.fulls.forEach(pc => drawPiece(ctx, pc, lt, b.items[pc.j], W, H, s, { px: 0, py: 0 }, 0));
   ctx.restore();
@@ -2097,9 +2187,9 @@ function drawCollage(ctx, o, lt, W, H, exitE = 0) {
 }
 function collageSfx(o, add) {
   const L = collageLayout(o, 1920, 1080), b = o.b, t0 = o.t0;
-  const pS = { slide: 'paper', drop: 'paper', toss: 'swish', pop: 'pop', spin: 'swish', zoomin: 'soft', flip: 'paper', wipe: 'paper', unroll: 'paper', tearin: 'rip', develop: 'soft', rise: 'soft', bounce: 'boing', jelly: 'boing', swirl: 'swish', iris: 'soft', blinds: 'paper', curtain: 'paper', diamond: 'soft', tiles: 'tick', fold: 'paper', zip: 'swish', tilt: 'paper', pendulum: 'soft', glitch: 'glitch', slam: 'thump', flipup: 'paper' };
+  const pS = { slide: 'paper', drop: 'paper', toss: 'swish', pop: 'pop', spin: 'swish', zoomin: 'soft', flip: 'paper', wipe: 'paper', unroll: 'paper', tearin: 'rip', develop: 'soft', rise: 'soft', bounce: 'boing', jelly: 'boing', swirl: 'swish', iris: 'soft', blinds: 'paper', curtain: 'paper', diamond: 'soft', tiles: 'tick', fold: 'paper', zip: 'swish', tilt: 'paper', pendulum: 'soft', glitch: 'glitch', slam: 'thump', flipup: 'paper', divine: 'chime', ascend: 'shimmer', emerge: 'soft', mist: 'soft' };
   [...L.pieces, ...L.fulls].forEach(pc => add(t0 + Math.max(0, b.items[pc.j]), pS[pc.anim] || 'paper', 0.9));
-  L.tags.forEach(tg => { const t = t0 + Math.max(0, b.items[tg.j]); if (tg.anim === 'type') { for (let k = 0; k < 5; k++) add(t + k * 0.1, 'type', 0.45); } else add(t, tg.anim === 'stamp' || tg.anim === 'slam' ? 'thump' : tg.anim === 'glitch' ? 'glitch' : tg.anim === 'bounce' || tg.anim === 'jelly' ? 'boing' : tg.anim === 'zip' ? 'swish' : 'pop', tg.anim === 'stamp' || tg.anim === 'slam' ? 1 : 0.7); });
+  L.tags.forEach(tg => { const t = t0 + Math.max(0, b.items[tg.j]); if (tg.anim === 'type') { for (let k = 0; k < 5; k++) add(t + k * 0.1, 'type', 0.45); } else add(t, tg.anim === 'stamp' || tg.anim === 'slam' ? 'thump' : tg.anim === 'glitch' ? 'glitch' : tg.anim === 'bounce' || tg.anim === 'jelly' ? 'boing' : tg.anim === 'zip' ? 'swish' : isMyth() ? 'chime' : 'pop', tg.anim === 'stamp' || tg.anim === 'slam' ? 1 : 0.7); });
   o.sh.items.forEach((it, j) => { if (it.arrow || it.circle) add(t0 + b.items[j], 'marker', 0.9);
     if (it.gfx) { const t = t0 + Math.max(0, b.items[j]), d = it.data || {};
       if (it.gfx === 'timeline') (d.items || []).slice(0, 7).forEach((e, i) => add(t + 0.4 + i * 0.75, 'pop', 0.8));
@@ -2180,6 +2270,21 @@ function boardExit(ctx, kind, A, B, p, W, H, prev, prevLt) {
       ctx.drawImage(B, 0, 0, W, H / 2, 0, -off, W, H / 2); ctx.drawImage(B, 0, H / 2, W, H / 2, 0, H / 2 + off, W, H / 2); shadowOff(ctx);
       break;
     }
+    case 'lightburst': {   // divine flash: everything goes bright gold-white, the new board comes out of the light
+      ctx.drawImage(p < 0.5 ? A : B, 0, 0); const k = Math.sin(p * Math.PI);
+      const g = ctx.createRadialGradient(W / 2, H * 0.45, 0, W / 2, H * 0.45, Math.hypot(W, H) * (0.2 + 0.5 * k)); g.addColorStop(0, `rgba(255,248,220,${k})`); g.addColorStop(0.5, `rgba(255,200,110,${0.8 * k})`); g.addColorStop(1, `rgba(255,160,60,${0.35 * k})`);
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); ctx.restore();
+      ctx.save(); ctx.globalAlpha = k * 0.35; ctx.fillStyle = '#fff6dc'; ctx.fillRect(0, 0, W, H); ctx.restore(); break;
+    }
+    case 'smoke': {   // the old board melts into soft smoke, the new one clears out of it
+      ctx.drawImage(B, 0, 0); ctx.save(); ctx.globalAlpha = 1 - e; ctx.filter = `blur(${(e * 26 * s).toFixed(1)}px)`; ctx.translate(W / 2, H / 2); ctx.scale(1 + 0.06 * e, 1 + 0.06 * e); ctx.drawImage(A, -W / 2, -H / 2); ctx.restore();
+      const rg = mulberry32(5); ctx.save(); ctx.globalCompositeOperation = 'screen'; for (let k = 0; k < 7; k++) { const cx = rg() * W, cy = rg() * H, R2 = (200 + rg() * 380) * s * (0.6 + e), a = 0.22 * Math.sin(p * Math.PI); const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R2); g.addColorStop(0, `rgba(210,190,170,${a})`); g.addColorStop(1, 'rgba(210,190,170,0)'); ctx.fillStyle = g; ctx.fillRect(cx - R2, cy - R2, R2 * 2, R2 * 2); } ctx.restore(); break;
+    }
+    case 'mandala': {   // a spinning golden mandala opens the new board
+      ctx.drawImage(A, 0, 0); const R2 = Math.hypot(W, H) / 2 * e; ctx.save(); ctx.beginPath(); const n = 16; for (let k = 0; k <= n * 2; k++) { const a = k / (n * 2) * Math.PI * 2 + e * 1.2, rr = R2 * (k % 2 ? 0.86 : 1.0); k ? ctx.lineTo(W / 2 + Math.cos(a) * rr, H / 2 + Math.sin(a) * rr) : ctx.moveTo(W / 2 + Math.cos(a) * rr, H / 2 + Math.sin(a) * rr); } ctx.closePath(); ctx.clip(); ctx.drawImage(B, 0, 0); ctx.restore();
+      if (p < 0.97) { const m = mythMandala(); const z = R2 * 2.3; ctx.save(); ctx.globalAlpha = 0.9 * (1 - p); ctx.translate(W / 2, H / 2); ctx.rotate(e * 2); ctx.drawImage(m, -z / 2, -z / 2, z, z); ctx.restore(); }
+      break;
+    }
     default: ctx.drawImage(B, 0, 0);
   }
 }
@@ -2230,7 +2335,7 @@ function dust(ctx, W, H, t) {
 'use strict';
 
 const isMod = () => S.settings.mode === 'modern';
-const isCol = () => S.settings.mode === 'collage' || S.settings.mode === 'modern';
+const isCol = () => S.settings.mode === 'collage' || S.settings.mode === 'modern' || S.settings.mode === 'myth';
 const MOD = { green: '#a9dc8d', pink: '#f6b6a8', salmon: '#f08f78', tape: 'rgba(168,196,92,0.88)', ink: '#141414', paper: '#fbfbf9' };
 const stopMo = () => S.settings.stopmo === 'on';
 const qT = t => stopMo() ? Math.floor(t * 12 + 1e-6) / 12 : t;           // animation time in 12 fps steps
@@ -2397,6 +2502,12 @@ function drawBoldTag(ctx, tg, lt, t0p, s, exitE, W, H, tr) {
 }
 
 /* ============ the AI request: modern-collage wording ============ */
+const MYTH_INTRO = `You are the visual director of an Indian mythology story video (Ramayana, Mahabharata, Puranas, gods and heroes) in a "divine temple" style: a dark, warm temple background with a slowly turning golden mandala and soft light rays; cinematic painted pictures appear one by one, exactly on the word where the narrator mentions them — characters as glowing cut-out figures with a golden aura, scenes in ornate gold frames — plus short gold titles. Every few seconds the board changes with a flash of divine light, smoke or a spinning mandala. The mood is epic, devotional and emotional, never cartoonish.`;
+const MYTH_ASSETS = `- kind "cutout": ONE character or object alone (a god, a hero, a sage, a weapon, a chariot, a crown, a conch, a lotus, a diya). It will be cut out and shown glowing on the dark background. kind "scene": a full scene that fills its picture (a battlefield, a palace hall, a forest ashram, a river at dawn) — shown in a gold frame.
+- prompt: English, concrete: who, what they do, expression, setting, time of day, camera view. Be true to the story and the scriptures. Do NOT describe an art style. No text or letters in the picture.
+- CHARACTERS STAY THE SAME: give every recurring character ONE fixed look and copy it word for word into every prompt where that character appears (for example "Karna, a young warrior with shining golden armour and golden earrings, long dark hair, red dhoti"). Never change their clothes, colours or age between pictures.
+- Show emotions and key moments with strong pictures (a hand refusing a crown, a lone diya, an arrow in flight, feet being touched in respect) — visual symbols work very well.
+- Show gods with respect: dignified, calm, glowing; never comic.`;
 const MOD_INTRO = 'You are the visual director of an explainer video in the "modern editorial paper collage" style: clean white crumpled paper; realistic BLACK-AND-WHITE halftone photo cut-outs where only ONE key object (or one part of it) is bright red-orange; big pastel green and pink circles behind the subjects, green tape strips, grid-paper and halftone patches; witty visual metaphors (a bank building as a man\'s head, a money tree, a house on an open palm, a dollar balloon being pumped). Pictures pop in one by one, exactly on the word where the narrator mentions them, with a stop-motion feel; short bold sans-serif text types on. Every few seconds the camera whips to a new collage "board".';
 
 </script>
@@ -2622,6 +2733,10 @@ const LOOKS = {
   modern: { name: 'Modern documentary photo', text: 'Style: realistic modern documentary photograph, photojournalism, natural colours, sharp focus.' },
   engraving: { name: 'Old engraving / lithograph', text: 'Style: 19th-century engraving or lithograph illustration, fine black ink hatching and cross-hatching, aged paper tone.' },
   painting: { name: 'Classic painting', text: 'Style: museum-quality classical painting (Indian miniature or oil painting as fits the subject), rich detail.' },
+  mythic: { name: '🕉️ Mythic painting (colour, divine light)', text: 'Style: cinematic Indian mythology digital painting, epic and devotional, rich jewel colours (deep red, saffron, gold, peacock blue, emerald), soft golden divine rim light, glowing aura around gods, dramatic sky, ornate gold jewellery and silk clothes, highly detailed, painterly, in the classical Indian art tradition.' },
+  miniature: { name: '🕉️ Indian miniature painting', text: 'Style: traditional Indian miniature painting (Pahari / Rajput school), flat rich colours, fine gold detailing, decorative patterned clothes, stylised trees and palaces, painted on aged paper.' },
+  carving: { name: '🕉️ Temple stone carving', text: 'Style: ancient Indian temple stone relief carving in warm sandstone, deep carved detail, lit by warm oil-lamp light from the side, weathered texture.' },
+  mythgold: { name: '🕉️ Gold & black ink (dark, sacred)', text: 'Style: sacred illustration in black ink and shining gold leaf on a very dark background, fine line work, glowing gold highlights, mystical and elegant.' },
   cutout: { name: 'Object on white', text: 'Style: one realistic object or person isolated in the centre on a plain pure white background, soft studio light.' }
 };
 const MAP_LOOK = 'Style: vintage hand-drawn map on aged paper, clear coastlines, rivers and borders, soft colours, almost no labels.';
@@ -2780,7 +2895,7 @@ const perSheet = () => Math.max(1, +S.settings.perImage || 1);
 function sheets() { const sl = imageSlots(), n = perSheet(), out = []; for (let i = 0; i < sl.length; i += n) out.push({ k: out.length, slots: sl.slice(i, i + n) }); return out; }
 function sheetPrompt(sh, total, lv = 0) {
   const n = perSheet(), [cols, rows] = sheetGrid(n, false);
-  let t = `SHEET ${sh.k + 1} OF ${total} (a NEW image, different from the earlier sheets). Make ONE ${cols > rows ? 'landscape 3:2' : 'square'} image divided into a REGULAR grid of ${cols} columns × ${rows} rows = ${n} separate pictures, ALL EXACTLY THE SAME WIDTH AND HEIGHT (like a contact sheet: every column is equally wide in every row, every row equally tall), separated by straight wide plain WHITE gaps. Each picture stays completely inside its own cell; nothing crosses a gap. No numbers, labels, captions or frames.\n`;
+  let t = `SHEET ${sh.k + 1} OF ${total} (a NEW image, different from the earlier sheets). Make ONE ${cols > rows ? 'landscape (16:9 or 3:2)' : 'square'} image divided into a REGULAR grid of ${cols} columns × ${rows} rows = ${n} separate pictures (exactly ${cols} side by side in each row), ALL EXACTLY THE SAME WIDTH AND HEIGHT (like a contact sheet: every column is equally wide in every row, every row equally tall), separated by straight wide plain WHITE gaps (each gap about 3% of the image width) and a white margin around the outside. Every cell is its OWN complete picture with its own composition — do NOT paint one big picture across the grid. Each picture stays completely inside its own cell; nothing crosses a gap. No numbers, labels, captions or frames.\n`;
   for (let r = 0; r < rows; r++) {
     t += `Row ${r + 1}, left to right:\n`;
     for (let c = 0; c < cols; c++) { const x = sh.slots[r * cols + c]; t += x ? `  ${c + 1}. ${(slotSafe(x, lv).text || 'a related documentary picture').replace(/\.\s*$/, '')}${cellNote(x)}.\n` : `  ${c + 1}. leave this cell plain white.\n`; }
@@ -2789,7 +2904,11 @@ function sheetPrompt(sh, total, lv = 0) {
   return t;
 }
 function refreshSlots() { R.slotN = Object.fromEntries(imageSlots().map(x => [x.key, x.n])); }
-async function splitSheet(blob, n = perSheet()) { const [c, r] = sheetGrid(n, false); return splitGrid(blob, c, r); }
+async function splitSheet(blob, n = perSheet(), k = null) {
+  const bmp = await createImageBitmap(blob);
+  try { const g = bestGrid(bmp, n), parts = await cutCells(bmp, g); if (k != null) { S.sheetCuts = S.sheetCuts || {}; S.sheetCuts[k] = { cols: g.cols, rows: g.rows, ys: g.ys, xs: g.xs, n }; await setImage('SHEET:' + k, blob); } return parts; }
+  finally { bmp.close && bmp.close(); }
+}
 
 /* ---- (old) cutting a 2×2 sheet into its four pictures ---- */
 function cv(w, h) { const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h)); return c; }
@@ -3050,6 +3169,52 @@ function hookSfx(add) {
   add(0.25, 'thump', 0.8); add(HOOK_D - 0.65, 'boom', 1);
 }
 
+/* ============ MYTHOLOGY: mandala, light rays, embers, gold titles ============ */
+function mythMandala() {
+  if (R.mandala) return R.mandala; const N = 1024, c = cv(N, N), x = c.getContext('2d'), C = N / 2; x.translate(C, C);
+  x.strokeStyle = '#f2c766'; x.fillStyle = '#f2c766'; x.lineWidth = 3;
+  const ring = (r0) => { x.beginPath(); x.arc(0, 0, r0, 0, 6.283); x.stroke(); };
+  [80, 150, 250, 330, 420, 500].forEach(ring);
+  const petals = (n, r0, r1, wdt) => { for (let k = 0; k < n; k++) { x.save(); x.rotate(k / n * 6.283); x.beginPath(); x.moveTo(0, -r0); x.quadraticCurveTo(wdt, -(r0 + r1) / 2, 0, -r1); x.quadraticCurveTo(-wdt, -(r0 + r1) / 2, 0, -r0); x.stroke(); x.restore(); } };
+  petals(8, 20, 80, 30); petals(16, 80, 150, 26); petals(24, 150, 250, 30); petals(32, 250, 330, 22); petals(48, 330, 420, 18);
+  for (let k = 0; k < 64; k++) { x.save(); x.rotate(k / 64 * 6.283); x.beginPath(); x.arc(0, -460, 10, 0, 6.283); x.fill(); x.fillRect(-1.5, -500, 3, 30); x.restore(); }
+  for (let k = 0; k < 96; k++) { x.save(); x.rotate(k / 96 * 6.283); x.beginPath(); x.arc(0, -290, 3.5, 0, 6.283); x.fill(); x.restore(); }
+  R.mandala = c; return c;
+}
+function drawMythBack(ctx, W, H, gt, s) {
+  const m = mythMandala(), z = Math.max(W, H) * 1.05, cos = theme().cosmic;
+  ctx.save(); ctx.globalAlpha = cos ? 0.08 : 0.11; ctx.translate(W / 2, H * 0.48); ctx.rotate(gt * 0.025); ctx.drawImage(m, -z / 2, -z / 2, z, z); ctx.restore();
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';   // slow light rays from above
+  for (let k = 0; k < 6; k++) { const a = -0.55 + k * 0.22 + Math.sin(gt * 0.15 + k) * 0.04, al = 0.035 + 0.025 * Math.sin(gt * 0.4 + k * 1.7), L = Math.hypot(W, H) * 1.1, ox = W * 0.5, oy = -H * 0.15;
+    const g = ctx.createLinearGradient(ox, oy, ox + Math.sin(a) * L, oy + Math.cos(a) * L); g.addColorStop(0, `rgba(255,214,140,${al * 2})`); g.addColorStop(1, 'rgba(255,214,140,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ox + Math.sin(a - 0.06) * L, oy + Math.cos(a - 0.06) * L); ctx.lineTo(ox + Math.sin(a + 0.06) * L, oy + Math.cos(a + 0.06) * L); ctx.closePath(); ctx.fill(); }
+  ctx.restore();
+}
+function drawMythFront(ctx, W, H, gt, s) {   // glowing embers / diya sparks drifting up
+  if (S.settings.dust === 'off' && S.settings.decor === 'off') return;
+  const r = mulberry32(31), n = 34, cos = theme().cosmic; ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < n; i++) { const sp = 0.25 + r() * 0.7, x0 = r() * W, ph = r() * 6.28, sz = (1.4 + r() * 3.2) * s, yy = H * 1.05 - ((gt * sp * H * 0.06 + r() * H * 1.1) % (H * 1.1)), xx = x0 + Math.sin(gt * 0.6 + ph) * 26 * s, tw = 0.5 + 0.5 * Math.sin(gt * 3 + ph * 3);
+    const g = ctx.createRadialGradient(xx, yy, 0, xx, yy, sz * 5); g.addColorStop(0, cos ? `rgba(220,215,255,${0.7 * tw})` : `rgba(255,205,110,${0.75 * tw})`); g.addColorStop(0.25, cos ? `rgba(160,150,255,${0.25 * tw})` : `rgba(255,140,40,${0.25 * tw})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.fillRect(xx - sz * 5, yy - sz * 5, sz * 10, sz * 10); }
+  ctx.restore();
+}
+const mythF = (z) => `400 ${z}px "Tiro Devanagari Hindi", "Playfair Display", serif`;
+function drawMythTag(ctx, tg, lt, t0p, s, exitE, W, H, tr) {   // gold engraved text with an ornament line, dark glow behind
+  const it = tg.it, style = tg.style, port = H > W * 1.05; let text = String(it.tag || ''); if (it.count) text = countText(text, clamp((lt - t0p) / 1.3, 0, 1));
+  const size = tg.size * (style === 'title' ? 1.25 : style === 'number' ? 1.0 : 1.12), maxW = W * (port ? 0.86 : 0.5); ctx.font = mythF(size);
+  const lines = []; let cur = ''; text.split(/\s+/).filter(Boolean).forEach(w => { const t = cur ? cur + ' ' + w : w; if (cur && ctx.measureText(t).width > maxW) { lines.push(cur); cur = w; } else cur = t; }); if (cur) lines.push(cur);
+  let shown = lines; if (tr.typeP != null) { let left = Math.max(1, Math.ceil(lines.join('').length * tr.typeP)); shown = lines.map(l => { const c = [...l], o = c.slice(0, Math.max(0, left)).join(''); left -= c.length; return o; }); }
+  const lh = size * 1.25, bw = Math.max(...lines.map(l => ctx.measureText(l).width), 10), bh = lh * lines.length;
+  let x = tg.x, y = tg.y; if (tg.align === 'right') x -= bw / 2; else if (tg.align === 'left') x += bw / 2;
+  x = clamp(x, bw / 2 + W * 0.05, W - bw / 2 - W * 0.05); y = clamp(y, bh / 2 + H * 0.06, H - bh / 2 - H * 0.06); if (exitE > 0) y -= exitE * exitE * H;
+  ctx.globalAlpha *= tr.alpha; ctx.translate(x + tr.dx * s, y + tr.dy * s); ctx.rotate((tr.rot || 0) * 0.5); ctx.scale(tr.sx, tr.sy);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const g = ctx.createLinearGradient(0, -bh / 2, 0, bh / 2); g.addColorStop(0, '#fff1c2'); g.addColorStop(0.5, '#f2c35a'); g.addColorStop(1, '#b97a1f');
+  shown.forEach((l, i) => { const yy = -bh / 2 + lh * (i + 0.5); ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 18 * s; ctx.lineWidth = size * 0.1; ctx.strokeStyle = 'rgba(40,16,4,0.9)'; ctx.strokeText(l, 0, yy); ctx.shadowColor = 'rgba(255,170,60,0.6)'; ctx.shadowBlur = 22 * s; ctx.fillStyle = style === 'stamp' ? '#ff8a4a' : g; ctx.fillText(l, 0, yy); });
+  ctx.shadowBlur = 0; const q = easeOutCubic(clamp((lt - t0p - 0.15) / 0.6, 0, 1)), uw = (bw * 0.55 + 30 * s) * q, uy = bh / 2 + size * 0.12;
+  if (q > 0) { ctx.strokeStyle = 'rgba(242,195,90,0.9)'; ctx.lineWidth = Math.max(1.5, 2.2 * s); ctx.beginPath(); ctx.moveTo(-uw, uy); ctx.lineTo(uw, uy); ctx.stroke(); ctx.save(); ctx.translate(0, uy); ctx.rotate(Math.PI / 4); ctx.fillStyle = '#f2c35a'; const d = 7 * s * q; ctx.fillRect(-d, -d, d * 2, d * 2); ctx.restore(); [-1, 1].forEach(k => { ctx.beginPath(); ctx.arc(k * uw, uy, 3.5 * s, 0, 6.283); ctx.fill(); }); }
+}
+
 /* ============ Shorts: title at the start, end card at the end ============ */
 function drawShortOverlay(ctx, W, H, lt, len) {
   const o = R.short; if (!o) return; const s = Math.min(W, H) / 1080;
@@ -3202,22 +3367,23 @@ $$('.tab').forEach(b => b.onclick = () => showTab(b.dataset.tab));
 $$('[data-go]').forEach(b => b.onclick = () => showTab(b.dataset.go));
 
 /* ============ settings ============ */
-const BIND = ['whooshVol', 'endFade', 'hook', 'hookText', 'depth', 'shortEnd', 'shortCaps', 'gemMark', 'mode', 'animVar', 'decor', 'dust', 'stopmo', 'capPos', 'capColor', 'split', 'aspect', 'textLang', 'pace', 'look', 'perImage', 'theme', 'photo', 'accent', 'trans', 'motion', 'grain', 'vignette', 'captions', 'watermark', 'sfx', 'sfxVol', 'musicVol', 'duck', 'res', 'fps'];
+const BIND = ['edges', 'whooshVol', 'endFade', 'hook', 'hookText', 'depth', 'shortEnd', 'shortCaps', 'gemMark', 'mode', 'animVar', 'decor', 'dust', 'stopmo', 'capPos', 'capColor', 'split', 'aspect', 'textLang', 'pace', 'look', 'perImage', 'theme', 'photo', 'accent', 'trans', 'motion', 'grain', 'vignette', 'captions', 'watermark', 'sfx', 'sfxVol', 'musicVol', 'duck', 'res', 'fps'];
 const NUMS = new Set(['whooshVol', 'perImage', 'motion', 'grain', 'sfxVol', 'musicVol', 'res', 'fps']);
 $('#look').innerHTML = Object.entries(LOOKS).map(([k, v]) => `<option value="${k}">${v.name}</option>`).join('');
 function applyModeDefaults() {
-  const m = S.settings.mode, base = { decor: 'on', dust: 'on', vignette: 'on', grain: 0.05, stopmo: 'off', accent: '#f5d327' };
-  Object.assign(S.settings, m === 'modern' ? { theme: 'clean', photo: 'spot', look: 'spot', captions: 'off', perImage: 6, decor: 'on', dust: 'off', vignette: 'off', grain: 0.03, stopmo: 'on', accent: '#ee5a36', trans: 'auto' }
+  const m = S.settings.mode, base = { decor: 'on', dust: 'on', vignette: 'on', grain: 0.05, stopmo: 'off', accent: '#f5d327', capColor: '#a6ff1a' };
+  if (m === 'myth') Object.assign(S.settings, { theme: 'temple', photo: 'myth', look: 'mythic', captions: 'words', capColor: '#ffd36b', perImage: 6, decor: 'on', dust: 'on', vignette: 'on', grain: 0.04, stopmo: 'off', accent: '#e8b04a', trans: 'auto', animVar: 'mixed' });
+  else Object.assign(S.settings, m === 'modern' ? { theme: 'clean', photo: 'spot', look: 'spot', captions: 'off', perImage: 6, decor: 'on', dust: 'off', vignette: 'off', grain: 0.03, stopmo: 'on', accent: '#ee5a36', trans: 'auto', capColor: '#a6ff1a' }
     : m === 'collage' ? { ...base, theme: 'parchment', photo: 'warm', look: 'sepia', captions: 'words', perImage: 6 } : { ...base, theme: 'paper', photo: 'bw', look: 'archival', captions: 'off', perImage: 1 });
   R.paper.clear(); R.filt.clear(); if (R.mod) R.mod.clear(); applySettingsToUI(); renderSlots();
-  toast(m === 'modern' ? 'Modern collage: white paper, B&W halftone pictures with one red-orange part, circles + tape, stop-motion, 6 pictures per AI image' : m === 'collage' ? 'Layered collage style: parchment, sepia pictures, word captions, 6 pictures per AI image' : 'Classic Vox style');
+  toast(m === 'myth' ? 'Mythology style: dark temple background, golden mandala + light rays, glowing figures, gold frames and titles, divine light transitions, temple bell sounds' : m === 'modern' ? 'Modern collage: white paper, B&W halftone pictures with one red-orange part, circles + tape, stop-motion, 6 pictures per AI image' : m === 'collage' ? 'Layered collage style: parchment, sepia pictures, word captions, 6 pictures per AI image' : 'Classic Vox style');
 }
 function applySettingsToUI() { if ($('#aspect2')) $('#aspect2').value = S.settings.aspect; if ($('#captions2')) $('#captions2').value = S.settings.captions; if ($('#ccBtn')) $('#ccBtn').classList.toggle('on', S.settings.captions !== 'off'); BIND.forEach(k => { const el = $('#' + k); if (el) el.value = S.settings[k]; }); $('#projTitle').value = S.settings.title || ''; }
 BIND.forEach(k => { const el = $('#' + k); if (!el) return; el.addEventListener(el.type === 'range' || el.type === 'color' || el.tagName === 'INPUT' ? 'input' : 'change', () => {
   S.settings[k] = NUMS.has(k) ? +el.value : el.value;
   if (k === 'mode') applyModeDefaults();
   if (k === 'captions') showCaptions();
-  if (k === 'aspect') { sizePreview(); if ($('#aspect2')) $('#aspect2').value = S.settings.aspect; if ($('#aspect')) $('#aspect').value = S.settings.aspect; } if (k === 'theme' || k === 'accent') { R.paper.clear(); R.filt.clear(); }
+  if (k === 'aspect') { sizePreview(); if ($('#aspect2')) $('#aspect2').value = S.settings.aspect; if ($('#aspect')) $('#aspect').value = S.settings.aspect; } if (k === 'theme' || k === 'accent') { R.paper.clear(); R.filt.clear(); } if (k === 'edges') R.lay && R.lay.clear();
   if (k === 'perImage' || k === 'look') renderSlots(); if (k === 'musicVol' && S.musicBlob) music.volume = clamp(musicGainAt(nowT()), 0, 1);
   touch(); save(); redraw();
 }); });
@@ -3338,7 +3504,7 @@ function updateBadge() { const sl = imageSlots(), have = sl.filter(x => S.images
 const typeLabel = x => x.asset ? ({ cutout: 'Cut-out', scene: 'Scene', decor: 'Decor' }[x.asset.kind] || 'Picture') + (x.full ? ' · full colour' : '') + ' · ' + x.asset.id.replace(/_/g, ' ') : TYPES[x.sh.type].name + (x.sh.type === 'compare' ? (x.b ? ' · right' : ' · left') : '');
 function shotTime(sh) { if (!sh) return 'all boards'; const o = resolve().shots.find(o => o.sh === sh); return o ? fmt(o.t0, 0) : ''; }
 function renderSlots() {
-  refreshSlots(); updateBadge();
+  refreshSlots(); updateBadge(); if (window.renderSheetTools) renderSheetTools();
   const sl = imageSlots(), box = $('#slots');
   if (!sl.length) { box.innerHTML = '<p class="muted">No pictures needed yet. Make the plan first (step 2).</p>'; $('#picInfo').textContent = ''; return; }
   const have = sl.filter(x => S.images[x.key]).length; $('#picInfo').textContent = `${have} of ${sl.length} pictures done.${have < sl.length ? ' Tip: click a card to choose where the next pasted picture goes.' : ' All done — check the Edit tab.'}`;
@@ -3386,7 +3552,7 @@ async function putImage(key, blob) {
 }
 async function putSheet(k, blob) {
   const sh = sheets()[k]; if (!sh) return;
-  try { const parts = await splitSheet(await cleaned(blob)); for (let i = 0; i < sh.slots.length; i++) await setImage(sh.slots[i].key, parts[i]); } catch (e) { return toast('Could not cut this sheet: ' + e.message); }
+  try { const parts = await splitSheet(await cleaned(blob), perSheet(), k); for (let i = 0; i < sh.slots.length; i++) await setImage(sh.slots[i].key, parts[i]); } catch (e) { return toast('Could not cut this sheet: ' + e.message); }
   renderSlots(); jumpToKey(sh.slots[0].key); toast(`Sheet ${k + 1} cut into ${sh.slots.length} pictures`);
 }
 function jumpToKey(key) { const x = findSlot(key); if (!x || !x.sh) return; const o = resolve().shots.find(o => o.sh === x.sh); if (o) setT(o.t0 + Math.min(1.5, o.d * 0.5)); }
@@ -3404,7 +3570,7 @@ async function bulkImages(files) {
     const m = f.name.match(/(\d+)/); let idx = m ? +m[1] - 1 : -1;
     if (!(idx >= 0 && idx < list.length)) idx = list.findIndex(x => grid ? x.slots.some(y => !S.images[y.key]) : !S.images[x.key]);
     if (idx < 0) break;
-    try { const cf = await cleaned(f); if (grid) { const parts = await splitSheet(cf); for (let i = 0; i < list[idx].slots.length; i++) await setImage(list[idx].slots[i].key, parts[i]); } else await setImage(list[idx].key, cf); done++; } catch (_) {}
+    try { const cf = await cleaned(f); if (grid) { const parts = await splitSheet(cf, perSheet(), idx); for (let i = 0; i < list[idx].slots.length; i++) await setImage(list[idx].slots[i].key, parts[i]); } else await setImage(list[idx].key, cf); done++; } catch (_) {}
   }
   renderSlots(); drawPreview(); toast(`${done} ${grid ? 'sheets' : 'pictures'} added`);
 }
@@ -3609,7 +3775,7 @@ async function openProject(file) {
 }
 async function restore(p) {
   pause(); S.settings = migrateSettings({ ...DEFAULTS, ...(p.settings || {}) }, (p.settings || {}).sv); S.script = p.script || ''; S.segments = p.segments || []; S.starts = p.starts || []; S.timing = p.timing || 'auto'; S.srtCues = p.srtCues || null;
-  S.shots = p.shots || []; S.assets = p.assets || []; S.yt = p.yt || null; if (window.renderYT && curTab === 'yt') setTimeout(renderYT, 0); S.images = p.images || {}; S.uid = Math.max(p.uid || 1, 1 + Math.max(0, ...S.segments.map(s => +s.id || 0), ...S.shots.map(s => +s.id || 0)));
+  S.shots = p.shots || []; S.assets = p.assets || []; S.yt = p.yt || null; if (window.renderYT && curTab === 'yt') setTimeout(renderYT, 0); S.images = p.images || {}; S.sheetCuts = p.sheetCuts || {}; S.uid = Math.max(p.uid || 1, 1 + Math.max(0, ...S.segments.map(s => +s.id || 0), ...S.shots.map(s => +s.id || 0)));
   applySettingsToUI(); $('#script').value = S.script; showWords();
   audioBuf = null; analysis = null; if (vo.src) { URL.revokeObjectURL(vo.src); vo.removeAttribute('src'); vo.load(); } $('#voDrop').classList.remove('has'); $('#voInfo').textContent = 'MP3 / WAV / M4A — tap or drop';
   if (p.audioBlob) await setVoice(p.audioBlob, p.audioName); S.starts = p.starts || S.starts;
@@ -3743,6 +3909,7 @@ function ytLangName() {
   return 'English';
 }
 function ytStyle() {
+  if (isMyth()) return 'the same look as the video: dark warm temple background with a glowing golden mandala, a cinematic Indian mythology painting of the main character with a golden divine aura, ornate gold frame accents, gold engraved Hindi title text with a dark glow';
   return isMod()
     ? 'the same look as the video: modern editorial paper collage on clean white crumpled paper, black-and-white halftone photo cut-outs with ONE bright red-orange object, big pastel green and pink circles, green tape strips, bold black sans-serif text'
     : S.settings.mode === 'collage'
@@ -4051,6 +4218,63 @@ $('#gemAll').onclick = async () => {
   if (typeof renderSlots === 'function') renderSlots(); redraw(); toast(n ? `Gemini ✦ removed from ${n} picture${n > 1 ? 's' : ''}` : 'No Gemini ✦ found in the pictures');
 };
 window.VoxExtras = ({ projectIssues, findShorts, exportShort, thDraw, thFill, drawHook, hookText, hookPics, DEPTH, makeMask });
+</script>
+<script>
+/* Vox Studio — FIX CUTS: see how a picture sheet was cut and move the cut lines by hand. */
+'use strict';
+function renderSheetTools() {
+  const box = $('#sheetTools'); if (!box) return;
+  if (+S.settings.perImage <= 1) { box.innerHTML = ''; return; }
+  const list = sheets().filter(sh => S.images['SHEET:' + sh.k]);
+  box.innerHTML = list.length ? `<span class="muted" style="align-self:center">Pictures look cut wrong? </span>` + list.map(sh => `<button class="btn small" data-fixcut="${sh.k}">✂️ Fix cuts · sheet ${sh.k + 1}</button>`).join('') : '';
+  box.querySelectorAll('[data-fixcut]').forEach(b => b.onclick = () => openCutEditor(+b.dataset.fixcut));
+}
+function openCutEditor(k) {
+  const src = R.img['SHEET:' + k]; if (!src) return toast('This sheet was added with an older version: paste it again once, then you can fix its cuts');
+  const n = perSheet(); let g = JSON.parse(JSON.stringify(S.sheetCuts && S.sheetCuts[k] && S.sheetCuts[k].cols ? S.sheetCuts[k] : bestGrid(src, n))), trim = true, drag = null;
+  const ov = document.createElement('div'); ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(10,10,12,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:12px;touch-action:none';
+  ov.innerHTML = `<div style="color:#fff;font:600 15px system-ui;text-align:center;max-width:720px">Sheet ${k + 1}: drag the <b style="color:#ffd84a">yellow lines</b> into the white gaps between the pictures, and the <b style="color:#5ee3ff">blue edges</b> to the outer border. Numbers = which picture goes where.</div>
+    <canvas style="max-width:94vw;max-height:66vh;border-radius:8px;background:#222;cursor:grab"></canvas>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center">
+      <button class="btn small" data-a="swap">⇄ Layout ${g.cols}×${g.rows}</button><button class="btn small" data-a="auto">Auto find</button><button class="btn small" data-a="even">Even grid</button>
+      <label style="color:#fff;font:14px system-ui;display:flex;align-items:center;gap:6px"><input type="checkbox" data-a="trim" checked> Trim white edges</label>
+      <button class="btn small" data-a="cancel" style="background:#444;color:#fff">Cancel</button><button class="btn small primary" data-a="apply">Apply cuts</button></div>`;
+  document.body.appendChild(ov);
+  const c = ov.querySelector('canvas'), x = c.getContext('2d'), sc = Math.min(1, 1600 / Math.max(src.width, src.height)); c.width = Math.round(src.width * sc); c.height = Math.round(src.height * sc);
+  const W = c.width, H = c.height, lw = Math.max(2, W / 400);
+  const even = (cols, rows) => ({ cols, rows, ys: Array.from({ length: rows + 1 }, (_, i) => i / rows), xs: Array.from({ length: rows }, () => Array.from({ length: cols + 1 }, (_, i) => i / cols)) });
+  function draw() {
+    x.drawImage(src, 0, 0, W, H); x.fillStyle = 'rgba(0,0,0,0.35)';
+    const Y = g.ys.map(v => v * H); x.fillRect(0, 0, W, Y[0]); x.fillRect(0, Y[g.rows], W, H - Y[g.rows]);
+    for (let r = 0; r < g.rows; r++) { const X = g.xs[r].map(v => v * W); x.fillRect(0, Y[r], X[0], Y[r + 1] - Y[r]); x.fillRect(X[g.cols], Y[r], W - X[g.cols], Y[r + 1] - Y[r]);
+      for (let i = 0; i <= g.cols; i++) { x.strokeStyle = i === 0 || i === g.cols ? '#5ee3ff' : '#ffd84a'; x.lineWidth = lw * 1.6; x.beginPath(); x.moveTo(X[i], Y[r]); x.lineTo(X[i], Y[r + 1]); x.stroke(); }
+      for (let i = 0; i < g.cols; i++) { const cx = (X[i] + X[i + 1]) / 2, cy = (Y[r] + Y[r + 1]) / 2, z = Math.max(18, W / 26); x.fillStyle = 'rgba(0,0,0,0.6)'; x.beginPath(); x.arc(cx, cy, z * 0.8, 0, 6.283); x.fill(); x.fillStyle = '#fff'; x.font = `800 ${z}px system-ui`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(String(r * g.cols + i + 1), cx, cy); } }
+    for (let i = 0; i <= g.rows; i++) { x.strokeStyle = i === 0 || i === g.rows ? '#5ee3ff' : '#ffd84a'; x.lineWidth = lw * 1.6; x.beginPath(); x.moveTo(0, Y[i]); x.lineTo(W, Y[i]); x.stroke(); }
+    ov.querySelector('[data-a="swap"]').textContent = `⇄ Layout ${g.cols}×${g.rows}`;
+  }
+  const pos = e => { const b = c.getBoundingClientRect(); return { px: (e.clientX - b.left) / b.width * W, py: (e.clientY - b.top) / b.height * H }; };
+  c.onpointerdown = e => { const { px, py } = pos(e), tol = W / 40; let best = null;
+    g.ys.forEach((v, i) => { const d = Math.abs(py - v * H); if (d < tol && (!best || d < best.d)) best = { d, t: 'y', i }; });
+    for (let r = 0; r < g.rows; r++) if (py >= g.ys[r] * H - tol && py <= g.ys[r + 1] * H + tol) g.xs[r].forEach((v, i) => { const d = Math.abs(px - v * W); if (d < tol && (!best || d < best.d - 2)) best = { d, t: 'x', r, i }; });
+    if (best) { drag = best; c.setPointerCapture(e.pointerId); c.style.cursor = 'grabbing'; } };
+  c.onpointermove = e => { if (!drag) return; const { px, py } = pos(e), m = 0.03;
+    if (drag.t === 'y') { const a = drag.i ? g.ys[drag.i - 1] + m : 0, b = drag.i < g.rows ? g.ys[drag.i + 1] - m : 1; g.ys[drag.i] = clamp(py / H, a, b); }
+    else { const L = g.xs[drag.r], a = drag.i ? L[drag.i - 1] + m : 0, b = drag.i < g.cols ? L[drag.i + 1] - m : 1; L[drag.i] = clamp(px / W, a, b); }
+    draw(); };
+  c.onpointerup = () => { drag = null; c.style.cursor = 'grab'; };
+  ov.onclick = async e => { const a = e.target.dataset && e.target.dataset.a; if (!a) return;
+    if (a === 'trim') { trim = e.target.checked; return; }
+    if (a === 'cancel') { ov.remove(); return; }
+    if (a === 'swap') { g = n === 6 || n === 2 ? gridCuts(src, g.rows, g.cols) : g; draw(); return; }
+    if (a === 'auto') { g = gridCuts(src, g.cols, g.rows); draw(); return; }
+    if (a === 'even') { g = even(g.cols, g.rows); draw(); return; }
+    if (a === 'apply') { const sh = sheets()[k]; if (!sh) return ov.remove(); e.target.disabled = true; e.target.textContent = 'Cutting…';
+      try { const full = await createImageBitmap(S.images['SHEET:' + k]), parts = await cutCells(full, g, trim); full.close && full.close(); for (let i = 0; i < sh.slots.length; i++) if (parts[i]) await setImage(sh.slots[i].key, parts[i]); S.sheetCuts = S.sheetCuts || {}; S.sheetCuts[k] = { cols: g.cols, rows: g.rows, ys: g.ys, xs: g.xs, n }; save(); }
+      catch (err) { toast('Could not cut: ' + err.message); }
+      ov.remove(); renderSlots(); drawPreview(); toast(`Sheet ${k + 1} cut again`); } };
+  draw();
+}
+window.renderSheetTools = renderSheetTools;
 </script>
 </body>
 </html>
