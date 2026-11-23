@@ -4747,14 +4747,15 @@ Kuber ne Lanka kaise khoyi?
 Arjun aur Hanuman ka mukabla: dhwaj par Hanuman kyun?
 Krishna ki Dwarka samudra mein kaise doobi?
 Pandavon ki swarg yatra: sirf Yudhishthira kyun pahuche?`;
-const AP_ART = 'Simple hand-drawn stickman illustration for an Indian mythology story: clean bold black ink lines on a plain white background. Every character is a stickman with a perfectly round white head, a simple expressive face (dot eyes, eyebrows, mouth) and thin line limbs, told apart only by their costume: traditional ancient Indian clothes (dhoti, angavastram, sari), crowns, jewellery and weapons. Flat accent colours (gold, saffron, red, blue) only on costumes and key objects; no gradients, no realistic shading, no 3D. Ancient settings only: palaces, courts, forests, rivers, battlefields.';
+const AP_ART_OLD = 'Simple hand-drawn stickman illustration for an Indian mythology story: clean bold black ink lines on a plain white background. Every character is a stickman with a perfectly round white head, a simple expressive face (dot eyes, eyebrows, mouth) and thin line limbs, told apart only by their costume: traditional ancient Indian clothes (dhoti, angavastram, sari), crowns, jewellery and weapons. Flat accent colours (gold, saffron, red, blue) only on costumes and key objects; no gradients, no realistic shading, no 3D. Ancient settings only: palaces, courts, forests, rivers, battlefields.';
+const AP_ART = 'Cute cartoon illustration for an Indian mythology story, in exactly the same style in every picture: chibi-like characters with big expressive eyes, soft rounded faces and slightly large heads, clean bold black outlines, flat bright colours with light soft shading. Traditional ancient Indian clothes (dhoti, angavastram, sari), crowns, jewellery and weapons in rich gold, saffron, red and blue. Simple clean backgrounds of ancient settings: palaces, courts, forests, rivers, battlefields. No photorealism, no 3D render, no stickman, no text.';
 const AP_DEF = { art: AP_ART, chars: true, vmode: 'grid', writer: 'gemini', model: 'claude-opus-5-5', len: 8, lang: 'hinglish', channel: '', check: true,
   ttsModel: 'gemini-2.5-pro-preview-tts', voice: 'Orus', style: 'Promo/Hype', pace: 'Natural', accent: 'Neutral',
   img: 'flow', imgFallback: true, publish: '17:00', cat: '27', approve: true, comment: true, start: '13:00', daily: false };
 const AP = { claudeKey: '', s: { ...AP_DEF }, topics: [], log: [] };
 let apRunning = false, apStopFlag = false, apApproveWait = null;
 const apSave = () => DB.put('autopilot', { claudeKey: AP.claudeKey, s: AP.s, topics: AP.topics, log: AP.log.slice(-300) }).catch(() => {});
-async function apLoad() { try { const v = await DB.get('autopilot'); if (v) { AP.claudeKey = v.claudeKey || ''; AP.s = { ...AP_DEF, ...(v.s || {}) }; AP.topics = v.topics || []; AP.log = v.log || []; } } catch (_) {} }
+async function apLoad() { try { const v = await DB.get('autopilot'); if (v) { AP.claudeKey = v.claudeKey || ''; AP.s = { ...AP_DEF, ...(v.s || {}) }; if (!AP.s.art || AP.s.art.trim() === AP_ART_OLD) AP.s.art = AP_ART; /* the old default style becomes the new one */ AP.topics = v.topics || []; AP.log = v.log || []; } } catch (_) {} }
 const apNext = () => AP.topics.find(t => t.s !== 'done');
 function apLog(msg, keep = true) {
   const line = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '  ' + msg;
@@ -5019,6 +5020,9 @@ async function apGeminiImage(prompt, aspect) {
   if (!d) throw new Error('Gemini sent no picture');
   return new Blob([Uint8Array.from(atob(d.data), c => c.charCodeAt(0))], { type: d.mimeType || d.mime_type });
 }
+// the app's own prompts say "stickman"; with a non-stickman art style they must not
+const apIsStick = () => /stick ?man/i.test(S.settings.styleText || '') && !/no stickman/i.test(S.settings.styleText || '');
+const apNoStick = t => apIsStick() ? t : t.replace(/stick ?man|stick figures?/gi, 'cartoon character').replace(/cartoon character (story|animation)/gi, 'cartoon $1');
 const AP_WPM = 162;   // Gemini's narrator: about 2.7 words a second (measured in the first videos)
 const AP_DIRECTOR_RULE = '\n\nSETTING: ancient India. Do not show modern things (TV, phones, computers, glasses, modern rooms or clothes) unless the narration line itself talks about today or the viewer. Use the characters exactly as listed above.';
 function apCastPrompt() {
@@ -5116,7 +5120,7 @@ function apLangRule() {
 }
 function apScriptPrompt(topic) {
   const min = +AP.s.len || 8, words = min * AP_WPM;
-  return `You are the scriptwriter of a Hindi YouTube channel about Indian mythology${AP.s.channel ? ` called "${AP.s.channel}"` : ''} (narrated stickman animation, one narrator voice).
+  return `You are the scriptwriter of a Hindi YouTube channel about Indian mythology${AP.s.channel ? ` called "${AP.s.channel}"` : ''} (narrated ${apIsStick() ? 'stickman' : 'cartoon'} animation, one narrator voice).
 Write the complete voiceover script for the video: "${topic}".
 
 LENGTH: about ${min} minutes = about ${words} words (the narrator speaks about ${AP_WPM} words per minute). Stay within ±10%; never shorter.
@@ -5269,7 +5273,7 @@ async function apRun(trigger) {
       }
       apLog(`4/9 Gemini is describing the pictures for ${S.segments.length} scenes…`); P(0.24);
       try {
-        const txt = await apGemText(directorPrompt() + AP_DIRECTOR_RULE, { temperature: 0.7, maxOutputTokens: 16000 }, 'flash', 'Scenes');
+        const txt = await apGemText(apNoStick(directorPrompt()) + AP_DIRECTOR_RULE, { temperature: 0.7, maxOutputTokens: 16000 }, 'flash', 'Scenes');
         let c = 0;
         txt.split('\n').forEach(l => { const mm = l.match(/^\s*(?:scene\s*)?(\d+)\s*[:.)\-–]\s*(.+)$/i); if (mm) { const k = +mm[1] - 1; if (S.segments[k]) { S.segments[k].visual = mm[2].trim().replace(/^["']|["']$/g, ''); c++; } } });
         apLog(`Picture descriptions for ${c} of ${S.segments.length} scenes`); renderScenes(); renderPrompts(); save();
@@ -5291,7 +5295,7 @@ async function apRun(trigger) {
     apLog('6/9 Making the background music…'); P(0.7); try { await amMake(false); } catch (e) { apLog('Music skipped: ' + e.message); }
 
     apLog('7/9 Writing the YouTube kit…'); P(0.72);
-    try { ytApply(lParseJSON(await apGemText(ytPrompt(), { responseMimeType: 'application/json', temperature: 0.8 }, 'flash', 'YouTube kit'))); }
+    try { ytApply(lParseJSON(await apGemText(apNoStick(ytPrompt()), { responseMimeType: 'application/json', temperature: 0.8 }, 'flash', 'YouTube kit'))); }
     catch (e) { apLog('Kit by Gemini failed (' + e.message + '), using the quick kit'); ytQuick(); }
     if (AP.s.channel && !S.settings.ytChannel) S.settings.ytChannel = AP.s.channel;
     let thumb = null;
