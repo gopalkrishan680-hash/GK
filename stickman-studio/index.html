@@ -4916,16 +4916,46 @@ function apWav(pcm, rate) {
   v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
   new Int16Array(b, 44).set(pcm); return new Blob([b], { type: 'audio/wav' });
 }
-// Only a short style line: a long English instruction gets read out loud by the TTS model
+// Style goes in a "director's notes" block and only the TRANSCRIPT part is meant to be spoken
+// (a plain English instruction in front of the text was read out loud)
 function apTtsText(chunk) {
   const low = v => String(v || '').trim().toLowerCase();
-  return `Say in an energetic ${low(AP.s.style) || 'promo/hype'} narrator voice, ${low(AP.s.pace) || 'natural'} pace, ${low(AP.s.accent) || 'neutral'} accent:\n${chunk}`;
+  const lang = AP.s.lang === 'english' ? 'English' : AP.s.lang === 'hindi' ? 'Hindi' : 'Hindi (the transcript is Hindi written in Roman letters)';
+  return `### DIRECTOR'S NOTES
+Speak only the transcript below, in ${lang}, as one narrator. Style: ${low(AP.s.style) || 'promo/hype'}, energetic and gripping. Pace: ${low(AP.s.pace) || 'natural'}. Accent: ${low(AP.s.accent) || 'neutral'}. Never read these notes aloud.
+
+### TRANSCRIPT
+${chunk}`;
+}
+const apBadAudio = new Set();
+/* Listens to one voice part with a Gemini text model and says whether it matches the script part */
+async function apVoiceCheck(pcm, rate, text) {
+  const n = pcm.length, b = new ArrayBuffer(44 + n * 2), v = new DataView(b);
+  const w = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+  new Int16Array(b, 44).set(pcm);
+  const u8 = new Uint8Array(b); let bin = ''; for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+  const prompt = `The audio should be a narrator reading exactly this script part (Hindi/Hinglish written in Roman letters):
+"""${text}"""
+Listen and compare. Ignore accent, pronunciation and tiny word changes. Answer ONLY JSON: {"ok": true|false, "issue": "short reason"}.
+ok is false if any sentence is missing, any sentence is spoken twice, or anything is spoken that is not in the script (for example instructions or notes in English).`;
+  const ver = s => { const m = s.match(/(\d+(?:\.\d+)?)/); return m ? +m[1] : 0; };
+  const models = (await apModels()).filter(n => /^gemini/i.test(n) && /flash/i.test(n) && !/tts|image|embed|live|native|lite/i.test(n) && !apBadAudio.has(n)).sort((a, b) => ver(b) - ver(a));
+  for (const m of models) {
+    try {
+      const j = await apGem(`/models/${m}:generateContent`, { contents: [{ role: 'user', parts: [{ inlineData: { mimeType: 'audio/wav', data: btoa(bin) } }, { text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0 } }, 180);
+      const r = lParseJSON(lGemText(j));
+      return { ok: r.ok !== false, issue: String(r.issue || '') };
+    } catch (e) { if (apStopFlag) throw e; apBadAudio.add(m); }   // own list: a model that cannot listen may still write
+  }
+  return null;   // no model could check: keep the length check only
 }
 async function apTTS(script, onPart) {
   const chunks = apChunks(script), models = await apTtsModels();
   if (!models.length) throw new Error('This Gemini key has no TTS model');
   let mi = 0, rate = 24000; const parts = [];
-  let doneWords = 0, doneSecs = 0;   // speaking speed of the good parts so far
+  let checks = true;   // turned off if no Gemini model can listen to audio
   const words = t => t.split(/\s+/).filter(Boolean).length;
   const once = async (text) => {
     const body = { contents: [{ role: 'user', parts: [{ text: apTtsText(text) }] }], generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: AP.s.voice || 'Orus' } } } } };
@@ -4947,20 +4977,26 @@ async function apTTS(script, onPart) {
     apCheckStop(); onPart && onPart(i, chunks.length, models[mi]);
     // a part much longer than its words means the model repeated lines or read something extra;
     // much shorter means it skipped some: make it again (up to 3 tries) and keep the closest one
-    const w = words(chunks[i]), wps = doneSecs > 20 ? doneWords / doneSecs : 2.5;
-    const tight = doneSecs > 20, lo = tight ? 0.62 : 0.45, hi = tight ? 1.35 : 1.8;
-    let best = null, bestErr = Infinity;
-    for (let t = 0; t < 3; t++) {
+    // the narrator speaks about 2.7 words a second; a part far off that, or one that does not match
+    // the script when Gemini listens to it (missing, repeated or extra lines), is made again
+    const w = words(chunks[i]), wps = 2.7;
+    let best = null, bestErr = Infinity, good = false;
+    for (let t = 0; t < 4 && !good; t++) {
       const pcm = await once(chunks[i]); if (!pcm) continue;
-      const secs = pcm.length / rate, ratio = secs / (w / wps + 0.8);
-      const err = Math.abs(Math.log(ratio));
-      if (err < bestErr) { best = pcm; bestErr = err; }
-      if (ratio >= lo && ratio <= hi) break;
-      apLog(`Voice part ${i + 1}: ${secs.toFixed(1)} s for ${w} words looks wrong (${ratio < lo ? 'too short' : 'too long: repeated or extra words'}), making it again`);
+      const secs = pcm.length / rate, ratio = secs / (w / wps + 0.8), err = Math.abs(Math.log(ratio));
+      if (ratio < 0.55 || ratio > 1.5) {
+        if (err < bestErr) { best = pcm; bestErr = err; }
+        apLog(`Voice part ${i + 1}: ${secs.toFixed(1)} s for ${w} words (${ratio < 0.55 ? 'too short' : 'too long'}), making it again`);
+        continue;
+      }
+      let verdict = null;
+      if (checks) { verdict = await apVoiceCheck(pcm, rate, chunks[i]); if (!verdict) { checks = false; apLog('Voice check: no Gemini model can listen to audio with this key; only the length is checked'); } }
+      if (!verdict || verdict.ok) { best = pcm; good = true; break; }
+      if (err < bestErr || !best) { best = pcm; bestErr = err; }
+      apLog(`Voice part ${i + 1} does not match the script (${verdict.issue || 'missing or repeated lines'}), making it again`);
     }
     if (!best) throw new Error(`no audio came back for part ${i + 1}`);
-    if (bestErr > Math.log(1.6)) apLog(`Voice part ${i + 1} is still off after 3 tries; check it in the video`);
-    else { doneWords += w; doneSecs += best.length / rate; }
+    if (!good) apLog(`Voice part ${i + 1} is still not right after 4 tries; check it in the video`);
     parts.push(best);
     parts.push(new Int16Array(Math.round(rate * 0.35)));   // short breath between parts
   }
@@ -4983,6 +5019,7 @@ async function apGeminiImage(prompt, aspect) {
   if (!d) throw new Error('Gemini sent no picture');
   return new Blob([Uint8Array.from(atob(d.data), c => c.charCodeAt(0))], { type: d.mimeType || d.mime_type });
 }
+const AP_WPM = 162;   // Gemini's narrator: about 2.7 words a second (measured in the first videos)
 const AP_DIRECTOR_RULE = '\n\nSETTING: ancient India. Do not show modern things (TV, phones, computers, glasses, modern rooms or clothes) unless the narration line itself talks about today or the viewer. Use the characters exactly as listed above.';
 function apCastPrompt() {
   return `Below is the narration script of an Indian mythology video. List the main characters that will be shown in the pictures (at most 8).
@@ -5078,11 +5115,11 @@ function apLangRule() {
     : 'Hinglish: Hindi written in Roman (English) letters, the way people type on WhatsApp — e.g. "Karna jaanta tha ki woh galat taraf hai". No Devanagari.';
 }
 function apScriptPrompt(topic) {
-  const min = +AP.s.len || 8, words = min * 140;
+  const min = +AP.s.len || 8, words = min * AP_WPM;
   return `You are the scriptwriter of a Hindi YouTube channel about Indian mythology${AP.s.channel ? ` called "${AP.s.channel}"` : ''} (narrated stickman animation, one narrator voice).
 Write the complete voiceover script for the video: "${topic}".
 
-LENGTH: about ${min} minutes = about ${words} words (narration at ~140 words per minute). Stay within ±10%.
+LENGTH: about ${min} minutes = about ${words} words (the narrator speaks about ${AP_WPM} words per minute). Stay within ±10%; never shorter.
 LANGUAGE: ${apLangRule()} Conversational, like a gripping storyteller talking to friends — not a textbook.
 
 STRUCTURE (5 steps; do NOT write the step names or any headings):
@@ -5099,6 +5136,14 @@ RULES
 - No stage directions, no [music], no emojis, no headings, no bullet points, no word counts, no notes.
 
 OUTPUT: only the narration, in plain paragraphs with one blank line between paragraphs.`;
+}
+function apExpandPrompt(topic, script, words) {
+  return `Below is the narration script for the Indian mythology video "${topic}". It is too short: it has about ${script.split(/\s+/).length} words but must have about ${words} words (${Math.round(words / AP_WPM)} minutes).
+Rewrite it to about ${words} words. Keep the same language and script (${apLangRule()}), the same hook, the same 5-step order and the same ending question. Add depth, not filler: more of the story events in order, short dialogues, emotions, what the scriptures say (name the text and Parva/Kanda), where versions differ, and why it matters today. Never invent verses or quotes. Do not repeat sentences.
+Return ONLY the full script in plain paragraphs, nothing else.
+
+SCRIPT:
+${script}`;
 }
 function apCheckPrompt(topic, script) {
   return `You are a careful editor for an Indian mythology YouTube channel. Below is the narration script for the video "${topic}".
@@ -5178,8 +5223,14 @@ async function apRun(trigger) {
     const who = AP.s.writer === 'claude' ? 'Claude' : 'Gemini';
     apLog(`1/9 ${who} is writing the script…`); P(0.03);
     let script = apClean(await apWrite(apScriptPrompt(topic.t)));
-    apLog(`Script: ${script.split(/\s+/).length} words`);
-    if (AP.s.check) { apLog(`2/9 ${who} is checking the facts…`); P(0.08); const fixed = apClean(await apWrite(apCheckPrompt(topic.t, script))); if (fixed.split(/\s+/).length > script.split(/\s+/).length * 0.6) script = fixed; }
+    const target = (+AP.s.len || 8) * AP_WPM, wc = t => t.split(/\s+/).filter(Boolean).length;
+    for (let k = 0; k < 2 && wc(script) < target * 0.85; k++) {
+      apLog(`Script has ${wc(script)} words, needs about ${target}: making it longer…`);
+      const longer = apClean(await apWrite(apExpandPrompt(topic.t, script, target)));
+      if (wc(longer) > wc(script)) script = longer;
+    }
+    apLog(`Script: ${wc(script)} words (~${(wc(script) / AP_WPM).toFixed(1)} min)`);
+    if (AP.s.check) { apLog(`2/9 ${who} is checking the facts…`); P(0.08); const fixed = apClean(await apWrite(apCheckPrompt(topic.t, script))); if (wc(fixed) >= wc(script) * 0.9) script = fixed; else apLog('Fact check made the script much shorter; keeping the full script'); }
     S.script = script; $('#script').value = script; save();
 
     apLog('3/9 Gemini is speaking the voiceover…'); P(0.12);
