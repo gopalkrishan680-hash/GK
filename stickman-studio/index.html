@@ -761,6 +761,8 @@ html:not(.mode-layers) .layers-only { display: none !important; }
     <div class="panel">
       <h3>🖼 Pictures and thumbnail</h3>
       <label class="f">Video style<select id="apVmode"><option value="grid">Grid images: one full picture per scene (3×3 grid sheets)</option><option value="layers">Layered explainer: paper cut-outs and keywords</option></select></label>
+      <label class="f">Art style (the same in every picture of every video)<textarea id="apArt" rows="4"></textarea></label>
+      <label class="row"><input type="checkbox" id="apChars"> Same look for every character (a character list is made from each script)</label>
       <label class="f">Make the pictures with<select id="apImg"><option value="flow">Flow app on this phone (automatic, no key)</option><option value="gemini">Gemini API (Gemini key)</option></select></label>
       <label class="row"><input type="checkbox" id="apImgFallback"> If Flow fails, use Gemini instead</label>
       <div id="apFlowBox" class="ap-sub">
@@ -4745,7 +4747,8 @@ Kuber ne Lanka kaise khoyi?
 Arjun aur Hanuman ka mukabla: dhwaj par Hanuman kyun?
 Krishna ki Dwarka samudra mein kaise doobi?
 Pandavon ki swarg yatra: sirf Yudhishthira kyun pahuche?`;
-const AP_DEF = { vmode: 'grid', writer: 'gemini', model: 'claude-opus-5-5', len: 8, lang: 'hinglish', channel: '', check: true,
+const AP_ART = 'Simple hand-drawn stickman illustration for an Indian mythology story: clean bold black ink lines on a plain white background. Every character is a stickman with a perfectly round white head, a simple expressive face (dot eyes, eyebrows, mouth) and thin line limbs, told apart only by their costume: traditional ancient Indian clothes (dhoti, angavastram, sari), crowns, jewellery and weapons. Flat accent colours (gold, saffron, red, blue) only on costumes and key objects; no gradients, no realistic shading, no 3D. Ancient settings only: palaces, courts, forests, rivers, battlefields.';
+const AP_DEF = { art: AP_ART, chars: true, vmode: 'grid', writer: 'gemini', model: 'claude-opus-5-5', len: 8, lang: 'hinglish', channel: '', check: true,
   ttsModel: 'gemini-2.5-pro-preview-tts', voice: 'Orus', style: 'Promo/Hype', pace: 'Natural', accent: 'Neutral',
   img: 'flow', imgFallback: true, publish: '17:00', cat: '27', approve: true, comment: true, start: '13:00', daily: false };
 const AP = { claudeKey: '', s: { ...AP_DEF }, topics: [], log: [] };
@@ -4791,7 +4794,7 @@ $('#apTopics').addEventListener('click', e => {
 });
 
 /* ---- settings UI ---- */
-const AP_BIND = { apVmode: 'vmode', apWriter: 'writer', apModel: 'model', apLen: 'len', apLang: 'lang', apChannel: 'channel', apCheck: 'check', apTtsModel: 'ttsModel', apVoice: 'voice', apStyle: 'style', apPace: 'pace', apAccent: 'accent',
+const AP_BIND = { apArt: 'art', apChars: 'chars', apVmode: 'vmode', apWriter: 'writer', apModel: 'model', apLen: 'len', apLang: 'lang', apChannel: 'channel', apCheck: 'check', apTtsModel: 'ttsModel', apVoice: 'voice', apStyle: 'style', apPace: 'pace', apAccent: 'accent',
   apImg: 'img', apImgFallback: 'imgFallback', apPublish: 'publish', apCat: 'cat', apApproveOn: 'approve', apComment: 'comment', apStart: 'start', apDaily: 'daily' };
 function apShow() {
   for (const [id, k] of Object.entries(AP_BIND)) { const el = $('#' + id); if (el.type === 'checkbox') el.checked = !!AP.s[k]; else el.value = AP.s[k]; }
@@ -4895,7 +4898,7 @@ async function apTtsModels() {
   const pro = all.filter(n => /pro/i.test(n)).sort((a, b) => ver(b) - ver(a)), flash = all.filter(n => /flash/i.test(n)).sort((a, b) => ver(b) - ver(a));
   return [...new Set([want, ...pro, ...flash].filter(Boolean))];
 }
-function apChunks(text, max = 1100) {
+function apChunks(text, max = 450) {
   const paras = text.split(/\n\s*\n/).map(p => p.replace(/\s+/g, ' ').trim()).filter(Boolean), out = [];
   let cur = '';
   const push = s => { if (cur && (cur.length + s.length + 1) > max) { out.push(cur); cur = ''; } cur += (cur ? '\n\n' : '') + s; };
@@ -4913,17 +4916,19 @@ function apWav(pcm, rate) {
   v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
   new Int16Array(b, 44).set(pcm); return new Blob([b], { type: 'audio/wav' });
 }
+// Only a short style line: a long English instruction gets read out loud by the TTS model
 function apTtsText(chunk) {
-  const lang = AP.s.lang === 'english' ? 'English' : AP.s.lang === 'hindi' ? 'Hindi' : 'Hinglish (Hindi written in Roman letters; pronounce it as natural spoken Hindi)';
-  return `Read the following narration aloud as one narrator, in ${lang}. Style: ${AP.s.style || 'Promo/Hype'} — energetic, gripping and confident, like a trailer narrator. Pace: ${AP.s.pace || 'Natural'}. Accent: ${AP.s.accent || 'Neutral'}. Read only the narration text:\n\n${chunk}`;
+  const low = v => String(v || '').trim().toLowerCase();
+  return `Say in an energetic ${low(AP.s.style) || 'promo/hype'} narrator voice, ${low(AP.s.pace) || 'natural'} pace, ${low(AP.s.accent) || 'neutral'} accent:\n${chunk}`;
 }
 async function apTTS(script, onPart) {
   const chunks = apChunks(script), models = await apTtsModels();
   if (!models.length) throw new Error('This Gemini key has no TTS model');
   let mi = 0, rate = 24000; const parts = [];
-  for (let i = 0; i < chunks.length; i++) {
-    apCheckStop(); onPart && onPart(i, chunks.length, models[mi]);
-    const body = { contents: [{ role: 'user', parts: [{ text: apTtsText(chunks[i]) }] }], generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: AP.s.voice || 'Orus' } } } } };
+  let doneWords = 0, doneSecs = 0;   // speaking speed of the good parts so far
+  const words = t => t.split(/\s+/).filter(Boolean).length;
+  const once = async (text) => {
+    const body = { contents: [{ role: 'user', parts: [{ text: apTtsText(text) }] }], generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: AP.s.voice || 'Orus' } } } } };
     let j;
     for (;;) {
       try { j = await apGem(`/models/${models[mi]}:generateContent`, body, 300); break; }
@@ -4933,10 +4938,30 @@ async function apTTS(script, onPart) {
       }
     }
     const d = (j.candidates?.[0]?.content?.parts || []).map(p => p.inlineData || p.inline_data).find(x => x && x.data);
-    if (!d) throw new Error(`no audio came back for part ${i + 1}`);
+    if (!d) return null;
     const m = String(d.mimeType || d.mime_type || '').match(/rate=(\d+)/); if (m) rate = +m[1];
     const bin = atob(d.data), u8 = new Uint8Array(bin.length); for (let k = 0; k < bin.length; k++) u8[k] = bin.charCodeAt(k);
-    parts.push(new Int16Array(u8.buffer, 0, u8.length >> 1));
+    return new Int16Array(u8.buffer, 0, u8.length >> 1);
+  };
+  for (let i = 0; i < chunks.length; i++) {
+    apCheckStop(); onPart && onPart(i, chunks.length, models[mi]);
+    // a part much longer than its words means the model repeated lines or read something extra;
+    // much shorter means it skipped some: make it again (up to 3 tries) and keep the closest one
+    const w = words(chunks[i]), wps = doneSecs > 20 ? doneWords / doneSecs : 2.5;
+    const tight = doneSecs > 20, lo = tight ? 0.62 : 0.45, hi = tight ? 1.35 : 1.8;
+    let best = null, bestErr = Infinity;
+    for (let t = 0; t < 3; t++) {
+      const pcm = await once(chunks[i]); if (!pcm) continue;
+      const secs = pcm.length / rate, ratio = secs / (w / wps + 0.8);
+      const err = Math.abs(Math.log(ratio));
+      if (err < bestErr) { best = pcm; bestErr = err; }
+      if (ratio >= lo && ratio <= hi) break;
+      apLog(`Voice part ${i + 1}: ${secs.toFixed(1)} s for ${w} words looks wrong (${ratio < lo ? 'too short' : 'too long: repeated or extra words'}), making it again`);
+    }
+    if (!best) throw new Error(`no audio came back for part ${i + 1}`);
+    if (bestErr > Math.log(1.6)) apLog(`Voice part ${i + 1} is still off after 3 tries; check it in the video`);
+    else { doneWords += w; doneSecs += best.length / rate; }
+    parts.push(best);
     parts.push(new Int16Array(Math.round(rate * 0.35)));   // short breath between parts
   }
   const total = parts.reduce((s, p) => s + p.length, 0), pcm = new Int16Array(total); let o = 0;
@@ -4958,9 +4983,36 @@ async function apGeminiImage(prompt, aspect) {
   if (!d) throw new Error('Gemini sent no picture');
   return new Blob([Uint8Array.from(atob(d.data), c => c.charCodeAt(0))], { type: d.mimeType || d.mime_type });
 }
+const AP_DIRECTOR_RULE = '\n\nSETTING: ancient India. Do not show modern things (TV, phones, computers, glasses, modern rooms or clothes) unless the narration line itself talks about today or the viewer. Use the characters exactly as listed above.';
+function apCastPrompt() {
+  return `Below is the narration script of an Indian mythology video. List the main characters that will be shown in the pictures (at most 8).
+For EACH write ONE line in exactly this form:  Name: look
+The look is at most 30 words and fits this art style: ${(S.settings.styleText || '').trim()}
+Give every character one fixed, easy to recognise costume and colour that stays the same in every picture (for example "Karna: golden armour, sun-shaped gold earrings, saffron dhoti, bow"), headgear or crown, and traditional details where the stories require them (for example "Krishna: blue skin, peacock feather in a gold crown, yellow dhoti, flute"). Keep each character in the art style above. Reply ONLY with the lines, nothing else.
+
+SCRIPT:
+${S.script}`;
+}
+/* Flow puts a small "AI" badge in the bottom right corner of its pictures: paint it out from the pixels around it */
+async function apCleanFlowMark(blob) {
+  try {
+    const bmp = await createImageBitmap(blob), W = bmp.width, H = bmp.height;
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(bmp, 0, 0); try { bmp.close(); } catch (_) {}
+    const x0 = Math.floor(W * 0.932), x1 = Math.ceil(W * 0.982), y0 = Math.floor(H * 0.895), y1 = Math.ceil(H * 0.968);
+    const w = x1 - x0, h = y1 - y0, ww = w + 2, id = x.getImageData(x0 - 1, y0 - 1, ww, h + 2), d = id.data;
+    const px = (xx, yy, k) => d[(yy * ww + xx) * 4 + k];
+    for (let yy = 1; yy <= h; yy++) for (let xx = 1; xx <= w; xx++) {
+      const u = xx / (w + 1), v = yy / (h + 1), o = (yy * ww + xx) * 4;
+      for (let k = 0; k < 3; k++) d[o + k] = ((1 - u) * px(0, yy, k) + u * px(w + 1, yy, k) + (1 - v) * px(xx, 0, k) + v * px(xx, h + 1, k)) / 2;
+    }
+    x.putImageData(id, x0 - 1, y0 - 1);
+    return await new Promise(r => c.toBlob(b => r(b || blob), 'image/png'));
+  } catch (_) { return blob; }
+}
 async function apImage(prompt, aspect, label) {
   if (AP.s.img === 'flow' && APP) {
-    try { return await apFlowImage(prompt + (aspect === '16:9' ? '\n\nLandscape 16:9 picture.' : ''), m => apLog(`${label}: ${m}`, false)); }
+    try { return await apCleanFlowMark(await apFlowImage(prompt + (aspect === '16:9' ? '\n\nLandscape 16:9 picture.' : ''), m => apLog(`${label}: ${m}`, false))); }
     catch (e) {
       if (apStopFlag || !AP.s.imgFallback || !(VP.gemKey || '').trim()) throw e;
       apLog(`${label}: ${e.message} → trying Gemini`);
@@ -5119,7 +5171,8 @@ async function apRun(trigger) {
     apLog(`▶ ${trigger === 'alarm' ? 'Daily run' : 'Run'}: "${topic.t}"`); P(0.01);
     // keep the open project, then start a clean one
     try { await DB.put('project:before-autopilot', snapshot()); } catch (_) {}
-    await restore({ settings: { ...S.settings, title: topic.t, mode: AP.s.vmode === 'layers' ? 'layers' : 'grid' }, script: '', segments: [], starts: [], grids: [], overrides: {} });
+    await restore({ settings: { ...S.settings, title: topic.t, mode: AP.s.vmode === 'layers' ? 'layers' : 'grid',
+      style: 'stickman', styleText: (AP.s.art || AP_ART).trim(), characters: '', fit: 'fill', captions: 'bottom', capWords: 'off', res: 1080 }, script: '', segments: [], starts: [], grids: [], overrides: {} });
     S.yt = null; S.autoMusic = null; amShowPlan();
 
     const who = AP.s.writer === 'claude' ? 'Claude' : 'Gemini';
@@ -5154,9 +5207,18 @@ async function apRun(trigger) {
       if (missing) apLog(`${missing} pictures are still missing (they stay empty in the video)`);
     } else {
       // GRID IMAGES: a short picture description per scene, then one 3×3 grid image per 9 scenes
+      if (AP.s.chars) {
+        apLog('4/9 Gemini is fixing the look of every character…'); P(0.23);
+        try {
+          const cast = await apGemText(apCastPrompt(), { temperature: 0.4, maxOutputTokens: 4000 }, 'flash', 'Characters');
+          S.settings.characters = cast.split('\n').map(l => l.replace(/^[\s*•\-\d.)]+/, '').trim()).filter(l => /^[^:]{2,40}:\s*\S/.test(l)).slice(0, 10).join('\n');
+          if (S.settings.characters) apLog('Characters: ' + S.settings.characters.split('\n').map(l => l.split(':')[0]).join(', '));
+          save();
+        } catch (e) { if (apStopFlag) throw e; apLog('Character list failed (' + e.message + ')'); }
+      }
       apLog(`4/9 Gemini is describing the pictures for ${S.segments.length} scenes…`); P(0.24);
       try {
-        const txt = await apGemText(directorPrompt(), { temperature: 0.7, maxOutputTokens: 16000 }, 'flash', 'Scenes');
+        const txt = await apGemText(directorPrompt() + AP_DIRECTOR_RULE, { temperature: 0.7, maxOutputTokens: 16000 }, 'flash', 'Scenes');
         let c = 0;
         txt.split('\n').forEach(l => { const mm = l.match(/^\s*(?:scene\s*)?(\d+)\s*[:.)\-–]\s*(.+)$/i); if (mm) { const k = +mm[1] - 1; if (S.segments[k]) { S.segments[k].visual = mm[2].trim().replace(/^["']|["']$/g, ''); c++; } } });
         apLog(`Picture descriptions for ${c} of ${S.segments.length} scenes`); renderScenes(); renderPrompts(); save();
