@@ -237,7 +237,7 @@ pre.mono { background: #faf6ec; border: 1px solid var(--line); border-radius: 8p
       <p class="hint">The plan decides what is on screen for every part of the narration: photos, zooms, maps, quotes, numbers, timelines, chapter cards… and writes a picture prompt for each.</p>
       <div class="card style-pick">
         <label class="inline">Video style <select id="mode"><option value="collage">Layered collage (cut-outs, torn paper, tags) — like the reference</option><option value="modern">Modern collage (white paper, B&amp;W + one red-orange part, circles, tape, stop-motion)</option><option value="classic">Classic Vox shots (photo, zoom, map, quote, number…)</option></select></label>
-        <label class="inline">Animations <select id="animVar"><option value="mixed">Mixed (all animations)</option><option value="wild">Wild (more motion)</option><option value="calm">Calm (few, gentle)</option></select></label>
+        <label class="inline">Animations <select id="animVar"><option value="mixed">Mixed (all animations)</option><option value="wild">Wild (more motion)</option><option value="calm">Calm (few, gentle)</option><option value="unique">✨ Unique (bounce, jelly, iris, blinds, tiles, glitch, swirl…)</option></select></label>
       </div>
       <div class="row wrap-row">
         <label class="inline">On-screen text <select id="textLang"><option value="auto">Auto (Hindi script → देवनागरी)</option><option value="hi">Hindi (देवनागरी)</option><option value="en">English</option><option value="hinglish">Hinglish (Roman)</option></select></label>
@@ -342,7 +342,7 @@ pre.mono { background: #faf6ec; border: 1px solid var(--line); border-radius: 8p
           <label>Background <select id="theme"><option value="parchment">Old parchment</option><option value="paper">Paper (cream)</option><option value="graph">Graph paper</option><option value="news">Newsprint (grey)</option><option value="dark">Dark</option><option value="clean">Clean white crumpled paper (modern)</option></select></label>
           <label>Photos <select id="photo"><option value="bw">Black &amp; white print</option><option value="warm">Sepia / warm vintage</option><option value="duo">Duotone (accent colour)</option><option value="color">Original colours</option><option value="spot">B&amp;W halftone + one red-orange part (modern)</option></select></label>
           <label>Accent colour <input type="color" id="accent"></label>
-          <label>Transitions <select id="trans"><option value="auto">Mixed (auto)</option><option value="peel">Page peel</option><option value="tear">Paper tear</option><option value="scatter">Scatter</option><option value="push">Push up</option><option value="zoomthrough">Zoom through</option><option value="slide">Paper slide</option><option value="cut">Cut</option><option value="whip">Whip pan</option><option value="zoom">Zoom</option><option value="drop">Drop</option><option value="fade">Fade</option></select></label>
+          <label>Transitions <select id="trans"><option value="auto">Mixed (auto)</option><option value="peel">Page peel</option><option value="tear">Paper tear</option><option value="scatter">Scatter</option><option value="push">Push up</option><option value="zoomthrough">Zoom through</option><option value="slide">Paper slide</option><option value="cut">Cut</option><option value="whip">Whip pan</option><option value="zoom">Zoom</option><option value="drop">Drop</option><option value="fade">Fade</option><option value="iris">✨ Iris circle</option><option value="blinds">✨ Blinds</option><option value="spin">✨ Spin away</option><option value="flipcard">✨ Card flip</option><option value="glitch">✨ Glitch</option><option value="split">✨ Split open</option><option value="slices">✨ Slices</option><option value="shutter">✨ Shutter</option></select></label>
           <label>Camera motion <input type="range" id="motion" min="0" max="1.6" step="0.1"></label>
           <label>Film grain <input type="range" id="grain" min="0" max="0.15" step="0.01"></label>
           <label>Vignette <select id="vignette"><option value="on">On</option><option value="off">Off</option></select></label>
@@ -352,8 +352,8 @@ pre.mono { background: #faf6ec; border: 1px solid var(--line); border-radius: 8p
           <label>Dust specks <select id="dust"><option value="on">On</option><option value="off">Off</option></select></label>
           <label>Stop-motion feel <select id="stopmo"><option value="on">On (12 fps steps + paper jitter)</option><option value="off">Off (smooth)</option></select></label>
           <label>Channel name (corner) <input id="watermark" placeholder="e.g. Kissa-e-Kyun"></label>
-          <label>Hook intro (first 4 s) <select id="hook"><option value="on">On: fast picture cuts + boom</option><option value="off">Off</option></select></label>
-          <label>Hook text (optional) <input id="hookText" placeholder="Empty = no text, only pictures. Typed text shows after the cuts"></label>
+          <label>Video start <select id="hook"><option value="off">Normal (starts with the first scene)</option><option value="on">Hook: fast picture cuts + boom (first 4 s)</option></select></label>
+          <label>Hook text (optional) <input id="hookText" placeholder="Only used with the Hook start. Empty = no text"></label>
           <label>2.5D depth on pictures <select id="depth"><option value="on">On: the person lifts off the picture (needs internet once)</option><option value="off">Off (flat pictures)</option></select></label>
         </div>
       </div>
@@ -362,6 +362,8 @@ pre.mono { background: #faf6ec; border: 1px solid var(--line); border-radius: 8p
         <div class="form">
           <label>Sound effects <select id="sfx"><option value="on">On (paper, whoosh, marker, pop)</option><option value="off">Off</option></select></label>
           <label>Effects volume <input type="range" id="sfxVol" min="0" max="1" step="0.05"></label>
+          <label>Whoosh volume (transitions) <input type="range" id="whooshVol" min="0" max="1" step="0.05"></label>
+          <label>Ending <select id="endFade"><option value="on">Soft fade-out at the end</option><option value="off">Hard stop</option></select></label>
           <label>Music volume <input type="range" id="musicVol" min="0" max="0.5" step="0.01"></label>
           <label>Music ducking <select id="duck"><option value="on">Quieter while speaking</option><option value="off">Off</option></select></label>
         </div>
@@ -445,6 +447,7 @@ const yieldNow = () => new Promise(r => { const c = new MessageChannel(); c.port
 const easeOutCubic = p => 1 - Math.pow(1 - clamp(p, 0, 1), 3);
 const easeInOut = p => { p = clamp(p, 0, 1); return p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2; };
 const easeOutBack = p => { p = clamp(p, 0, 1); const c1 = 1.4, c3 = c1 + 1; return 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2); };
+const easeOutQuint = p => 1 - Math.pow(1 - clamp(p, 0, 1), 5);
 const prog = (t, a, dur) => clamp((t - a) / Math.max(1e-3, dur), 0, 1);
 function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 function hashStr(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
@@ -490,9 +493,14 @@ const DEFAULTS = {
   title: '', aspect: '16:9', res: TOUCH ? 720 : 1080, fps: 30,
   mode: 'collage', split: 'sentence', pace: 'normal', textLang: 'auto', look: 'sepia', perImage: 6, animVar: 'mixed', decor: 'on', dust: 'on', stopmo: 'off', safe: 'on', gemMark: 'auto', capPos: 'mid', capColor: '#a6ff1a',
   theme: 'parchment', photo: 'warm', grain: 0.05, vignette: 'on', captions: 'words', watermark: '', accent: '#f5d327',
-  trans: 'auto', motion: 1, sfx: 'on', sfxVol: 0.55, musicVol: 0.14, duck: 'on',
-  hook: 'on', hookText: '', depth: 'on', shortEnd: '', shortCaps: 'off'
+  trans: 'auto', motion: 1, sfx: 'on', sfxVol: 0.5, whooshVol: 0.25, musicVol: 0.14, duck: 'on', endFade: 'on', sv: 2,
+  hook: 'off', hookText: '', depth: 'on', shortEnd: '', shortCaps: 'off'
 };
+// projects saved by older versions: the fast-cut hook is no longer on by default, whoosh is quieter
+function migrateSettings(st, savedVer) {
+  if ((+savedVer || 0) < 2) { st.hook = 'off'; st.whooshVol = DEFAULTS.whooshVol; if (st.sfxVol > 0.5) st.sfxVol = 0.5; st.sv = 2; }
+  return st;
+}
 const S = { v: 1, settings: { ...DEFAULTS }, script: '', segments: [], starts: [], timing: 'auto', shots: [], assets: [], images: {}, audioBlob: null, audioName: '', musicBlob: null, musicName: '', uid: 1 };
 const R = { img: {}, filt: new Map(), ver: 1, res: null, paper: new Map(), grain: null, models: null };   // runtime caches
 let audioBuf = null, analysis = null;
@@ -1039,7 +1047,7 @@ function enterOf(sh, k, all) {
     if (pv.exit && pv.exit !== 'auto' && TRANS_DUR[pv.exit] != null) return pv.exit;
     if (sh.enter && sh.enter !== 'auto') return sh.enter;
     if (S.settings.trans !== 'auto') return S.settings.trans;
-    const pool = isMod() ? ['whip', 'push', 'whip', 'slide', 'scatter', 'whip', 'zoomthrough'] : S.settings.animVar === 'calm' ? ['peel', 'slide', 'fade', 'push'] : BOARD_EXITS; let pick = pool[Math.floor(rnd(sh, 5)() * pool.length)];
+    const pool = S.settings.animVar === 'unique' ? NEW_EXITS : isMod() ? ['push', 'iris', 'whip', 'slide', 'split', 'scatter', 'blinds', 'zoomthrough', 'flipcard', 'slices'] : S.settings.animVar === 'calm' ? ['peel', 'slide', 'fade', 'push', 'iris'] : BOARD_EXITS; let pick = pool[Math.floor(rnd(sh, 5)() * pool.length)];
     if (k > 1 && all[k - 1].enter === pick) pick = pool[(pool.indexOf(pick) + 1 + (k % 3)) % pool.length];
     return pick;
   }
@@ -1297,6 +1305,7 @@ function drawFrame(ctx, W, H, t) {
   ctx.restore();
   if (hookOn() && t < HOOK_D) drawHook(ctx, W, H, t);
   overlays(ctx, W, H, t);
+  if (S.settings.endFade !== 'off' && !R.short && S.segments.length) { const D = duration(), q = clamp((t - (D - 0.8)) / 0.8, 0, 1); if (q > 0) { ctx.save(); ctx.fillStyle = `rgba(0,0,0,${(q * q).toFixed(3)})`; ctx.fillRect(0, 0, W, H); ctx.restore(); } }
 }
 function emptyCard(ctx, W, H) {
   const s = Math.min(W, H) / 1080; ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = theme().ink;
@@ -1322,6 +1331,9 @@ function overlays(ctx, W, H, t) {
 }
 
 /* ============ sound effects (made in the app, no files) ============ */
+// whoosh-like sounds (transitions, risers, boom) have their own, low-by-default volume
+const WHOOSHY = new Set(['whoosh', 'riser', 'boom', 'swish']);
+function sfxGain(e) { return +S.settings.sfxVol * e.v * (WHOOSHY.has(e.s) ? +(S.settings.whooshVol ?? 0.25) : 1); }
 let sfxCache = null;
 function sfxEvents() {
   const key = resolve().key + S.settings.sfx + (hookOn() ? 'H' + hookPics().length : '') + (R.noHook ? 'n' : ''); if (sfxCache && sfxCache.key === key) return sfxCache.ev;
@@ -1330,7 +1342,7 @@ function sfxEvents() {
   hookSfx(add);
   for (const o of resolve().shots) {
     const b = o.b, t0 = o.t0, sh = o.sh;
-    if (o.k > 0) add(t0, { slide: 'paper', drop: 'paper', whip: 'whoosh', zoom: 'soft', fade: 'soft', peel: 'rip', tear: 'rip', push: 'whoosh', scatter: 'whoosh', zoomthrough: 'whoosh' }[o.enter] || 'thump', o.enter === 'cut' ? 0.5 : 1);
+    if (o.k > 0) add(t0, { slide: 'paper', drop: 'paper', whip: 'whoosh', zoom: 'soft', fade: 'soft', peel: 'rip', tear: 'rip', push: 'whoosh', scatter: 'whoosh', zoomthrough: 'whoosh', iris: 'soft', blinds: 'paper', spin: 'whoosh', flipcard: 'paper', glitch: 'glitch', split: 'rip', slices: 'swish', shutter: 'paper' }[o.enter] || 'thump', o.enter === 'cut' ? 0.5 : 1);
     if (sh.type === 'collage') { collageSfx(o, add); continue; }
     if (sh.title && ['photo', 'zoom', 'text'].includes(sh.type)) add(t0 + b.tag, 'tick', 0.6);
     switch (sh.type) {
@@ -1355,7 +1367,13 @@ function sfxBank(actx) {
   let lp = 0, lp2 = 0, hp = 0, prevN = 0;
   const bank = {
     paper: buf(0.42, (t) => { const n = noise(); lp += (n - lp) * 0.35; const env = Math.sin(Math.PI * Math.min(1, t / 0.42)) ** 1.5; return (n - lp) * 0.55 * env * (0.7 + 0.3 * Math.sin(t * 90)); }),
-    whoosh: buf(0.5, (t) => { const n = noise(); const f = 0.04 + 0.25 * Math.sin(Math.PI * t / 0.5); lp2 += (n - lp2) * f; return lp2 * 1.6 * Math.sin(Math.PI * t / 0.5) ** 2; }),
+    whoosh: buf(0.5, (t) => { const n = noise(); const f = 0.03 + 0.16 * Math.sin(Math.PI * t / 0.5); lp2 += (n - lp2) * f; return lp2 * 1.0 * Math.sin(Math.PI * t / 0.5) ** 2; }),
+    // short airy swish for a single picture flying in (much lighter than a whoosh)
+    swish: (() => { let a = 0; return buf(0.28, (t) => { const n = noise(); a += (n - a) * (0.08 + 0.3 * t / 0.28); return a * 0.6 * Math.sin(Math.PI * t / 0.28) ** 2; }); })(),
+    // soft cartoon boing for bounce / jelly
+    boing: buf(0.35, (t) => Math.sin(2 * Math.PI * (180 + 90 * Math.sin(t * 38)) * t) * Math.exp(-t * 9) * 0.32),
+    // digital glitch: short bit-crushed buzz bursts
+    glitch: buf(0.22, (t) => { const on = Math.sin(t * 180) > 0 ? 1 : 0.15; return (Math.round(noise() * 3) / 3) * 0.28 * on * (1 - t / 0.22) + Math.sign(Math.sin(2 * Math.PI * 330 * t)) * 0.06 * on * (1 - t / 0.22); }),
     soft: buf(0.6, (t) => { const n = noise(); lp += (n - lp) * 0.05; return lp * 2.2 * Math.sin(Math.PI * t / 0.6) ** 2; }),
     pop: buf(0.12, (t) => Math.sin(2 * Math.PI * (520 - 2400 * t) * t) * Math.exp(-t * 38) * 0.7),
     tick: buf(0.05, (t) => noise() * Math.exp(-t * 160) * 0.5),
@@ -1415,11 +1433,29 @@ const ANIMS = {
   rise:    { d: 0.65, kinds: 'cpst', f: (p, pc, W, H) => { const e = easeOutCubic(p); return { dy: (1 - e) * H * 0.25, alpha: clamp(p * 2, 0, 1) }; } },
   stamp:   { d: 0.35, kinds: 't', f: p => { const k = 1 + 1.3 * Math.pow(1 - easeOutCubic(p), 2); return { sx: k, sy: k, alpha: clamp(p * 4, 0, 1) }; } },
   swing:   { d: 1.3, kinds: 't', f: p => ({ rot: Math.sin(p * Math.PI * 3.2) * 0.5 * Math.pow(1 - p, 1.6), pivotTop: true, alpha: clamp(p * 6, 0, 1), dy: -(1 - easeOutCubic(clamp(p * 3, 0, 1))) * 60 }) },
-  type:    { d: 0.6, kinds: 't', f: p => ({ typeP: p }) }
+  type:    { d: 0.6, kinds: 't', f: p => ({ typeP: p }) },
+  // ---- unique styles ----
+  bounce:  { d: 0.95, kinds: 'cpst', f: (p, pc, W, H) => { if (p < 0.45) { const u = p / 0.45; return { dy: -(1 - u * u) * H * 0.6, sx: 0.9, sy: 1.12, alpha: clamp(p * 8, 0, 1) }; } const u = (p - 0.45) / 0.55, imp = Math.exp(-u * 5) * Math.cos(u * 17); return { dy: -Math.abs(Math.sin(u * Math.PI * 2)) * H * 0.07 * (1 - u), sx: 1 + 0.2 * imp, sy: 1 - 0.2 * imp }; } },
+  jelly:   { d: 0.9, kinds: 'cpst', f: p => { const k = easeOutCubic(clamp(p * 1.6, 0, 1)), w = Math.sin(p * Math.PI * 5) * 0.28 * Math.pow(1 - p, 1.5); return { sx: k * (1 + w), sy: k * (1 - w), alpha: clamp(p * 4, 0, 1) }; } },
+  swirl:   { d: 0.85, kinds: 'cp', f: (p, pc, W, H) => { const e = easeOutCubic(p), a = (1 - e) * Math.PI * 1.6 * (pc.fx < 0 ? -1 : 1), r = (1 - e) * Math.min(W, H) * 0.55, k = 0.25 + 0.75 * e; return { dx: Math.cos(a) * r, dy: Math.sin(a) * r, rot: (1 - e) * 2.2 * (pc.fx < 0 ? -1 : 1), sx: k, sy: k, alpha: clamp(p * 3, 0, 1) }; } },
+  iris:    { d: 0.7, kinds: 'ps', f: p => ({ clip: 'iris', e: easeOutCubic(p) }) },
+  blinds:  { d: 0.8, kinds: 'ps', f: p => ({ clip: 'blinds', e: p }) },
+  curtain: { d: 0.7, kinds: 'ps', f: p => ({ clip: 'curtain', e: easeInOut(p) }) },
+  diamond: { d: 0.7, kinds: 'ps', f: p => ({ clip: 'diamond', e: easeOutCubic(p) }) },
+  tiles:   { d: 0.9, kinds: 'ps', f: p => ({ clip: 'tiles', e: p }) },
+  fold:    { d: 0.75, kinds: 'cps', f: p => { const e = easeOutBack(p); return { sy: Math.max(0.02, e), sx: 1 + 0.06 * (1 - clamp(e, 0, 1)), ky: (1 - clamp(e, 0, 1)) * 0.25, shade: 1 - clamp(p * 1.3, 0, 1) }; } },
+  zip:     { d: 0.55, kinds: 'cpst', f: (p, pc, W) => { const e = easeOutQuint(p), q = 1 - e; return { dx: (pc.fx || -1) * W * 0.65 * q, sx: 1 + 0.9 * q, sy: 1 - 0.3 * q, kx: -(pc.fx || -1) * 0.35 * q, alpha: clamp(p * 5, 0, 1) }; } },
+  tilt:    { d: 0.8, kinds: 'cps', f: p => { const e = easeOutBack(p), q = 1 - clamp(e, 0, 1.1); return { sx: 0.35 + 0.65 * e, ky: q * 0.45, rot: q * -0.2, shade: clamp(q, 0, 1), alpha: clamp(p * 3, 0, 1) }; } },
+  pendulum:{ d: 1.3, kinds: 'cp', f: p => ({ rot: Math.sin(p * Math.PI * 3) * 0.45 * Math.pow(1 - p, 1.7), pivotTop: true, alpha: clamp(p * 6, 0, 1), dy: -(1 - easeOutCubic(clamp(p * 3, 0, 1))) * 80 }) },
+  glitch:  { d: 0.65, kinds: 'cpst', f: p => { const j = p < 0.8 ? 1 - p / 0.8 : 0, n1 = Math.sin(p * 131.7), n2 = Math.sin(p * 77.3 + 1.3); return { dx: (n1 > 0.3 ? 1 : n1 < -0.5 ? -1 : 0) * 38 * j, dy: (n2 > 0.75 ? 10 : 0) * j, sx: 1 + (n2 > 0.4 ? 0.07 : 0) * j, alpha: j && n2 < -0.65 ? 0.2 : clamp(p * 6, 0, 1), rgb: j }; } },
+  slam:    { d: 0.6, kinds: 'cpt', f: p => { const e = easeOutCubic(clamp(p / 0.45, 0, 1)), k = 1 + 1.6 * Math.pow(1 - e, 2), sh = p > 0.45 ? Math.sin((p - 0.45) * 70) * 10 * (1 - p) : 0; return { sx: k, sy: k, dx: sh, dy: sh * 0.6, rot: (1 - e) * 0.15, alpha: clamp(p * 5, 0, 1) }; } },
+  flipup:  { d: 0.65, kinds: 'cpst', f: p => { const e = easeOutBack(p); return { sy: Math.max(0.02, Math.abs(Math.cos((1 - clamp(e, 0, 1.2)) * Math.PI / 2))), shade: 1 - clamp(p * 1.4, 0, 1) }; } }
 };
-const ANIM_POOL = { calm: ['slide', 'pop', 'wipe', 'develop', 'rise'], mixed: Object.keys(ANIMS), wild: Object.keys(ANIMS) };
-const BOARD_EXITS = ['peel', 'slide', 'push', 'tear', 'scatter', 'zoomthrough', 'whip', 'fade', 'drop'];
-const EXIT_DUR = { peel: 0.75, push: 0.55, tear: 0.7, scatter: 0.6, zoomthrough: 0.55 };
+const UNIQUE_ANIMS = ['bounce', 'jelly', 'swirl', 'iris', 'blinds', 'curtain', 'diamond', 'tiles', 'fold', 'zip', 'tilt', 'pendulum', 'glitch', 'slam', 'flipup'];
+const ANIM_POOL = { calm: ['slide', 'pop', 'wipe', 'develop', 'rise', 'iris', 'fold'], mixed: Object.keys(ANIMS), wild: Object.keys(ANIMS), unique: UNIQUE_ANIMS };
+const NEW_EXITS = ['iris', 'blinds', 'spin', 'flipcard', 'glitch', 'split', 'slices', 'shutter'];
+const BOARD_EXITS = ['peel', 'slide', 'push', 'tear', 'scatter', 'zoomthrough', 'whip', 'fade', 'drop', ...NEW_EXITS];
+const EXIT_DUR = { peel: 0.75, push: 0.55, tear: 0.7, scatter: 0.6, zoomthrough: 0.55, iris: 0.7, blinds: 0.7, spin: 0.65, flipcard: 0.7, glitch: 0.45, split: 0.6, slices: 0.7, shutter: 0.65 };
 Object.assign(TRANS_DUR, EXIT_DUR);
 function animFor(it, kindLetter, used, seed) {
   if (it.anim && ANIMS[it.anim] && ANIMS[it.anim].kinds.includes(kindLetter)) return it.anim;
@@ -1555,6 +1591,10 @@ async function splitGrid(blob, cols, rows) {
       const rowW = yy => { let n = 0, m = 0; for (let xx = 0; xx < cw; xx += 3) { n += white(xx, yy); m++; } return n / m > 0.96; };
       let l = 0, r = cw - 1, tp = 0, b = ch - 1;
       while (l < cw * 0.25 && colW(l)) l++; while (r > cw * 0.75 && colW(r)) r--; while (tp < ch * 0.25 && rowW(tp)) tp++; while (b > ch * 0.75 && rowW(b)) b--;
+      // a thin line of the next picture can sit inside the white gap (white | line | white | picture): cut past it too
+      const deep = (len, isW, from, dir) => { let cut = from - dir, dark = 0; for (let k = 0; k < len * 0.22; k++) { const i = from + dir * k; if (isW(i)) cut = i; else if (++dark > Math.max(3, len * 0.025)) break; } return cut; };
+      l = Math.max(l, deep(cw, colW, 0, 1) + 1); r = Math.min(r, deep(cw, colW, cw - 1, -1) - 1); tp = Math.max(tp, deep(ch, rowW, 0, 1) + 1); b = Math.min(b, deep(ch, rowW, ch - 1, -1) - 1);
+      if (r - l < cw * 0.5) { l = 0; r = cw - 1; } if (b - tp < ch * 0.5) { tp = 0; b = ch - 1; }
       const m = 3, o = cv(Math.max(4, r - l + 1 - m * 2), Math.max(4, b - tp + 1 - m * 2)); o.getContext('2d').drawImage(tc, l + m, tp + m, o.width, o.height, 0, 0, o.width, o.height);
       out.push(await new Promise(res => o.toBlob(res, 'image/jpeg', 0.93)));
     }
@@ -1573,7 +1613,7 @@ function collagePrompt() {
     : `- kind "cutout": ONE subject alone (person, bust, statue, animal, object, building, vehicle). It will be cut out and shown as a sticker. kind "scene": a full scene or landscape that fills its picture (shown as a torn-paper piece).
 - prompt: English, concrete and historically accurate: subject, place, era, action, view. Do NOT describe an art style. No text or letters in the picture.`;
   const kinds = M
-    ? `  "pic": an asset id. Optional "anim" (how it enters): pop, slide, drop, rise, zoomin, toss, spin, wipe. Optional "full": true.
+    ? `  "pic": an asset id. Optional "anim" (how it enters): pop, slide, drop, rise, zoomin, toss, spin, wipe, bounce, jelly, swirl, iris, blinds, curtain, diamond, tiles, fold, zip, tilt, pendulum, glitch, slam, flipup. Optional "full": true.
   "tag": a short bold text line, 1–5 words, sentence case ("Safe & predictable investment"). Optional "on": the asset id it sits next to. Optional "count": true when it holds a number that should count up. Optional "anim": type, pop, rise.
   "title": a big bold headline, 2–5 words, for the opening or closing board.
   "stamp": 1–3 words in the red-orange accent colour, for the one word that matters most ("Passive income").
@@ -1583,9 +1623,9 @@ function collagePrompt() {
   "chart": a list of 2–6 [label, number] pairs ([["2004", 145], ["2009", 206]]) with a "title" ("Lok Sabha seats") — an animated bar chart. Use it when the narration compares numbers. Only real numbers from the narration.
   "route": {"from": "Italy", "to": "New Delhi"} — a dotted travel line with a little plane between two places; optional "title". Use it when someone moves or travels.
   "number": a big number that counts up ("145"), with an optional short "label" ("seats").
-- Optional on a board: "exit" (how this board leaves): whip, push, slide, scatter, zoomthrough. Mostly whip.`
-    : `  "pic": an asset id. Optional "anim" (how it enters): slide, drop, pop, spin, toss, zoomin, flip, wipe, unroll, tearin, develop, rise. Optional "shape" for scenes: torn, tape, band. Optional "full": true.
-  "tag": a 1–3 word label on a torn paper tag (UPPERCASE where the language has capitals). Optional "on": the asset id it sticks to. Optional "count": true when it holds a number that should count up. Optional "anim": pop, stamp, swing, type, wipe, drop, rise.
+- Optional on a board: "exit" (how this board leaves): push, slide, iris, split, blinds, slices, flipcard, scatter, zoomthrough, whip, glitch, shutter, spin. Vary them, use whip rarely.`
+    : `  "pic": an asset id. Optional "anim" (how it enters): slide, drop, pop, spin, toss, zoomin, flip, wipe, unroll, tearin, develop, rise, bounce, jelly, swirl, iris, blinds, curtain, diamond, tiles, fold, zip, tilt, pendulum, glitch, slam, flipup. Optional "shape" for scenes: torn, tape, band. Optional "full": true.
+  "tag": a 1–3 word label on a torn paper tag (UPPERCASE where the language has capitals). Optional "on": the asset id it sticks to. Optional "count": true when it holds a number that should count up. Optional "anim": pop, stamp, swing, type, wipe, drop, rise, bounce, jelly, zip, glitch, slam, flipup.
   "stamp": a 1–2 word red rubber stamp ("WARNING", "NO PROOF", "MYTH?", "TRUE").
   "note": a short handwritten note on a yellow sticky note (2–5 words).
   "arrow": an asset id, with "to": another asset id on the same board — a red hand-drawn arrow from one to the other.
@@ -1594,7 +1634,7 @@ function collagePrompt() {
   "chart": a list of 2–6 [label, number] pairs ([["2004", 145], ["2009", 206]]) with a "title" ("Lok Sabha seats") — an animated bar chart. Use it when the narration compares numbers. Only real numbers from the narration.
   "route": {"from": "Italy", "to": "New Delhi"} — a dotted travel line with a little plane between two places; optional "title". Use it when someone moves or travels.
   "number": a big number that counts up ("145"), with an optional short "label" ("seats").
-- Optional on a board: "exit" (how this board leaves): peel, slide, push, tear, scatter, zoomthrough, whip, fade, drop. Vary them.`;
+- Optional on a board: "exit" (how this board leaves): peel, slide, push, tear, scatter, zoomthrough, whip, fade, drop, iris, blinds, spin, flipcard, glitch, split, slices, shutter. Vary them.`;
   return `${intro}
 
 The narration is split into ${S.segments.length} numbered scenes with their start times; the video is ${fmt(D, 0)} long.
@@ -1829,7 +1869,7 @@ function collageLayout(o, W, H) {
     else { x = W / 2 + (r() - 0.5) * W * 0.3; y = H * (port ? 0.88 : 0.86); }
     tags.push({ it, j, style, size, x, y, align, rot: (r() - 0.5) * (style === 'stamp' ? 0.35 : 0.1) - (style === 'stamp' ? 0.12 : 0), anim: animFor(it, 't', new Set(), hashStr(sh.id + 'ta' + j)), seed: hashStr(sh.id + 'ts' + j) });
   });
-  if (isMod()) tags.forEach(t => { t.bold = true; if (!(t.it.anim && ['type', 'pop', 'rise', 'drop'].includes(t.it.anim))) t.anim = t.it.count ? 'pop' : 'type'; });
+  if (isMod()) { const TA = ['type', 'pop', 'rise', 'drop', 'bounce', 'jelly', 'zip', 'glitch', 'slam', 'flipup'], UT = ['type', 'bounce', 'jelly', 'zip', 'glitch', 'slam', 'flipup']; tags.forEach(t => { t.bold = true; if (!(t.it.anim && TA.includes(t.it.anim))) t.anim = t.it.count ? 'pop' : S.settings.animVar === 'unique' ? UT[t.seed % UT.length] : S.settings.animVar === 'wild' && t.seed % 3 === 0 ? UT[1 + t.seed % (UT.length - 1)] : 'type'; }); }
   else {
     if (tags.length && !tags[0].it.anim && tags[0].style === 'stamp') tags[0].anim = 'stamp';
     tags.forEach(t => { if (t.style === 'stamp' && !t.it.anim) t.anim = 'stamp'; });
@@ -1973,11 +2013,19 @@ function drawPiece(ctx, pc, lt, t0p, W, H, s, cam, exitE) {
   let cx = r.x + r.w / 2 + tr.dx + cam.px * (pc.depth - 1) + (bo ? bo.dx : 0), cy = r.y + r.h / 2 + tr.dy + cam.py * (pc.depth - 1) + (pc.kind === 'full' ? 0 : idle) + (bo ? bo.dy : 0);
   let rot = pc.rot + tr.rot + (bo ? bo.rot : 0);
   if (exitE > 0) { const ang = Math.atan2(cy - H / 2, cx - W / 2 + 0.01), d = exitE * exitE * Math.max(W, H) * 1.3; cx += Math.cos(ang) * d; cy += Math.sin(ang) * d; rot += exitE * (pc.seed % 2 ? 1.2 : -1.2); }
-  ctx.save(); ctx.globalAlpha *= tr.alpha; ctx.translate(cx, cy); ctx.rotate(rot); ctx.scale(tr.sx, tr.sy);
+  ctx.save(); ctx.globalAlpha *= tr.alpha; ctx.translate(cx, cy);
+  if (tr.pivotTop) { ctx.translate(0, -r.h / 2); ctx.rotate(rot); ctx.translate(0, r.h / 2); } else ctx.rotate(rot);
+  if (tr.kx || tr.ky) ctx.transform(1, tr.ky || 0, tr.kx || 0, 1, 0, 0);
+  ctx.scale(tr.sx, tr.sy);
   const x = -r.w / 2, y = -r.h / 2;
-  if (tr.clip) { ctx.beginPath(); const e = tr.e;
-    if (tr.clip === 'wipe') ctx.rect(x - 40 * s, y - 40 * s, (r.w + 80 * s) * e, r.h + 80 * s);
-    else if (tr.clip === 'unroll') ctx.rect(x - 40 * s, y - 40 * s, r.w + 80 * s, (r.h + 80 * s) * e);
+  if (tr.clip && tr.p < 1) { ctx.beginPath(); const e = tr.e, m = 40 * s;
+    if (tr.clip === 'wipe') ctx.rect(x - m, y - m, (r.w + 2 * m) * e, r.h + 2 * m);
+    else if (tr.clip === 'unroll') ctx.rect(x - m, y - m, r.w + 2 * m, (r.h + 2 * m) * e);
+    else if (tr.clip === 'iris') ctx.arc(0, 0, Math.max(0.5, (Math.hypot(r.w, r.h) / 2 + m) * e), 0, Math.PI * 2);
+    else if (tr.clip === 'diamond') { const R2 = Math.max(0.5, ((r.w + r.h) / 2 + m * 1.5) * e); ctx.moveTo(0, -R2); ctx.lineTo(R2, 0); ctx.lineTo(0, R2); ctx.lineTo(-R2, 0); ctx.closePath(); }
+    else if (tr.clip === 'curtain') { const ow = (r.w / 2 + m) * e; ctx.rect(-ow, y - m, ow * 2, r.h + 2 * m); }
+    else if (tr.clip === 'blinds') { const n = 7, st = 0.07, sh = (r.h + 2 * m) / n; for (let k = 0; k < n; k++) { const q = easeOutCubic(clamp((e - k * st) / (1 - (n - 1) * st), 0, 1)); if (q > 0) ctx.rect(x - m, y - m + sh * k + sh * (1 - q) / 2, r.w + 2 * m, sh * q + 0.5); } }
+    else if (tr.clip === 'tiles') { const cols = 6, rows = 4, tw = (r.w + 2 * m) / cols, th = (r.h + 2 * m) / rows, rr = mulberry32(pc.seed + 11); for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) { const q = easeOutBack(clamp((e - rr() * 0.6) / 0.4, 0, 1)); if (q > 0) { const cxx = x - m + tw * (i + 0.5), cyy = y - m + th * (j + 0.5); ctx.rect(cxx - tw * q / 2, cyy - th * q / 2, tw * q + 0.5, th * q + 0.5); } } }
     else { const ex = x - 40 * s + (r.w + 80 * s) * e, rr = mulberry32(pc.seed); ctx.moveTo(x - 50 * s, y - 50 * s); for (let k = 0; k <= 16; k++) ctx.lineTo(ex + (rr() - 0.5) * 30 * s, y - 50 * s + (r.h + 100 * s) * k / 16); ctx.lineTo(x - 50 * s, y + r.h + 50 * s); ctx.closePath(); }
     ctx.clip(); }
   if (pc.kind === 'gfx') drawGfx(ctx, pc, x, y, r.w, r.h, s, lt - t0p);
@@ -1993,6 +2041,7 @@ function drawPiece(ctx, pc, lt, t0p, W, H, s, cam, exitE) {
     if (st) { ctx.drawImage(st, x, y, r.w, r.h); if (tr.develop > 0 || tr.shade > 0) { /* stickers just fade */ } }
     else drawMissing(ctx, x, y, r.w, r.h, s, (R.slotN || {})[pc.key]);
   }
+  if (tr.rgb > 0.04) { const rg = mulberry32(pc.seed + Math.floor(tr.p * 24)); ctx.save(); for (let k = 0; k < 3; k++) { const sy = y + rg() * r.h, sh = (6 + rg() * 26) * s, off = (rg() - 0.5) * 60 * s * tr.rgb; ctx.fillStyle = k % 2 ? 'rgba(0,235,255,0.45)' : 'rgba(255,40,100,0.45)'; ctx.fillRect(x + off, sy, r.w, sh); } ctx.restore(); }
   ctx.restore();
 }
 function drawCTag(ctx, tg, lt, t0p, s, exitE, W, H) {
@@ -2048,9 +2097,9 @@ function drawCollage(ctx, o, lt, W, H, exitE = 0) {
 }
 function collageSfx(o, add) {
   const L = collageLayout(o, 1920, 1080), b = o.b, t0 = o.t0;
-  const pS = { slide: 'paper', drop: 'paper', toss: 'whoosh', pop: 'pop', spin: 'whoosh', zoomin: 'soft', flip: 'paper', wipe: 'paper', unroll: 'paper', tearin: 'rip', develop: 'soft', rise: 'soft' };
+  const pS = { slide: 'paper', drop: 'paper', toss: 'swish', pop: 'pop', spin: 'swish', zoomin: 'soft', flip: 'paper', wipe: 'paper', unroll: 'paper', tearin: 'rip', develop: 'soft', rise: 'soft', bounce: 'boing', jelly: 'boing', swirl: 'swish', iris: 'soft', blinds: 'paper', curtain: 'paper', diamond: 'soft', tiles: 'tick', fold: 'paper', zip: 'swish', tilt: 'paper', pendulum: 'soft', glitch: 'glitch', slam: 'thump', flipup: 'paper' };
   [...L.pieces, ...L.fulls].forEach(pc => add(t0 + Math.max(0, b.items[pc.j]), pS[pc.anim] || 'paper', 0.9));
-  L.tags.forEach(tg => { const t = t0 + Math.max(0, b.items[tg.j]); if (tg.anim === 'type') { for (let k = 0; k < 5; k++) add(t + k * 0.1, 'type', 0.45); } else add(t, tg.anim === 'stamp' ? 'thump' : 'pop', tg.anim === 'stamp' ? 1 : 0.7); });
+  L.tags.forEach(tg => { const t = t0 + Math.max(0, b.items[tg.j]); if (tg.anim === 'type') { for (let k = 0; k < 5; k++) add(t + k * 0.1, 'type', 0.45); } else add(t, tg.anim === 'stamp' || tg.anim === 'slam' ? 'thump' : tg.anim === 'glitch' ? 'glitch' : tg.anim === 'bounce' || tg.anim === 'jelly' ? 'boing' : tg.anim === 'zip' ? 'swish' : 'pop', tg.anim === 'stamp' || tg.anim === 'slam' ? 1 : 0.7); });
   o.sh.items.forEach((it, j) => { if (it.arrow || it.circle) add(t0 + b.items[j], 'marker', 0.9);
     if (it.gfx) { const t = t0 + Math.max(0, b.items[j]), d = it.data || {};
       if (it.gfx === 'timeline') (d.items || []).slice(0, 7).forEach((e, i) => add(t + 0.4 + i * 0.75, 'pop', 0.8));
@@ -2090,6 +2139,47 @@ function boardExit(ctx, kind, A, B, p, W, H, prev, prevLt) {
       break;
     }
     case 'zoomthrough': { ctx.save(); ctx.translate(W / 2, H / 2); ctx.scale(1 + 2.2 * e * e, 1 + 2.2 * e * e); ctx.globalAlpha = 1; ctx.drawImage(A, -W / 2, -H / 2); ctx.restore(); ctx.globalAlpha = clamp((p - 0.35) / 0.65, 0, 1); ctx.drawImage(B, 0, 0); ctx.globalAlpha = 1; break; }
+    case 'iris': {   // the new board opens in a growing circle with an accent ring
+      ctx.drawImage(A, 0, 0); const R2 = Math.hypot(W, H) / 2 * e; ctx.save(); ctx.beginPath(); ctx.arc(W / 2, H / 2, Math.max(0.5, R2), 0, Math.PI * 2); ctx.clip(); ctx.drawImage(B, 0, 0); ctx.restore();
+      if (p < 0.98) { ctx.save(); ctx.strokeStyle = accent(); ctx.globalAlpha = 0.9; ctx.lineWidth = 18 * s * (1 - p); ctx.beginPath(); ctx.arc(W / 2, H / 2, Math.max(0.5, R2), 0, Math.PI * 2); ctx.stroke(); ctx.restore(); }
+      break;
+    }
+    case 'blinds': {   // vertical blinds turn one after another
+      ctx.drawImage(A, 0, 0); const n = 9, sw = W / n; ctx.save(); ctx.beginPath();
+      for (let k = 0; k < n; k++) { const q = easeInOut(clamp((p - k * 0.05) / (1 - (n - 1) * 0.05), 0, 1)); if (q > 0) ctx.rect(sw * k + sw * (1 - q) / 2, 0, sw * q + 0.5, H); }
+      ctx.clip(); ctx.drawImage(B, 0, 0); ctx.restore(); break;
+    }
+    case 'spin': {   // the old board spins away into the distance
+      ctx.drawImage(B, 0, 0); const k = 1 - e; if (k > 0.01) { ctx.save(); ctx.translate(W / 2, H / 2); ctx.rotate(e * 1.3); ctx.scale(k, k); shadowOn(ctx, s, 1.6); ctx.fillStyle = '#000'; ctx.fillRect(-W / 2, -H / 2, W, H); shadowOff(ctx); ctx.drawImage(A, -W / 2, -H / 2); ctx.restore(); }
+      break;
+    }
+    case 'flipcard': {   // the whole frame turns over like a card
+      ctx.drawImage(paperBg(W, H), 0, 0); const first = p < 0.5, q = first ? Math.cos(e * Math.PI) : -Math.cos(e * Math.PI), img = first ? A : B;
+      ctx.save(); ctx.translate(W / 2, H / 2); ctx.scale(Math.max(0.01, q) * (0.9 + 0.1 * q), 0.9 + 0.1 * q); shadowOn(ctx, s, 1.4); ctx.drawImage(img, -W / 2, -H / 2); shadowOff(ctx); ctx.fillStyle = `rgba(0,0,0,${0.35 * (1 - q)})`; ctx.fillRect(-W / 2, -H / 2, W, H); ctx.restore();
+      break;
+    }
+    case 'glitch': {   // digital glitch: slices jump sideways, colour bars, then the new board
+      const base = p < 0.5 ? A : B, other = p < 0.5 ? B : A, rg = mulberry32(Math.floor(p * 18) + 3), j = Math.sin(p * Math.PI);
+      ctx.drawImage(base, 0, 0);
+      for (let k = 0; k < 7; k++) { const y = rg() * H, h = (10 + rg() * 90) * s, off = (rg() - 0.5) * 160 * s * j, src = rg() < 0.35 ? other : base; ctx.drawImage(src, 0, y, W, h, off, y, W, h); }
+      ctx.save(); ctx.globalAlpha = 0.25 * j; ctx.fillStyle = '#00e5ff'; ctx.fillRect(0, rg() * H, W, 8 * s); ctx.fillStyle = '#ff2864'; ctx.fillRect(0, rg() * H, W, 8 * s); ctx.restore();
+      break;
+    }
+    case 'split': {   // the old board splits in two halves that slide apart
+      ctx.drawImage(B, 0, 0); const off = e * H * 0.55; shadowOn(ctx, s, 1.2);
+      ctx.drawImage(A, 0, 0, W, H / 2, 0, -off, W, H / 2); ctx.drawImage(A, 0, H / 2, W, H / 2, 0, H / 2 + off, W, H / 2); shadowOff(ctx);
+      break;
+    }
+    case 'slices': {   // the new board arrives in bands from alternating sides
+      ctx.drawImage(A, 0, 0); const n = 6, bh = H / n;
+      for (let k = 0; k < n; k++) { const q = easeOutCubic(clamp((p - k * 0.06) / (1 - (n - 1) * 0.06), 0, 1)), dir = k % 2 ? 1 : -1, x = dir * (1 - q) * W; ctx.drawImage(B, 0, bh * k, W, bh + 1, x, bh * k, W, bh + 1); }
+      break;
+    }
+    case 'shutter': {   // the new board closes in from top and bottom like a shutter
+      ctx.drawImage(A, 0, 0); ctx.fillStyle = `rgba(0,0,0,${0.25 * e})`; ctx.fillRect(0, 0, W, H); const off = (1 - easeOutCubic(p)) * H * 0.5; shadowOn(ctx, s, 1.2);
+      ctx.drawImage(B, 0, 0, W, H / 2, 0, -off, W, H / 2); ctx.drawImage(B, 0, H / 2, W, H / 2, 0, H / 2 + off, W, H / 2); shadowOff(ctx);
+      break;
+    }
     default: ctx.drawImage(B, 0, 0);
   }
 }
@@ -2286,7 +2376,7 @@ function drawModLayer(ctx, L, which, lt, s, W, H, cam, b, exitE) {
 /* ============ bold sans-serif text (types on, with a "_" cursor) ============ */
 function drawBoldTag(ctx, tg, lt, t0p, s, exitE, W, H, tr) {
   const it = tg.it, style = tg.style; let full = String(it.tag || '');
-  const port = H > W * 1.05, size = 64 * s * (port ? 1.3 : 1) * (style === 'number' ? 2.4 : style === 'title' ? 1.3 : style === 'note' ? 0.9 : 1), maxW = W * (port ? 0.84 : 0.4);
+  const port = H > W * 1.05, size = 74 * s * (port ? 1.3 : 1) * (style === 'number' ? 2.4 : style === 'title' ? 1.3 : style === 'note' ? 0.9 : 1), maxW = W * (port ? 0.84 : 0.4);
   ctx.font = sansF(size, 800);
   const lines = []; let cur = ''; full.split(/\s+/).filter(Boolean).forEach(w => { const t = cur ? cur + ' ' + w : w; if (cur && ctx.measureText(t).width > maxW) { lines.push(cur); cur = w; } else cur = t; }); if (cur) lines.push(cur);
   let shown = lines.map(l => l);
@@ -2295,7 +2385,7 @@ function drawBoldTag(ctx, tg, lt, t0p, s, exitE, W, H, tr) {
   if (tr.typeP != null) { const tot = lines.join('').length, n = Math.max(1, Math.ceil(tot * tr.typeP)); let left = n; shown = shown.map(l => { const c = [...l], o = c.slice(0, Math.max(0, left)).join(''); left -= c.length; return o; }); }
   const lh = size * 1.08, bw = Math.max(...lines.map(l => ctx.measureText(l).width)), bh = lh * lines.length;
   let x = tg.x, y = tg.y; if (tg.align === 'right') x -= bw; else if (tg.align === 'center') x -= bw / 2;
-  x = clamp(x, W * 0.03, W - bw - W * 0.03); y = clamp(y - bh / 2, H * 0.03, H - bh - H * 0.03);
+  x = clamp(x, W * 0.05, W - bw - W * 0.05); y = clamp(y - bh / 2, H * 0.05, H - bh - H * 0.05);
   if (exitE > 0) y -= exitE * exitE * H;
   const bo = boil(tg.seed, lt, s);
   ctx.globalAlpha *= tr.alpha; ctx.translate(x + bo.dx + tr.dx * s, y + bo.dy + tr.dy * s); ctx.scale(tr.sx, tr.sy);
@@ -2799,7 +2889,7 @@ async function mixAudio(sr) {
   const v = oc.createBufferSource(); v.buffer = audioBuf; v.connect(oc.destination); v.start(0);
   try { const mb = await musicBuffer(); if (mb) { const m = oc.createBufferSource(); m.buffer = mb; m.loop = true; const g = oc.createGain(); g.gain.setValueCurveAtTime(musicCurve(D), 0, D); const fade = oc.createGain(); fade.gain.setValueAtTime(1, Math.max(0, D - 2)); fade.gain.linearRampToValueAtTime(0, D); m.connect(g).connect(fade).connect(oc.destination); m.start(0); } } catch (_) {}
   const ev = sfxEvents();
-  if (ev.length) { const bank = sfxBank(oc); for (const e of ev) { if (e.t >= D || !bank[e.s]) continue; const s = oc.createBufferSource(); s.buffer = bank[e.s]; const g = oc.createGain(); g.gain.value = +S.settings.sfxVol * e.v; s.connect(g).connect(oc.destination); s.start(Math.max(0, e.t)); } }
+  if (ev.length) { const bank = sfxBank(oc); for (const e of ev) { if (e.t >= D || !bank[e.s]) continue; const s = oc.createBufferSource(); s.buffer = bank[e.s]; const g = oc.createGain(); g.gain.value = sfxGain(e); s.connect(g).connect(oc.destination); s.start(Math.max(0, e.t)); } }
   return await oc.startRendering();
 }
 async function loadFonts() { const list = [sansF(40, 800), sansF(40, 900), sansF(40, 700), sansF(40, 600), serifF(40), serifF(40, 700), `italic 600 40px ${F_SERIF}`, condF(40), condF(40, 600), typeF(40), handF(40)]; try { await Promise.all(list.flatMap(f => [document.fonts.load(f, 'Aa'), document.fonts.load(f, 'अआ')])); } catch (_) {} }
@@ -3079,7 +3169,7 @@ function loop() {
   if (!hasVoice() && t >= duration()) { simT = duration(); pause(); return; }
   drawPreview();
   if (S.musicBlob) music.volume = clamp(musicGainAt(t), 0, 1);
-  if (sfxCtx && sfxBuf && S.settings.sfx !== 'off') { for (const e of sfxEvents()) { if (e.t > lastSfxT && e.t <= t && t - e.t < 0.25) { const s = sfxCtx.createBufferSource(); s.buffer = sfxBuf[e.s]; const g = sfxCtx.createGain(); g.gain.value = +S.settings.sfxVol * e.v; s.connect(g).connect(sfxCtx.destination); s.start(); } } }
+  if (sfxCtx && sfxBuf && S.settings.sfx !== 'off') { for (const e of sfxEvents()) { if (e.t > lastSfxT && e.t <= t && t - e.t < 0.25) { const s = sfxCtx.createBufferSource(); s.buffer = sfxBuf[e.s]; const g = sfxCtx.createGain(); g.gain.value = sfxGain(e); s.connect(g).connect(sfxCtx.destination); s.start(); } } }
   lastSfxT = t;
   if (playing) rafId = requestAnimationFrame(loop);
 }
@@ -3112,8 +3202,8 @@ $$('.tab').forEach(b => b.onclick = () => showTab(b.dataset.tab));
 $$('[data-go]').forEach(b => b.onclick = () => showTab(b.dataset.go));
 
 /* ============ settings ============ */
-const BIND = ['hook', 'hookText', 'depth', 'shortEnd', 'shortCaps', 'gemMark', 'mode', 'animVar', 'decor', 'dust', 'stopmo', 'capPos', 'capColor', 'split', 'aspect', 'textLang', 'pace', 'look', 'perImage', 'theme', 'photo', 'accent', 'trans', 'motion', 'grain', 'vignette', 'captions', 'watermark', 'sfx', 'sfxVol', 'musicVol', 'duck', 'res', 'fps'];
-const NUMS = new Set(['perImage', 'motion', 'grain', 'sfxVol', 'musicVol', 'res', 'fps']);
+const BIND = ['whooshVol', 'endFade', 'hook', 'hookText', 'depth', 'shortEnd', 'shortCaps', 'gemMark', 'mode', 'animVar', 'decor', 'dust', 'stopmo', 'capPos', 'capColor', 'split', 'aspect', 'textLang', 'pace', 'look', 'perImage', 'theme', 'photo', 'accent', 'trans', 'motion', 'grain', 'vignette', 'captions', 'watermark', 'sfx', 'sfxVol', 'musicVol', 'duck', 'res', 'fps'];
+const NUMS = new Set(['whooshVol', 'perImage', 'motion', 'grain', 'sfxVol', 'musicVol', 'res', 'fps']);
 $('#look').innerHTML = Object.entries(LOOKS).map(([k, v]) => `<option value="${k}">${v.name}</option>`).join('');
 function applyModeDefaults() {
   const m = S.settings.mode, base = { decor: 'on', dust: 'on', vignette: 'on', grain: 0.05, stopmo: 'off', accent: '#f5d327' };
@@ -3518,7 +3608,7 @@ async function openProject(file) {
   } catch (e) { toast('Could not open: ' + e.message); }
 }
 async function restore(p) {
-  pause(); S.settings = { ...DEFAULTS, ...(p.settings || {}) }; S.script = p.script || ''; S.segments = p.segments || []; S.starts = p.starts || []; S.timing = p.timing || 'auto'; S.srtCues = p.srtCues || null;
+  pause(); S.settings = migrateSettings({ ...DEFAULTS, ...(p.settings || {}) }, (p.settings || {}).sv); S.script = p.script || ''; S.segments = p.segments || []; S.starts = p.starts || []; S.timing = p.timing || 'auto'; S.srtCues = p.srtCues || null;
   S.shots = p.shots || []; S.assets = p.assets || []; S.yt = p.yt || null; if (window.renderYT && curTab === 'yt') setTimeout(renderYT, 0); S.images = p.images || {}; S.uid = Math.max(p.uid || 1, 1 + Math.max(0, ...S.segments.map(s => +s.id || 0), ...S.shots.map(s => +s.id || 0)));
   applySettingsToUI(); $('#script').value = S.script; showWords();
   audioBuf = null; analysis = null; if (vo.src) { URL.revokeObjectURL(vo.src); vo.removeAttribute('src'); vo.load(); } $('#voDrop').classList.remove('has'); $('#voInfo').textContent = 'MP3 / WAV / M4A — tap or drop';
