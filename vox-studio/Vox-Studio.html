@@ -23,6 +23,7 @@ h3 { font: 800 16px/1.2 "Archivo", "Hind", sans-serif; margin: 0 0 10px; }
 button, input, select, textarea { font: inherit; color: inherit; }
 .muted { color: var(--sub); font-size: 13px; }
 .hint { color: var(--sub); margin: 0 0 14px; max-width: 70ch; }
+#lookInfo { margin: 0; font-size: 12px; flex: 1; min-width: 160px; }
 .info { color: var(--ink); background: #fbf5dc; border-left: 4px solid var(--yel); padding: 8px 12px; border-radius: 6px; margin: 10px 0; }
 .info:empty { display: none; }
 .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; }
@@ -340,6 +341,8 @@ pre.mono { background: #faf6ec; border: 1px solid var(--line); border-radius: 8p
       <div class="card">
         <h3>Look</h3>
         <div class="form">
+          <label>Look variety <select id="variety"><option value="auto">🎲 New look for every video (backgrounds, motifs, layouts, frames, animations change)</option><option value="off">Same look every time (uses the Background below)</option></select></label>
+          <div class="row"><button class="btn ghost small" id="newLookBtn" type="button">🎲 New look</button> <span class="hint" id="lookInfo"></span></div>
           <label>Background <select id="theme"><option value="parchment">Old parchment</option><option value="paper">Paper (cream)</option><option value="graph">Graph paper</option><option value="news">Newsprint (grey)</option><option value="dark">Dark</option><option value="clean">Clean white crumpled paper (modern)</option><option value="temple">🕉️ Temple night (dark maroon, gold jali)</option><option value="cosmos">🕉️ Cosmic (deep blue, stars)</option></select></label>
           <label>Photos <select id="photo"><option value="bw">Black &amp; white print</option><option value="warm">Sepia / warm vintage</option><option value="duo">Duotone (accent colour)</option><option value="color">Original colours</option><option value="spot">B&amp;W halftone + one red-orange part (modern)</option><option value="myth">🕉️ Mythic colour (rich, warm, golden light)</option><option value="gold">🕉️ Gold duotone</option></select></label>
           <label>Accent colour <input type="color" id="accent"></label>
@@ -362,7 +365,7 @@ pre.mono { background: #faf6ec; border: 1px solid var(--line); border-radius: 8p
       <div class="card">
         <h3>Sound</h3>
         <div class="form">
-          <label>Sound effects <select id="sfx"><option value="on">On (paper, whoosh, marker, pop)</option><option value="off">Off</option></select></label>
+          <label>Sound effects <select id="sfx"><option value="subtle">Gentle — only on scene changes (recommended)</option><option value="on">All (every picture, tag, marker, pop)</option><option value="off">Off</option></select></label>
           <label>Effects volume <input type="range" id="sfxVol" min="0" max="1" step="0.05"></label>
           <label>Whoosh volume (transitions) <input type="range" id="whooshVol" min="0" max="1" step="0.05"></label>
           <label>Ending <select id="endFade"><option value="on">Soft fade-out at the end</option><option value="off">Hard stop</option></select></label>
@@ -495,12 +498,15 @@ const DEFAULTS = {
   title: '', aspect: '16:9', res: TOUCH ? 720 : 1080, fps: 30,
   mode: 'collage', split: 'sentence', pace: 'normal', textLang: 'auto', look: 'sepia', perImage: 6, animVar: 'mixed', decor: 'on', dust: 'on', stopmo: 'off', safe: 'on', gemMark: 'auto', capPos: 'mid', capColor: '#a6ff1a',
   theme: 'parchment', photo: 'warm', grain: 0.05, vignette: 'on', captions: 'words', watermark: '', accent: '#f5d327',
-  trans: 'auto', motion: 1, sfx: 'on', sfxVol: 0.5, whooshVol: 0.25, musicVol: 0.14, duck: 'on', endFade: 'on', edges: 'auto', sv: 2,
+  trans: 'auto', motion: 1, sfx: 'subtle', sfxVol: 0.5, whooshVol: 0.25, musicVol: 0.14, duck: 'on', endFade: 'on', edges: 'auto', sv: 3,
+  variety: 'auto', styleSeed: 0,
   hook: 'off', hookText: '', depth: 'on', shortEnd: '', shortCaps: 'off'
 };
 // projects saved by older versions: the fast-cut hook is no longer on by default, whoosh is quieter
 function migrateSettings(st, savedVer) {
   if ((+savedVer || 0) < 2) { st.hook = 'off'; st.whooshVol = DEFAULTS.whooshVol; if (st.sfxVol > 0.5) st.sfxVol = 0.5; st.sv = 2; }
+  // v3: gentle sound effects (only on scene changes) and a new look for every video
+  if ((+savedVer || 0) < 3) { if (st.sfx === 'on') st.sfx = 'subtle'; if (!st.variety) st.variety = 'auto'; st.sv = 3; }
   return st;
 }
 const S = { v: 1, settings: { ...DEFAULTS }, script: '', segments: [], starts: [], timing: 'auto', shots: [], assets: [], images: {}, audioBlob: null, audioName: '', musicBlob: null, musicName: '', uid: 1 };
@@ -740,8 +746,15 @@ const THEMES = {
   parchment: { bg: '#d6c4a0', ink: INK, sub: '#5d4f3a', fiber: 'rgba(110,80,40,', grid: 0, parch: true },
   dark: { bg: '#1d1c1a', ink: '#f2ede1', sub: '#aaa292', fiber: 'rgba(255,240,210,', grid: 0 },
   clean: { bg: '#f4f4f1', ink: INK, sub: '#55524b', fiber: 'rgba(90,90,90,', grid: 0, crumple: true },
-  temple: { bg: '#170b07', ink: '#f8e7bf', sub: '#d8b56e', fiber: 'rgba(255,190,110,', grid: 0, temple: true },
-  cosmos: { bg: '#0a0b1c', ink: '#f2ecff', sub: '#b9b0e8', fiber: 'rgba(190,180,255,', grid: 0, temple: true, cosmic: true }
+  temple: { bg: '#170b07', ink: '#f8e7bf', sub: '#d8b56e', fiber: 'rgba(255,190,110,', grid: 0, temple: true, ember: '255,205,110', motifCol: '#f2c766' },
+  cosmos: { bg: '#0a0b1c', ink: '#f2ecff', sub: '#b9b0e8', fiber: 'rgba(190,180,255,', grid: 0, temple: true, cosmic: true, ember: '220,215,255', motifCol: '#cfc6ff' },
+  // more divine backgrounds (the 'New look for every video' option picks 2–3 of them per video)
+  fire:   { bg: '#1a0604', ink: '#ffe6c8', sub: '#f0a070', fiber: 'rgba(255,140,80,', grid: 0, temple: true, glow: ['rgba(205,55,15,0.62)', 'rgba(110,20,8,0.40)'], jali: 'rgba(255,150,80,0.05)', ember: '255,130,50', motifCol: '#ffb15a' },
+  river:  { bg: '#03121a', ink: '#e6f6ff', sub: '#9fd2e6', fiber: 'rgba(150,220,240,', grid: 0, temple: true, pattern: 'waves', glow: ['rgba(20,115,145,0.55)', 'rgba(8,50,80,0.35)'], jali: 'rgba(160,225,245,0.07)', ember: '170,230,255', motifCol: '#e8d39a' },
+  forest: { bg: '#06130a', ink: '#eef8e0', sub: '#b6d69a', fiber: 'rgba(190,230,150,', grid: 0, temple: true, pattern: 'leaves', glow: ['rgba(45,125,60,0.50)', 'rgba(15,60,25,0.35)'], jali: 'rgba(190,235,150,0.06)', ember: '230,255,170', motifCol: '#e6d48a' },
+  dawn:   { bg: '#1d0a12', ink: '#fff0e0', sub: '#f4b38e', fiber: 'rgba(255,190,150,', grid: 0, temple: true, pattern: 'none', glow: ['rgba(235,115,60,0.62)', 'rgba(140,40,72,0.38)'], ember: '255,200,140', motifCol: '#ffd08a', petal: '255,150,120' },
+  royal:  { bg: '#120724', ink: '#f6ecff', sub: '#d2b3f0', fiber: 'rgba(210,170,255,', grid: 0, temple: true, glow: ['rgba(125,50,175,0.55)', 'rgba(60,20,92,0.35)'], jali: 'rgba(230,200,255,0.05)', ember: '255,210,120', motifCol: '#f0c35e' },
+  ash:    { bg: '#121110', ink: '#f2eee8', sub: '#c4bcb0', fiber: 'rgba(230,220,200,', grid: 0, temple: true, pattern: 'none', glow: ['rgba(125,112,95,0.45)', 'rgba(50,45,40,0.35)'], ember: '255,230,200', motifCol: '#d9c9a8' }
 };
 const TYPES = {
   photo: { name: 'Photo', img: 'need', help: 'Photo print + caption tag; text strip and red circle on the cue word' },
@@ -760,7 +773,31 @@ const TYPES = {
 const accent = () => S.settings.accent || '#f5d327';
 const isMyth = () => S.settings.mode === 'myth';
 const GOLD = '#f0c35e';
-const theme = () => THEMES[S.settings.theme] || THEMES.paper;
+const theme = () => THEMES[R.curTheme || S.settings.theme] || THEMES[S.settings.theme] || THEMES.paper;
+
+/* ============ a new look for every video ============
+   From the project (title + script) a 'style pack' is picked: 2–3 backgrounds that change every few boards,
+   background motifs (mandala, chakra, lotus, clouds), particles, picture layouts, frames and a set of
+   animations and transitions. Same project = same look; another video = another look. '🎲 New look' re-rolls it. */
+const MYTH_BACKS = ['temple', 'cosmos', 'fire', 'river', 'forest', 'dawn', 'royal', 'ash'];
+const PAPER_BACKS = ['parchment', 'paper', 'graph', 'news', 'dark'];
+function packSeed() { return ((+S.settings.styleSeed) || hashStr((S.settings.title || '') + '|' + String(S.script || '').slice(0, 400)) || 1) >>> 0; }
+function stylePack() {
+  if (S.settings.variety === 'off') return null;
+  const seed = packSeed(), mode = S.settings.mode;
+  if (R.pack && R.pack.seed === seed && R.pack.mode === mode) return R.pack;
+  const r = mulberry32(seed ^ 0x5bd1e995), pick = a => a[Math.floor(r() * a.length)];
+  const take = (a, n) => { const b = [...new Set(a)]; for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b.slice(0, n); };
+  const myth = mode === 'myth';
+  const backs = myth ? take(MYTH_BACKS, 2 + Math.floor(r() * 2)) : mode === 'modern' ? ['clean'] : take(mode === 'classic' ? ['paper', 'graph', 'news', 'parchment'] : PAPER_BACKS, 2);
+  const animBase = myth ? [...MYTH_ANIMS, 'slide', 'develop', 'unroll', 'curtain', 'wipe', 'tilt', 'flipup', 'swirl', 'drop', 'blinds'] : Object.keys(ANIMS);
+  const exitBase = myth ? [...MYTH_EXITS, 'fade', 'push', 'slices', 'blinds', 'peel'] : mode === 'modern' ? ['push', 'iris', 'whip', 'slide', 'split', 'scatter', 'blinds', 'zoomthrough', 'flipcard', 'slices'] : BOARD_EXITS;
+  R.pack = { seed, mode, backs, every: 2 + Math.floor(r() * 2), motifs: take(['mandala', 'chakra', 'lotus', 'clouds'], 2), motifSide: r() < 0.4, rays: r() < 0.65,
+    particles: pick(['embers', 'petals', 'stars', 'dust', 'embers']), anims: take(animBase, 6), exits: take(exitBase, 4), tpl: Math.floor(r() * 3), frames: take(['frame', 'gline', 'arch', 'plain'], 2) };
+  return R.pack;
+}
+function packText() { const P = stylePack(); if (!P) return 'Same look every time'; return `Backgrounds: ${P.backs.join(', ')} · ${S.settings.mode === 'myth' ? `motifs: ${P.motifs.join(', ')} · particles: ${P.particles} · frames: ${P.frames.join(', ')} · ` : ''}animations: ${P.anims.join(', ')} · transitions: ${P.exits.join(', ')}`; }
+function shotTheme(o) { const P = stylePack(); if (!P || !o) return S.settings.theme; return P.backs[Math.floor((o.k || 0) / P.every) % P.backs.length]; }
 
 /* ============ images ============ */
 const imgKey = (sh, b) => sh.id + (b ? 'b' : 'a');
@@ -831,9 +868,9 @@ function noiseTile(size, seed, gray) {
   for (let i = 0; i < id.data.length; i += 4) { const v = gray ? 128 + (r() - 0.5) * 255 : r() * 255; id.data[i] = id.data[i + 1] = id.data[i + 2] = v; id.data[i + 3] = gray ? 255 : r() * 255; }
   x.putImageData(id, 0, 0); return c;
 }
-function paperBg(W, H, key = S.settings.theme) {
+function paperBg(W, H, key = R.curTheme || S.settings.theme) {
   const ck = key + W + 'x' + H; let c = R.paper.get(ck); if (c) return c;
-  if (R.paper.size > 6) R.paper.clear();
+  if (R.paper.size > 14) R.paper.clear();
   c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d'); const T = THEMES[key] || THEMES.paper; const s = Math.min(W, H) / 1080; const r = mulberry32(77);
   x.fillStyle = T.bg; x.fillRect(0, 0, W, H);
   for (let i = 0; i < 22; i++) { const gx = r() * W, gy = r() * H, gr = (120 + r() * 380) * s; const g = x.createRadialGradient(gx, gy, 0, gx, gy, gr); const dark = r() < 0.6; g.addColorStop(0, dark ? 'rgba(90,70,40,0.05)' : 'rgba(255,255,245,0.07)'); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(gx - gr, gy - gr, gr * 2, gr * 2); }
@@ -849,10 +886,13 @@ function paperBg(W, H, key = S.settings.theme) {
   }
   if (T.temple) {   // mythology: warm light in the middle, carved jali pattern, dark edges
     const gl = x.createRadialGradient(W / 2, H * 0.45, 0, W / 2, H * 0.45, Math.hypot(W, H) * 0.55);
-    gl.addColorStop(0, T.cosmic ? 'rgba(90,70,170,0.55)' : 'rgba(150,62,20,0.60)'); gl.addColorStop(0.45, T.cosmic ? 'rgba(40,30,90,0.35)' : 'rgba(90,30,12,0.35)'); gl.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gl; x.fillRect(0, 0, W, H);
-    x.strokeStyle = T.cosmic ? 'rgba(200,190,255,0.05)' : 'rgba(240,190,100,0.055)'; x.lineWidth = Math.max(1, 1.4 * s); const g = 64 * s;
-    for (let gy = -g; gy < H + g; gy += g) for (let gx = -g; gx < W + g; gx += g) { const ox = (Math.round(gy / g) % 2) * g / 2; x.beginPath(); x.moveTo(gx + ox, gy - g * 0.35); x.lineTo(gx + ox + g * 0.35, gy); x.lineTo(gx + ox, gy + g * 0.35); x.lineTo(gx + ox - g * 0.35, gy); x.closePath(); x.stroke(); x.beginPath(); x.arc(gx + ox, gy, g * 0.08, 0, 6.283); x.stroke(); }
-    if (T.cosmic) for (let i = 0; i < 260 * (W * H) / (1920 * 1080); i++) { x.fillStyle = `rgba(255,255,255,${0.15 + r() * 0.6})`; x.beginPath(); x.arc(r() * W, r() * H, (0.4 + r() * 1.6) * s, 0, 6.283); x.fill(); }
+    const GL = T.glow || (T.cosmic ? ['rgba(90,70,170,0.55)', 'rgba(40,30,90,0.35)'] : ['rgba(150,62,20,0.60)', 'rgba(90,30,12,0.35)']);
+    gl.addColorStop(0, GL[0]); gl.addColorStop(0.45, GL[1]); gl.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gl; x.fillRect(0, 0, W, H);
+    x.strokeStyle = T.jali || (T.cosmic ? 'rgba(200,190,255,0.05)' : 'rgba(240,190,100,0.055)'); x.lineWidth = Math.max(1, 1.4 * s); const g = 64 * s;
+    if (T.pattern === 'waves') { for (let gy = H * 0.08; gy < H; gy += 46 * s) { x.beginPath(); for (let gx = 0; gx <= W; gx += 12 * s) { const yy = gy + Math.sin(gx / (90 * s) + gy * 0.013) * 9 * s; if (gx) x.lineTo(gx, yy); else x.moveTo(gx, yy); } x.stroke(); } }
+    else if (T.pattern === 'leaves') { for (let i = 0; i < 90 * (W * H) / (1920 * 1080); i++) { const lx = r() * W, ly = r() * H, a = r() * 6.283, L = (26 + r() * 40) * s; x.save(); x.translate(lx, ly); x.rotate(a); x.beginPath(); x.moveTo(-L / 2, 0); x.quadraticCurveTo(0, -L * 0.35, L / 2, 0); x.quadraticCurveTo(0, L * 0.35, -L / 2, 0); x.stroke(); x.beginPath(); x.moveTo(-L / 2, 0); x.lineTo(L / 2, 0); x.stroke(); x.restore(); } }
+    else if (T.pattern !== 'none') for (let gy = -g; gy < H + g; gy += g) for (let gx = -g; gx < W + g; gx += g) { const ox = (Math.round(gy / g) % 2) * g / 2; x.beginPath(); x.moveTo(gx + ox, gy - g * 0.35); x.lineTo(gx + ox + g * 0.35, gy); x.lineTo(gx + ox, gy + g * 0.35); x.lineTo(gx + ox - g * 0.35, gy); x.closePath(); x.stroke(); x.beginPath(); x.arc(gx + ox, gy, g * 0.08, 0, 6.283); x.stroke(); }
+    if (T.cosmic || T.stars) for (let i = 0; i < 260 * (W * H) / (1920 * 1080); i++) { x.fillStyle = `rgba(255,255,255,${0.15 + r() * 0.6})`; x.beginPath(); x.arc(r() * W, r() * H, (0.4 + r() * 1.6) * s, 0, 6.283); x.fill(); }
     const e = x.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.hypot(W, H) * 0.6); e.addColorStop(0, 'rgba(0,0,0,0)'); e.addColorStop(1, 'rgba(0,0,0,0.72)'); x.fillStyle = e; x.fillRect(0, 0, W, H);
   }
   if (T.grid) { x.strokeStyle = T.grid; x.lineWidth = Math.max(1, 1.2 * s); const g = 54 * s; x.beginPath(); for (let gx = (W % g) / 2; gx < W; gx += g) { x.moveTo(gx, 0); x.lineTo(gx, H); } for (let gy = (H % g) / 2; gy < H; gy += g) { x.moveTo(0, gy); x.lineTo(W, gy); } x.stroke(); }
@@ -1062,7 +1102,8 @@ function enterOf(sh, k, all) {
     if (pv.exit && pv.exit !== 'auto' && TRANS_DUR[pv.exit] != null) return pv.exit;
     if (sh.enter && sh.enter !== 'auto') return sh.enter;
     if (S.settings.trans !== 'auto') return S.settings.trans;
-    const pool = isMyth() && S.settings.animVar !== 'unique' ? MYTH_EXITS : S.settings.animVar === 'unique' ? NEW_EXITS : isMod() ? ['push', 'iris', 'whip', 'slide', 'split', 'scatter', 'blinds', 'zoomthrough', 'flipcard', 'slices'] : S.settings.animVar === 'calm' ? ['peel', 'slide', 'fade', 'push', 'iris'] : BOARD_EXITS; let pick = pool[Math.floor(rnd(sh, 5)() * pool.length)];
+    const PK = S.settings.animVar === 'mixed' ? stylePack() : null;
+    const pool = PK ? PK.exits : isMyth() && S.settings.animVar !== 'unique' ? MYTH_EXITS : S.settings.animVar === 'unique' ? NEW_EXITS : isMod() ? ['push', 'iris', 'whip', 'slide', 'split', 'scatter', 'blinds', 'zoomthrough', 'flipcard', 'slices'] : S.settings.animVar === 'calm' ? ['peel', 'slide', 'fade', 'push', 'iris'] : BOARD_EXITS; let pick = pool[Math.floor(rnd(sh, 5)() * pool.length)];
     if (k > 1 && all[k - 1].enter === pick) pick = pool[(pool.indexOf(pick) + 1 + (k % 3)) % pool.length];
     return pick;
   }
@@ -1099,6 +1140,7 @@ const TRANS_DUR = { slide: 0.55, whip: 0.36, zoom: 0.45, drop: 0.5, fade: 0.4, c
 /* ============ one shot ============ */
 function drawShot(ctx, o, lt, W, H, fi) {
   const sh = o.sh, s = Math.min(W, H) / 1080, port = H > W * 1.05, d = o.d, mo = +S.settings.motion;
+  R.curTheme = shotTheme(o); R.curK = o.k || 0;
   if (sh.type === 'chapter') ctx.drawImage(yellowBg(W, H), 0, 0); else ctx.drawImage(paperBg(W, H), 0, 0);
   if (sh.type === 'collage') { drawCollage(ctx, o, lt, W, H); return; }
   const slots = R.slotN || {}; const N = k => slots[k];
@@ -1348,16 +1390,19 @@ function overlays(ctx, W, H, t) {
 /* ============ sound effects (made in the app, no files) ============ */
 // whoosh-like sounds (transitions, risers, boom) have their own, low-by-default volume
 const WHOOSHY = new Set(['whoosh', 'riser', 'boom', 'swish']);
-function sfxGain(e) { return +S.settings.sfxVol * e.v * (WHOOSHY.has(e.s) ? +(S.settings.whooshVol ?? 0.25) : 1); }
+// effects go quieter while the narrator speaks, so they never cover the voice
+function voiceAt(t) { if (!analysis || !analysis.env) return 0; const k = Math.floor(t * 20); for (let j = k - 2; j <= k + 6; j++) if (analysis.env[j]) return 1; return 0; }
+function sfxGain(e) { return +S.settings.sfxVol * e.v * (WHOOSHY.has(e.s) ? +(S.settings.whooshVol ?? 0.25) : 1) * (voiceAt(e.t) ? 0.55 : 1); }
 let sfxCache = null;
 function sfxEvents() {
   const key = resolve().key + S.settings.sfx + (hookOn() ? 'H' + hookPics().length : '') + (R.noHook ? 'n' : ''); if (sfxCache && sfxCache.key === key) return sfxCache.ev;
   const ev = []; sfxCache = { key, ev }; if (S.settings.sfx === 'off') return ev;
-  const add = (t, s, v = 1) => ev.push({ t, s, v });
-  hookSfx(add);
+  const add = (t, s, v = 1, kind = '') => ev.push({ t, s, v, kind });
+  hookSfx((t, s, v) => add(t, s, v, 'T'));
   for (const o of resolve().shots) {
     const b = o.b, t0 = o.t0, sh = o.sh;
-    if (o.k > 0) add(t0, { slide: 'paper', drop: 'paper', whip: 'whoosh', zoom: 'soft', fade: 'soft', peel: 'rip', tear: 'rip', push: 'whoosh', scatter: 'whoosh', zoomthrough: 'whoosh', iris: 'soft', blinds: 'paper', spin: 'whoosh', flipcard: 'paper', glitch: 'glitch', split: 'rip', slices: 'swish', shutter: 'paper', lightburst: 'bell', smoke: 'soft', mandala: 'chime' }[o.enter] || 'thump', o.enter === 'cut' ? 0.5 : 1);
+    if (o.k > 0) add(t0, { slide: 'paper', drop: 'paper', whip: 'whoosh', zoom: 'soft', fade: 'soft', peel: 'rip', tear: 'rip', push: 'whoosh', scatter: 'whoosh', zoomthrough: 'whoosh', iris: 'soft', blinds: 'paper', spin: 'whoosh', flipcard: 'paper', glitch: 'glitch', split: 'rip', slices: 'swish', shutter: 'paper', lightburst: 'bell', smoke: 'soft', mandala: 'chime' }[o.enter] || 'thump', o.enter === 'cut' ? 0.5 : 1, 'T');
+    if (S.settings.sfx === 'subtle') continue;   // gentle: only the scene changes make a sound
     if (sh.type === 'collage') { collageSfx(o, add); continue; }
     if (sh.title && ['photo', 'zoom', 'text'].includes(sh.type)) add(t0 + b.tag, 'tick', 0.6);
     switch (sh.type) {
@@ -1373,7 +1418,20 @@ function sfxEvents() {
       default: if (sh.text) add(t0 + b.text, 'pop', 0.7); if (sh.mark && sh.mark !== 'none' && sh.focus) add(t0 + b.mark, 'marker');
     }
   }
-  return ev.sort((a, b) => a.t - b.t);
+  ev.sort((a, b) => a.t - b.t);
+  // never stack sounds: keep a gap between effects (typing / ticks may run in quick rows only in 'All' mode)
+  const kept = []; let lastT = -9, lastW = -9; const gap = S.settings.sfx === 'subtle' ? 1.6 : 0.35;
+  for (const e of ev) { const rowOk = S.settings.sfx === 'on' && (e.s === 'type' || e.s === 'tick');
+    if (!rowOk && e.t - lastT < gap) continue; if (WHOOSHY.has(e.s) && e.t - lastW < 1.5) continue;
+    if (S.settings.sfx === 'subtle') e.v *= 0.8; kept.push(e); if (!rowOk) lastT = e.t; if (WHOOSHY.has(e.s)) lastW = e.t; }
+  ev.length = 0; ev.push(...kept); return ev;
+}
+// softens a made-in-app sound: removes the harsh 'shhh' hiss above ~4 kHz and fades both ends (no clicks)
+function softenBuf(b, sr, lowpass) {
+  const d = b.getChannelData(0), n = d.length, fi = Math.min(n >> 2, Math.round(sr * 0.006)), fo = Math.min(n >> 1, Math.round(sr * 0.03));
+  if (lowpass) { const a = 1 - Math.exp(-2 * Math.PI * 4200 / sr); for (let pass = 0; pass < 2; pass++) { let y = 0; for (let i = 0; i < n; i++) { y += (d[i] - y) * a; d[i] = y; } } }
+  for (let i = 0; i < fi; i++) d[i] *= i / fi; for (let i = 0; i < fo; i++) d[n - 1 - i] *= i / fo;
+  return b;
 }
 function sfxBank(actx) {
   const sr = actx.sampleRate, rnd2 = mulberry32(9);
@@ -1386,10 +1444,10 @@ function sfxBank(actx) {
     // short airy swish for a single picture flying in (much lighter than a whoosh)
     swish: (() => { let a = 0; return buf(0.28, (t) => { const n = noise(); a += (n - a) * (0.08 + 0.3 * t / 0.28); return a * 0.6 * Math.sin(Math.PI * t / 0.28) ** 2; }); })(),
     // temple bell: inharmonic partials with a long decay
-    bell: buf(2.2, (t) => [[1, 1], [2.76, 0.5], [5.4, 0.25], [8.93, 0.12]].reduce((a, [m, g]) => a + Math.sin(2 * Math.PI * 520 * m * t) * g * Math.exp(-t * (1.6 + m * 0.5)), 0) * 0.32 * Math.min(1, t * 400)),
+    bell: buf(2.2, (t) => [[1, 1], [2.76, 0.35], [5.4, 0.12]].reduce((a, [m, g]) => a + Math.sin(2 * Math.PI * 392 * m * t) * g * Math.exp(-t * (1.8 + m * 0.7)), 0) * 0.2 * Math.min(1, t * 200)),
     // small bright chime / ghungroo shimmer
-    chime: buf(0.9, (t) => (Math.sin(2 * Math.PI * 1568 * t) * 0.5 + Math.sin(2 * Math.PI * 2349 * t) * 0.3 + Math.sin(2 * Math.PI * 3136 * t) * 0.15) * Math.exp(-t * 5) * 0.22 * Math.min(1, t * 300)),
-    shimmer: (() => { let a = 0; return buf(1.0, (t) => { const n = noise(); a += (n - a) * 0.6; const q = t / 1.0; return ((n - a) * 0.18 + Math.sin(2 * Math.PI * (1200 + 900 * q) * t) * 0.06) * Math.sin(Math.PI * q) ** 2; }); })(),
+    chime: buf(0.9, (t) => (Math.sin(2 * Math.PI * 784 * t) * 0.6 + Math.sin(2 * Math.PI * 1175 * t) * 0.25) * Math.exp(-t * 6) * 0.11 * Math.min(1, t * 150)),
+    shimmer: (() => { let a = 0; return buf(1.0, (t) => { const n = noise(); a += (n - a) * 0.6; const q = t / 1.0; return ((n - a) * 0.12 + Math.sin(2 * Math.PI * (700 + 300 * q) * t) * 0.025) * Math.sin(Math.PI * q) ** 2; }); })(),
     // soft cartoon boing for bounce / jelly
     boing: buf(0.35, (t) => Math.sin(2 * Math.PI * (180 + 90 * Math.sin(t * 38)) * t) * Math.exp(-t * 9) * 0.32),
     // digital glitch: short bit-crushed buzz bursts
@@ -1402,10 +1460,12 @@ function sfxBank(actx) {
     thump: buf(0.18, (t) => Math.sin(2 * Math.PI * (110 - 200 * t) * t) * Math.exp(-t * 22) * 0.55),
     marker: buf(0.55, (t) => { const n = noise(); hp += (n - hp) * 0.6; const f = Math.sin(2 * Math.PI * 7 * t) * 0.5 + 0.5; return (n - hp) * 0.35 * Math.sin(Math.PI * t / 0.55) * (0.6 + 0.4 * f); }),
     // rising whoosh + tone that builds up to a reveal (0.9 s, loudest at the end)
-    riser: (() => { let lpR = 0, ph = 0; return buf(0.9, (t) => { const q = t / 0.9, n = noise(); lpR += (n - lpR) * (0.02 + 0.5 * q * q); ph += 2 * Math.PI * (180 + 900 * q * q) / sr; return (lpR * 1.4 + Math.sin(ph) * 0.18) * Math.pow(q, 2.2) * (q > 0.97 ? (1 - q) / 0.03 : 1) * 0.8; }); })(),
+    riser: (() => { let lpR = 0, ph = 0; return buf(0.9, (t) => { const q = t / 0.9, n = noise(); lpR += (n - lpR) * (0.02 + 0.5 * q * q); ph += 2 * Math.PI * (180 + 900 * q * q) / sr; return (lpR * 1.2 + Math.sin(ph) * 0.06) * Math.pow(q, 2.2) * (q > 0.97 ? (1 - q) / 0.03 : 1) * 0.8; }); })(),
     // deep cinematic hit
     boom: (() => { let lpB = 0; return buf(1.4, (t) => { const n = noise(); lpB += (n - lpB) * 0.03; const f = 58 - 26 * Math.min(1, t / 0.5); return (Math.sin(2 * Math.PI * f * t) * 0.9 + Math.sin(2 * Math.PI * f * 2.01 * t) * 0.2) * Math.exp(-t * 3.2) * 0.75 + lpB * 3 * Math.exp(-t * 6) + noise() * 0.25 * Math.exp(-t * 40); }); })()
   };
+  const HISSY = new Set(['paper', 'whoosh', 'swish', 'soft', 'rip', 'marker', 'riser', 'shimmer', 'tick', 'glitch', 'boom']);
+  for (const k in bank) softenBuf(bank[k], sr, HISSY.has(k));
   return bank;
 }
 // music level: lower while the voice speaks (20 points per second)
@@ -1488,7 +1548,8 @@ const EXIT_DUR = { peel: 0.75, push: 0.55, tear: 0.7, scatter: 0.6, zoomthrough:
 Object.assign(TRANS_DUR, EXIT_DUR);
 function animFor(it, kindLetter, used, seed) {
   if (it.anim && ANIMS[it.anim] && ANIMS[it.anim].kinds.includes(kindLetter)) return it.anim;
-  const pool = (isMyth() && ['mixed', 'calm'].includes(S.settings.animVar) ? MYTH_ANIMS : (ANIM_POOL[S.settings.animVar] || ANIM_POOL.mixed)).filter(a => ANIMS[a] && ANIMS[a].kinds.includes(kindLetter));
+  const P = S.settings.animVar === 'mixed' ? stylePack() : null, packPool = P ? P.anims.filter(a => ANIMS[a] && ANIMS[a].kinds.includes(kindLetter)) : [];
+  const pool = packPool.length >= 2 ? packPool : (isMyth() && ['mixed', 'calm'].includes(S.settings.animVar) ? MYTH_ANIMS : (ANIM_POOL[S.settings.animVar] || ANIM_POOL.mixed)).filter(a => ANIMS[a] && ANIMS[a].kinds.includes(kindLetter));
   const r = mulberry32(seed); let pick = pool[Math.floor(r() * pool.length)];
   for (let k = 0; k < 6 && used.has(pick); k++) pick = pool[Math.floor(r() * pool.length)];
   used.add(pick); return pick;
@@ -1527,6 +1588,15 @@ function borderStats(d, w, h) {
   const r = med(0), g = med(1), b = med(2), lum = bs.map(p => (d[p * 4] + d[p * 4 + 1] + d[p * 4 + 2]) / 3).sort((a, b2) => a - b2);
   return { bs, r, g, b, l: (r + g + b) / 3, lo: lum[Math.floor(lum.length * 0.08)], light: (r + g + b) / 3 > 170 };
 }
+// grows (dilate) or shrinks (erode) a 0/1 mask by r pixels (square), in two quick passes
+function morphMask(m, w, h, r, erode) {
+  const t = new Uint8Array(w * h), o = new Uint8Array(w * h), row = new Int32Array(Math.max(w, h) + 1);
+  for (let y = 0; y < h; y++) { row[0] = 0; for (let x = 0; x < w; x++) row[x + 1] = row[x] + m[y * w + x];
+    for (let x = 0; x < w; x++) { const a = Math.max(0, x - r), b = Math.min(w, x + r + 1), sum = row[b] - row[a]; t[y * w + x] = erode ? (sum === b - a ? 1 : 0) : (sum > 0 ? 1 : 0); } }
+  for (let x = 0; x < w; x++) { row[0] = 0; for (let y = 0; y < h; y++) row[y + 1] = row[y] + t[y * w + x];
+    for (let y = 0; y < h; y++) { const a = Math.max(0, y - r), b = Math.min(h, y + r + 1), sum = row[b] - row[a]; o[y * w + x] = erode ? (sum === b - a ? 1 : 0) : (sum > 0 ? 1 : 0); } }
+  return o;
+}
 // removes the plain (white) background that touches the border; keeps everything inside the subject
 function cutout(src, maxSide = 1000) {
   const k = Math.min(1, maxSide / Math.max(src.width, src.height)), w = Math.max(1, Math.round(src.width * k)), h = Math.max(1, Math.round(src.height * k));
@@ -1534,12 +1604,20 @@ function cutout(src, maxSide = 1000) {
   const id = x.getImageData(0, 0, w, h), d = id.data, N = w * h, B = borderStats(d, w, h);
   if (!B.light) return c;   // not on a light background: keep as it is
   const thr = Math.max(175, Math.min(B.l, B.lo) - 18);
-  const isBg = p => { const o = p * 4, r = d[o], g = d[o + 1], b = d[o + 2]; return Math.max(r, g, b) - Math.min(r, g, b) < 34 && (r + g + b) / 3 >= thr; };
-  const out = new Uint8Array(N), st = new Int32Array(N); let sp = 0;
-  for (const p of B.bs) if (!out[p] && isBg(p)) { out[p] = 1; st[sp++] = p; }
-  while (sp) { const p = st[--sp], px = p % w;
-    if (px > 0 && !out[p - 1] && isBg(p - 1)) { out[p - 1] = 1; st[sp++] = p - 1; } if (px < w - 1 && !out[p + 1] && isBg(p + 1)) { out[p + 1] = 1; st[sp++] = p + 1; }
-    if (p >= w && !out[p - w] && isBg(p - w)) { out[p - w] = 1; st[sp++] = p - w; } if (p < N - w && !out[p + w] && isBg(p + w)) { out[p + w] = 1; st[sp++] = p + w; } }
+  // background = close to the border colour (not just 'any light grey'), so off-white clothes are kept
+  const isBg = p => { const o = p * 4, r = d[o], g = d[o + 1], b = d[o + 2]; return Math.max(r, g, b) - Math.min(r, g, b) < 34 && (r + g + b) / 3 >= thr && Math.abs(r - B.r) + Math.abs(g - B.g) + Math.abs(b - B.b) < 66; };
+  const cand = new Uint8Array(N); for (let p = 0; p < N; p++) cand[p] = isBg(p) ? 1 : 0;
+  // the flood runs on a shrunk mask: it cannot squeeze through gaps thinner than ~5 px into a white saree / beard
+  const rad = Math.max(2, Math.round(Math.max(w, h) / 300)), er = morphMask(cand, w, h, rad, true);
+  const flood = (m) => { const o = new Uint8Array(N), st = new Int32Array(N); let sp = 0;
+    for (const p of B.bs) if (!o[p] && m[p]) { o[p] = 1; st[sp++] = p; }
+    while (sp) { const p = st[--sp], px = p % w;
+      if (px > 0 && !o[p - 1] && m[p - 1]) { o[p - 1] = 1; st[sp++] = p - 1; } if (px < w - 1 && !o[p + 1] && m[p + 1]) { o[p + 1] = 1; st[sp++] = p + 1; }
+      if (p >= w && !o[p - w] && m[p - w]) { o[p - w] = 1; st[sp++] = p - w; } if (p < N - w && !o[p + w] && m[p + w]) { o[p + w] = 1; st[sp++] = p + w; } }
+    return o; };
+  let out = flood(er); let cnt = 0; for (let p = 0; p < N; p++) cnt += out[p];
+  if (cnt < N * 0.02) out = flood(cand);   // very thin background: use the plain flood
+  else { const gr = morphMask(out, w, h, rad + 1, false); for (let p = 0; p < N; p++) out[p] = gr[p] & cand[p]; }
   for (let p = 0; p < N; p++) { const o = p * 4; if (out[p]) d[o + 3] = 0; else { const px = p % w; if ((px > 0 && out[p - 1]) || (px < w - 1 && out[p + 1]) || (p >= w && out[p - w]) || (p < N - w && out[p + w])) d[o + 3] = 150; } }
   x.putImageData(id, 0, 0);
   const colS = new Uint32Array(w), rowS = new Uint32Array(h); for (let p = 0; p < N; p++) if (d[p * 4 + 3] > 40) { colS[p % w]++; rowS[(p / w) | 0]++; }
@@ -1836,6 +1914,21 @@ const TPL = {
     [{ x: .0, y: .05, w: .36, h: .56 }, { x: .32, y: .08, w: .36, h: .5 }, { x: .64, y: .04, w: .36, h: .56 }, { x: .2, y: .52, w: .56, h: .46 }]
   ]
 };
+// other arrangements for the same number of pictures (a video's style pack mixes them with the ones above)
+const TPL_ALT = {
+  port: [
+    [[{ x: .05, y: .3, w: .9, h: .5 }], [{ x: .02, y: .1, w: .96, h: .62 }]],
+    [[{ x: .03, y: .1, w: .94, h: .5 }, { x: .25, y: .58, w: .7, h: .34 }], [{ x: .0, y: .14, w: .62, h: .5 }, { x: .4, y: .45, w: .6, h: .45 }]],
+    [[{ x: .02, y: .08, w: .96, h: .44 }, { x: .0, y: .54, w: .5, h: .36 }, { x: .5, y: .54, w: .5, h: .36 }]],
+    [[{ x: .02, y: .12, w: .47, h: .36 }, { x: .51, y: .12, w: .47, h: .36 }, { x: .02, y: .5, w: .47, h: .36 }, { x: .51, y: .5, w: .47, h: .36 }]]
+  ],
+  land: [
+    [[{ x: .04, y: .1, w: .62, h: .8 }], [{ x: .1, y: .06, w: .8, h: .88 }]],
+    [[{ x: .02, y: .04, w: .58, h: .62 }, { x: .44, y: .38, w: .54, h: .58 }], [{ x: .02, y: .06, w: .64, h: .88 }, { x: .64, y: .2, w: .34, h: .6 }]],
+    [[{ x: .01, y: .18, w: .33, h: .64 }, { x: .335, y: .12, w: .33, h: .7 }, { x: .665, y: .18, w: .33, h: .64 }], [{ x: .27, y: .06, w: .46, h: .88 }, { x: .0, y: .3, w: .28, h: .5 }, { x: .72, y: .3, w: .28, h: .5 }]],
+    [[{ x: .02, y: .04, w: .47, h: .46 }, { x: .51, y: .04, w: .47, h: .46 }, { x: .02, y: .5, w: .47, h: .46 }, { x: .51, y: .5, w: .47, h: .46 }]]
+  ]
+};
 function picAspect(it) { if (it.gfx) return GFX_ASPECT[it.gfx] || 2; const a = assetById(it.pic); if (!a) return 1.3; const key = assetKey(a.id); if (a.kind === 'scene' || it.full) { const i = R.img[key]; return i ? i.width / i.height : 1.33; } const st = sticker(key, assetMode(a, it)); return st ? st.width / st.height : 0.82; }
 /* ============ text never sits on a picture ============
    Each tag is measured the way it is drawn, then put in the nearest free spot (away from every picture,
@@ -1843,6 +1936,11 @@ function picAspect(it) { if (it.gfx) return GFX_ASPECT[it.gfx] || 2; const a = a
 function tagBox(tg, W, H, s, port) {
   const c = (R.mctx = R.mctx || cv(8, 8).getContext('2d')), it = tg.it, style = tg.style;
   let w, h;
+  if (isMyth() && !tg.bold) {   // same font, size and line wrap as drawMythTag (+ the ornament line under it)
+    const size = tg.size * (style === 'title' ? 1.25 : style === 'number' ? 1.0 : 1.12), maxW = W * (port ? 0.86 : 0.5); c.font = mythF(size);
+    const lines = []; let cur = ''; String(it.tag || '').split(/\s+/).filter(Boolean).forEach(wd => { const t = cur ? cur + ' ' + wd : wd; if (cur && c.measureText(t).width > maxW) { lines.push(cur); cur = wd; } else cur = t; }); if (cur) lines.push(cur);
+    w = Math.max(1, ...lines.map(l => c.measureText(l).width)) + size * 0.9; h = size * 1.25 * Math.max(1, lines.length) + size * 0.7; return { w, h };
+  }
   if (tg.bold) {
     const size = 64 * s * (port ? 1.3 : 1) * (style === 'number' ? 2.4 : style === 'title' ? 1.3 : style === 'note' ? 0.9 : 1), maxW = W * (port ? 0.84 : 0.4);
     c.font = sansF(size, 800); const lines = []; let cur = '';
@@ -1858,7 +1956,7 @@ function tagBox(tg, W, H, s, port) {
 }
 function placeTags(pieces, tags, W, H, s, port) {
   if (!tags.length) return 0;
-  const mo = +S.settings.motion || 0, z = 1 + 0.05 * mo, pad = (12 + 30 * mo) * s, gap = 14 * s;
+  const mo = +S.settings.motion || 0, z = 1 + 0.05 * mo, pad = (12 + 30 * mo) * s, gap = 14 * s, hg = 80 * s;   // hg: wide side gap, so two tags never read as one line
   const ov = (a, b) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
   const fixed = [];
   if (S.settings.captions === 'words') { const capY = H * (S.settings.capPos === 'low' ? (port ? 0.8 : 0.86) : (port ? 0.42 : 0.82)), bh = (port ? 80 : 62) * s * 0.85; fixed.push({ x: W * 0.05, y: capY - bh, w: W * 0.9, h: bh * 2 }); }
@@ -1879,11 +1977,13 @@ function placeTags(pieces, tags, W, H, s, port) {
       let best = null; const nx = 48, ny = 40;
       for (let gx = 0; gx <= nx; gx++) for (let gy = 0; gy <= ny; gy++) {
         const cx = x1 > x0 ? x0 + (x1 - x0) * gx / nx : W / 2, cy = y1 > y0 ? y0 + (y1 - y0) * gy / ny : H / 2, box = { x: cx - b.w / 2, y: cy - b.h / 2, w: b.w, h: b.h };
-        let o = 0; obs.forEach(r => { o += ov(box, r); }); out.forEach(r => { o += ov(box, { x: r.x - gap, y: r.y - gap, w: r.w + gap * 2, h: r.h + gap * 2 }) * 2; });
-        const sc = o / (b.w * b.h) * 100 + Math.hypot(cx - want[i].x, cy - want[i].y) / Math.hypot(W, H);
-        if (!best || sc < best.sc) best = { sc, o, cx, cy, box };
+        let o = 0; obs.forEach(r => { o += ov(box, r); }); out.forEach(r => { o += ov(box, { x: r.x - hg, y: r.y - gap, w: r.w + hg * 2, h: r.h + gap * 2 }) * 2; });
+        // two tags side by side on one row read as one sentence: prefer putting them one under the other
+        let row = 0; out.forEach(r => { const vy = Math.min(box.y + box.h, r.y + r.h) - Math.max(box.y, r.y), hx = Math.max(r.x - (box.x + box.w), box.x - (r.x + r.w)); if (vy > 0 && hx < W * 0.22) row += 6; });
+        const sc = o / (b.w * b.h) * 100 + row + Math.hypot(cx - want[i].x, cy - want[i].y) / Math.hypot(W, H);
+        if (!best || sc < best.sc) best = { sc, o, row, cx, cy, box };
       }
-      bad += best.o / (b.w * b.h); out.push(best.box); t._p = { x: best.cx, y: best.cy };
+      bad += best.o / (b.w * b.h) + (best.row ? 0.25 : 0); out.push(best.box); t._p = { x: best.cx, y: best.cy };
     });
     return { bad, pos: tags.map(t => t._p) };
   };
@@ -1905,7 +2005,8 @@ function collageLayout(o, W, H) {
   if (R.lay.size > 400) R.lay.clear();
   const sh = o.sh, port = H > W * 1.05, s = Math.min(W, H) / 1080, rnd0 = mulberry32(hashStr(String(sh.id)) ^ 0x9e37), mirror = rnd0() < 0.5;
   const pics = sh.items.map((it, j) => ({ it, j })).filter(x => (x.it.pic && !x.it.full) || x.it.gfx), n = Math.min(4, pics.length);
-  const tpl = (port ? TPL.port : TPL.land)[Math.max(0, n - 1)] || [];
+  const P = stylePack(), alts = ((port ? TPL_ALT.port : TPL_ALT.land)[Math.max(0, n - 1)]) || [], vi = P && alts.length ? (P.tpl + hashStr(String(sh.id))) % (alts.length + 1) : 0;
+  const tpl = vi ? alts[vi - 1] : ((port ? TPL.port : TPL.land)[Math.max(0, n - 1)] || []);
   const usedA = new Set(), pieces = [];
   pics.forEach(({ it, j }, q) => {
     const a = it.gfx ? null : assetById(it.pic), r = mulberry32(hashStr(sh.id + ':' + j));
@@ -1916,7 +2017,7 @@ function collageLayout(o, W, H) {
     if (kind === 'gfx') { const k = 0.94; rect = fitRect(asp, { x: reg.x + reg.w * (1 - k) / 2, y: reg.y + reg.h * (1 - k) / 2, w: reg.w * k, h: reg.h * k }); const minW = W * (port ? 0.86 : 0.5); if (rect.w < minW) { const c = rect.x + rect.w / 2, cy0 = rect.y + rect.h / 2, w2 = Math.min(minW, W * 0.94), h2 = w2 / asp; rect = { x: clamp(c - w2 / 2, W * 0.03, W * 0.97 - w2), y: clamp(cy0 - h2 / 2, H * 0.03, H * 0.97 - h2), w: w2, h: h2 }; }
       if (S.settings.captions === 'words') { const capTop = H * (S.settings.capPos === 'low' ? (port ? 0.8 : 0.86) : (port ? 0.42 : 0.82)) - (port ? 80 : 62) * s * 0.9; if (capTop > H * 0.6 && rect.y + rect.h > capTop) { const room = capTop - H * 0.04; if (rect.h > room) { const k2 = room / rect.h; rect = { x: rect.x + rect.w * (1 - k2) / 2, y: rect.y, w: rect.w * k2, h: room }; } rect.y = Math.max(H * 0.04, capTop - rect.h); } } }
     else if (kind === 'scene') {
-      shape = it.shape || (isMyth() ? (reg.w >= W * 0.8 && r() < 0.4 ? 'band' : 'frame') : S.settings.edges === 'clean' ? (reg.w >= W * 0.8 && r() < 0.5 ? 'band' : r() < 0.5 ? 'plain' : 'tape') : isMod() ? (reg.w >= W * 0.8 && r() < 0.5 ? 'band' : r() < 0.5 ? 'plain' : r() < 0.6 ? 'tape' : 'torn') : (reg.w >= W * 0.8 && r() < 0.6 ? 'band' : r() < 0.55 ? 'torn' : 'tape'));
+      shape = it.shape || (isMyth() ? (reg.w >= W * 0.8 && r() < 0.4 ? 'band' : P ? P.frames[Math.floor(r() * P.frames.length)] : 'frame') : S.settings.edges === 'clean' ? (reg.w >= W * 0.8 && r() < 0.5 ? 'band' : r() < 0.5 ? 'plain' : 'tape') : isMod() ? (reg.w >= W * 0.8 && r() < 0.5 ? 'band' : r() < 0.5 ? 'plain' : r() < 0.6 ? 'tape' : 'torn') : (reg.w >= W * 0.8 && r() < 0.6 ? 'band' : r() < 0.55 ? 'torn' : 'tape'));
       // the whole picture must show: the frame on screen has the picture's own shape (no cropping).
       // A full-width band only works for wide pictures; a square / tall picture becomes a normal print.
       if (shape === 'band') { const bw = W * 1.06, bh = bw / asp; if (bh <= reg.h * 1.15 && bh <= H * 0.8) rect = { x: -W * 0.03, y: clamp(reg.y + (reg.h - bh) / 2, 0, H - bh), w: bw, h: bh }; else shape = isMyth() ? 'frame' : isMod() || S.settings.edges === 'clean' ? 'tape' : 'torn'; }
@@ -1936,7 +2037,7 @@ function collageLayout(o, W, H) {
   let freeTop = 0, corner = 0; const tags = [];
   sh.items.forEach((it, j) => {
     if (it.tag == null) return; const style = it.style || 'paper', r = mulberry32(hashStr(sh.id + 't' + j));
-    const size = (style === 'number' ? 150 : style === 'title' ? 88 : style === 'stamp' ? 74 : style === 'note' ? 54 : 62) * s * (port ? 1.35 : 1);
+    const size = (style === 'number' ? 150 : style === 'title' ? 88 : style === 'stamp' ? 74 : style === 'note' ? 54 : 62) * s * (port ? 1.35 : 1) * (isMyth() && style !== 'number' ? 1.3 : 1);
     let anchor = it.on ? byId(it.on) : null; if (!anchor && style !== 'title' && freeTop > 0) anchor = [...pieces].reverse().find(p => p.j < j) || null;
     let x, y, align = 'center';
     if (anchor) { const R0 = anchor.rect, c = (corner++ + (mirror ? 1 : 0)) % 4; const ix = c === 0 || c === 3 ? R0.x + R0.w * 0.92 : R0.x + R0.w * 0.08, iy = c < 2 ? R0.y + R0.h * 0.12 : R0.y + R0.h * 0.86; x = ix; y = iy; align = c === 0 || c === 3 ? 'right' : 'left'; }
@@ -1979,10 +2080,11 @@ function drawScenePiece(ctx, pc, x, y, w, h, s, lt, tr) {
   const M = isMod();
   ctx.save();
   if (pc.shape === 'frame') mythFrame(ctx, x, y, w, h, s);
+  else if (pc.shape === 'gline' || pc.shape === 'arch') mythLine(ctx, x, y, w, h, s, pc.shape === 'arch');
   else if (outer) { shadowOn(ctx, s, M ? 0.45 : 0.6); ctx.fillStyle = M ? '#fdfdfc' : '#efe4c9'; polyPath(ctx, outer, x, y); ctx.fill(); shadowOff(ctx); }
   else { const b = pc.shape === 'plain' ? 0 : 7 * s; shadowOn(ctx, s, M ? 0.45 : 0.7); ctx.fillStyle = M ? '#ffffff' : '#f3ead6'; ctx.fillRect(x - b, y - b, w + b * 2, h + b * 2); shadowOff(ctx); }
   ctx.save();
-  if (inner) { polyPath(ctx, inner, x, y); ctx.clip(); } else { ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip(); }
+  if (inner) { polyPath(ctx, inner, x, y); ctx.clip(); } else if (pc.shape === 'arch') { archPath(ctx, x, y, w, h); ctx.clip(); } else { ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip(); }
   if (src) { const kb = 1.01 + 0.02 * clamp(lt / 8, 0, 1), sa = src.width / src.height; let iw = w * kb, ih = iw / sa; if (ih < h * kb) { ih = h * kb; iw = ih * sa; } const px = Math.sin(pc.phase) * (iw - w) * 0.3 * clamp(lt / 6, 0, 1); drawDepth(ctx, pc.key, src, x + (w - iw) / 2 + px, y + (h - ih) / 2, iw, ih, clamp((lt - (tr.t0p || 0)) / 5, 0, 1), px, s); }
   else drawMissing(ctx, x, y, w, h, s, (R.slotN || {})[pc.key]);
   if (tr.develop > 0) { ctx.fillStyle = M ? `rgba(250,250,248,${tr.develop})` : `rgba(232,214,176,${tr.develop})`; ctx.fillRect(x, y, w, h); }
@@ -1991,6 +2093,13 @@ function drawScenePiece(ctx, pc, x, y, w, h, s, lt, tr) {
   ctx.restore();
   if (pc.shape === 'tape') { const tw = Math.min(150 * s, w * 0.28), th = (M ? 30 : 40) * s; [[0.08, -0.6], [0.92, 0.6]].forEach(([fx, rr]) => { ctx.save(); ctx.translate(x + w * fx, y + 4 * s); ctx.rotate(rr); ctx.fillStyle = M ? MOD.tape : 'rgba(236,224,186,0.8)'; ctx.fillRect(-tw / 2, -th / 2, tw, th); ctx.restore(); }); }
   ctx.restore();
+}
+function archPath(ctx, x, y, w, h) { const r = Math.min(w * 0.5, h * 0.42); ctx.beginPath(); ctx.moveTo(x, y + h); ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y + r * 0.12, x + w / 2, y); ctx.quadraticCurveTo(x + w, y + r * 0.12, x + w, y + r); ctx.lineTo(x + w, y + h); ctx.closePath(); }
+function mythLine(ctx, x, y, w, h, s, arch) {   // thin glowing gold line (plain rectangle or temple arch)
+  const o = 5 * s, path = () => { if (arch) archPath(ctx, x - o, y - o, w + o * 2, h + o * 2); else { ctx.beginPath(); ctx.rect(x - o, y - o, w + o * 2, h + o * 2); } };
+  ctx.save(); ctx.shadowColor = 'rgba(255,170,60,0.55)'; ctx.shadowBlur = 34 * s; ctx.fillStyle = '#1c0d04'; path(); ctx.fill(); ctx.restore();
+  const g = ctx.createLinearGradient(x, y, x + w, y + h); g.addColorStop(0, '#f8dc8c'); g.addColorStop(0.5, '#b07a22'); g.addColorStop(1, '#ffe8a6');
+  ctx.save(); ctx.strokeStyle = g; ctx.lineWidth = Math.max(2, 3.5 * s); path(); ctx.stroke(); ctx.restore();
 }
 function mythFrame(ctx, x, y, w, h, s) {   // ornate gold frame with a dark inner line and corner jewels
   const b = Math.max(6, Math.min(w, h) * 0.035), o = b + 3 * s;
@@ -2507,7 +2616,8 @@ const MYTH_ASSETS = `- kind "cutout": ONE character or object alone (a god, a he
 - prompt: English, concrete: who, what they do, expression, setting, time of day, camera view. Be true to the story and the scriptures. Do NOT describe an art style. No text or letters in the picture.
 - CHARACTERS STAY THE SAME: give every recurring character ONE fixed look and copy it word for word into every prompt where that character appears (for example "Karna, a young warrior with shining golden armour and golden earrings, long dark hair, red dhoti"). Never change their clothes, colours or age between pictures.
 - Show emotions and key moments with strong pictures (a hand refusing a crown, a lone diya, an arrow in flight, feet being touched in respect) — visual symbols work very well.
-- Show gods with respect: dignified, calm, glowing; never comic.`;
+- Show gods with respect: dignified, calm, glowing; never comic.
+- VARIETY: never show the same cut-out on two boards in a row, and use one asset at most 2 times in the whole video. For a character who comes back often, make extra assets (another pose, a close-up, a different moment) instead of repeating one picture.`;
 const MOD_INTRO = 'You are the visual director of an explainer video in the "modern editorial paper collage" style: clean white crumpled paper; realistic BLACK-AND-WHITE halftone photo cut-outs where only ONE key object (or one part of it) is bright red-orange; big pastel green and pink circles behind the subjects, green tape strips, grid-paper and halftone patches; witty visual metaphors (a bank building as a man\'s head, a money tree, a house on an open palm, a dollar balloon being pumped). Pictures pop in one by one, exactly on the word where the narrator mentions them, with a stop-motion feel; short bold sans-serif text types on. Every few seconds the camera whips to a new collage "board".';
 
 </script>
@@ -3170,31 +3280,68 @@ function hookSfx(add) {
 }
 
 /* ============ MYTHOLOGY: mandala, light rays, embers, gold titles ============ */
-function mythMandala() {
-  if (R.mandala) return R.mandala; const N = 1024, c = cv(N, N), x = c.getContext('2d'), C = N / 2; x.translate(C, C);
-  x.strokeStyle = '#f2c766'; x.fillStyle = '#f2c766'; x.lineWidth = 3;
+function mythMandala(col = '#f2c766') {
+  R.mandalas = R.mandalas || {}; if (R.mandalas[col]) return R.mandalas[col]; const N = 1024, c = cv(N, N), x = c.getContext('2d'), C = N / 2; x.translate(C, C);
+  x.strokeStyle = col; x.fillStyle = col; x.lineWidth = 3;
   const ring = (r0) => { x.beginPath(); x.arc(0, 0, r0, 0, 6.283); x.stroke(); };
   [80, 150, 250, 330, 420, 500].forEach(ring);
   const petals = (n, r0, r1, wdt) => { for (let k = 0; k < n; k++) { x.save(); x.rotate(k / n * 6.283); x.beginPath(); x.moveTo(0, -r0); x.quadraticCurveTo(wdt, -(r0 + r1) / 2, 0, -r1); x.quadraticCurveTo(-wdt, -(r0 + r1) / 2, 0, -r0); x.stroke(); x.restore(); } };
   petals(8, 20, 80, 30); petals(16, 80, 150, 26); petals(24, 150, 250, 30); petals(32, 250, 330, 22); petals(48, 330, 420, 18);
   for (let k = 0; k < 64; k++) { x.save(); x.rotate(k / 64 * 6.283); x.beginPath(); x.arc(0, -460, 10, 0, 6.283); x.fill(); x.fillRect(-1.5, -500, 3, 30); x.restore(); }
   for (let k = 0; k < 96; k++) { x.save(); x.rotate(k / 96 * 6.283); x.beginPath(); x.arc(0, -290, 3.5, 0, 6.283); x.fill(); x.restore(); }
-  R.mandala = c; return c;
+  R.mandalas[col] = c; return c;
+}
+function mythChakra(col) {   // Sudarshan-like wheel: spokes, rings, hub
+  R.chakras = R.chakras || {}; if (R.chakras[col]) return R.chakras[col]; const N = 1024, c = cv(N, N), x = c.getContext('2d'); x.translate(N / 2, N / 2);
+  x.strokeStyle = col; x.fillStyle = col; x.lineWidth = 4; [70, 120, 420, 460, 500].forEach(r0 => { x.beginPath(); x.arc(0, 0, r0, 0, 6.283); x.stroke(); });
+  for (let k = 0; k < 24; k++) { x.save(); x.rotate(k / 24 * 6.283); x.beginPath(); x.moveTo(-6, -120); x.quadraticCurveTo(-22, -270, 0, -420); x.quadraticCurveTo(22, -270, 6, -120); x.stroke(); x.beginPath(); x.arc(0, -440, 8, 0, 6.283); x.fill(); x.restore(); }
+  for (let k = 0; k < 72; k++) { x.save(); x.rotate(k / 72 * 6.283); x.beginPath(); x.moveTo(0, -460); x.lineTo(-10, -500); x.lineTo(10, -500); x.closePath(); x.fill(); x.restore(); }
+  x.beginPath(); x.arc(0, 0, 40, 0, 6.283); x.fill(); R.chakras[col] = c; return c;
+}
+function mythLotus(col) {   // big lotus outline rising from the bottom
+  R.lotus = R.lotus || {}; if (R.lotus[col]) return R.lotus[col]; const c = cv(1200, 600), x = c.getContext('2d'); x.translate(600, 590); x.strokeStyle = col; x.lineWidth = 4;
+  [[11, 560, 0.25], [9, 470, 0.32], [7, 380, 0.42], [5, 290, 0.55]].forEach(([n, L, wd]) => { for (let k = 0; k < n; k++) { const a = -Math.PI / 2 + (k - (n - 1) / 2) * (Math.PI * 0.9 / n); x.save(); x.rotate(a + Math.PI / 2); x.beginPath(); x.moveTo(0, 0); x.quadraticCurveTo(L * wd, -L * 0.55, 0, -L); x.quadraticCurveTo(-L * wd, -L * 0.55, 0, 0); x.stroke(); x.restore(); } });
+  R.lotus[col] = c; return c;
 }
 function drawMythBack(ctx, W, H, gt, s) {
-  const m = mythMandala(), z = Math.max(W, H) * 1.05, cos = theme().cosmic;
-  ctx.save(); ctx.globalAlpha = cos ? 0.08 : 0.11; ctx.translate(W / 2, H * 0.48); ctx.rotate(gt * 0.025); ctx.drawImage(m, -z / 2, -z / 2, z, z); ctx.restore();
+  const T = theme(), P = stylePack(), cos = T.cosmic, col = T.motifCol || '#f2c766', ec = T.ember || '255,214,140', k = R.curK || 0;
+  const motif = P ? P.motifs[Math.floor(k / P.every) % P.motifs.length] : 'mandala', side = P && P.motifSide, flip = k % 2 ? -1 : 1;
+  if (motif === 'mandala' || motif === 'chakra') {
+    const m = motif === 'chakra' ? mythChakra(col) : mythMandala(col), z = side ? H * 1.35 : Math.max(W, H) * 1.05;
+    ctx.save(); ctx.globalAlpha = cos ? 0.08 : 0.11; ctx.translate(side ? W * (flip > 0 ? 0.86 : 0.14) : W / 2, side ? H * 0.5 : H * 0.48); ctx.rotate(gt * (motif === 'chakra' ? 0.05 : 0.025) * flip); ctx.drawImage(m, -z / 2, -z / 2, z, z); ctx.restore();
+  } else if (motif === 'lotus') {
+    const m = mythLotus(col), w = Math.min(W * 1.1, H * 1.9), h = w / 2, br = 1 + 0.015 * Math.sin(gt * 0.6);
+    ctx.save(); ctx.globalAlpha = 0.1; ctx.translate(W / 2, H * 1.02); ctx.scale(br, br); ctx.drawImage(m, -w / 2, -h, w, h); ctx.restore();
+  } else if (motif === 'clouds') {   // slow drifting mist
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; const rr = mulberry32(57);
+    for (let i = 0; i < 9; i++) { const sp = 0.012 + rr() * 0.02, cx = ((rr() + gt * sp) % 1.4 - 0.2) * W, cy = H * (0.15 + rr() * 0.75), R2 = (220 + rr() * 260) * s; const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R2); g.addColorStop(0, `rgba(${ec},0.07)`); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(cx - R2, cy - R2, R2 * 2, R2 * 2); }
+    ctx.restore();
+  }
+  if (P && !P.rays) return;
   ctx.save(); ctx.globalCompositeOperation = 'lighter';   // slow light rays from above
   for (let k = 0; k < 6; k++) { const a = -0.55 + k * 0.22 + Math.sin(gt * 0.15 + k) * 0.04, al = 0.035 + 0.025 * Math.sin(gt * 0.4 + k * 1.7), L = Math.hypot(W, H) * 1.1, ox = W * 0.5, oy = -H * 0.15;
-    const g = ctx.createLinearGradient(ox, oy, ox + Math.sin(a) * L, oy + Math.cos(a) * L); g.addColorStop(0, `rgba(255,214,140,${al * 2})`); g.addColorStop(1, 'rgba(255,214,140,0)');
+    const g = ctx.createLinearGradient(ox, oy, ox + Math.sin(a) * L, oy + Math.cos(a) * L); g.addColorStop(0, `rgba(${ec},${al * 2})`); g.addColorStop(1, `rgba(${ec},0)`);
     ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ox + Math.sin(a - 0.06) * L, oy + Math.cos(a - 0.06) * L); ctx.lineTo(ox + Math.sin(a + 0.06) * L, oy + Math.cos(a + 0.06) * L); ctx.closePath(); ctx.fill(); }
   ctx.restore();
 }
 function drawMythFront(ctx, W, H, gt, s) {   // glowing embers / diya sparks drifting up
   if (S.settings.dust === 'off' && S.settings.decor === 'off') return;
-  const r = mulberry32(31), n = 34, cos = theme().cosmic; ctx.save(); ctx.globalCompositeOperation = 'lighter';
-  for (let i = 0; i < n; i++) { const sp = 0.25 + r() * 0.7, x0 = r() * W, ph = r() * 6.28, sz = (1.4 + r() * 3.2) * s, yy = H * 1.05 - ((gt * sp * H * 0.06 + r() * H * 1.1) % (H * 1.1)), xx = x0 + Math.sin(gt * 0.6 + ph) * 26 * s, tw = 0.5 + 0.5 * Math.sin(gt * 3 + ph * 3);
-    const g = ctx.createRadialGradient(xx, yy, 0, xx, yy, sz * 5); g.addColorStop(0, cos ? `rgba(220,215,255,${0.7 * tw})` : `rgba(255,205,110,${0.75 * tw})`); g.addColorStop(0.25, cos ? `rgba(160,150,255,${0.25 * tw})` : `rgba(255,140,40,${0.25 * tw})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+  const T = theme(), P = stylePack(), kind = P ? P.particles : 'embers', ec = T.ember || '255,205,110';
+  if (kind === 'petals') {   // flower petals floating down
+    const r = mulberry32(41), pc = T.petal || '255,150,110'; ctx.save();
+    for (let i = 0; i < 22; i++) { const sp = 0.3 + r() * 0.5, x0 = r() * W, ph = r() * 6.28, sz = (7 + r() * 7) * s, yy = ((gt * sp * H * 0.05 + r() * H * 1.2) % (H * 1.2)) - H * 0.1, xx = x0 + Math.sin(gt * 0.7 + ph) * 40 * s;
+      ctx.save(); ctx.translate(xx, yy); ctx.rotate(gt * (0.6 + r()) + ph); ctx.scale(1, 0.45 + 0.35 * Math.sin(gt * 2 + ph)); ctx.fillStyle = `rgba(${pc},0.55)`; ctx.beginPath(); ctx.ellipse(0, 0, sz, sz * 0.55, 0, 0, 6.283); ctx.fill(); ctx.restore(); }
+    ctx.restore(); return;
+  }
+  if (kind === 'stars') {   // still twinkling stars with a small cross sparkle
+    const r = mulberry32(43); ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 40; i++) { const xx = r() * W, yy = r() * H, ph = r() * 6.28, tw = Math.max(0, Math.sin(gt * (1 + r() * 1.5) + ph)), L = (4 + r() * 9) * s * tw; if (tw < 0.05) continue;
+      ctx.strokeStyle = `rgba(${ec},${0.7 * tw})`; ctx.lineWidth = Math.max(1, 1.3 * s); ctx.beginPath(); ctx.moveTo(xx - L, yy); ctx.lineTo(xx + L, yy); ctx.moveTo(xx, yy - L); ctx.lineTo(xx, yy + L); ctx.stroke(); }
+    ctx.restore(); return;
+  }
+  const r = mulberry32(31), n = kind === 'dust' ? 60 : 34, cos = theme().cosmic; ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < n; i++) { const sp = (kind === 'dust' ? 0.08 : 0.25) + r() * (kind === 'dust' ? 0.2 : 0.7), x0 = r() * W, ph = r() * 6.28, sz = (kind === 'dust' ? 0.6 + r() * 1.3 : 1.4 + r() * 3.2) * s, yy = H * 1.05 - ((gt * sp * H * 0.06 + r() * H * 1.1) % (H * 1.1)), xx = x0 + Math.sin(gt * 0.6 + ph) * 26 * s, tw = 0.5 + 0.5 * Math.sin(gt * 3 + ph * 3);
+    const g = ctx.createRadialGradient(xx, yy, 0, xx, yy, sz * 5); g.addColorStop(0, `rgba(${ec},${0.75 * tw})`); g.addColorStop(0.25, `rgba(${ec},${0.22 * tw})`); g.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = g; ctx.fillRect(xx - sz * 5, yy - sz * 5, sz * 10, sz * 10); }
   ctx.restore();
 }
@@ -3367,7 +3514,7 @@ $$('.tab').forEach(b => b.onclick = () => showTab(b.dataset.tab));
 $$('[data-go]').forEach(b => b.onclick = () => showTab(b.dataset.go));
 
 /* ============ settings ============ */
-const BIND = ['edges', 'whooshVol', 'endFade', 'hook', 'hookText', 'depth', 'shortEnd', 'shortCaps', 'gemMark', 'mode', 'animVar', 'decor', 'dust', 'stopmo', 'capPos', 'capColor', 'split', 'aspect', 'textLang', 'pace', 'look', 'perImage', 'theme', 'photo', 'accent', 'trans', 'motion', 'grain', 'vignette', 'captions', 'watermark', 'sfx', 'sfxVol', 'musicVol', 'duck', 'res', 'fps'];
+const BIND = ['variety', 'edges', 'whooshVol', 'endFade', 'hook', 'hookText', 'depth', 'shortEnd', 'shortCaps', 'gemMark', 'mode', 'animVar', 'decor', 'dust', 'stopmo', 'capPos', 'capColor', 'split', 'aspect', 'textLang', 'pace', 'look', 'perImage', 'theme', 'photo', 'accent', 'trans', 'motion', 'grain', 'vignette', 'captions', 'watermark', 'sfx', 'sfxVol', 'musicVol', 'duck', 'res', 'fps'];
 const NUMS = new Set(['whooshVol', 'perImage', 'motion', 'grain', 'sfxVol', 'musicVol', 'res', 'fps']);
 $('#look').innerHTML = Object.entries(LOOKS).map(([k, v]) => `<option value="${k}">${v.name}</option>`).join('');
 function applyModeDefaults() {
@@ -3378,15 +3525,18 @@ function applyModeDefaults() {
   R.paper.clear(); R.filt.clear(); if (R.mod) R.mod.clear(); applySettingsToUI(); renderSlots();
   toast(m === 'myth' ? 'Mythology style: dark temple background, golden mandala + light rays, glowing figures, gold frames and titles, divine light transitions, temple bell sounds' : m === 'modern' ? 'Modern collage: white paper, B&W halftone pictures with one red-orange part, circles + tape, stop-motion, 6 pictures per AI image' : m === 'collage' ? 'Layered collage style: parchment, sepia pictures, word captions, 6 pictures per AI image' : 'Classic Vox style');
 }
-function applySettingsToUI() { if ($('#aspect2')) $('#aspect2').value = S.settings.aspect; if ($('#captions2')) $('#captions2').value = S.settings.captions; if ($('#ccBtn')) $('#ccBtn').classList.toggle('on', S.settings.captions !== 'off'); BIND.forEach(k => { const el = $('#' + k); if (el) el.value = S.settings[k]; }); $('#projTitle').value = S.settings.title || ''; }
+function applySettingsToUI() { if ($('#aspect2')) $('#aspect2').value = S.settings.aspect; if ($('#captions2')) $('#captions2').value = S.settings.captions; if ($('#ccBtn')) $('#ccBtn').classList.toggle('on', S.settings.captions !== 'off'); BIND.forEach(k => { const el = $('#' + k); if (el) el.value = S.settings[k]; }); $('#projTitle').value = S.settings.title || ''; R.pack = null; showLook(); }
 BIND.forEach(k => { const el = $('#' + k); if (!el) return; el.addEventListener(el.type === 'range' || el.type === 'color' || el.tagName === 'INPUT' ? 'input' : 'change', () => {
   S.settings[k] = NUMS.has(k) ? +el.value : el.value;
   if (k === 'mode') applyModeDefaults();
   if (k === 'captions') showCaptions();
   if (k === 'aspect') { sizePreview(); if ($('#aspect2')) $('#aspect2').value = S.settings.aspect; if ($('#aspect')) $('#aspect').value = S.settings.aspect; } if (k === 'theme' || k === 'accent') { R.paper.clear(); R.filt.clear(); } if (k === 'edges') R.lay && R.lay.clear();
+  if (k === 'variety' || k === 'mode') { R.pack = null; R.paper.clear(); R.lay && R.lay.clear(); showLook(); }
   if (k === 'perImage' || k === 'look') renderSlots(); if (k === 'musicVol' && S.musicBlob) music.volume = clamp(musicGainAt(nowT()), 0, 1);
   touch(); save(); redraw();
 }); });
+function showLook() { const el = $('#lookInfo'); if (el) el.textContent = packText(); }
+$('#newLookBtn').onclick = () => { S.settings.variety = 'auto'; if ($('#variety')) $('#variety').value = 'auto'; S.settings.styleSeed = (Math.floor(Math.random() * 2147483646) + 1); R.pack = null; R.paper.clear(); R.lay && R.lay.clear(); touch(); save(); redraw(); showLook(); toast('New look — ' + packText()); };
 function showCaptions() { const v = S.settings.captions; $('#ccBtn').classList.toggle('on', v !== 'off'); $('#ccBtn').title = v === 'off' ? 'Captions are OFF (tap to turn on)' : 'Captions are ON (tap to turn off)'; if ($('#captions2')) $('#captions2').value = v; if ($('#captions')) $('#captions').value = v; }
 $('#ccBtn').onclick = () => { if (S.settings.captions !== 'off') { S.settings.lastCaptions = S.settings.captions; S.settings.captions = 'off'; } else S.settings.captions = S.settings.lastCaptions || 'words'; showCaptions(); touch(); save(); redraw(); toast(S.settings.captions === 'off' ? 'Captions OFF' : 'Captions ON'); };
 $('#captions2').onchange = e => { S.settings.captions = e.target.value; showCaptions(); touch(); save(); redraw(); };
