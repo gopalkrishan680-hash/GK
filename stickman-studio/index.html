@@ -448,6 +448,15 @@ html:not(.mode-layers) .layers-only { display: none !important; }
             <option value="glow">Glow silhouette (channel style)</option>
             <option value="doodle">Whiteboard doodle</option>
             <option value="cartoon">Colourful stickman cartoon</option>
+            <optgroup label="Mythology / Indian">
+              <option value="miniature">Indian miniature painting</option>
+              <option value="pattachitra">Pattachitra folk art</option>
+              <option value="comic">Retro Indian comic book</option>
+              <option value="epic">Cinematic epic painting</option>
+              <option value="mural">Temple mural / fresco</option>
+              <option value="shadow">Shadow puppet silhouette</option>
+              <option value="storybook">Soft 2D storybook</option>
+            </optgroup>
             <option value="custom">Custom style</option>
           </select>
         </label>
@@ -736,6 +745,13 @@ const STYLES = {
   glow: { text: 'Cinematic silhouette style: pure black silhouette characters with a soft glowing rim-light outline, plain round heads with no hair, big white oval eyes, expressive eyebrows. Moody dark backgrounds with blurred depth of field, warm and cool coloured light, film still look.', gutter: 'white' },
   doodle: { text: 'Whiteboard explainer doodle: black marker stick figures and simple sketched objects on a clean white board, light hand-drawn shading, occasional red and blue marker accents, minimal and easy to read.', gutter: 'black' },
   cartoon: { text: 'Colourful flat 2D cartoon with stickman-like characters: round heads, thin limbs, big expressive eyes, bright flat colour backgrounds, soft shadows, playful and clean vector look.', gutter: 'white' },
+  miniature: { text: 'Indian miniature painting style (Mughal and Rajput): flat perspective, rich jewel colours (deep red, gold, emerald green, lapis blue), fine detailed brushwork, ornate clothing and jewellery, stylised trees, rivers and palaces, faces in graceful profile, soft aged paper texture.', gutter: 'black' },
+  pattachitra: { text: 'Pattachitra folk painting style: thick black outlines, flat bright colours (red, yellow, white, black, indigo), large expressive almond-shaped eyes, decorative patterns on clothes and jewellery, simple plain background, traditional Indian folk art look.', gutter: 'white' },
+  comic: { text: 'Retro Indian comic book illustration (1970s-80s): bold ink outlines, flat printed colours with a light halftone dot texture, dramatic heroic poses, expressive faces, traditional Indian clothes and ornaments, vintage paper look.', gutter: 'black' },
+  epic: { text: 'Epic cinematic digital painting of Indian mythology: dramatic god rays, glowing divine light and auras, deep shadows, rich warm gold and teal colours, mist and dust in the air, painterly brush strokes, majestic film still composition.', gutter: 'white' },
+  mural: { text: 'Ancient Indian temple mural fresco style (like Ajanta cave paintings): earthy ochre, terracotta, faded green and soft black, cracked old plaster texture, graceful flat figures, soft worn edges, timeless sacred mood.', gutter: 'black' },
+  shadow: { text: 'Traditional shadow puppet silhouette style: solid black figures with ornate cut-out details in crowns, weapons and jewellery, glowing orange, gold and red sunset backgrounds, layered paper depth, strong clear outlines and poses.', gutter: 'white' },
+  storybook: { text: 'Soft 2D storybook illustration of an Indian tale: warm pastel colours, gentle gradients, rounded friendly characters with kind expressive faces, traditional Indian clothes, light paper grain, cosy and emotional mood.', gutter: 'black' },
   custom: { text: '', gutter: 'white' }
 };
 const CHANNEL_CHARS = `Rohan (hero): black silhouette, plain round head with NO hair, white oval eyes, expressive eyebrows, young man
@@ -1053,7 +1069,8 @@ function directorPrompt(idx) {
   const head = partial
     ? `Below are scenes ${first + 1} to ${last + 1} (${list.length} scenes) of a voiceover script split into ${all} numbered scenes.`
     : `Below is a voiceover script split into ${all} numbered scenes.`;
-  return `You are a storyboard director for a stickman story video. ${head} Each scene is shown on screen for only 1-3 seconds, so each needs ONE clear, simple image.
+  const kind = ['stickman', 'glow', 'doodle', 'cartoon'].includes(S.settings.style) ? 'a stickman story video' : S.settings.style === 'custom' ? 'an illustrated story video' : 'an illustrated Indian mythology / story video';
+  return `You are a storyboard director for ${kind}. ${head} Each scene is shown on screen for only 1-3 seconds, so each needs ONE clear, simple image.
 ${ctx}
 IMPORTANT: write a line for EVERY scene listed below (${list.length} lines), keep the scene numbers exactly as given, do not skip, merge or stop early.
 
