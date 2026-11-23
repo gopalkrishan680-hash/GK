@@ -58,13 +58,17 @@ jobs:
             echo "No SS_KEYSTORE_BASE64 secret: signing with the cached key"
           fi
           keytool -list -v -keystore "$SS_KEYSTORE_FILE" -storepass "$SS_KEYSTORE_PASSWORD" | grep -E "SHA1:" || true
-          gradle -p stickman-android :app:assembleRelease --no-daemon --stacktrace
+          gradle -p stickman-android :app:assembleStickmanRelease :app:assembleStudio3dRelease --no-daemon --stacktrace
       - name: Name the APK
-        run: cp stickman-android/app/build/outputs/apk/release/app-release.apk StickmanStudio.apk
+        run: |
+          cp stickman-android/app/build/outputs/apk/stickman/release/app-stickman-release.apk StickmanStudio.apk
+          cp stickman-android/app/build/outputs/apk/studio3d/release/app-studio3d-release.apk 3DStudio.apk
       - uses: actions/upload-artifact@v4
         with:
           name: StickmanStudio-apk
-          path: StickmanStudio.apk
+          path: |
+            StickmanStudio.apk
+            3DStudio.apk
 
   release:
     needs: build
@@ -83,10 +87,10 @@ jobs:
             gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/$id" || true
           done
           sleep 5
-          gh release create android-latest StickmanStudio.apk \
+          gh release create android-latest StickmanStudio.apk 3DStudio.apk \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
             --title "Stickman Studio for Android (latest build)" \
-            --notes "Build ${GITHUB_RUN_NUMBER} from ${GITHUB_SHA::7}. Download StickmanStudio.apk on your phone and open it to install (allow installing from your browser when Android asks). New builds install over the old one and keep your projects."
+            --notes "Build ${GITHUB_RUN_NUMBER} from ${GITHUB_SHA::7}. Download StickmanStudio.apk (or 3DStudio.apk, the 3D Pixar-style app) on your phone and open it to install (allow installing from your browser when Android asks). New builds install over the old one and keep your projects."
           # gh can leave the release as a draft when the tag was still being deleted: publish it
           for n in 1 2 3 4 5; do
             draft=$(gh api "repos/$GITHUB_REPOSITORY/releases" --jq '[.[] | select(.tag_name=="android-latest")][0].draft')

@@ -18,6 +18,27 @@ android {
         versionName = "1.0.$buildNumber"
     }
 
+    // Two apps from the same code: Stickman Studio, and 3D Studio (3D Pixar-style cinematic videos).
+    // Each has its own package, name, icon and storage; the page reads the flavour from the bridge.
+    flavorDimensions += "brand"
+    productFlavors {
+        create("stickman") {
+            dimension = "brand"
+            applicationId = "com.gopalkrishan.stickmanstudio"
+            resValue("string", "app_name", "Stickman Studio")
+            resValue("string", "flow_service_label", "Stickman Studio Auto Pilot (Flow helper)")
+            buildConfigField("String", "FLAVOR_ID", "\"stickman\"")
+        }
+        create("studio3d") {
+            dimension = "brand"
+            applicationId = "com.gopalkrishan.studio3d"
+            resValue("string", "app_name", "3D Studio")
+            resValue("string", "flow_service_label", "3D Studio Auto Pilot (Flow helper)")
+            buildConfigField("String", "FLAVOR_ID", "\"pauranik\"")
+        }
+    }
+    buildFeatures { buildConfig = true }
+
     // Signing key comes from the CI secrets (never from the repository). Without it the build is
     // signed with the runner's debug key, which CI caches so updates still install over the old app.
     val ksFile = System.getenv("SS_KEYSTORE_FILE")

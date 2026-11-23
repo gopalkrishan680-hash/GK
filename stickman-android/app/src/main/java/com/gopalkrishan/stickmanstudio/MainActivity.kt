@@ -375,7 +375,7 @@ class MainActivity : ComponentActivity() {
             val values = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, name)
                 put(MediaStore.MediaColumns.MIME_TYPE, mime)
-                put(MediaStore.MediaColumns.RELATIVE_PATH, "$folder/Stickman Studio")
+                put(MediaStore.MediaColumns.RELATIVE_PATH, "$folder/${getString(R.string.app_name)}")
                 put(MediaStore.MediaColumns.IS_PENDING, 1)
             }
             val collection = if (isVideo) MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
@@ -384,7 +384,7 @@ class MainActivity : ComponentActivity() {
             saveUri = uri
             saveMime = mime
             saveStream = contentResolver.openOutputStream(uri)
-            saveLabel = "$folder/Stickman Studio/$name"
+            saveLabel = "$folder/${getString(R.string.app_name)}/$name"
             return saveStream != null
         }
 
@@ -439,7 +439,7 @@ class MainActivity : ComponentActivity() {
         fun copyText(text: String) {
             runOnUiThread {
                 (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager)
-                    .setPrimaryClip(ClipData.newPlainText("Stickman Studio prompt", text))
+                    .setPrimaryClip(ClipData.newPlainText("prompt", text))
             }
         }
 
@@ -492,6 +492,10 @@ class MainActivity : ComponentActivity() {
 
         @JavascriptInterface
         fun flowDebug(): String = FlowService.prefs(this@MainActivity).let { (it.getString("flowDump", "") ?: "") + "\n\n" + (it.getString("flowDumpComposer", "") ?: "") + "\n\n" + (it.getString("flowDumpAspect", "") ?: "") + "\n\n" + (it.getString("flowDumpReady", "") ?: "") + "\n\n" + (it.getString("flowDumpDownload", "") ?: "") }.trim()
+
+        /** "stickman" or "pauranik" (3D Studio): the page picks its name, style and video look from it. */
+        @JavascriptInterface
+        fun flavor(): String = BuildConfig.FLAVOR_ID
 
         @JavascriptInterface
         fun flowApps(): String = FlowService.apps(this@MainActivity)

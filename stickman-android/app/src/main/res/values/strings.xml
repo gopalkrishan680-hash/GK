@@ -1,6 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Stickman Studio</string>
-    <string name="flow_service_label">Stickman Studio Auto Pilot (Flow helper)</string>
-    <string name="flow_service_desc">Lets Auto Pilot use the Flow app for you: it opens Flow, types the picture prompt, presses Generate and downloads the picture, then goes back to Stickman Studio. It only acts during an Auto Pilot run or while you teach it, and only in the app you picked.</string>
+    <string name="flow_service_desc">Lets Auto Pilot use the Flow app for you: it opens Flow, types the picture prompt, presses Generate and downloads the picture, then goes back to this app. It only acts during an Auto Pilot run or while you teach it, and only in the app you picked.</string>
 </resources>

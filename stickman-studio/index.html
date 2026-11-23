@@ -252,9 +252,9 @@ html:not(.mode-layers) .layers-only { display: none !important; }
 <header class="top">
   <div class="wrap">
     <div class="top-row">
-      <div class="brand" aria-label="Stickman Studio">
+      <div class="brand" aria-label="App name">
         <svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="13" cy="6" r="3.6"/><path d="M13 10v8M13 12.5l-5 3.5M13 12.5l5-3M13 18l-4 6M13 18l4 6"/></svg>
-        Stickman Studio
+        <span id="appName">Stickman Studio</span>
       </div>
       <div class="grow"><input type="text" id="projTitle" placeholder="Video title" aria-label="Project title"></div>
       <div class="status" id="status"></div>
@@ -465,6 +465,7 @@ html:not(.mode-layers) .layers-only { display: none !important; }
             <option value="glow">Glow silhouette (channel style)</option>
             <option value="doodle">Whiteboard doodle</option>
             <option value="cartoon">Colourful stickman cartoon</option>
+            <option value="pixar">3D Pixar-style cinematic</option>
             <option value="custom">Custom style</option>
           </select>
         </label>
@@ -837,6 +838,10 @@ function fmtSrt(t) { t = Math.max(0, t); const h = Math.floor(t / 3600), m = Mat
 let toastT;
 function toast(msg) { const el = $('#toast'); el.textContent = msg; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, 2600); }
 const APP = !!window.AndroidBridge;
+/* Two apps are built from this page: Stickman Studio and 3D Studio (3D Pixar-style cinematic videos) */
+const FLAVOR = (() => { try { if (APP && AndroidBridge.flavor) return AndroidBridge.flavor() || 'stickman'; } catch (_) {} return /[#&]pauranik/.test(location.hash) ? 'pauranik' : 'stickman'; })();
+const IS3D = FLAVOR === 'pauranik', APP_NAME = IS3D ? '3D Studio' : 'Stickman Studio';
+if (IS3D) { document.title = APP_NAME; document.documentElement.classList.add('flavor-3d'); const an = document.getElementById('appName'); if (an) an.textContent = APP_NAME; }
 if (APP) document.documentElement.classList.add('in-app');
 async function copyText(txt) {
   if (APP) { try { AndroidBridge.copyText(txt); toast('Copied'); return; } catch (_) {} }
@@ -872,6 +877,7 @@ const STYLES = {
   glow: { text: 'Cinematic silhouette style: pure black silhouette characters with a soft glowing rim-light outline, plain round heads with no hair, big white oval eyes, expressive eyebrows. Moody dark backgrounds with blurred depth of field, warm and cool coloured light, film still look.', gutter: 'white' },
   doodle: { text: 'Whiteboard explainer doodle: black marker stick figures and simple sketched objects on a clean white board, light hand-drawn shading, occasional red and blue marker accents, minimal and easy to read.', gutter: 'black' },
   cartoon: { text: 'Colourful flat 2D cartoon with stickman-like characters: round heads, thin limbs, big expressive eyes, bright flat colour backgrounds, soft shadows, playful and clean vector look.', gutter: 'white' },
+  pixar: { text: 'Cinematic 3D animated film still in the style of a modern Pixar / Disney feature: stylised 3D characters with big expressive eyes and soft rounded features, rich detailed textures, subsurface skin, volumetric light and god rays, warm golden key light with cool shadows, shallow depth of field, dramatic composition, filmic colour grading. Indian mythology: traditional ancient Indian costumes, gold jewellery, crowns, weapons, palaces, forests, rivers and battlefields. No text, no watermark.', gutter: 'white' },
   custom: { text: '', gutter: 'white' }
 };
 const CHANNEL_CHARS = `Rohan (hero): black silhouette, plain round head with NO hair, white oval eyes, expressive eyebrows, young man
@@ -885,7 +891,8 @@ const isOldSample = p => /^It was Rohan's result day\./.test(String(p.script || 
 const DEFAULTS = { title: '', aspect: '16:9', grid: 3, style: 'stickman', styleText: STYLES.stickman.text, characters: '', gutter: 'auto',
   splitLevel: 'all', minWords: 2, maxWords: 14, captions: 'bar', fit: 'auto', enhance: 'on', v: 3, capSize: 1, motion: 6, transition: 'fade', transDur: 0.15, res: 1080, fps: 30, musicVol: 0.12, anim: 'on', animAmt: 1, capWords: 'on', pics: 'images', skStyle: 'chibi', lPer: 9, lLib: 'on',
   gemMark: 'auto', fx: 'on', fxAmt: 1, fxDoodle: 'on', fxSfx: 'on', fxVol: 0.6, gridAuto: true, mode: 'layers', lBg: 'parchment', lEnter: 'auto', lTrans: 'cut', lIdle: 'subtle', lCam: 'on', lCaps: 'off', sfx: 'on', sfxVol: 0.5, duck: 'on' };
-try { if (matchMedia('(pointer: coarse)').matches) DEFAULTS.res = 720; } catch (_) {}   // phones: smaller, faster export
+try { if (matchMedia('(pointer: coarse)').matches) DEFAULTS.res = 720; } catch (_) {}
+if (IS3D) Object.assign(DEFAULTS, { style: 'pixar', styleText: STYLES.pixar.text, mode: 'grid', cine: 'on', motion: 9, transition: 'fade', transDur: 0.45, fxDoodle: 'off', fit: 'fill', captions: 'bottom', capWords: 'off', res: 1080 });   // phones: smaller, faster export
 const S = { settings: { ...DEFAULTS }, script: '', segments: [], starts: [], grids: [], overrides: {}, audioBlob: null, audioName: '', musicBlob: null, musicName: '' };
 let uid = 1;
 let audioBuf = null, analysis = null;
@@ -2419,8 +2426,24 @@ function drawFrameBase(ctx, W, H, t) {
     else if (tr === 'zoom') { drawScene(ctx, i - 1, t, W, PH, { scale: 1 + 0.25 * e }); drawScene(ctx, i, t, W, PH, { alpha: e, scale: 1.18 - 0.18 * e }); }
     else drawScene(ctx, i, t, W, PH);
   } else drawScene(ctx, i, t, W, PH);
+  if (S.settings.cine === 'on') drawCine(ctx, W, PH);
   if (L.band) { ctx.fillStyle = '#0d0e11'; ctx.fillRect(0, PH, W, L.band); }
   drawCaption(ctx, W, H, S.segments[i].text, lt, L, d);
+}
+
+/* cinematic look: warm/teal film grade, vignette and thin letterbox bars (3D Studio) */
+let cineCache = null;
+function drawCine(ctx, W, H) {
+  if (!cineCache || cineCache.W !== W || cineCache.H !== H) {
+    const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+    const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, 'rgba(20,70,90,0.10)'); g.addColorStop(1, 'rgba(255,140,40,0.10)');
+    x.fillStyle = g; x.fillRect(0, 0, W, H);
+    const v = x.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.hypot(W, H) * 0.6);
+    v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.45)'); x.fillStyle = v; x.fillRect(0, 0, W, H);
+    const bar = Math.round(H * 0.055); x.fillStyle = '#000'; x.fillRect(0, 0, W, bar); x.fillRect(0, H - bar, W, bar);
+    cineCache = { W, H, c };
+  }
+  ctx.drawImage(cineCache.c, 0, 0);
 }
 
 /* ============ preview ============ */
@@ -4749,13 +4772,14 @@ Krishna ki Dwarka samudra mein kaise doobi?
 Pandavon ki swarg yatra: sirf Yudhishthira kyun pahuche?`;
 const AP_ART_OLD = 'Simple hand-drawn stickman illustration for an Indian mythology story: clean bold black ink lines on a plain white background. Every character is a stickman with a perfectly round white head, a simple expressive face (dot eyes, eyebrows, mouth) and thin line limbs, told apart only by their costume: traditional ancient Indian clothes (dhoti, angavastram, sari), crowns, jewellery and weapons. Flat accent colours (gold, saffron, red, blue) only on costumes and key objects; no gradients, no realistic shading, no 3D. Ancient settings only: palaces, courts, forests, rivers, battlefields.';
 const AP_ART = 'Cute cartoon illustration for an Indian mythology story, in exactly the same style in every picture: chibi-like characters with big expressive eyes, soft rounded faces and slightly large heads, clean bold black outlines, flat bright colours with light soft shading. Traditional ancient Indian clothes (dhoti, angavastram, sari), crowns, jewellery and weapons in rich gold, saffron, red and blue. Simple clean backgrounds of ancient settings: palaces, courts, forests, rivers, battlefields. No photorealism, no 3D render, no stickman, no text.';
-const AP_DEF = { art: AP_ART, chars: true, vmode: 'grid', writer: 'gemini', model: 'claude-opus-5-5', len: 8, lang: 'hinglish', channel: '', check: true,
+const AP_ART_3D = STYLES.pixar.text;
+const AP_DEF = { art: IS3D ? AP_ART_3D : AP_ART, chars: true, vmode: 'grid', writer: 'gemini', model: 'claude-opus-5-5', len: 8, lang: 'hinglish', channel: '', check: true,
   ttsModel: 'gemini-2.5-pro-preview-tts', voice: 'Orus', style: 'Promo/Hype', pace: 'Natural', accent: 'Neutral',
   img: 'flow', imgFallback: true, publish: '17:00', cat: '27', approve: true, comment: true, start: '13:00', daily: false };
 const AP = { claudeKey: '', s: { ...AP_DEF }, topics: [], log: [] };
 let apRunning = false, apStopFlag = false, apApproveWait = null;
 const apSave = () => DB.put('autopilot', { claudeKey: AP.claudeKey, s: AP.s, topics: AP.topics, log: AP.log.slice(-300) }).catch(() => {});
-async function apLoad() { try { const v = await DB.get('autopilot'); if (v) { AP.claudeKey = v.claudeKey || ''; AP.s = { ...AP_DEF, ...(v.s || {}) }; if (!AP.s.art || AP.s.art.trim() === AP_ART_OLD) AP.s.art = AP_ART; /* the old default style becomes the new one */ AP.topics = v.topics || []; AP.log = v.log || []; } } catch (_) {} }
+async function apLoad() { try { const v = await DB.get('autopilot'); if (v) { AP.claudeKey = v.claudeKey || ''; AP.s = { ...AP_DEF, ...(v.s || {}) }; if (!AP.s.art || AP.s.art.trim() === AP_ART_OLD) AP.s.art = IS3D ? AP_ART_3D : AP_ART; /* the old default style becomes the new one */ AP.topics = v.topics || []; AP.log = v.log || []; } } catch (_) {} }
 const apNext = () => AP.topics.find(t => t.s !== 'done');
 function apLog(msg, keep = true) {
   const line = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '  ' + msg;
@@ -4837,7 +4861,7 @@ function apFlowRefresh() {
   return st;
 }
 $('#apFlowApp').onchange = e => { AndroidBridge.flowSetApp(e.target.value); apFlowRefresh(); };
-$('#apFlowAcc').onclick = () => { toast('Find "Stickman Studio Auto Pilot (Flow helper)" and turn it on'); AndroidBridge.openAccessibility(); };
+$('#apFlowAcc').onclick = () => { toast(`Find "${APP_NAME} Auto Pilot (Flow helper)" and turn it on`); AndroidBridge.openAccessibility(); };
 $('#apPerms').onclick = () => AndroidBridge.requestPerms();
 window.ssPermsDone = () => apFlowRefresh();
 $('#apFlowMin').onchange = $('#apFlowMax').onchange = () => AndroidBridge.flowSetWaits(+$('#apFlowMin').value || 20, +$('#apFlowMax').value || 240);
@@ -5022,7 +5046,8 @@ async function apGeminiImage(prompt, aspect) {
 }
 // the app's own prompts say "stickman"; with a non-stickman art style they must not
 const apIsStick = () => /stick ?man/i.test(S.settings.styleText || '') && !/no stickman/i.test(S.settings.styleText || '');
-const apNoStick = t => apIsStick() ? t : t.replace(/stick ?man|stick figures?/gi, 'cartoon character').replace(/cartoon character (story|animation)/gi, 'cartoon $1');
+const apNoStick = t => { if (apIsStick()) return t; const w = IS3D ? '3D animated character' : 'cartoon character', k = IS3D ? 'cinematic 3D' : 'cartoon';
+  return t.replace(/stick ?man|stick figures?/gi, w).replace(new RegExp(w + ' (story|animation)', 'gi'), k + ' $1'); };
 const AP_WPM = 162;   // Gemini's narrator: about 2.7 words a second (measured in the first videos)
 const AP_DIRECTOR_RULE = '\n\nSETTING: ancient India. Do not show modern things (TV, phones, computers, glasses, modern rooms or clothes) unless the narration line itself talks about today or the viewer. Use the characters exactly as listed above.';
 function apCastPrompt() {
@@ -5120,7 +5145,7 @@ function apLangRule() {
 }
 function apScriptPrompt(topic) {
   const min = +AP.s.len || 8, words = min * AP_WPM;
-  return `You are the scriptwriter of a Hindi YouTube channel about Indian mythology${AP.s.channel ? ` called "${AP.s.channel}"` : ''} (narrated ${apIsStick() ? 'stickman' : 'cartoon'} animation, one narrator voice).
+  return `You are the scriptwriter of a Hindi YouTube channel about Indian mythology${AP.s.channel ? ` called "${AP.s.channel}"` : ''} (narrated ${apIsStick() ? 'stickman' : IS3D ? 'cinematic 3D' : 'cartoon'} animation, one narrator voice).
 Write the complete voiceover script for the video: "${topic}".
 
 LENGTH: about ${min} minutes = about ${words} words (the narrator speaks about ${AP_WPM} words per minute). Stay within ±10%; never shorter.
@@ -5221,7 +5246,8 @@ async function apRun(trigger) {
     // keep the open project, then start a clean one
     try { await DB.put('project:before-autopilot', snapshot()); } catch (_) {}
     await restore({ settings: { ...S.settings, title: topic.t, mode: AP.s.vmode === 'layers' ? 'layers' : 'grid',
-      style: 'stickman', styleText: (AP.s.art || AP_ART).trim(), characters: '', fit: 'fill', captions: 'bottom', capWords: 'off', res: 1080 }, script: '', segments: [], starts: [], grids: [], overrides: {} });
+      style: IS3D ? 'pixar' : 'stickman', styleText: (AP.s.art || (IS3D ? AP_ART_3D : AP_ART)).trim(), characters: '', fit: 'fill', captions: 'bottom', capWords: 'off', res: 1080,
+      ...(IS3D ? { cine: 'on', motion: 9, transition: 'fade', transDur: 0.45, fxDoodle: 'off' } : {}) }, script: '', segments: [], starts: [], grids: [], overrides: {} });
     S.yt = null; S.autoMusic = null; amShowPlan();
 
     const who = AP.s.writer === 'claude' ? 'Claude' : 'Gemini';

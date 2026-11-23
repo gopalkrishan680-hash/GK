@@ -15,6 +15,14 @@ cannot do on its own:
   server link (`stickmanstudio://connect?url=…`); the app asks before connecting. A copied server link is
   noticed when you switch back to the app.
 
+## Two apps: Stickman Studio and 3D Studio
+The same code builds two apps (Gradle flavours): **Stickman Studio** (`com.gopalkrishan.stickmanstudio`) and
+**3D Studio** (`com.gopalkrishan.studio3d`), which makes 3D Pixar-style cinematic videos: Pixar-style art style for
+the pictures, a cinematic look in the video (film grade, vignette, thin letterbox bars, slower fades, more camera
+motion) and no cartoon doodles. They install side by side with separate projects and settings. CI publishes both in
+the `android-latest` release (`StickmanStudio.apk`, `3DStudio.apk`). For YouTube upload, 3D Studio needs its own
+Android OAuth client (package `com.gopalkrishan.studio3d`, same SHA-1).
+
 ## Auto Pilot (★ tab)
 Makes one video a day from the **Mythology Roadmap** topic list: Gemini (free key, default) or Claude (API key)
 writes the script and checks the facts,
