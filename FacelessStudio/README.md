@@ -48,6 +48,14 @@ Manual control: start a line with a tag – `[stat] [list] [quote] [note] [phone
 **22 layouts × several variants each × 11 transitions × 6 themes**, all driven by a random seed. Tap "Shuffle animations" to give the whole
 video a new look (timing stays the same). In the editor you can change any scene's layout, transition and image, or tap 🎲 to re-roll just that scene.
 
+## Whiteboard Doodle style
+
+Pick **Video style → Whiteboard Doodle** (or the ✏️ chip in the editor). On a white board every picture is first
+**sketched in pencil** (made automatically from your image), then **coloured in**, and the line is **written in
+handwriting**, with marker underlines, circled numbers, arrows and stars, plus a soft marker sound. Six layouts rotate
+(picture + caption, picture left/right with text, title + picture, handwriting only, big circled number); the board
+slides or the page turns between scenes. No hand graphic is shown.
+
 ## Variety engine (no boring repeats)
 
 Every scene is a **combination** of six independent choices:

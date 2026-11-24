@@ -70,6 +70,52 @@ class ImageStore(private val paths: List<String>, private val maxEdge: Int) {
         override fun sizeOf(key: Int, value: Bitmap) = value.byteCount
     }
     private val blurCache = LruCache<Int, Bitmap>(64)
+    private val sketchCache = object : LruCache<Int, Bitmap>(48 * 1024 * 1024) {
+        override fun sizeOf(key: Int, value: Bitmap) = value.byteCount
+    }
+
+    /**
+     * Pencil-sketch version of a picture for the whiteboard style ("colour dodge" sketch:
+     * grey / (1 - blurred inverted grey)), computed once and cached.
+     */
+    fun sketch(i: Int): Bitmap? {
+        if (paths.isEmpty() || i < 0) return null
+        val idx = i % paths.size
+        sketchCache.get(idx)?.let { return it }
+        synchronized(sketchCache) {
+            sketchCache.get(idx)?.let { return it }
+            val src0 = get(idx) ?: return null
+            val tw = minOf(960, src0.width); val th = maxOf(1, src0.height * tw / src0.width)
+            val src = Bitmap.createScaledBitmap(src0, tw, th, true)
+            val n = tw * th
+            val px = IntArray(n); src.getPixels(px, 0, tw, 0, 0, tw, th)
+            val g = IntArray(n) { val c = px[it]; ((c shr 16 and 255) * 30 + (c shr 8 and 255) * 59 + (c and 255) * 11) / 100 }
+            // box blur of the inverted grey via an integral image
+            val r = maxOf(3, tw / 110)
+            val integral = LongArray((tw + 1) * (th + 1))
+            for (y in 0 until th) {
+                var row = 0L
+                for (x in 0 until tw) {
+                    row += 255 - g[y * tw + x]
+                    integral[(y + 1) * (tw + 1) + x + 1] = integral[y * (tw + 1) + x + 1] + row
+                }
+            }
+            val out = IntArray(n)
+            for (y in 0 until th) for (x in 0 until tw) {
+                val x0 = maxOf(0, x - r); val x1 = minOf(tw, x + r + 1); val y0 = maxOf(0, y - r); val y1 = minOf(th, y + r + 1)
+                val sum = integral[y1 * (tw + 1) + x1] - integral[y0 * (tw + 1) + x1] - integral[y1 * (tw + 1) + x0] + integral[y0 * (tw + 1) + x0]
+                val blurInv = (sum / ((x1 - x0) * (y1 - y0))).toInt()
+                val gray = g[y * tw + x]
+                var v = if (blurInv >= 255) 255 else minOf(255, gray * 255 / (256 - blurInv))
+                v = (255.0 * Math.pow(v / 255.0, 2.2)).toInt()          // darker, crisper pencil lines
+                out[y * tw + x] = (0xFF shl 24) or (v shl 16) or (v shl 8) or v
+            }
+            val b = Bitmap.createBitmap(out, tw, th, Bitmap.Config.ARGB_8888)
+            if (src !== src0) src.recycle()
+            sketchCache.put(idx, b)
+            return b
+        }
+    }
 
     fun get(i: Int): Bitmap? {
         if (paths.isEmpty() || i < 0) return null

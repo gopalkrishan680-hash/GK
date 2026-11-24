@@ -107,5 +107,13 @@ class Variety(seed: Long, private val pacing: Pacing) {
         return t
     }
 
+    /** Whiteboard: the camera pans along the board, or the page turns. */
+    fun doodleTransition(last: Transition): Transition {
+        val pool = listOf(Transition.SLIDE_LEFT, Transition.SLIDE_UP, Transition.FADE, Transition.PAGE, Transition.CUT).filter { it != last }
+        val t = leastUsed(pool, trUse)
+        trUse[t] = (trUse[t] ?: 0) + 1
+        return t
+    }
+
     fun uses(t: SceneType) = layoutUse[t] ?: 0
 }

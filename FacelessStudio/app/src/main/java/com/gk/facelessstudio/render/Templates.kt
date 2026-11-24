@@ -21,6 +21,7 @@ import kotlin.math.sin
 object Templates {
 
     fun draw(k: Kit, c: Canvas, s: Scene, t: Float, d: Float) {
+        if (Doodle.draw(k, c, s, t, d)) return
         if (MoreTemplates.draw(k, c, s, t, d)) return
         when (s.type) {
             SceneType.KINETIC -> kinetic(k, c, s, t, d)

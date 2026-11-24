@@ -247,13 +247,13 @@ class FrameRenderer(
     }
 
     private fun overlays(c: Canvas, s: Scene, tMs: Long) {
-        c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), vignette)
+        if (!p.doodle) c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), vignette)
         if (!s.type.showsOwnText) when (p.captionMode) {
             com.gk.facelessstudio.model.CaptionMode.FULL -> captions(c, s, tMs)
             com.gk.facelessstudio.model.CaptionMode.KEYWORDS -> keywordPops(c, s, tMs)
             com.gk.facelessstudio.model.CaptionMode.OFF -> {}
         }
-        if (p.grain) {
+        if (p.grain && !p.doodle) {
             val r = Random(tMs / 42)
             grainPaint.shader.setLocalMatrix(android.graphics.Matrix().apply { setTranslate(r.nextFloat() * 128, r.nextFloat() * 128); postScale(k.u * 1.5f, k.u * 1.5f) })
             c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), grainPaint)

@@ -216,6 +216,22 @@ object Sfx {
         }
     }
 
+    /** Marker on a whiteboard: band-limited noise in quick strokes. */
+    fun scribble(ms: Int, seed: Int): FloatArray {
+        val n = SAMPLE_RATE * ms / 1000
+        val r = Random(seed)
+        var lp = 0f; var hp = 0f; var prev = 0f
+        return FloatArray(n) { i ->
+            val x = i / SAMPLE_RATE.toFloat()
+            val stroke = sin(2 * PI * (3.2 + 1.5 * sin(x * 1.3)) * x).toFloat().let { it * it }
+            val noise = r.nextFloat() * 2 - 1
+            lp += 0.35f * (noise - lp)
+            hp = 0.9f * (hp + lp - prev); prev = lp
+            val fade = min(1f, i / (SAMPLE_RATE * 0.05f)) * min(1f, (n - i) / (SAMPLE_RATE * 0.08f))
+            hp * stroke * fade * 0.6f
+        }
+    }
+
     fun click(): FloatArray {
         val n = SAMPLE_RATE / 100
         val r = Random(9)
@@ -246,7 +262,13 @@ object Mixer {
             }
         }
 
-        if (project.sfx) {
+        if (project.sfx && project.doodle) {
+            project.scenes.forEachIndexed { idx, s ->
+                if (s.type == SceneType.OUTRO) return@forEachIndexed
+                val len = (s.durationMs * 0.8).toInt().coerceIn(400, 7000)
+                add(buf, Sfx.scribble(len, idx), ((s.startMs + 100) * SAMPLE_RATE / 1000).toInt(), 0.16f)
+            }
+        } else if (project.sfx) {
             val whoosh = Sfx.whoosh()
             val pop = Sfx.pop()
             val boom = Sfx.boom()

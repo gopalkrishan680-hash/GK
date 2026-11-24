@@ -283,6 +283,20 @@ private fun FileRow(name: String, sub: String, onRemove: () -> Unit, onReplace: 
 private fun StyleStep(vm: AppViewModel) {
     val p by vm.project.collectAsState()
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        SectionCard("Video style") {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                listOf(false to ("✨  Animated" to "Motion graphics: 34 layouts, charts, transitions — every scene different."),
+                    true to ("✏️  Whiteboard Doodle" to "Each picture is sketched, then coloured in, and the text is handwritten on a white board, like InstaDoodle.")).forEach { (doodle, info) ->
+                    val sel = p.doodle == doodle
+                    Column(Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).background(if (sel) Neon.copy(alpha = 0.15f) else Surface2)
+                        .border(2.dp, if (sel) Neon else Color.Transparent, RoundedCornerShape(14.dp)).clickable { vm.setDoodle(doodle) }.padding(12.dp)) {
+                        Text(info.first, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Spacer(Modifier.height(4.dp))
+                        Text(info.second, color = Muted, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
         SectionCard("Video size") {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Aspect.entries.forEach { a ->

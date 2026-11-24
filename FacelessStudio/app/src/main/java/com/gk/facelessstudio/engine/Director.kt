@@ -122,7 +122,13 @@ object Director {
                 if (ScriptAnalyzer.keywords(text, 5).size >= 4) add(SceneType.WORD_CLOUD)
                 if (strong.size >= 2) add(SceneType.STICKY_NOTES)
             }
-            type = if (forced != null) forced.also { variety.use(it) }
+            type = if (project.doodle) when {
+                // whiteboard: the hand writes numbers big, writes lines without a picture, otherwise sketches the picture
+                stat != null || percent != null -> SceneType.DOODLE_NUMBER.also { variety.use(it) }
+                !hasImg -> SceneType.DOODLE_TEXT.also { variety.use(it) }
+                else -> variety.layout(emptyList(), listOf(SceneType.DOODLE_CENTER, SceneType.DOODLE_LEFT, SceneType.DOODLE_RIGHT, SceneType.DOODLE_TOP))
+            }
+            else if (forced != null) forced.also { variety.use(it) }
             else if (ownImage) variety.layout(preferred.filter { !it.needsImage || hasImg }, pictureLayouts + textLayouts, soft, first = pictureLayouts)
             else variety.layout(preferred.filter { !it.needsImage || hasImg }, pictureLayouts + textLayouts, soft)
 
@@ -132,6 +138,7 @@ object Director {
 
             val transition = when {
                 gi == 0 -> Transition.FADE
+                project.doodle -> variety.doodleTransition(lastTransition)
                 first.forceCut -> Transition.CUT
                 else -> variety.transition(lastTransition, first.chapterStart)
             }
@@ -158,7 +165,9 @@ object Director {
                     hasImg -> Backdrop.entries
                     else -> Backdrop.entries.filter { it != Backdrop.IMAGE }
                 })
-                sc.copy(fx = look.fx, bg = look.bg, cam = look.cam, deco = look.deco)
+                // the whiteboard stays clean: no camera moves or motion-graphics decorations
+                if (project.doodle) sc.copy(fx = look.fx, bg = look.bg, cam = CamMove.STILL, deco = Deco.NONE)
+                else sc.copy(fx = look.fx, bg = look.bg, cam = look.cam, deco = look.deco)
             }
             history.addLast(type); if (history.size > 3) history.removeFirst()
         }
@@ -237,6 +246,15 @@ object Director {
             SceneType.NEWS_FLASH -> Pair(emptyList(), ph(7))
             SceneType.OUTRO -> Pair(emptyList(), project.handle)
             SceneType.KINETIC -> Pair(emptyList(), "")
+            SceneType.DOODLE_NUMBER -> {
+                val big = percent?.let { "${it.first.toInt()}%" }
+                    ?: stat?.let { st -> st.prefix + (if (st.decimals > 0) String.format("%.${st.decimals}f", st.number) else String.format("%,d", st.number.toLong())) + st.suffix }
+                    ?: ScriptAnalyzer.strongWords(text, 1).firstOrNull() ?: "!"
+                Pair(listOf(ScriptAnalyzer.phrase(text, 9)), big)
+            }
+            SceneType.DOODLE_CENTER -> Pair(emptyList(), ScriptAnalyzer.phrase(text, 12))
+            SceneType.DOODLE_TOP -> Pair(emptyList(), ScriptAnalyzer.phrase(text, 6))
+            SceneType.DOODLE_LEFT, SceneType.DOODLE_RIGHT, SceneType.DOODLE_TEXT -> Pair(emptyList(), "")
         }
     }
 
