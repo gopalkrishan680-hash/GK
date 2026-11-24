@@ -77,7 +77,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -298,7 +297,6 @@ private fun StyleStep(vm: AppViewModel) {
                 }
             }
         }
-        if (p.storyMode) SectionCard("Story style") { StoryStylePicker(vm) }
         SectionCard("Video size") {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Aspect.entries.forEach { a ->
@@ -371,50 +369,3 @@ private fun ToggleRow(label: String, value: Boolean, onChange: (Boolean) -> Unit
 }
 
 
-
-
-/** Story looks with a live preview rendered from the project's own first picture. */
-@Composable
-private fun StoryStylePicker(vm: AppViewModel) {
-    val p by vm.project.collectAsState()
-    val img = p.images.indexOfFirst { it.isNotBlank() }
-    androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        items(com.gk.facelessstudio.model.StoryStyle.entries.size) { i ->
-            val st = com.gk.facelessstudio.model.StoryStyle.entries[i]
-            val sel = p.storyStyle == st
-            val preview by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, st, img, p.images.getOrNull(img), p.aspect) {
-                value = if (img < 0) null else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                    runCatching { stylePreview(p, st, img, vm.fonts) }.getOrNull()
-                }
-            }
-            Column(Modifier.width(170.dp).clip(RoundedCornerShape(14.dp)).background(Surface2)
-                .border(2.dp, if (sel) Neon else Color.Transparent, RoundedCornerShape(14.dp)).clickable { vm.setStoryStyle(st) }) {
-                Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black), contentAlignment = Alignment.Center) {
-                    preview?.let { androidx.compose.foundation.Image(it, null, modifier = Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop) }
-                        ?: Text(st.emoji, fontSize = 34.sp)
-                }
-                Column(Modifier.padding(10.dp)) {
-                    Text("${st.emoji} ${st.label}", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    Text(st.sub, color = Muted, fontSize = 11.sp, maxLines = 2)
-                }
-            }
-        }
-    }
-    if (img < 0) Text("Add images in step 3 to see each style with your own pictures.", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
-}
-
-private fun stylePreview(p: com.gk.facelessstudio.model.Project, st: com.gk.facelessstudio.model.StoryStyle, img: Int, fonts: com.gk.facelessstudio.render.Fonts): androidx.compose.ui.graphics.ImageBitmap {
-    val (w, h) = 480 to 270
-    val text = com.gk.facelessstudio.engine.GridWorkflow.pieces(p).getOrNull(img)?.ifBlank { null } ?: p.title.ifBlank { "Once upon a time" }
-    val names = com.gk.facelessstudio.engine.ScriptAnalyzer.storyNames(p.script, p.characters)
-    val scene = com.gk.facelessstudio.model.Scene(
-        text = text, startMs = 0, endMs = 4000, type = com.gk.facelessstudio.model.SceneType.KEN_BURNS,
-        transition = com.gk.facelessstudio.model.Transition.CUT, imageIndex = img, variant = 4242,
-        title = com.gk.facelessstudio.engine.ScriptAnalyzer.phrase(text, 10),
-        emphasis = com.gk.facelessstudio.engine.ScriptAnalyzer.storyEmphasis(text, names).ifEmpty { names.take(1).map { n -> n.replaceFirstChar { it.uppercase() } } },
-    )
-    val proj = p.copy(storyMode = true, storyStyle = st, scenes = listOf(scene), durationMs = 4000, aspect = com.gk.facelessstudio.model.Aspect.LANDSCAPE, progressBar = false, handle = "")
-    val bmp = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
-    com.gk.facelessstudio.render.FrameRenderer(w, h, proj, fonts, com.gk.facelessstudio.render.ImageStore(p.images, 640)).draw(android.graphics.Canvas(bmp), 3200)
-    return bmp.asImageBitmap()
-}

@@ -155,10 +155,7 @@ fun EditorScreen(vm: AppViewModel, onBack: () -> Unit, onEditSetup: (Int) -> Uni
                 Button(onClick = { preview.pause(); vm.shuffle() }, enabled = busy == null, shape = RoundedCornerShape(12.dp)) {
                     Icon(Icons.Default.Shuffle, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Shuffle animations")
                 }
-                if (p.storyMode) com.gk.facelessstudio.model.StoryStyle.entries.forEach { st ->
-                    FilterChip(selected = p.storyStyle == st, onClick = { preview.pause(); vm.setStoryStyle(st) }, label = { Text("${st.emoji} ${st.label}", fontSize = 12.sp) })
-                }
-                if (!p.storyMode || p.storyStyle == com.gk.facelessstudio.model.StoryStyle.CINEMATIC) Themes.all.forEach { t ->
+                Themes.all.forEach { t ->
                     Box(Modifier.size(34.dp).clip(CircleShape).background(Color(t.accent)).clickable { vm.setTheme(t.id) }, contentAlignment = Alignment.Center) {
                         if (p.themeId == t.id) Icon(Icons.Default.CheckCircle, null, tint = Color.Black, modifier = Modifier.size(20.dp))
                     }

@@ -4,7 +4,6 @@ import com.gk.facelessstudio.model.Pacing
 import com.gk.facelessstudio.model.Project
 import com.gk.facelessstudio.model.Scene
 import com.gk.facelessstudio.model.SceneType
-import com.gk.facelessstudio.model.StoryStyle
 import com.gk.facelessstudio.model.Transition
 import kotlin.math.abs
 import kotlin.math.max
@@ -179,7 +178,7 @@ object Director {
                 gi == 0 -> Transition.FADE
                 first.forceCut -> Transition.CUT
                 story && first.chapterStart -> if (rnd.nextBoolean()) Transition.DIP else Transition.FLASH
-                story -> pickStoryTransition(rnd, lastTransition, project.storyStyle)
+                story -> pickStoryTransition(rnd, lastTransition)
                 first.chapterStart -> listOf(Transition.FLASH, Transition.GLITCH, Transition.ZOOM_PUNCH, Transition.SHUTTER).random(rnd)
                 else -> pickTransition(rnd, project.pacing, lastTransition)
             }
@@ -221,7 +220,7 @@ object Director {
     fun reroll(project: Project, index: Int): Project {
         val s = project.scenes.getOrNull(index) ?: return project
         val rnd = Random(s.variant.toLong() * 31 + System.nanoTime())
-        val tr = if (project.storyMode) pickStoryTransition(rnd, s.transition, project.storyStyle) else pickTransition(rnd, project.pacing, s.transition)
+        val tr = if (project.storyMode) pickStoryTransition(rnd, s.transition) else pickTransition(rnd, project.pacing, s.transition)
         val updated = project.scenes.toMutableList()
         updated[index] = s.copy(variant = rnd.nextInt(1_000_000), transition = if (index == 0) Transition.FADE else tr)
         return project.copy(scenes = updated)
@@ -254,17 +253,9 @@ object Director {
         return items.last().first
     }
 
-    private fun pickStoryTransition(rnd: Random, last: Transition, style: StoryStyle = StoryStyle.CINEMATIC): Transition {
-        val pool = when (style) {
-            StoryStyle.COMIC -> listOf(Transition.SLIDE_LEFT to 3f, Transition.WHIP to 2f, Transition.ZOOM_PUNCH to 2f, Transition.CUT to 2f, Transition.FLASH to 0.6f)
-            StoryStyle.VINTAGE -> listOf(Transition.DIP to 3f, Transition.CUT to 3f, Transition.FLASH to 1f, Transition.CIRCLE to 0.8f)
-            StoryStyle.STORYBOOK -> listOf(Transition.PAGE to 4f, Transition.FADE to 3f)
-            StoryStyle.MYSTERY -> listOf(Transition.CUT to 6f, Transition.FADE to 1f)   // the camera pans between photos itself
-            StoryStyle.NOIR -> listOf(Transition.FADE to 3f, Transition.DIP to 3f, Transition.FLASH to 1.2f, Transition.CUT to 1.5f)
-            StoryStyle.DOCUMENTARY -> listOf(Transition.FADE to 5f, Transition.DIP to 2f, Transition.CUT to 1f)
-            StoryStyle.CINEMATIC -> listOf(Transition.FADE to 5f, Transition.DIP to 1.6f, Transition.CUT to 2f, Transition.ZOOM_PUNCH to 0.6f)
-        }
-            .filter { it.first != last || it.first == Transition.FADE || it.first == Transition.CUT }
+    private fun pickStoryTransition(rnd: Random, last: Transition): Transition {
+        val pool = listOf(Transition.FADE to 5f, Transition.DIP to 1.6f, Transition.CUT to 2f, Transition.ZOOM_PUNCH to 0.6f)
+            .filter { it.first != last || it.first == Transition.FADE }
         val sum = pool.sumOf { it.second.toDouble() }.toFloat()
         var r = rnd.nextFloat() * sum
         for ((t, w) in pool) { r -= w; if (r <= 0f) return t }

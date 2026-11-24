@@ -50,20 +50,11 @@ class StoryTest {
         val bad = setOf(SceneType.PHONE, SceneType.KEY_POINTS, SceneType.CHECKLIST, SceneType.MINDMAP, SceneType.IMAGE_BANNER, SceneType.SPOTLIGHT)
         assertTrue(p.scenes.none { it.type in bad })
         val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val r = FrameRenderer(854, 480, p, Fonts(ctx.assets), ImageStore(p.images, 1200))
         val bmp = Bitmap.createBitmap(854, 480, Bitmap.Config.ARGB_8888)
-        for (style in com.gk.facelessstudio.model.StoryStyle.entries) {
-            val ps = Director.build(p.copy(storyStyle = style), null)
-            println("STYLE $style: " + ps.scenes.joinToString(" ") { it.transition.name })
-            val r = FrameRenderer(854, 480, ps, Fonts(ctx.assets), ImageStore(ps.images, 1200))
-            listOf(0, 1, 2, 6, 7, 9).forEach { i ->
-                val sc = ps.scenes[i]
-                r.draw(Canvas(bmp), sc.startMs + (sc.durationMs * 0.8f).toLong())
-                File(out, "${style.name}_%02d.png".format(i)).outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
-            }
-            // one mid-transition frame
-            val sc = ps.scenes[3]
-            r.draw(Canvas(bmp), sc.startMs + 10)
-            File(out, "${style.name}_t.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        p.scenes.forEachIndexed { i, s ->
+            r.draw(Canvas(bmp), s.startMs + (s.durationMs * 0.75f).toLong())
+            File(out, "s%02d_${s.type}.png".format(i)).outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
         }
     }
 }
