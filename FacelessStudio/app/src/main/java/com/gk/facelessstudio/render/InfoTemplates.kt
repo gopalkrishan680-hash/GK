@@ -14,7 +14,7 @@ import kotlin.math.roundToLong
 object InfoTemplates {
 
     private fun bg(k: Kit, c: Canvas, s: Scene, t: Float) {
-        if (!k.bgImageBlur(c, s.imageIndex, t, 0.72f)) k.bgGrid(c, t)
+        Fx.backdrop(k, c, s, t)
     }
 
     private fun fmt(v: Double): String = when {
@@ -149,7 +149,7 @@ object InfoTemplates {
     /** Image card on one side, headline + animated bullet chips on the other: an infographic for ordinary lines. */
     fun keyPoints(k: Kit, c: Canvas, s: Scene, t: Float, d: Float) {
         val bmp = k.images.get(s.imageIndex)
-        k.bgGrid(c, t)
+        Fx.backdrop(k, c, s, t)
         val pad = 44f * k.u
         var textX = pad; var textW = k.w - pad * 2; var textTop = pad + 20f * k.u
         if (bmp != null) {

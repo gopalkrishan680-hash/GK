@@ -21,6 +21,7 @@ import kotlin.math.sin
 object Templates {
 
     fun draw(k: Kit, c: Canvas, s: Scene, t: Float, d: Float) {
+        if (MoreTemplates.draw(k, c, s, t, d)) return
         when (s.type) {
             SceneType.KINETIC -> kinetic(k, c, s, t, d)
             SceneType.CHAPTER -> chapter(k, c, s, t, d)
@@ -44,6 +45,7 @@ object Templates {
             SceneType.BAR_CHART -> InfoTemplates.barChart(k, c, s, t, d)
             SceneType.TIMELINE -> InfoTemplates.timeline(k, c, s, t, d)
             SceneType.KEY_POINTS -> InfoTemplates.keyPoints(k, c, s, t, d)
+            else -> {}
         }
     }
 
@@ -59,14 +61,8 @@ object Templates {
 
     private fun typed(text: String, p: Float) = text.take((text.length * p.coerceIn(0f, 1f)).toInt())
 
-    private fun background(k: Kit, c: Canvas, s: Scene, t: Float, pick: Int) {
-        when (pick % 4) {
-            0 -> k.bgBlob(c, t, s.variant)
-            1 -> if (!k.bgImageBlur(c, s.imageIndex, t)) k.bgGrid(c, t)
-            2 -> k.bgGrid(c, t)
-            else -> { k.bgBlob(c, t, s.variant); k.particles(c, t, s.variant, 30) }
-        }
-    }
+    @Suppress("UNUSED_PARAMETER")
+    private fun background(k: Kit, c: Canvas, s: Scene, t: Float, pick: Int) = Fx.backdrop(k, c, s, t)
 
     // ------------------------------------------------------------------ KINETIC
     private fun kinetic(k: Kit, c: Canvas, s: Scene, t: Float, d: Float) {
@@ -101,9 +97,8 @@ object Templates {
                 k.text.textAlign = Paint.Align.CENTER
                 k.text.alpha = (255 * k.clamp01(p * 2)).toInt()
                 k.glow(if (isEm(g)) k.theme.accent else Color.WHITE, 16f * k.u)
-                c.save(); c.scale(sc, sc, k.cx, k.cy)
-                c.drawText(g, k.cx, k.cy + size * 0.35f, k.text)
-                c.restore()
+                k.text.alpha = 255
+                Fx.text(k, c, g, k.cx, k.cy + size * 0.35f, k.seg(localT, 0f, 0.4f), s.fx, cur)
             }
             1 -> { // stack: lines build up
                 val visible = groups.subList(max(0, cur - 3), cur + 1)
@@ -144,7 +139,7 @@ object Templates {
     // ------------------------------------------------------------------ CHAPTER
     private fun chapter(k: Kit, c: Canvas, s: Scene, t: Float, d: Float) {
         val r = k.rnd(s)
-        if (r.nextBoolean()) k.bgBlob(c, t, s.variant) else k.bgGlow(c, t)
+        Fx.backdrop(k, c, s, t)
         if (r.nextBoolean()) k.particles(c, t, s.variant, 50)
         val title = s.title.uppercase().ifBlank { "NEXT" }
         val zoom = 1f + 0.05f * k.clamp01(t / max(1f, d))
@@ -211,7 +206,7 @@ object Templates {
     private fun imageBanner(k: Kit, c: Canvas, s: Scene, t: Float, d: Float) {
         val bmp = k.images.get(s.imageIndex) ?: return spotlight(k, c, s, t, d)
         val r = k.rnd(s)
-        k.bgGrid(c, t, spot = false)
+        Fx.backdrop(k, c, s, t)
         val zoom = k.lerp(1.04f, 1.14f, k.clamp01(t / d))
         val right = r.nextBoolean()
         if (!k.portrait) {
@@ -255,7 +250,7 @@ object Templates {
     private fun questionList(k: Kit, c: Canvas, s: Scene, t: Float, d: Float) {
         val r = k.rnd(s)
         val bmp = k.images.get(s.imageIndex)
-        k.bgGrid(c, t)
+        Fx.backdrop(k, c, s, t)
         val pad = 44f * k.u
         var maxW = k.w - pad * 2
         if (bmp != null && !k.portrait) {
@@ -304,7 +299,7 @@ object Templates {
 
     // ------------------------------------------------------------------ CHECKLIST
     private fun checklist(k: Kit, c: Canvas, s: Scene, t: Float, d: Float) {
-        k.bgGlow(c, t)
+        Fx.backdrop(k, c, s, t)
         val items = s.lines.ifEmpty { listOf(s.text) }.take(9)
         val cw = if (k.portrait) k.w * 0.82f else min(k.w * 0.40f, k.h * 0.85f)
         val itemSize = min(24f * k.u, (k.h * 0.62f) / (items.size * 2.1f))
@@ -349,7 +344,7 @@ object Templates {
 
     // ------------------------------------------------------------------ MIND MAP
     private fun mindmap(k: Kit, c: Canvas, s: Scene, t: Float, d: Float) {
-        k.bgGrid(c, t, spot = true)
+        Fx.backdrop(k, c, s, t)
         val bmp = k.images.get(s.imageIndex)
         if (bmp != null) {
             val iw = if (k.portrait) k.w * 0.7f else k.w * 0.28f
@@ -453,7 +448,7 @@ object Templates {
     // ------------------------------------------------------------------ BIG STAT
     private fun bigStat(k: Kit, c: Canvas, s: Scene, t: Float, d: Float) {
         val r = k.rnd(s)
-        if (r.nextBoolean()) k.bgBlob(c, t, s.variant) else { if (!k.bgImageBlur(c, s.imageIndex, t, 0.7f)) k.bgBlob(c, t, s.variant) }
+        Fx.backdrop(k, c, s, t)
         k.rays(c, k.cx, k.cy, t, k.theme.accent)
         val prefix = s.lines.getOrElse(0) { "" }
         val value = s.lines.getOrNull(1)?.toDoubleOrNull() ?: 0.0
@@ -493,7 +488,7 @@ object Templates {
             k.rect.set(0f, 0f, k.w.toFloat(), k.h.toFloat())
             k.cover(c, bmp, k.rect, k.lerp(1.08f, 1.2f, k.clamp01(t / d)))
             c.drawColor(0x40000000)
-        } else k.bgBlob(c, t, s.variant)
+        } else Fx.backdrop(k, c, s, t)
         val date = s.lines.getOrElse(0) { "" }
         val time = s.lines.getOrElse(1) { "" }
         if (date.isNotBlank()) {
@@ -530,7 +525,7 @@ object Templates {
 
     // ------------------------------------------------------------------ VERSUS
     private fun versus(k: Kit, c: Canvas, s: Scene, t: Float, d: Float) {
-        k.bgGlow(c, t)
+        Fx.backdrop(k, c, s, t)
         val a = s.lines.getOrElse(0) { "THIS" }; val b = s.lines.getOrElse(1) { "THAT" }
         val bw = if (k.portrait) k.w * 0.7f else k.w * 0.30f
         val bh = if (k.portrait) k.h * 0.2f else k.h * 0.32f
@@ -566,7 +561,7 @@ object Templates {
 
     // ------------------------------------------------------------------ QUOTE
     private fun quote(k: Kit, c: Canvas, s: Scene, t: Float, d: Float) {
-        if (!k.bgImageBlur(c, s.imageIndex, t, 0.72f)) k.bgBlob(c, t, s.variant)
+        Fx.backdrop(k, c, s, t)
         val q = s.lines.firstOrNull() ?: s.text
         val size = if (k.portrait) 46f * k.u else 40f * k.u
         k.setText(k.fonts.heavy, size, Color.WHITE, q)
@@ -592,8 +587,8 @@ object Templates {
             for (wd in l.split(" ")) {
                 val p = k.seg(t, starts.getOrElse(wi) { 0f }, starts.getOrElse(wi) { 0f } + 0.25f)
                 k.text.color = if (ScriptAnalyzer.cleanWord(wd).lowercase() in em) k.theme.accent else Color.WHITE
-                k.text.alpha = (255 * p).toInt()
-                c.drawText(wd, x, top + li * lh + (1f - p) * 14f * k.u, k.text)
+                k.text.alpha = 255
+                Fx.text(k, c, wd, x, top + li * lh, p, s.fx, wi)
                 x += k.text.measureText(wd) + space
                 wi++
             }
@@ -603,7 +598,7 @@ object Templates {
     // ------------------------------------------------------------------ CAUSE -> EFFECT
     private fun splitArrow(k: Kit, c: Canvas, s: Scene, t: Float, d: Float) {
         val r = k.rnd(s)
-        if (r.nextBoolean()) k.bgGlow(c, t) else k.bgBlob(c, t, s.variant)
+        Fx.backdrop(k, c, s, t)
         val bmp = k.images.get(s.imageIndex)
         val a = s.lines.getOrElse(0) { "" }; val b = s.lines.getOrElse(1) { "" }
         val cardW = if (k.portrait) k.w * 0.6f else k.w * 0.3f
@@ -669,7 +664,7 @@ object Templates {
 
     // ------------------------------------------------------------------ POLAROID STACK
     private fun polaroid(k: Kit, c: Canvas, s: Scene, t: Float, d: Float) {
-        if (!k.bgImageBlur(c, s.imageIndex, t, 0.55f)) k.bgBlob(c, t, s.variant)
+        Fx.backdrop(k, c, s, t)
         val r = k.rnd(s)
         val n = k.images.count
         val idx = listOf(s.imageIndex - 1, s.imageIndex + 1, s.imageIndex).map { ((it % n) + n) % n }
@@ -730,7 +725,7 @@ object Templates {
     // ------------------------------------------------------------------ PHONE MOCKUP
     private fun phone(k: Kit, c: Canvas, s: Scene, t: Float, d: Float) {
         val bmp = k.images.get(s.imageIndex) ?: return spotlight(k, c, s, t, d)
-        k.bgGrid(c, t)
+        Fx.backdrop(k, c, s, t)
         val ph = if (k.portrait) k.h * 0.58f else k.h * 0.84f
         val pw = ph * 0.5f
         val px = if (k.portrait) k.cx else k.w * 0.27f
@@ -765,7 +760,7 @@ object Templates {
     // ------------------------------------------------------------------ SPOTLIGHT TEXT
     private fun spotlight(k: Kit, c: Canvas, s: Scene, t: Float, d: Float) {
         val r = k.rnd(s)
-        k.bgGrid(c, t, spot = false)
+        Fx.backdrop(k, c, s, t)
         val sway = sin(t * 0.6f) * k.w * 0.05f
         k.path.reset()
         k.path.moveTo(k.cx - k.w * 0.05f + sway, 0f); k.path.lineTo(k.cx + k.w * 0.05f + sway, 0f)
@@ -797,10 +792,10 @@ object Templates {
             var x = if (leftAlign) x0 else k.cx - lw / 2
             for (wd in l.split(" ")) {
                 val st = starts.getOrElse(wi) { 0f }
-                val p = k.seg(t, st, st + 0.22f)
+                val p = k.seg(t, st, st + 0.35f)
                 k.text.color = if (ScriptAnalyzer.cleanWord(wd).lowercase() in em) k.theme.accent else Color.WHITE
-                k.text.alpha = (255 * (0.18f + 0.82f * p)).toInt()
-                c.drawText(wd, x, top + li * lh + (1f - k.outCubic(p)) * 10f * k.u, k.text)
+                k.text.alpha = 255
+                Fx.text(k, c, wd, x, top + li * lh, p, s.fx, wi)
                 x += k.text.measureText(wd) + space
                 wi++
             }
@@ -810,7 +805,7 @@ object Templates {
 
     // ------------------------------------------------------------------ OUTRO
     private fun outro(k: Kit, c: Canvas, s: Scene, t: Float, d: Float) {
-        if (!k.bgImageBlur(c, s.imageIndex, t, 0.7f)) k.bgBlob(c, t, s.variant)
+        Fx.backdrop(k, c, s, t)
         k.particles(c, t, s.variant, 60, k.theme.accent)
         val handle = s.title.let { if (it.startsWith("@") || it.isBlank()) it else "@$it" }
         val p = k.outBack(k.seg(t, 0f, 0.45f))

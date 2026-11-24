@@ -48,6 +48,24 @@ Manual control: start a line with a tag – `[stat] [list] [quote] [note] [phone
 **22 layouts × several variants each × 11 transitions × 6 themes**, all driven by a random seed. Tap "Shuffle animations" to give the whole
 video a new look (timing stays the same). In the editor you can change any scene's layout, transition and image, or tap 🎲 to re-roll just that scene.
 
+## Variety engine (no boring repeats)
+
+Every scene is a **combination** of six independent choices:
+
+| Dimension | Options |
+|---|---|
+| Layout | 34 (22 classic + Image-in-Text, Film Strip, Magnifier, Breaking News, Chat Message, Search Bar, Circle Reveal, Diagonal Split, Word Cloud, Gauge, Steps, Sticky Notes) |
+| Text entrance | 12: pop, rise, slide, type, cascade, blur, drop, wipe, flip, bounce, glitch, zoom |
+| Backdrop | 12: blob, grid, glow, image, particles, sweep, rays, dots, waves, bokeh, stripes, aurora |
+| Camera | 9: still, push, pull, drift left/right, rise, tilt, handheld, breathe |
+| Decoration | 11: none, light sweep, sparkles, corners, confetti, scanlines, frame, shapes, flare, spotlight, brackets |
+| Transition | 16 (incl. dip, page turn, doors, blinds, pixelate) |
+
+Rules the planner follows for every video: a layout is used **at most twice** (only in very long videos, after every
+layout has been used twice, does the cap rise — evenly for all), the same layout never returns within 3 scenes, every
+dimension prefers its least-used option, and **no full combination ever appears twice**. Layouts that match the line's
+content (numbers, dates, questions, lists, quotes…) get priority. The editor shows the live variety status.
+
 ## Extra features
 
 - Caption modes: **Keywords** (default – only key words pop up, the visuals carry the story), **Full** word-by-word captions, or **Off**

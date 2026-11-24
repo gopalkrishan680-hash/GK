@@ -160,40 +160,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun reroll(i: Int) = update { Director.reroll(it, i) }
 
     fun setSceneType(i: Int, t: SceneType) = update { p ->
-        val l = p.scenes.toMutableList()
-        val s = l[i]
-        var lines = s.lines
-        var title = s.title
-        // fill in content the new layout needs
-        when (t) {
-            SceneType.QUESTION_LIST -> if (lines.isEmpty() || s.type != SceneType.QUESTION_LIST) lines = listOf(s.text)
-            SceneType.CHECKLIST -> { lines = p.chapters.ifEmpty { ScriptAnalyzer.keywords(s.text, 4) }; title = p.title.ifBlank { "FULL GUIDE" }.uppercase() }
-            SceneType.MINDMAP -> ScriptAnalyzer.detectList(s.text).let {
-                title = (it?.first?.ifBlank { null } ?: ScriptAnalyzer.headline(s.text, 4)).uppercase()
-                lines = it?.second ?: ScriptAnalyzer.keywords(s.text, 3).map { w -> w.replaceFirstChar { c -> c.uppercase() } }
-            }
-            SceneType.BIG_STAT -> ScriptAnalyzer.detectStat(s.text)?.let { st ->
-                lines = listOf(st.prefix, st.number.toString(), st.decimals.toString(), st.grouped.toString(), st.suffix); title = st.label
-            } ?: run { _toast.value = "No number found in this line"; return@update p }
-            SceneType.DATE_STAMP -> lines = ScriptAnalyzer.detectDate(s.text) ?: listOf(ScriptAnalyzer.headline(s.text, 2), "")
-            SceneType.VERSUS -> lines = (ScriptAnalyzer.detectVersus(s.text)?.toList() ?: ScriptAnalyzer.keywords(s.text, 2)).map { it.uppercase() }
-            SceneType.QUOTE -> lines = listOf(ScriptAnalyzer.detectQuote(s.text) ?: s.text)
-            SceneType.SPLIT_ARROW -> lines = (ScriptAnalyzer.detectCause(s.text)?.toList() ?: ScriptAnalyzer.keywords(s.text, 2)).map { it.uppercase() }
-            SceneType.CHAPTER -> title = p.chapters.getOrNull(s.chapterIndex) ?: ScriptAnalyzer.headline(s.text, 3)
-            SceneType.OUTRO -> title = p.handle
-            SceneType.DONUT -> ScriptAnalyzer.detectPercent(s.text)?.let { lines = listOf(it.first.toString()); title = it.second }
-                ?: run { _toast.value = "No percentage found in this line"; return@update p }
-            SceneType.BAR_CHART -> ScriptAnalyzer.detectNumbers(s.text)?.let { n -> lines = n.map { "${it.first}|${it.second}" }; title = ScriptAnalyzer.headline(s.text, 4) }
-                ?: run { _toast.value = "This line needs at least two numbers"; return@update p }
-            SceneType.TIMELINE -> ScriptAnalyzer.detectYears(s.text)?.let { y -> lines = y.map { "${it.first}|${it.second}" } }
-                ?: run { _toast.value = "This line needs at least two years"; return@update p }
-            SceneType.KEY_POINTS -> { title = ScriptAnalyzer.headline(s.text, 4); lines = ScriptAnalyzer.keywords(s.text, 3).map { it.replaceFirstChar { c -> c.uppercase() } } }
-            SceneType.KEN_BURNS, SceneType.POLAROID -> title = ScriptAnalyzer.headline(s.text, 4)
-            else -> title = if (title.isBlank()) ScriptAnalyzer.headline(s.text, if (t == SceneType.HEADLINE_IMAGE) 2 else 4) else title
+        val s = p.scenes[i]
+        val text = s.text
+        val missing = when (t) {
+            SceneType.BIG_STAT -> if (ScriptAnalyzer.detectStat(text) == null) "No number found in this line" else null
+            SceneType.DONUT, SceneType.GAUGE -> if (ScriptAnalyzer.detectPercent(text) == null) "No percentage found in this line" else null
+            SceneType.BAR_CHART -> if (ScriptAnalyzer.detectNumbers(text) == null) "This line needs at least two numbers" else null
+            SceneType.TIMELINE -> if (ScriptAnalyzer.detectYears(text) == null) "This line needs at least two years" else null
+            else -> if (t.needsImage && p.images.none { it.isNotBlank() }) "This layout needs an image" else null
         }
-        if (t.needsImage && p.images.isEmpty()) { _toast.value = "This layout needs an image"; return@update p }
-        l[i] = s.copy(type = t, lines = lines, title = title, lineStarts = if (t == SceneType.QUESTION_LIST && lines.size != s.lineStarts.size) lines.indices.map { it / lines.size.toFloat() } else s.lineStarts,
-            imageIndex = if (s.imageIndex < 0 && p.images.isNotEmpty()) 0 else s.imageIndex)
+        if (missing != null) { _toast.value = missing; return@update p }
+        val (lines, title) = Director.fill(t, text, if (s.type == SceneType.QUESTION_LIST) s.lines else listOf(text), s.type == SceneType.QUESTION_LIST && s.lines.size > 1,
+            p, p.chapters, s.chapterIndex)
+        val l = p.scenes.toMutableList()
+        l[i] = s.copy(type = t, lines = lines, title = title,
+            lineStarts = if (lines.size != s.lineStarts.size) lines.indices.map { it / lines.size.coerceAtLeast(1).toFloat() } else s.lineStarts,
+            imageIndex = if (s.imageIndex < 0) p.images.indexOfFirst { it.isNotBlank() } else s.imageIndex)
         p.copy(scenes = l)
     }
 

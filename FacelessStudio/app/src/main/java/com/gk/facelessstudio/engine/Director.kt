@@ -3,7 +3,11 @@ package com.gk.facelessstudio.engine
 import com.gk.facelessstudio.model.Pacing
 import com.gk.facelessstudio.model.Project
 import com.gk.facelessstudio.model.Scene
+import com.gk.facelessstudio.model.Backdrop
+import com.gk.facelessstudio.model.CamMove
+import com.gk.facelessstudio.model.Deco
 import com.gk.facelessstudio.model.SceneType
+import com.gk.facelessstudio.model.TextFx
 import com.gk.facelessstudio.model.Transition
 import kotlin.math.abs
 import kotlin.math.max
@@ -46,6 +50,7 @@ object Director {
         val scenes = mutableListOf<Scene>()
         val history = ArrayDeque<SceneType>()
         var lastTransition = Transition.CUT
+        val variety = Variety(project.seed, project.pacing)
 
         groups.forEachIndexed { gi, g ->
             val first = g.chunks.first()
@@ -76,88 +81,46 @@ object Director {
             val numbers = ScriptAnalyzer.detectNumbers(text)
             val years = ScriptAnalyzer.detectYears(text)
 
-            type = when {
-                forced != null -> forced
-                g.isQuestionGroup -> SceneType.QUESTION_LIST
-                first.chapterStart && analysis.chapters.size >= 2 && chapter >= 0 && rnd.nextFloat() < 0.6f -> SceneType.CHECKLIST
-                first.chapterStart && chapter >= 0 -> SceneType.CHAPTER
-                vs != null -> SceneType.VERSUS
-                quote != null -> SceneType.QUOTE
-                list != null -> SceneType.MINDMAP
-                years != null -> SceneType.TIMELINE
-                percent != null && history.lastOrNull() != SceneType.DONUT -> SceneType.DONUT
-                numbers != null && history.lastOrNull() != SceneType.BAR_CHART -> SceneType.BAR_CHART
-                stat != null && history.lastOrNull() != SceneType.BIG_STAT -> SceneType.BIG_STAT
-                date != null && history.lastOrNull() != SceneType.DATE_STAMP -> SceneType.DATE_STAMP
-                cause != null && rnd.nextFloat() < 0.55f -> SceneType.SPLIT_ARROW
-                first.words.size <= 4 -> if (rnd.nextFloat() < 0.75f) SceneType.KINETIC else SceneType.SPOTLIGHT
-                else -> pickGeneric(rnd, history, images > 0, if (project.lineImages) 1f else images.toFloat() / max(1, groups.size))
+            val hasImg = imageIdx >= 0
+            val short = first.words.size <= 4
+            // layouts that fit what this line says
+            val preferred = buildList {
+                if (forced != null) add(forced)
+                if (g.isQuestionGroup) { add(SceneType.QUESTION_LIST); add(SceneType.SEARCH_BAR) }
+                if (first.chapterStart && chapter >= 0) { add(SceneType.CHAPTER); if (analysis.chapters.size >= 2) add(SceneType.CHECKLIST) }
+                if (vs != null) add(SceneType.VERSUS)
+                if (quote != null) { add(SceneType.QUOTE); add(SceneType.CHAT_CARD) }
+                if (ScriptAnalyzer.detectSpeaker(text) != null) add(SceneType.CHAT_CARD)
+                if (years != null) add(SceneType.TIMELINE)
+                if (percent != null) { add(SceneType.DONUT); add(SceneType.GAUGE) }
+                if (numbers != null) add(SceneType.BAR_CHART)
+                if (stat != null) add(SceneType.BIG_STAT)
+                if (date != null) add(SceneType.DATE_STAMP)
+                if (list != null) { add(SceneType.MINDMAP); add(SceneType.STEPS); add(SceneType.STICKY_NOTES) }
+                if (cause != null) add(SceneType.SPLIT_ARROW)
+                if (first.isQuestion) add(SceneType.SEARCH_BAR)
             }
-            if (type.needsImage && imageIdx < 0) type = pickGeneric(rnd, history, false, 0f)
+            // short punchy lines suit big-type layouts
+            val soft = if (!short) emptyList() else buildList {
+                add(SceneType.KINETIC); if (hasImg) { add(SceneType.TEXT_MASK); add(SceneType.HEADLINE_IMAGE) }
+            }
+            // layouts that can show any line
+            val generic = buildList {
+                if (hasImg) addAll(listOf(SceneType.KEN_BURNS, SceneType.IMAGE_BANNER, SceneType.HEADLINE_IMAGE, SceneType.POLAROID, SceneType.PHONE,
+                    SceneType.FILMSTRIP, SceneType.MAGNIFY, SceneType.NEWS_FLASH, SceneType.CIRCLE_REVEAL, SceneType.SPLIT_DIAGONAL, SceneType.TEXT_MASK))
+                addAll(listOf(SceneType.KINETIC, SceneType.SPOTLIGHT, SceneType.PAPER_NOTE, SceneType.KEY_POINTS, SceneType.WORD_CLOUD, SceneType.STICKY_NOTES, SceneType.CHAT_CARD))
+            }.filter { !it.needsImage || hasImg }
+            type = if (forced != null) forced.also { variety.use(it) }
+            else variety.layout(preferred.filter { !it.needsImage || hasImg }, generic, soft)
 
-            when (type) {
-                SceneType.QUESTION_LIST -> {
-                    lines = if (g.isQuestionGroup) g.chunks.map { it.text } else list?.second ?: g.chunks.map { it.text }
-                    title = analysis.chapters.getOrNull(chapter)?.uppercase() ?: ""
-                }
-                SceneType.CHECKLIST -> { lines = analysis.chapters; title = project.title.ifBlank { "FULL GUIDE" }.uppercase() }
-                SceneType.CHAPTER -> title = analysis.chapters.getOrNull(chapter) ?: ScriptAnalyzer.headline(text, 3)
-                SceneType.MINDMAP -> {
-                    val l = list ?: ScriptAnalyzer.detectList(text)
-                    title = (l?.first?.takeIf { it.isNotBlank() } ?: ScriptAnalyzer.headline(text, 4)).uppercase()
-                    lines = l?.second ?: ScriptAnalyzer.keywords(text, 3).map { it.replaceFirstChar { c -> c.uppercase() } }
-                }
-                SceneType.BIG_STAT -> {
-                    val s = stat ?: ScriptAnalyzer.detectStat(text)
-                    if (s != null) {
-                        lines = listOf(s.prefix, s.number.toString(), s.decimals.toString(), s.grouped.toString(), s.suffix)
-                        title = s.label
-                    } else type = SceneType.KINETIC
-                }
-                SceneType.DATE_STAMP -> {
-                    lines = date ?: listOf(ScriptAnalyzer.headline(text, 2), "")
-                    title = ScriptAnalyzer.headline(text, 3)
-                }
-                SceneType.VERSUS -> {
-                    val p = vs ?: ScriptAnalyzer.keywords(text, 2).let { Pair(it.getOrElse(0) { "THIS" }, it.getOrElse(1) { "THAT" }) }
-                    lines = listOf(p.first.uppercase(), p.second.uppercase())
-                }
-                SceneType.QUOTE -> lines = listOf(quote ?: text)
-                SceneType.DONUT -> {
-                    val pc = percent ?: ScriptAnalyzer.detectPercent(text)
-                    if (pc != null) { lines = listOf(pc.first.toString()); title = pc.second } else type = SceneType.KEY_POINTS
-                }
-                SceneType.BAR_CHART -> {
-                    val n = numbers ?: ScriptAnalyzer.detectNumbers(text)
-                    if (n != null) { lines = n.map { "${it.first}|${it.second}" }; title = ScriptAnalyzer.headline(text, 4) } else type = SceneType.KEY_POINTS
-                }
-                SceneType.TIMELINE -> {
-                    val y = years ?: ScriptAnalyzer.detectYears(text)
-                    if (y != null) { lines = y.map { "${it.first}|${it.second}" }; title = analysis.chapters.getOrNull(chapter)?.uppercase() ?: "" } else type = SceneType.KEY_POINTS
-                }
-                else -> {}
-            }
-            when (type) {
-                SceneType.KEY_POINTS -> {
-                    title = ScriptAnalyzer.headline(text, 4)
-                    lines = ScriptAnalyzer.keywords(text, 3).map { it.replaceFirstChar { c -> c.uppercase() } }
-                }
-                SceneType.KEN_BURNS, SceneType.POLAROID -> title = ScriptAnalyzer.headline(text, 4)
-                SceneType.SPLIT_ARROW -> {
-                    val c = cause ?: ScriptAnalyzer.keywords(text, 2).let { Pair(it.getOrElse(0) { "" }, it.getOrElse(1) { "" }) }
-                    lines = listOf(c.first.uppercase(), c.second.uppercase())
-                }
-                SceneType.IMAGE_BANNER, SceneType.HEADLINE_IMAGE, SceneType.PHONE, SceneType.SPOTLIGHT, SceneType.PAPER_NOTE ->
-                    title = (analysis.chapters.getOrNull(chapter)?.takeIf { type == SceneType.IMAGE_BANNER && rnd.nextBoolean() }
-                        ?: ScriptAnalyzer.headline(text, if (type == SceneType.HEADLINE_IMAGE) 2 else 4)).uppercase()
-                else -> {}
-            }
+            val filled = fill(type, text, g.chunks.map { it.text }, g.isQuestionGroup, project, analysis.chapters, chapter,
+                list, stat, date, vs, quote, cause, percent, numbers, years)
+            lines = filled.first; title = filled.second
 
             val transition = when {
                 gi == 0 -> Transition.FADE
                 first.forceCut -> Transition.CUT
-                first.chapterStart -> listOf(Transition.FLASH, Transition.GLITCH, Transition.ZOOM_PUNCH, Transition.SHUTTER).random(rnd)
-                else -> pickTransition(rnd, project.pacing, lastTransition)
+                else -> variety.transition(lastTransition, first.chapterStart)
             }
             lastTransition = transition
 
@@ -174,7 +137,11 @@ object Director {
                 title = title,
                 emphasis = emphasis,
                 chapterIndex = chapter,
-            )
+            ).let { sc ->
+                // photo layouts keep their picture; text layouts may get any backdrop
+                val look = variety.look(type, if (hasImg) Backdrop.entries else Backdrop.entries.filter { it != Backdrop.IMAGE })
+                sc.copy(fx = look.fx, bg = look.bg, cam = look.cam, deco = look.deco)
+            }
             history.addLast(type); if (history.size > 3) history.removeFirst()
         }
 
@@ -198,37 +165,62 @@ object Director {
         val s = project.scenes.getOrNull(index) ?: return project
         val rnd = Random(s.variant.toLong() * 31 + System.nanoTime())
         val tr = pickTransition(rnd, project.pacing, s.transition)
+        val taken = project.scenes.filterIndexed { i, _ -> i != index }.map { it.combo }.toSet()
+        var next = s
+        for (attempt in 0 until 80) {
+            next = s.copy(variant = rnd.nextInt(1_000_000), transition = if (index == 0) Transition.FADE else tr,
+                fx = TextFx.entries.random(rnd), bg = Backdrop.entries.random(rnd), cam = CamMove.entries.random(rnd), deco = Deco.entries.random(rnd))
+            if (next.combo !in taken && next.combo != s.combo) break
+        }
         val updated = project.scenes.toMutableList()
-        updated[index] = s.copy(variant = rnd.nextInt(1_000_000), transition = if (index == 0) Transition.FADE else tr)
+        updated[index] = next
         return project.copy(scenes = updated)
     }
 
+    /** Content (lines, title) every layout needs, from what the analyzer found in the line. */
+    fun fill(
+        type: SceneType, text: String, groupLines: List<String>, questionGroup: Boolean, project: Project,
+        chapters: List<String>, chapter: Int,
+        list: Pair<String, List<String>>? = ScriptAnalyzer.detectList(text), stat: ScriptAnalyzer.Stat? = ScriptAnalyzer.detectStat(text),
+        date: List<String>? = ScriptAnalyzer.detectDate(text), vs: Pair<String, String>? = ScriptAnalyzer.detectVersus(text),
+        quote: String? = ScriptAnalyzer.detectQuote(text), cause: Pair<String, String>? = ScriptAnalyzer.detectCause(text),
+        percent: Pair<Float, String>? = ScriptAnalyzer.detectPercent(text), numbers: List<Pair<String, Double>>? = ScriptAnalyzer.detectNumbers(text),
+        years: List<Pair<String, String>>? = ScriptAnalyzer.detectYears(text),
+    ): Pair<List<String>, String> {
+        val cap = { w: String -> w.replaceFirstChar { it.uppercase() } }
+        val kw = { n: Int -> ScriptAnalyzer.keywords(text, n).map(cap) }
+        val ph = { n: Int -> ScriptAnalyzer.phrase(text, n).uppercase() }
+        return when (type) {
+            SceneType.QUESTION_LIST -> Pair(if (questionGroup) groupLines else list?.second ?: groupLines, chapters.getOrNull(chapter)?.uppercase() ?: "")
+            SceneType.CHECKLIST -> Pair(chapters.ifEmpty { kw(4) }, project.title.ifBlank { "FULL GUIDE" }.uppercase())
+            SceneType.CHAPTER -> Pair(emptyList(), chapters.getOrNull(chapter) ?: ScriptAnalyzer.phrase(text, 4))
+            SceneType.MINDMAP -> Pair(list?.second ?: kw(3), (list?.first?.ifBlank { null } ?: ScriptAnalyzer.phrase(text, 5)).uppercase())
+            SceneType.STEPS, SceneType.STICKY_NOTES -> Pair(list?.second?.take(5) ?: kw(4), (list?.first?.ifBlank { null } ?: ScriptAnalyzer.phrase(text, 5)).uppercase())
+            SceneType.BIG_STAT -> stat?.let { Pair(listOf(it.prefix, it.number.toString(), it.decimals.toString(), it.grouped.toString(), it.suffix), it.label) } ?: Pair(emptyList(), ph(4))
+            SceneType.DATE_STAMP -> Pair(date ?: listOf(ScriptAnalyzer.headline(text, 2), ""), ph(4))
+            SceneType.VERSUS -> Pair((vs?.toList() ?: ScriptAnalyzer.keywords(text, 2).let { listOf(it.getOrElse(0) { "THIS" }, it.getOrElse(1) { "THAT" }) }).map { it.uppercase() }, "")
+            SceneType.QUOTE -> Pair(listOf(quote ?: text), "")
+            SceneType.CHAT_CARD -> Pair(listOf(quote ?: text), ScriptAnalyzer.detectSpeaker(text) ?: chapters.getOrNull(chapter) ?: project.title.ifBlank { "Did you know?" })
+            SceneType.DONUT, SceneType.GAUGE -> percent?.let { Pair(listOf(it.first.toString()), it.second) } ?: Pair(listOf("50"), ph(4))
+            SceneType.BAR_CHART -> Pair(numbers?.map { "${it.first}|${it.second}" } ?: emptyList(), ph(5))
+            SceneType.TIMELINE -> Pair(years?.map { "${it.first}|${it.second}" } ?: emptyList(), chapters.getOrNull(chapter)?.uppercase() ?: "")
+            SceneType.SPLIT_ARROW -> Pair((cause?.toList() ?: ScriptAnalyzer.keywords(text, 2)).map { it.uppercase() }, "")
+            SceneType.KEY_POINTS, SceneType.SPLIT_DIAGONAL -> Pair(kw(3), ph(5))
+            // a question group: first question is typed, the next ones show up as results
+            SceneType.SEARCH_BAR -> if (questionGroup && groupLines.size > 1) Pair(groupLines.drop(1).take(3), groupLines.first())
+                else Pair(kw(3), text)
+            SceneType.WORD_CLOUD -> Pair(ScriptAnalyzer.keywords(text, 7), "")
+            SceneType.TEXT_MASK -> Pair(listOf(ScriptAnalyzer.phrase(text, 8)), (ScriptAnalyzer.keywords(text, 1).firstOrNull() ?: ScriptAnalyzer.phrase(text, 2)).uppercase())
+            SceneType.KEN_BURNS, SceneType.POLAROID, SceneType.IMAGE_BANNER, SceneType.PHONE, SceneType.SPOTLIGHT, SceneType.PAPER_NOTE,
+            SceneType.FILMSTRIP, SceneType.MAGNIFY, SceneType.CIRCLE_REVEAL -> Pair(emptyList(), ph(5))
+            SceneType.HEADLINE_IMAGE -> Pair(emptyList(), ph(3))
+            SceneType.NEWS_FLASH -> Pair(emptyList(), ph(7))
+            SceneType.OUTRO -> Pair(emptyList(), project.handle)
+            SceneType.KINETIC -> Pair(emptyList(), "")
+        }
+    }
+
     // ---------------- helpers ----------------
-
-    private val IMAGE_POOL = listOf(
-        SceneType.KEN_BURNS to 5f, SceneType.IMAGE_BANNER to 2.5f, SceneType.HEADLINE_IMAGE to 2f,
-        SceneType.POLAROID to 1.2f, SceneType.PHONE to 1.2f, SceneType.KEY_POINTS to 2f,
-    )
-    private val TEXT_POOL = listOf(
-        SceneType.KINETIC to 2.5f, SceneType.SPOTLIGHT to 2f, SceneType.PAPER_NOTE to 1.8f, SceneType.KEY_POINTS to 2f,
-    )
-
-    private fun pickGeneric(rnd: Random, history: ArrayDeque<SceneType>, hasImages: Boolean, imageRatio: Float): SceneType {
-        val imgChance = if (!hasImages) 0f else (0.6f + imageRatio * 0.4f).coerceIn(0.65f, 0.9f)
-        val lastTwoText = history.takeLast(2).let { it.size == 2 && it.none { t -> t.needsImage } }
-        val useImage = hasImages && (lastTwoText || rnd.nextFloat() < imgChance)
-        val pool = if (useImage) IMAGE_POOL else TEXT_POOL
-        val last = history.lastOrNull()
-        val candidates = pool.filter { it.first != last && it.second > 0f }
-        return weighted(rnd, candidates.ifEmpty { pool })
-    }
-
-    private fun weighted(rnd: Random, items: List<Pair<SceneType, Float>>): SceneType {
-        val sum = items.sumOf { it.second.toDouble() }.toFloat()
-        var r = rnd.nextFloat() * sum
-        for ((t, w) in items) { r -= w; if (r <= 0f) return t }
-        return items.last().first
-    }
 
     private fun pickTransition(rnd: Random, pacing: Pacing, last: Transition): Transition {
         val pool = when (pacing) {

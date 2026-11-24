@@ -66,14 +66,13 @@ class RenderTest {
         val p = project(Aspect.LANDSCAPE)
         val types = p.scenes.map { it.type }.toSet()
         println("TYPES: " + p.scenes.joinToString { it.type.name })
-        assertTrue(SceneType.QUESTION_LIST in types)
+        assertTrue(types.any { it == SceneType.QUESTION_LIST || it == SceneType.SEARCH_BAR })
         assertTrue(SceneType.BIG_STAT in types)
         assertTrue(SceneType.VERSUS in types)
-        assertTrue(SceneType.MINDMAP in types)
-        assertTrue(SceneType.DONUT in types)
+        assertTrue(types.any { it in setOf(SceneType.MINDMAP, SceneType.STEPS, SceneType.STICKY_NOTES) })
+        assertTrue(types.any { it == SceneType.DONUT || it == SceneType.GAUGE })
         assertTrue(SceneType.BAR_CHART in types)
         assertTrue(SceneType.TIMELINE in types)
-        println("PROMPT: " + ScriptAnalyzer.imagePrompt("Ye internet ka wo hissa hai jo Google par nahi dikhta.", "Cinematic realistic photo", "16:9", "Dark Web", "Intro"))
         // scenes are contiguous
         p.scenes.zipWithNext().forEach { (x, y) -> assertEquals(x.endMs, y.startMs) }
     }

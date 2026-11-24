@@ -125,6 +125,8 @@ class Kit(
     val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND }
     val text = Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG)
     val bmpPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    /** Entrance style of the scene being drawn (set by the renderer). */
+    var curFx: com.gk.facelessstudio.model.TextFx = com.gk.facelessstudio.model.TextFx.SLIDE
     val rect = RectF()
     val rect2 = RectF()
     val path = Path()
@@ -343,11 +345,25 @@ class Kit(
         val lh = size * 1.15f
         val bw = lines.maxOf { text.measureText(it) } + size * 0.8f
         val bh = lh * lines.size + size * 0.45f
-        val off = (1f - outCubic(p)) * -(x + bw + 20f)
-        rect.set(x + off, y, x + off + bw, y + bh)
+        val e = outCubic(p)
+        c.save()
+        when (curFx) {
+            com.gk.facelessstudio.model.TextFx.POP, com.gk.facelessstudio.model.TextFx.BOUNCE, com.gk.facelessstudio.model.TextFx.ZOOM -> {
+                val sc = outBack(p); c.scale(sc, sc, x, y + bh / 2)
+            }
+            com.gk.facelessstudio.model.TextFx.WIPE, com.gk.facelessstudio.model.TextFx.TYPE, com.gk.facelessstudio.model.TextFx.CASCADE ->
+                c.clipRect(x - 2f, y - 2f, x + bw * e + 2f, y + bh + 2f)
+            com.gk.facelessstudio.model.TextFx.DROP, com.gk.facelessstudio.model.TextFx.RISE -> c.translate(0f, (1f - outBack(p)) * (if (curFx == com.gk.facelessstudio.model.TextFx.DROP) -bh * 2 else bh * 2))
+            com.gk.facelessstudio.model.TextFx.FLIP -> c.scale(1f, outBack(p), x, y + bh / 2)
+            else -> c.translate((1f - e) * -(x + bw + 20f), 0f)
+        }
+        rect.set(x, y, x + bw, y + bh)
         fill.color = color
+        fill.alpha = (255 * clamp01(p * 3)).toInt()
         c.drawRoundRect(rect, 6f * u, 6f * u, fill)
+        fill.alpha = 255
         lines.forEachIndexed { i, l -> c.drawText(l, rect.left + size * 0.4f, y + size * 0.2f + lh * (i + 0.8f), text) }
+        c.restore()
         return y + bh
     }
 }

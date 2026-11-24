@@ -162,7 +162,11 @@ fun EditorScreen(vm: AppViewModel, onBack: () -> Unit, onEditSetup: (Int) -> Uni
                 }
             }
             ExportBanner(vm)
-            Text("${p.scenes.size} scenes  •  tap to jump, use chips to change layout", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp))
+            val layouts = p.scenes.map { it.type }.toSet().size
+            val maxRepeat = p.scenes.groupingBy { it.type }.eachCount().values.maxOrNull() ?: 0
+            val unique = p.scenes.map { it.combo }.toSet().size == p.scenes.size
+            Text("${p.scenes.size} scenes  •  $layouts layouts  •  max ${maxRepeat}× each  •  " + if (unique) "every animation unique ✓" else "some animations repeat",
+                color = if (unique) Neon else Muted, fontSize = 12.sp, modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp))
             LazyColumn(state = listState, modifier = Modifier.weight(1f), contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 itemsIndexed(p.scenes, key = { i, s -> "$i-${s.startMs}" }) { i, s ->
                     SceneCard(vm, i, active = i == curScene, onJump = { preview.seek(s.startMs) })

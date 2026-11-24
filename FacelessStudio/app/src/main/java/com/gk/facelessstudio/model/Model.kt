@@ -35,6 +35,18 @@ enum class CaptionMode(val label: String, val sub: String) {
     OFF("Off", "No captions"),
 }
 
+/** How text arrives on screen. */
+enum class TextFx { POP, RISE, SLIDE, TYPE, CASCADE, BLUR, DROP, WIPE, FLIP, BOUNCE, GLITCH, ZOOM }
+
+/** What sits behind the content. */
+enum class Backdrop { BLOB, GRID, GLOW, IMAGE, PARTICLES, SWEEP, RAYS, DOTS, WAVES, BOKEH, STRIPES, AURORA }
+
+/** Whole-scene camera movement. */
+enum class CamMove { STILL, PUSH, PULL, DRIFT_L, DRIFT_R, RISE, TILT, HANDHELD, BREATHE }
+
+/** Extra decoration layer on top of a scene. */
+enum class Deco { NONE, LIGHT_SWEEP, SPARKLES, CORNERS, CONFETTI, SCANLINES, FRAME, SHAPES, FLARE, SPOTLIGHT, BRACKETS }
+
 /** Every visual layout the app can generate. `needsImage` layouts fall back to text layouts when no image exists. */
 enum class SceneType(val label: String, val needsImage: Boolean, val showsOwnText: Boolean) {
     KINETIC("Kinetic Words", false, true),
@@ -54,6 +66,18 @@ enum class SceneType(val label: String, val needsImage: Boolean, val showsOwnTex
     HEADLINE_IMAGE("Headline on Image", true, true),
     PHONE("Phone Mockup", true, true),
     SPOTLIGHT("Spotlight Text", false, true),
+    TEXT_MASK("Image in Text", true, true),
+    FILMSTRIP("Film Strip", true, false),
+    MAGNIFY("Magnifier", true, true),
+    NEWS_FLASH("Breaking News", true, true),
+    CHAT_CARD("Chat Message", false, true),
+    SEARCH_BAR("Search Bar", false, true),
+    CIRCLE_REVEAL("Circle Reveal", true, true),
+    SPLIT_DIAGONAL("Diagonal Split", true, true),
+    WORD_CLOUD("Word Cloud", false, true),
+    GAUGE("Gauge Meter", false, true),
+    STEPS("Steps", false, true),
+    STICKY_NOTES("Sticky Notes", false, true),
     DONUT("Percent Donut", false, true),
     BAR_CHART("Bar Chart", false, true),
     TIMELINE("Timeline", false, true),
@@ -64,7 +88,8 @@ enum class SceneType(val label: String, val needsImage: Boolean, val showsOwnTex
 enum class Transition(val label: String) {
     FADE("Fade"), ZOOM_PUNCH("Zoom Punch"), SLIDE_LEFT("Slide"), SLIDE_UP("Slide Up"),
     WHIP("Whip Pan"), FLASH("Flash"), GLITCH("Glitch"), CIRCLE("Circle Reveal"),
-    SHUTTER("Shutter"), SPIN("Spin Zoom"), CUT("Hard Cut")
+    SHUTTER("Shutter"), SPIN("Spin Zoom"), CUT("Hard Cut"),
+    DIP("Dip to Black"), PAGE("Page Turn"), DOORS("Doors"), BLINDS("Blinds"), PIXEL("Pixelate")
 }
 
 data class Scene(
@@ -83,7 +108,14 @@ data class Scene(
     val emphasis: List<String> = emptyList(),
     val chapterIndex: Int = -1,
     val locked: Boolean = false,
+    val fx: TextFx = TextFx.POP,
+    val bg: Backdrop = Backdrop.BLOB,
+    val cam: CamMove = CamMove.STILL,
+    val deco: Deco = Deco.NONE,
 ) {
+    /** The full animation "combination" of this scene; no two scenes in a video share one. */
+    val combo get() = "${type.name}/${fx.name}/${bg.name}/${cam.name}/${deco.name}"
+
     val durationMs get() = (endMs - startMs).coerceAtLeast(1)
 
     fun toJson(): JSONObject = JSONObject().apply {
@@ -92,7 +124,7 @@ data class Scene(
         put("variant", variant); put("lines", JSONArray(lines))
         put("lineStarts", JSONArray(lineStarts.map { it.toDouble() }))
         put("title", title); put("emph", JSONArray(emphasis)); put("chapter", chapterIndex)
-        put("locked", locked)
+        put("locked", locked); put("fx", fx.name); put("bg", bg.name); put("cam", cam.name); put("deco", deco.name)
     }
 
     companion object {
@@ -110,6 +142,10 @@ data class Scene(
             emphasis = o.optJSONArray("emph").strings(),
             chapterIndex = o.optInt("chapter", -1),
             locked = o.optBoolean("locked"),
+            fx = runCatching { TextFx.valueOf(o.optString("fx")) }.getOrDefault(TextFx.POP),
+            bg = runCatching { Backdrop.valueOf(o.optString("bg")) }.getOrDefault(Backdrop.BLOB),
+            cam = runCatching { CamMove.valueOf(o.optString("cam")) }.getOrDefault(CamMove.STILL),
+            deco = runCatching { Deco.valueOf(o.optString("deco")) }.getOrDefault(Deco.NONE),
         )
     }
 }

@@ -104,7 +104,10 @@ class FrameRenderer(
                 c.translate((r.nextFloat() - 0.5f) * amp * 2, (r.nextFloat() - 0.5f) * amp * 2)
             }
         }
+        k.curFx = s.fx
+        Fx.camera(k, c, s, t, d)
         Templates.draw(k, c, s, t, d)
+        Fx.deco(k, c, s, t, d)
         c.restore()
     }
 
@@ -159,6 +162,41 @@ class FrameRenderer(
                 val off = e * h
                 c.drawBitmap(ba, 0f, -off, paint)
                 c.drawBitmap(bb, 0f, h - off, paint)
+            }
+            Transition.DIP -> {
+                c.drawBitmap(if (pr < 0.5f) ba else bb, 0f, 0f, paint)
+                c.drawColor(k.alpha(Color.BLACK, 1f - abs(pr - 0.5f) * 2f))
+            }
+            Transition.PAGE -> {
+                c.drawBitmap(bb, 0f, 0f, paint)
+                c.save(); c.scale(1f - e, 1f, 0f, 0f); c.drawBitmap(ba, 0f, 0f, paint); c.drawColor(k.alpha(Color.BLACK, e * 0.45f)); c.restore()
+                val fold = w * (1f - e)
+                k.fill.shader = android.graphics.LinearGradient(fold, 0f, fold + 60f * k.u, 0f, 0x88000000.toInt(), 0, Shader.TileMode.CLAMP)
+                c.drawRect(fold, 0f, fold + 60f * k.u, h.toFloat(), k.fill); k.fill.shader = null
+            }
+            Transition.DOORS -> { // the old scene opens like two doors
+                c.drawBitmap(bb, 0f, 0f, paint)
+                val off = e * w / 2
+                c.save(); c.clipRect(0f, 0f, w / 2f - off, h.toFloat()); c.drawBitmap(ba, -off, 0f, paint); c.restore()
+                c.save(); c.clipRect(w / 2f + off, 0f, w.toFloat(), h.toFloat()); c.drawBitmap(ba, off, 0f, paint); c.restore()
+            }
+            Transition.BLINDS -> {
+                c.drawBitmap(ba, 0f, 0f, paint)
+                val bars = 9; val bh = h / bars.toFloat()
+                val path = Path()
+                for (j in 0 until bars) {
+                    val q = k.inOutCubic(k.clamp01(pr * 1.5f - j * 0.05f))
+                    path.addRect(0f, j * bh, w.toFloat(), j * bh + bh * q + 1, Path.Direction.CW)
+                }
+                c.save(); c.clipPath(path); c.drawBitmap(bb, 0f, 0f, paint); c.restore()
+            }
+            Transition.PIXEL -> {
+                val src = if (pr < 0.5f) ba else bb
+                val blocks = (4 + (1f - abs(pr - 0.5f) * 2f) * 40f).toInt()
+                val small = Bitmap.createScaledBitmap(src, (w / blocks).coerceAtLeast(2), (h / blocks).coerceAtLeast(2), false)
+                val pp = Paint()
+                c.drawBitmap(small, null, android.graphics.RectF(0f, 0f, w.toFloat(), h.toFloat()), pp)
+                small.recycle()
             }
             Transition.FLASH -> {
                 c.drawBitmap(if (pr < 0.5f) ba else bb, 0f, 0f, paint)

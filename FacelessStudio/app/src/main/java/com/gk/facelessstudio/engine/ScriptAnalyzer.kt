@@ -144,7 +144,8 @@ object ScriptAnalyzer {
         "gaya", "gayi", "gaye", "raha", "rahi", "rahe", "karna", "karne", "karti", "sakte", "sakta", "sakti", "milti",
         "milta", "milte", "dikhta", "dikhti", "dikhte", "hota", "hoti", "aata", "aati", "aate", "jaata", "jaati", "jata",
         "jati", "padho", "padhte", "dekha", "dekho", "kaha", "bana", "bani", "aaya", "aayi", "laga", "lagta", "rakhti",
-        "rakhta", "batati", "batata", "unke", "inke", "uske", "iske", "apne", "apni", "logon", "log", "wala", "wali", "wale",
+        "rakhta", "batati", "batata", "diya", "diye", "kiya", "kiye", "liya", "badal", "badla", "badli", "badle", "karo", "karein",
+        "chahiye", "sakte", "jaate", "jaana", "aana", "dena", "lena", "hua", "hui", "hue", "rehte", "rehti", "rehta", "lagte", "lagti", "unke", "inke", "uske", "iske", "apne", "apni", "logon", "log", "wala", "wali", "wale",
     )
 
     fun cleanWord(w: String) = w.trim { !it.isLetterOrDigit() && it != '%' && it != '₹' && it != '$' }
@@ -163,6 +164,39 @@ object ScriptAnalyzer {
         return (marked + scored.sortedByDescending { it.second }.map { it.first })
             .distinctBy { it.lowercase() }.take(max)
     }
+
+    /**
+     * A readable on-screen phrase taken *as is* from the line (no word salad):
+     * the whole line if short, otherwise the most meaningful run of consecutive words.
+     */
+    fun phrase(text: String, maxWords: Int): String {
+        val words = text.replace(Regex("[\"“”*]"), "").replace(Regex("\\[[a-zA-Z]+]"), "")
+            .trim().trimEnd('.', '!', '?', ',', '।', ';', ':').split(Regex("\\s+")).filter { it.isNotBlank() }
+        if (words.size <= maxWords) return words.joinToString(" ")
+        fun score(w: String): Float {
+            val c = cleanWord(w)
+            if (c.isEmpty() || c.lowercase() in STOP) return 0.3f
+            var s = c.length.toFloat()
+            if (c.first().isUpperCase()) s += 5
+            if (c.any { it.isDigit() }) s += 4
+            return s
+        }
+        var best = 0; var bestS = -1f
+        for (i in 0..words.size - maxWords) {
+            var s = 0f
+            for (j in i until i + maxWords) s += score(words[j])
+            if (i == 0 || words[i - 1].endsWith(",")) s += 3
+            if (s > bestS) { bestS = s; best = i }
+        }
+        var win = words.subList(best, best + maxWords)
+        while (win.size > 2 && cleanWord(win.last()).lowercase() in STOP) win = win.dropLast(1)
+        while (win.size > 2 && cleanWord(win.first()).lowercase() in STOP) win = win.drop(1)
+        return win.joinToString(" ").trimEnd(',', ';')
+    }
+
+    /** "Krishna ne kaha" / "Einstein said" -> speaker name for chat cards. */
+    fun detectSpeaker(text: String): String? =
+        Regex("([A-Z][a-zA-Z]+(?:\\s[A-Z][a-zA-Z]+)?)\\s+(?:ne\\s+kaha|ne\\s+bola|said|says|ne\\s+likha|told|asked)").find(text)?.groupValues?.get(1)
 
     fun headline(text: String, maxWords: Int = 3): String {
         val kw = keywords(text, maxWords).toSet()
