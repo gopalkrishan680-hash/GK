@@ -70,6 +70,7 @@ class MainActivity : ComponentActivity() {
     private fun handleIntent(intent: Intent?) {
         intent ?: return
         intent.getStringExtra(EXTRA_PRODUCT_ID)?.let { pending.value = "product/${Uri.encode(it)}"; return }
+        intent.getStringExtra(EXTRA_SEARCH_QUERY)?.let { pending.value = "search/${Uri.encode(it)}"; return }
         if (intent.action == Intent.ACTION_SEND) {
             val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return
             val url = extractUrl(text)
@@ -79,6 +80,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_PRODUCT_ID = "product_id"
+        const val EXTRA_SEARCH_QUERY = "search_query"
     }
 }
 
@@ -129,6 +131,7 @@ private fun AppScaffold(nav: NavHostController) {
                         onLink = { nav.navigate("link?u=${Uri.encode(it)}") },
                         onOpenProduct = openProduct,
                         onSeeWatchlist = { nav.navigate("watchlist") { launchSingleTop = true } },
+                        onOpenSettings = { nav.navigate("settings") { launchSingleTop = true } },
                     )
                 }
                 composable("watchlist") { WatchlistScreen(onOpenProduct = openProduct) }
@@ -145,6 +148,7 @@ private fun AppScaffold(nav: NavHostController) {
                         id = it.arguments?.getString("id").orEmpty(),
                         onBack = { nav.popBackStack() },
                         onCompare = search,
+                        onOpenProduct = openProduct,
                     )
                 }
                 composable("link?u={u}", arguments = listOf(navArgument("u") { type = NavType.StringType; defaultValue = "" })) {

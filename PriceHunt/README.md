@@ -4,10 +4,18 @@ Search once, see the price of the same product on **Amazon, Flipkart, Myntra, Me
 (plus optional **Tata CLiQ, Snapdeal, JioMart**) and jump straight to the cheapest one.
 
 ## Install
-Download **`PriceHunt-v1.0.0.apk`** from this folder on your phone, open it and allow
+Download **`PriceHunt-v1.1.0.apk`** from this folder on your phone, open it and allow
 "Install unknown apps" when Android asks. (Android 8.0 or newer.)
 
 ## Features
+- **On-screen price compare (new)** – while you look at a product in the Amazon / Flipkart / Myntra / Meesho / AJIO /
+  Tata CLiQ / Snapdeal / JioMart app, a PriceHunt bubble appears on the screen: *"▼ ₹200 less on Flipkart"*.
+  Tap it for a card with the same item's price on every other platform; tap a row to open it there.
+  Turn on in *Settings → On-screen price compare* (uses Android Accessibility; only those shopping apps are read).
+  If Android says *"Restricted setting"*: App info → ⋮ → *Allow restricted settings*, then switch it on again.
+- **Price on other platforms** – every product page in PriceHunt automatically shows the same item's price on the
+  other stores, with the difference (₹ less / more).
+- **Smarter matching** – detects different variants (128 GB vs 256 GB, 500 ml vs 1 L) so they aren't treated as the same item.
 - **One search, all stores** – results load in parallel; each store shows its status (results / blocked / retry).
 - **Lowest price card** – the cheapest matching item, how much you save vs. the costliest store, and a *Buy* button.
 - **"Same item, every store" table** – best match from each store, sorted by price, with the difference shown.

@@ -116,7 +116,7 @@ fun ResultsScreen(query: String, onBack: () -> Unit, onOpenProduct: (String) -> 
                     }
                 },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
-                actions = { IconButton(onClick = { vm.search(query) }) { Icon(Icons.Filled.Refresh, "Search again") } },
+                actions = { IconButton(onClick = { vm.search(query, fresh = true) }) { Icon(Icons.Filled.Refresh, "Search again") } },
             )
         }
     ) { pad ->

@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,7 +28,9 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -56,11 +59,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.gk.pricehunt.PriceHuntApp
+import com.gk.pricehunt.data.Repository
 import com.gk.pricehunt.data.Store
+import com.gk.pricehunt.data.StoreStatus
 import com.gk.pricehunt.data.db.PricePoint
 import com.gk.pricehunt.scrape.Matcher
 import com.gk.pricehunt.ui.components.Pill
@@ -81,7 +87,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProductScreen(id: String, onBack: () -> Unit, onCompare: (String) -> Unit) {
+fun ProductScreen(id: String, onBack: () -> Unit, onCompare: (String) -> Unit, onOpenProduct: (String) -> Unit) {
     val ctx = LocalContext.current
     val app = ctx.applicationContext as PriceHuntApp
     val repo = app.repo
@@ -149,7 +155,7 @@ fun ProductScreen(id: String, onBack: () -> Unit, onCompare: (String) -> Unit) {
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { onCompare(Matcher.queryFromTitle(p.title)) }, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Filled.Search, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Compare stores")
+                    Icon(Icons.Filled.Search, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("All results")
                 }
                 OutlinedButton(
                     onClick = {
@@ -170,6 +176,9 @@ fun ProductScreen(id: String, onBack: () -> Unit, onCompare: (String) -> Unit) {
                     fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp),
                 )
             }
+
+            // ---------------- same item on other platforms ----------------
+            OtherPlatformsSection(p.id, p.title, p.price, store, onOpenProduct)
 
             // ---------------- price history ----------------
             SectionTitle("Price history") {
@@ -279,4 +288,81 @@ private fun TrackDialog(current: Double, onDismiss: () -> Unit, onConfirm: (Doub
         confirmButton = { Button(onClick = { onConfirm(text.toDoubleOrNull()) }) { Text("Start tracking") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
+}
+
+@Composable
+private fun OtherPlatformsSection(id: String, title: String, price: Double, store: Store?, onOpenProduct: (String) -> Unit) {
+    val ctx = LocalContext.current
+    val app = ctx.applicationContext as PriceHuntApp
+    val others = remember(id) { app.settings.enabledStores.value.filter { it != store }.sortedBy { it.ordinal } }
+    val rows by remember(id) { app.repo.compareFlow(title, others) }.collectAsState(initial = emptyMap())
+    val matches = rows.values.mapNotNull { it.match }.sortedBy { it.price }
+    val loading = rows.isEmpty() || rows.values.any { it.status is StoreStatus.Loading }
+    val cheaper = matches.firstOrNull()?.takeIf { it.price < price }
+
+    SectionTitle("Price on other platforms") {
+        if (loading) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+    }
+    Card(
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(vertical = 6.dp)) {
+            val summary = when {
+                cheaper != null -> "${rupees(price - cheaper.price)} cheaper on ${cheaper.store.displayName}" to DealGreen
+                !loading && matches.isNotEmpty() -> "This store already has the lowest price" to DealGreen
+                !loading -> "Same item not found on other platforms" to MaterialTheme.colorScheme.onSurfaceVariant
+                else -> "Checking ${others.size} other platforms…" to MaterialTheme.colorScheme.onSurfaceVariant
+            }
+            Text(summary.first, fontWeight = FontWeight.Bold, color = summary.second, fontSize = 14.sp,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp))
+            Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.width(84.dp)) { StoreBadge(store) }
+                Text("This listing", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                Text(rupees(price), fontWeight = FontWeight.Bold)
+                Spacer(Modifier.width(36.dp))
+            }
+            val ordered = rows.values.sortedWith(compareBy<Repository.CompareRow> { it.match == null }.thenBy { it.match?.price ?: 0.0 })
+            ordered.forEach { r ->
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+                val m = r.match
+                Row(
+                    Modifier.fillMaxWidth()
+                        .let { if (m != null) it.clickable { onOpenProduct(m.id) } else it }
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.width(84.dp)) { StoreBadge(r.store) }
+                    if (m != null) {
+                        Text(m.title, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                        Spacer(Modifier.width(8.dp))
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(rupees(m.price), fontWeight = FontWeight.Bold, color = if (m.price < price) DealGreen else MaterialTheme.colorScheme.onSurface)
+                            val d = m.price - price
+                            Text(
+                                when { d < 0 -> "${rupees(-d)} less"; d > 0 -> "+${rupees(d)}"; else -> "same" },
+                                fontSize = 11.sp, color = if (d < 0) DealGreen else if (d > 0) DropRed else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        IconButton(onClick = { openInStore(ctx, m.url, r.store) }, modifier = Modifier.size(36.dp)) {
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Open in ${r.store.displayName}", Modifier.size(18.dp))
+                        }
+                    } else {
+                        val t = when (r.status) {
+                            is StoreStatus.Loading -> "Checking…"
+                            is StoreStatus.Done -> "Not found"
+                            else -> "Couldn't check"
+                        }
+                        Text(t, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                        if (r.status is StoreStatus.Loading) CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
+                        else TextButton(onClick = { openInStore(ctx, r.store.searchUrl(Matcher.queryFromTitle(title)), r.store) }) {
+                            Text("Search", fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

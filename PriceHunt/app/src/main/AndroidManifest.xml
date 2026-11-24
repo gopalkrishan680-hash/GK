@@ -46,5 +46,19 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
+
+        <!-- On-screen compare: shows other stores' prices as a bubble inside shopping apps -->
+        <service
+            android:name=".overlay.ShoppingAssistService"
+            android:exported="false"
+            android:label="@string/assist_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/assist_service" />
+        </service>
     </application>
 </manifest>

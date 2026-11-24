@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">PriceHunt</string>
+    <string name="assist_label">PriceHunt on-screen price compare</string>
+    <string name="assist_desc">When you open a product in Amazon, Flipkart, Myntra, Meesho, AJIO, Tata CLiQ, Snapdeal or JioMart, PriceHunt reads the product name and price shown on screen and displays a small bubble with the price of the same item on the other platforms. Only these shopping apps are read; nothing is collected or sent anywhere except the store searches themselves.</string>
 </resources>

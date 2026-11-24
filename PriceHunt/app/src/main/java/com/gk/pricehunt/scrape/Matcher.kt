@@ -28,11 +28,41 @@ object Matcher {
         return hit / total
     }
 
+    private val unitRe = Regex("""(\d+(?:\.\d+)?)\s*(gb|tb|mb|ml|ltr|litre|l|kg|gm|g|inch|in|cm|mm|w|mah|hz|mp|pcs|pc|pack|watt)\b""")
+
+    private fun units(s: String): Map<String, Set<String>> {
+        val m = HashMap<String, MutableSet<String>>()
+        unitRe.findAll(s.lowercase()).forEach {
+            val unit = when (val u = it.groupValues[2]) { "ltr", "litre" -> "l"; "gm" -> "g"; "pc" -> "pcs"; "watt" -> "w"; "in" -> "inch"; else -> u }
+            m.getOrPut(unit) { mutableSetOf() } += it.groupValues[1].trimEnd('0').trimEnd('.')
+        }
+        return m
+    }
+
+    /**
+     * Penalty (0..1) when both titles mention the same unit with different numbers,
+     * e.g. "128 GB" vs "256 GB" or "500 ml" vs "1 l" – i.e. a different variant.
+     */
+    fun variantConflict(ref: String, cand: String): Double {
+        val a = units(ref)
+        val b = units(cand)
+        var pen = 0.0
+        for ((unit, nums) in a) {
+            val other = b[unit] ?: continue
+            if (!other.containsAll(nums)) pen += 0.35
+        }
+        return pen.coerceAtMost(0.7)
+    }
+
+    /** Main score used everywhere: word overlap minus a penalty for a conflicting variant. */
+    fun score(query: String, title: String): Double =
+        (relevance(query, title) - variantConflict(query, title)).coerceAtLeast(0.0)
+
     /** A short search query from a long product title (used for "compare this item"). */
     fun queryFromTitle(title: String): String {
         val cleaned = title.replace(Regex("\\(.*?\\)|\\[.*?]|\\|.*$"), " ")
             .replace(Regex("[,/]"), " ")
             .replace(Regex("\\s+"), " ").trim()
-        return cleaned.split(' ').take(7).joinToString(" ")
+        return cleaned.split(' ').filter { it.isNotBlank() }.take(8).joinToString(" ")
     }
 }

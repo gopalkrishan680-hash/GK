@@ -179,6 +179,27 @@ fun SettingsScreen() {
             }
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
 
+            SectionTitle("On-screen price compare")
+            val assistOn = rememberAssistEnabled()
+            var paused by remember { mutableStateOf(settings.overlayPaused) }
+            var setup by remember { mutableStateOf(false) }
+            Text(
+                "Shows a bubble with other platforms' prices while you browse a product in the Amazon, Flipkart, Myntra, Meesho… apps.",
+                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                Text(if (assistOn) "Status: ON" else "Status: OFF", fontWeight = FontWeight.SemiBold,
+                    color = if (assistOn) DealGreen else MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
+                if (assistOn) OutlinedButton(onClick = { openAccessibilitySettings(ctx) }) { Text("Manage") }
+                else Button(onClick = { setup = true }) { Text("Turn on") }
+            }
+            if (assistOn) Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text("Pause the bubble", fontSize = 14.sp, modifier = Modifier.weight(1f))
+                Switch(checked = paused, onCheckedChange = { paused = it; settings.overlayPaused = it })
+            }
+            if (setup) AssistSetupDialog { setup = false }
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+
             SectionTitle("Price drop alerts")
             Text("Check tracked prices in background", fontSize = 14.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(vertical = 6.dp)) {
@@ -222,7 +243,7 @@ fun SettingsScreen() {
                     "PriceHunt is not affiliated with Amazon, Flipkart, Myntra, Meesho or any other store.",
                 fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Text("Version 1.0.0", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            Text("Version 1.1.0", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 16.dp))
         }
     }

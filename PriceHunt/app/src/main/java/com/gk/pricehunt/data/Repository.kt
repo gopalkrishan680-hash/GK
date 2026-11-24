@@ -7,6 +7,12 @@ import com.gk.pricehunt.data.db.ProductEntity
 import com.gk.pricehunt.data.db.RecentSearch
 import com.gk.pricehunt.scrape.Matcher
 import com.gk.pricehunt.scrape.WebScraper
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 
 class Repository(context: Context) {
@@ -19,8 +25,57 @@ class Repository(context: Context) {
         data class Error(val message: String) : SearchOutcome
     }
 
-    /** Search one store. Results are also saved so their prices start building history. */
-    suspend fun searchStore(store: Store, query: String): SearchOutcome {
+    private val cache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, SearchOutcome.Ok>>()
+
+    /** Search one store (cached for 15 min). Results are also saved so their prices start building history. */
+    suspend fun searchStore(store: Store, query: String, useCache: Boolean = true): SearchOutcome {
+        val ck = store.id + "|" + query.lowercase().trim()
+        if (useCache) cache[ck]?.let { (t, r) -> if (System.currentTimeMillis() - t < 15 * 60_000) return r }
+        val r = searchStoreUncached(store, query)
+        if (r is SearchOutcome.Ok && r.items.isNotEmpty()) cache[ck] = System.currentTimeMillis() to r
+        return r
+    }
+
+    data class CompareRow(val store: Store, val status: StoreStatus, val match: ProductResult? = null)
+
+    /**
+     * Looks for the same item (by title) on [stores] and emits the growing result map
+     * as every store answers. Used by the product screen and the on-screen bubble.
+     */
+    fun compareFlow(title: String, stores: Collection<Store>): Flow<Map<Store, CompareRow>> = channelFlow {
+        val query = Matcher.queryFromTitle(title)
+        val state = MutableStateFlow(stores.associateWith { CompareRow(it, StoreStatus.Loading) })
+        send(state.value)
+        coroutineScope {
+            stores.forEach { store ->
+                launch {
+                    val row = when (val r = searchStore(store, query)) {
+                        is SearchOutcome.Ok -> {
+                            val best = bestMatch(r.items, title)
+                            CompareRow(store, StoreStatus.Done(if (best == null) 0 else 1), best)
+                        }
+                        SearchOutcome.Blocked -> CompareRow(store, StoreStatus.Blocked)
+                        is SearchOutcome.Error -> CompareRow(store, StoreStatus.Failed(r.message))
+                    }
+                    state.update { it + (store to row) }
+                    send(state.value)
+                }
+            }
+        }
+    }
+
+    /** Best listing for a given product title: high word overlap, no variant conflict, then cheapest. */
+    fun bestMatch(items: List<ProductResult>, refTitle: String): ProductResult? {
+        val q = Matcher.queryFromTitle(refTitle)
+        val scored = items.map { it to Matcher.score(q, it.title) }.filter { it.second >= 0.6 }
+        if (scored.isEmpty()) return null
+        val top = scored.maxOf { it.second }
+        return scored.filter { it.second >= top - 0.08 }
+            .sortedWith(compareBy<Pair<ProductResult, Double>> { it.first.sponsored }.thenBy { it.first.price })
+            .first().first
+    }
+
+    private suspend fun searchStoreUncached(store: Store, query: String): SearchOutcome {
         val (json, _) = runCatching { scraper.search(store.id, store.productLinkRegex, store.searchUrl(query)) }
             .getOrElse { return SearchOutcome.Error(it.message ?: "error") }
         json ?: return SearchOutcome.Error("Page did not load")
@@ -39,7 +94,7 @@ class Repository(context: Context) {
                 imageUrl = o.optString("image").takeIf { it.startsWith("http") },
                 rating = o.optDouble("rating", Double.NaN).takeIf { !it.isNaN() && it in 0.5..5.0 },
                 sponsored = o.optBoolean("sponsored"),
-                relevance = Matcher.relevance(query, title),
+                relevance = Matcher.score(query, title),
             )
         }
         out.forEach { save(it) }

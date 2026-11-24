@@ -74,6 +74,7 @@ enum class Store(
 
     companion object {
         fun byId(id: String) = entries.firstOrNull { it.id == id }
+        fun fromPackage(pkg: String) = entries.firstOrNull { it.appPackage == pkg }
         fun fromUrl(url: String): Store? {
             val host = runCatching { java.net.URI(url).host?.lowercase() }.getOrNull() ?: return null
             return entries.firstOrNull { host.contains(it.hostHint) }

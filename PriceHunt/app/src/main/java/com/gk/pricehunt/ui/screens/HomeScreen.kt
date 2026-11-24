@@ -62,7 +62,7 @@ private val suggestions = listOf(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun HomeScreen(onSearch: (String) -> Unit, onLink: (String) -> Unit, onOpenProduct: (String) -> Unit, onSeeWatchlist: () -> Unit) {
+fun HomeScreen(onSearch: (String) -> Unit, onLink: (String) -> Unit, onOpenProduct: (String) -> Unit, onSeeWatchlist: () -> Unit, onOpenSettings: () -> Unit = {}) {
     val ctx = LocalContext.current
     val app = ctx.applicationContext as PriceHuntApp
     val recent by remember { app.repo.dao.observeSearches() }.collectAsState(initial = emptyList())
@@ -70,6 +70,7 @@ fun HomeScreen(onSearch: (String) -> Unit, onLink: (String) -> Unit, onOpenProdu
     val stores by app.settings.enabledStores.collectAsState()
     val scope = rememberCoroutineScope()
     var text by rememberSaveable { mutableStateOf("") }
+    val assistOn = rememberAssistEnabled()
 
     fun submit(q: String = text) {
         val s = q.trim()
@@ -111,6 +112,8 @@ fun HomeScreen(onSearch: (String) -> Unit, onLink: (String) -> Unit, onOpenProdu
                 stores.sortedBy { it.ordinal }.forEach { StoreBadge(it) }
             }
         }
+
+        if (!assistOn) item { AssistPromoCard() }
 
         if (recent.isNotEmpty()) {
             item {

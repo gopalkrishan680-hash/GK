@@ -36,6 +36,11 @@ class Settings(context: Context) {
         get() = prefs.getBoolean("hideSponsored", false)
         set(v) = prefs.edit().putBoolean("hideSponsored", v).apply()
 
+    /** Temporarily hide the on-screen compare bubble without turning the service off. */
+    var overlayPaused: Boolean
+        get() = prefs.getBoolean("overlayPaused", false)
+        set(v) = prefs.edit().putBoolean("overlayPaused", v).apply()
+
     var askedNotificationPermission: Boolean
         get() = prefs.getBoolean("askedNotif", false)
         set(v) = prefs.edit().putBoolean("askedNotif", v).apply()

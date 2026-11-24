@@ -55,7 +55,7 @@ class SearchViewModel(app: Application) : AndroidViewModel(app) {
         search(query)
     }
 
-    fun search(query: String, onlyStore: Store? = null) {
+    fun search(query: String, onlyStore: Store? = null, fresh: Boolean = false) {
         val stores = onlyStore?.let { listOf(it) } ?: settings.enabledStores.value.sortedBy { it.ordinal }
         if (onlyStore == null) {
             job?.cancel()
@@ -68,7 +68,7 @@ class SearchViewModel(app: Application) : AndroidViewModel(app) {
             stores.forEach { store ->
                 launch {
                     setStatus(store, StoreStatus.Loading)
-                    when (val r = repo.searchStore(store, query)) {
+                    when (val r = repo.searchStore(store, query, useCache = !fresh && onlyStore == null)) {
                         is Repository.SearchOutcome.Ok -> {
                             val items = if (settings.hideSponsored) r.items.filter { !it.sponsored } else r.items
                             _state.update { it.copy(results = it.results + items) }
