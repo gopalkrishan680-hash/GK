@@ -38,8 +38,11 @@ object Director {
         if (analysis.chunks.isEmpty()) return project.copy(scenes = emptyList(), durationMs = 0, chapters = analysis.chapters)
 
         val rnd = Random(project.seed)
+        val story = project.storyMode
         val times = timeChunks(analysis.chunks, voice)
-        val groups = group(analysis.chunks, times)
+        val groups = group(analysis.chunks, times, mergeQuestions = !story)
+        val names = if (story) ScriptAnalyzer.storyNames(project.script, project.characters) else emptySet()
+        val available = project.images.indices.filter { project.images[it].isNotBlank() }
 
         val images = project.images.size
         val total = times.last().second
@@ -63,7 +66,12 @@ object Director {
             var type: SceneType
             var lines: List<String> = emptyList()
             var title = ""
-            val emphasis = ScriptAnalyzer.keywords(text, 2)
+            val emphasis = if (story) ScriptAnalyzer.storyEmphasis(text, names) else ScriptAnalyzer.keywords(text, 2)
+            // text-only scenes still get a picture behind them: the nearest available one
+            val bgIdx = if (imageIdx >= 0 || available.isEmpty()) imageIdx else {
+                val want = if (project.lineImages) g.startIdx else (mid.toDouble() / max(1, total) * images).toInt()
+                available.minByOrNull { abs(it - want) } ?: -1
+            }
 
             val forced = first.forced
             val list = ScriptAnalyzer.detectList(text)
@@ -76,7 +84,17 @@ object Director {
             val numbers = ScriptAnalyzer.detectNumbers(text)
             val years = ScriptAnalyzer.detectYears(text)
 
-            type = when {
+            type = if (story) when {
+                forced != null -> forced
+                first.chapterStart && chapter >= 0 && gi > 0 -> SceneType.CHAPTER
+                gi == 0 && imageIdx >= 0 -> SceneType.HEADLINE_IMAGE          // hook: strongest picture + the line itself
+                quote != null -> SceneType.QUOTE
+                stat != null && history.lastOrNull() != SceneType.BIG_STAT -> SceneType.BIG_STAT
+                date != null && date[0].contains(' ') && history.lastOrNull() != SceneType.DATE_STAMP -> SceneType.DATE_STAMP
+                imageIdx < 0 -> SceneType.KINETIC
+                first.words.size <= 5 && history.lastOrNull() != SceneType.HEADLINE_IMAGE -> SceneType.HEADLINE_IMAGE
+                else -> SceneType.KEN_BURNS
+            } else when {
                 forced != null -> forced
                 g.isQuestionGroup -> SceneType.QUESTION_LIST
                 first.chapterStart && analysis.chapters.size >= 2 && chapter >= 0 && rnd.nextFloat() < 0.6f -> SceneType.CHECKLIST
@@ -93,7 +111,7 @@ object Director {
                 first.words.size <= 4 -> if (rnd.nextFloat() < 0.75f) SceneType.KINETIC else SceneType.SPOTLIGHT
                 else -> pickGeneric(rnd, history, images > 0, if (project.lineImages) 1f else images.toFloat() / max(1, groups.size))
             }
-            if (type.needsImage && imageIdx < 0) type = pickGeneric(rnd, history, false, 0f)
+            if (type.needsImage && imageIdx < 0) type = if (story) SceneType.KINETIC else pickGeneric(rnd, history, false, 0f)
 
             when (type) {
                 SceneType.QUESTION_LIST -> {
@@ -139,23 +157,28 @@ object Director {
             }
             when (type) {
                 SceneType.KEY_POINTS -> {
-                    title = ScriptAnalyzer.headline(text, 4)
+                    title = ScriptAnalyzer.phrase(text, 5).uppercase()
                     lines = ScriptAnalyzer.keywords(text, 3).map { it.replaceFirstChar { c -> c.uppercase() } }
                 }
-                SceneType.KEN_BURNS, SceneType.POLAROID -> title = ScriptAnalyzer.headline(text, 4)
+                SceneType.KEN_BURNS, SceneType.POLAROID -> title = if (story) {
+                    // cinematic subtitle on some shots: a real piece of the line, never a word salad
+                    if (rnd.nextFloat() < 0.45f) ScriptAnalyzer.phrase(text, 12) else ""
+                } else ScriptAnalyzer.phrase(text, 5).uppercase()
                 SceneType.SPLIT_ARROW -> {
                     val c = cause ?: ScriptAnalyzer.keywords(text, 2).let { Pair(it.getOrElse(0) { "" }, it.getOrElse(1) { "" }) }
                     lines = listOf(c.first.uppercase(), c.second.uppercase())
                 }
                 SceneType.IMAGE_BANNER, SceneType.HEADLINE_IMAGE, SceneType.PHONE, SceneType.SPOTLIGHT, SceneType.PAPER_NOTE ->
                     title = (analysis.chapters.getOrNull(chapter)?.takeIf { type == SceneType.IMAGE_BANNER && rnd.nextBoolean() }
-                        ?: ScriptAnalyzer.headline(text, if (type == SceneType.HEADLINE_IMAGE) 2 else 4)).uppercase()
+                        ?: ScriptAnalyzer.phrase(text, if (type == SceneType.HEADLINE_IMAGE) 6 else 5)).uppercase()
                 else -> {}
             }
 
             val transition = when {
                 gi == 0 -> Transition.FADE
                 first.forceCut -> Transition.CUT
+                story && first.chapterStart -> if (rnd.nextBoolean()) Transition.DIP else Transition.FLASH
+                story -> pickStoryTransition(rnd, lastTransition)
                 first.chapterStart -> listOf(Transition.FLASH, Transition.GLITCH, Transition.ZOOM_PUNCH, Transition.SHUTTER).random(rnd)
                 else -> pickTransition(rnd, project.pacing, lastTransition)
             }
@@ -167,7 +190,7 @@ object Director {
                 endMs = g.end,
                 type = type,
                 transition = transition,
-                imageIndex = imageIdx,
+                imageIndex = bgIdx,
                 variant = rnd.nextInt(1_000_000),
                 lines = lines,
                 lineStarts = g.lineStarts,
@@ -197,7 +220,7 @@ object Director {
     fun reroll(project: Project, index: Int): Project {
         val s = project.scenes.getOrNull(index) ?: return project
         val rnd = Random(s.variant.toLong() * 31 + System.nanoTime())
-        val tr = pickTransition(rnd, project.pacing, s.transition)
+        val tr = if (project.storyMode) pickStoryTransition(rnd, s.transition) else pickTransition(rnd, project.pacing, s.transition)
         val updated = project.scenes.toMutableList()
         updated[index] = s.copy(variant = rnd.nextInt(1_000_000), transition = if (index == 0) Transition.FADE else tr)
         return project.copy(scenes = updated)
@@ -228,6 +251,15 @@ object Director {
         var r = rnd.nextFloat() * sum
         for ((t, w) in items) { r -= w; if (r <= 0f) return t }
         return items.last().first
+    }
+
+    private fun pickStoryTransition(rnd: Random, last: Transition): Transition {
+        val pool = listOf(Transition.FADE to 5f, Transition.DIP to 1.6f, Transition.CUT to 2f, Transition.ZOOM_PUNCH to 0.6f)
+            .filter { it.first != last || it.first == Transition.FADE }
+        val sum = pool.sumOf { it.second.toDouble() }.toFloat()
+        var r = rnd.nextFloat() * sum
+        for ((t, w) in pool) { r -= w; if (r <= 0f) return t }
+        return pool.last().first
     }
 
     private fun pickTransition(rnd: Random, pacing: Pacing, last: Transition): Transition {
@@ -294,11 +326,11 @@ object Director {
     private class Group(val chunks: List<Chunk>, val start: Long, val end: Long, val isQuestionGroup: Boolean, val lineStarts: List<Float>, val startIdx: Int)
 
     /** Merges runs of questions into one typewriter-list scene (like a research question list). */
-    private fun group(chunks: List<Chunk>, times: List<Pair<Long, Long>>): List<Group> {
+    private fun group(chunks: List<Chunk>, times: List<Pair<Long, Long>>, mergeQuestions: Boolean = true): List<Group> {
         val out = mutableListOf<Group>()
         var i = 0
         while (i < chunks.size) {
-            if (chunks[i].isQuestion && chunks[i].forced == null) {
+            if (mergeQuestions && chunks[i].isQuestion && chunks[i].forced == null) {
                 var j = i
                 while (j + 1 < chunks.size && chunks[j + 1].isQuestion && j + 1 - i < 8 &&
                     chunks[j + 1].chapterIndex == chunks[i].chapterIndex && !chunks[j + 1].chapterStart && chunks[j + 1].forced == null) j++

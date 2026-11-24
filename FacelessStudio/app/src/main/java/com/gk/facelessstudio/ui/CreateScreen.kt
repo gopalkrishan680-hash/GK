@@ -283,6 +283,20 @@ private fun FileRow(name: String, sub: String, onRemove: () -> Unit, onReplace: 
 private fun StyleStep(vm: AppViewModel) {
     val p by vm.project.collectAsState()
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        SectionCard("Video type") {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                listOf(true to ("🎬  Story" to "Full-screen cinematic pictures, real subtitle lines, soft fades. For stories, history, mythology."),
+                    false to ("📊  Explainer" to "Infographics: charts, lists, checklists, phone & banners. For facts, tips, tutorials.")).forEach { (story, info) ->
+                    val sel = p.storyMode == story
+                    Column(Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).background(if (sel) Neon.copy(alpha = 0.15f) else Surface2)
+                        .border(2.dp, if (sel) Neon else Color.Transparent, RoundedCornerShape(14.dp)).clickable { vm.setStoryMode(story) }.padding(12.dp)) {
+                        Text(info.first, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Spacer(Modifier.height(4.dp))
+                        Text(info.second, color = Muted, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
         SectionCard("Video size") {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Aspect.entries.forEach { a ->

@@ -160,6 +160,10 @@ class FrameRenderer(
                 c.drawBitmap(ba, 0f, -off, paint)
                 c.drawBitmap(bb, 0f, h - off, paint)
             }
+            Transition.DIP -> {
+                c.drawBitmap(if (pr < 0.5f) ba else bb, 0f, 0f, paint)
+                c.drawColor(k.alpha(Color.BLACK, 1f - abs(pr - 0.5f) * 2f))
+            }
             Transition.FLASH -> {
                 c.drawBitmap(if (pr < 0.5f) ba else bb, 0f, 0f, paint)
                 c.drawColor(k.alpha(Color.WHITE, (1f - abs(pr - 0.5f) * 2f) * 0.95f))
@@ -210,7 +214,13 @@ class FrameRenderer(
 
     private fun overlays(c: Canvas, s: Scene, tMs: Long) {
         c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), vignette)
-        if (!s.type.showsOwnText) when (p.captionMode) {
+        if (p.storyMode) { // cinematic letterbox
+            val bar = h * 0.055f
+            k.fill.color = Color.BLACK
+            c.drawRect(0f, 0f, w.toFloat(), bar, k.fill); c.drawRect(0f, h - bar, w.toFloat(), h.toFloat(), k.fill)
+        }
+        val hasSubtitle = p.storyMode && s.type == SceneType.KEN_BURNS && s.title.isNotBlank()
+        if (!s.type.showsOwnText && !hasSubtitle) when (p.captionMode) {
             com.gk.facelessstudio.model.CaptionMode.FULL -> captions(c, s, tMs)
             com.gk.facelessstudio.model.CaptionMode.KEYWORDS -> keywordPops(c, s, tMs)
             com.gk.facelessstudio.model.CaptionMode.OFF -> {}

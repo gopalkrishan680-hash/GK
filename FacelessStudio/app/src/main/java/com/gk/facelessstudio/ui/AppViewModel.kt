@@ -76,6 +76,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setScript(v: String) = update { it.copy(script = v) }
     fun setAspect(v: Aspect) = update { it.copy(aspect = v) }
     fun setTheme(v: String) = update { it.copy(themeId = v) }
+    fun setStoryMode(v: Boolean) = update { it.copy(storyMode = v) }
     fun setPacing(v: Pacing) = update { it.copy(pacing = v) }
     fun setCaptionMode(v: com.gk.facelessstudio.model.CaptionMode) = update { it.copy(captionMode = v) }
     fun setSfx(v: Boolean) = update { it.copy(sfx = v) }

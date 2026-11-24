@@ -116,6 +116,7 @@ class Kit(
     val images: ImageStore,
 ) {
     val u = min(w, h) / 720f
+    val story = project.storyMode
     val landscape = w > h * 1.15f
     val portrait = h > w * 1.15f
     val cx = w / 2f
@@ -243,6 +244,12 @@ class Kit(
     }
 
     fun bgGrid(c: Canvas, t: Float, spot: Boolean = true) {
+        if (story) { // no tech grid in stories: deep warm darkness
+            c.drawColor(theme.bg)
+            fill.shader = RadialGradient(cx, cy, max(w, h) * 0.7f, intArrayOf(alpha(theme.accent, 0.10f), 0), null, Shader.TileMode.CLAMP)
+            c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), fill); fill.shader = null
+            return
+        }
         c.drawColor(theme.bg2)
         if (spot) {
             fill.shader = RadialGradient(cx, -h * 0.1f, max(w, h) * 0.9f, intArrayOf(alpha(theme.accent, 0.20f), 0), null, Shader.TileMode.CLAMP)
@@ -274,6 +281,14 @@ class Kit(
     }
 
     fun bgImageBlur(c: Canvas, idx: Int, t: Float, dark: Float = 0.6f): Boolean {
+        if (story) {
+            // stories keep the real picture (sharp, dimmed, slowly drifting) behind text instead of a blur
+            val img = images.get(idx) ?: return false
+            rect.set(0f, 0f, w.toFloat(), h.toFloat())
+            cover(c, img, rect, 1.12f + 0.04f * sin(t * 0.35f), sin(t * 0.2f) * 0.3f)
+            c.drawColor(alpha(Color.BLACK, (dark + 0.05f).coerceAtMost(0.78f)))
+            return true
+        }
         val b = images.blurred(idx) ?: return false
         rect.set(0f, 0f, w.toFloat(), h.toFloat())
         cover(c, b, rect, 1.15f + 0.03f * sin(t * 0.5f))
@@ -333,6 +348,27 @@ class Kit(
             path.lineTo(x + cos(a1) * len, y + sin(a1) * len); path.close()
             c.drawPath(path, fill)
         }
+    }
+
+    /** Cinematic subtitle: a real phrase of the line, lower centre, soft fade in/out. */
+    fun subtitle(c: Canvas, line: String, t: Float, d: Float) {
+        if (line.isBlank()) return
+        val a = clamp01(seg(t, 0.25f, 0.7f) * (1f - seg(t, d - 0.35f, d)))
+        if (a <= 0f) return
+        val size = (if (portrait) 46f else 40f) * u
+        setText(fonts.heavy, size, Color.WHITE, line)
+        val lines = wrap(line, w * 0.8f).take(2)
+        val lh = size * 1.25f
+        val base = h * (if (portrait) 0.76f else 0.86f) - (lines.size - 1) * lh
+        fill.shader = LinearGradient(0f, base - size * 2.2f, 0f, h.toFloat(), 0, alpha(Color.BLACK, 0.75f * a), Shader.TileMode.CLAMP)
+        c.drawRect(0f, base - size * 2.2f, w.toFloat(), h.toFloat(), fill); fill.shader = null
+        text.textAlign = Paint.Align.CENTER
+        text.setShadowLayer(8f * u, 0f, 3f * u, alpha(Color.BLACK, 0.9f))
+        lines.forEachIndexed { i, l ->
+            text.alpha = (255 * a).toInt()
+            c.drawText(l, cx, base + i * lh + (1f - a) * 12f * u, text)
+        }
+        text.clearShadowLayer()
     }
 
     /** Red/accent title banner like the reference "HIDDEN WORLD OF DARK WEB" box. */
