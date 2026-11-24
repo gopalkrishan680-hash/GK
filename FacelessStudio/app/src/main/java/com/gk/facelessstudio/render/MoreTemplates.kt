@@ -84,10 +84,10 @@ object MoreTemplates {
         val gap = 26f * k.u
         val stripH = fh + 70f * k.u
         val top = k.cy - stripH / 2
-        val slide = k.lerp(0f, 1f, k.inOutCubic(k.clamp01(t / d)))
+        val slide = k.outCubic(k.seg(t, 0f, min(1.4f, d * 0.6f)))
         k.fill.color = 0xFF111111.toInt()
         c.drawRect(0f, top, k.w.toFloat(), top + stripH, k.fill)
-        val off = -slide * (fw + gap)
+        val off = (1f - slide) * (fw + gap)
         for (j in -2..3) {
             val idx = ((s.imageIndex + j) % n + n) % n
             val bmp = k.images.get(idx) ?: continue
@@ -119,8 +119,9 @@ object MoreTemplates {
         c.drawColor(0x66000000)
         val r = k.rnd(s, 21)
         val e = k.inOutCubic(k.seg(t, 0.2f, max(1f, d * 0.7f)))
-        val x0 = k.w * (0.25f + r.nextFloat() * 0.15f); val y0 = k.h * (0.3f + r.nextFloat() * 0.2f)
-        val x1 = k.w * (0.55f + r.nextFloat() * 0.2f); val y1 = k.h * (0.35f + r.nextFloat() * 0.25f)
+        // characters are usually in the middle of an illustration: glide the lens across the centre
+        val x0 = k.w * (0.36f + r.nextFloat() * 0.06f); val y0 = k.h * (0.38f + r.nextFloat() * 0.1f)
+        val x1 = k.w * (0.58f + r.nextFloat() * 0.06f); val y1 = k.h * (0.42f + r.nextFloat() * 0.1f)
         val lx = k.lerp(x0, x1, e); val ly = k.lerp(y0, y1, e)
         val rad = min(k.w, k.h) * 0.22f
         // lens: same picture, 2.2x zoom around the lens centre
@@ -139,7 +140,7 @@ object MoreTemplates {
         k.stroke.color = 0xFF2A2A2A.toInt(); k.stroke.strokeWidth = 26f * k.u
         c.drawLine(lx + rad * 0.72f, ly + rad * 0.72f, lx + rad * 1.35f, ly + rad * 1.35f, k.stroke)
         val label = title(s, 4)
-        k.banner(c, label, 40f * k.u, k.h - 120f * k.u, k.w * 0.6f, 32f * k.u, k.seg(t, 0.5f, 0.9f))
+        k.banner(c, label, 40f * k.u, 40f * k.u, k.w * 0.6f, 32f * k.u, k.seg(t, 0.5f, 0.9f))
     }
 
     // ------------------------------------------------------------------ BREAKING NEWS
@@ -246,7 +247,7 @@ object MoreTemplates {
         if ((t * 2).toInt() % 2 == 0) { k.fill.color = k.theme.accent2; val cx0 = left + 78f * k.u + k.text.measureText(shown); c.drawRect(cx0, y + 20f * k.u, cx0 + 3f * k.u, y + 52f * k.u, k.fill) }
         c.restore()
         // result cards slide in after typing
-        val res = s.lines.ifEmpty { ScriptAnalyzer.keywords(s.text, 3) }.take(3)
+        val res = s.lines.take(3)
         val start = 0.4f + min(1.6f, q.length * 0.05f)
         res.forEachIndexed { i, rtext ->
             val rp = k.outCubic(k.seg(t, start + i * 0.25f, start + i * 0.25f + 0.4f))
@@ -315,7 +316,8 @@ object MoreTemplates {
         val head = title(s, 6)
         val maxW = k.w * 0.4f
         val bottom = k.banner(c, head, 44f * k.u, k.h * 0.22f, maxW, 34f * k.u, k.seg(t, 0.3f, 0.7f))
-        val pts = s.lines.ifEmpty { s.emphasis }.take(3)
+        val pts = s.lines.take(3)
+        if (pts.isEmpty()) Fx.paragraph(k, c, s, s.text, 44f * k.u, bottom + 60f * k.u, maxW, 30f * k.u, t, d, 0.6f)
         pts.forEachIndexed { i, pt ->
             val ip = k.seg(t, 0.7f + i * 0.25f, 1.1f + i * 0.25f)
             k.setText(k.fonts.heavy, 28f * k.u, Color.WHITE, pt)

@@ -66,6 +66,11 @@ layout has been used twice, does the cap rise — evenly for all), the same layo
 dimension prefers its least-used option, and **no full combination ever appears twice**. Layouts that match the line's
 content (numbers, dates, questions, lists, quotes…) get priority. The editor shows the live variety status.
 
+**Script-accurate visuals:** when every line has its own picture (grid workflow), each scene shows the picture made
+for that line — picture layouts come first, and text layouts are drawn over that same picture (sharp, dimmed) instead
+of a plain background. Question lines are not merged, so no line's picture is lost. Only real names, numbers and
+terms pop up on screen; headlines are real phrases of the line, never filler words.
+
 ## Extra features
 
 - Caption modes: **Keywords** (default – only key words pop up, the visuals carry the story), **Full** word-by-word captions, or **Off**

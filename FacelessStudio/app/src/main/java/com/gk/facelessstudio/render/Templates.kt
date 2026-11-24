@@ -76,6 +76,8 @@ object Templates {
         while (i < raw.size) {
             var n = per
             if (per > 1 && raw[i].length > 9) n = 1
+            // never end a phrase on a small word ("ne", "use", "ki"): pull the next word in
+            while (i + n < raw.size && n < per + 2 && ScriptAnalyzer.cleanWord(raw[i + n - 1]).lowercase().let { it.length <= 3 || it in setOf("aur", "lekin", "jab", "jo", "use", "unhe", "unko") }) n++
             groups += raw.subList(i, min(raw.size, i + n)).joinToString(" ")
             i += n
         }
@@ -403,7 +405,7 @@ object Templates {
     // ------------------------------------------------------------------ PAPER NOTE
     private fun paperNote(k: Kit, c: Canvas, s: Scene, t: Float, d: Float) {
         val r = k.rnd(s)
-        k.bgDesk(c)
+        if (s.bg == com.gk.facelessstudio.model.Backdrop.IMAGE && k.bgImageBlur(c, s.imageIndex, t, 0.6f)) Unit else k.bgDesk(c)
         val notebook = r.nextBoolean()
         val angle = (r.nextFloat() - 0.5f) * 7f + sin(t * 0.9f) * 0.6f
         val pw = if (k.portrait) k.w * 0.84f else k.w * 0.46f

@@ -240,6 +240,27 @@ object Fx {
         }
     }
 
+    /** The line itself, wrapped, words arriving one by one with the scene's entrance. */
+    fun paragraph(k: Kit, c: Canvas, s: Scene, text: String, x: Float, y: Float, maxW: Float, size: Float, t: Float, d: Float, start: Float = 0.4f) {
+        k.setText(k.fonts.heavy, size, Color.WHITE, text)
+        val lines = k.wrap(text, maxW).take(5)
+        val words = lines.sumOf { it.split(" ").size }
+        val span = max(0.6f, d * 0.65f)
+        val space = k.text.measureText(" ")
+        val em = s.emphasis.map { it.lowercase() }.toSet()
+        var wi = 0
+        lines.forEachIndexed { li, l ->
+            var cx0 = x
+            for (wd in l.split(" ")) {
+                val st = start + span * wi / max(1, words)
+                k.text.color = if (com.gk.facelessstudio.engine.ScriptAnalyzer.cleanWord(wd).lowercase() in em) k.theme.accent else Color.WHITE
+                text(k, c, wd, cx0, y + li * size * 1.3f, k.seg(t, st, st + 0.3f), s.fx, wi)
+                cx0 += k.text.measureText(wd) + space
+                wi++
+            }
+        }
+    }
+
     // ------------------------------------------------------------------ text entrances
     /**
      * Draws [str] with the scene's entrance animation at progress [p] (0..1). Uses the paint as configured

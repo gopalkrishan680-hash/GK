@@ -171,7 +171,8 @@ object InfoTemplates {
             c.restore()
         }
         val bottom = k.banner(c, s.title, textX, textTop + 30f * k.u, textW, 34f * k.u, k.seg(t, 0.1f, 0.5f))
-        val pts = s.lines.ifEmpty { s.emphasis }.take(3)
+        val pts = s.lines.take(3)
+        if (pts.isEmpty()) { Fx.paragraph(k, c, s, s.text, textX, bottom + 60f * k.u, textW, 32f * k.u, t, d); return }
         val span = max(0.9f, d * 0.7f)
         pts.forEachIndexed { i, pt ->
             val st = 0.45f + (span - 0.45f) * i / max(1, pts.size)

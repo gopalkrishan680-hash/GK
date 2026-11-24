@@ -43,7 +43,7 @@ object Director {
 
         val rnd = Random(project.seed)
         val times = timeChunks(analysis.chunks, voice)
-        val groups = group(analysis.chunks, times)
+        val groups = group(analysis.chunks, times, mergeQuestions = !project.lineImages)
 
         val images = project.images.size
         val total = times.last().second
@@ -68,7 +68,8 @@ object Director {
             var type: SceneType
             var lines: List<String> = emptyList()
             var title = ""
-            val emphasis = ScriptAnalyzer.keywords(text, 2)
+            // only real names / numbers pop on screen, never filler words
+            val emphasis = ScriptAnalyzer.strongWords(text, 2)
 
             val forced = first.forced
             val list = ScriptAnalyzer.detectList(text)
@@ -82,36 +83,48 @@ object Director {
             val years = ScriptAnalyzer.detectYears(text)
 
             val hasImg = imageIdx >= 0
+            // the picture was made for exactly this line: it must be on screen
+            val ownImage = project.lineImages && hasImg
             val short = first.words.size <= 4
+            val strong = ScriptAnalyzer.strongWords(text, 3)
             // layouts that fit what this line says
             val preferred = buildList {
                 if (forced != null) add(forced)
                 if (g.isQuestionGroup) { add(SceneType.QUESTION_LIST); add(SceneType.SEARCH_BAR) }
                 if (first.chapterStart && chapter >= 0) { add(SceneType.CHAPTER); if (analysis.chapters.size >= 2) add(SceneType.CHECKLIST) }
                 if (vs != null) add(SceneType.VERSUS)
-                if (quote != null) { add(SceneType.QUOTE); add(SceneType.CHAT_CARD) }
-                if (ScriptAnalyzer.detectSpeaker(text) != null) add(SceneType.CHAT_CARD)
+                if (quote != null) { add(SceneType.QUOTE); if (!ownImage) add(SceneType.CHAT_CARD) }
+                if (ScriptAnalyzer.detectSpeaker(text) != null && !ownImage) add(SceneType.CHAT_CARD)
                 if (years != null) add(SceneType.TIMELINE)
                 if (percent != null) { add(SceneType.DONUT); add(SceneType.GAUGE) }
                 if (numbers != null) add(SceneType.BAR_CHART)
                 if (stat != null) add(SceneType.BIG_STAT)
                 if (date != null) add(SceneType.DATE_STAMP)
-                if (list != null) { add(SceneType.MINDMAP); add(SceneType.STEPS); add(SceneType.STICKY_NOTES) }
+                if (list != null) { add(SceneType.MINDMAP); add(SceneType.STEPS); if (!ownImage) add(SceneType.STICKY_NOTES) }
                 if (cause != null) add(SceneType.SPLIT_ARROW)
-                if (first.isQuestion) add(SceneType.SEARCH_BAR)
+                if (first.isQuestion && !ownImage) add(SceneType.SEARCH_BAR)
             }
             // short punchy lines suit big-type layouts
             val soft = if (!short) emptyList() else buildList {
-                add(SceneType.KINETIC); if (hasImg) { add(SceneType.TEXT_MASK); add(SceneType.HEADLINE_IMAGE) }
+                if (hasImg) { if (strong.isNotEmpty()) add(SceneType.TEXT_MASK); add(SceneType.HEADLINE_IMAGE) }
+                if (!ownImage) add(SceneType.KINETIC)
             }
-            // layouts that can show any line
-            val generic = buildList {
-                if (hasImg) addAll(listOf(SceneType.KEN_BURNS, SceneType.IMAGE_BANNER, SceneType.HEADLINE_IMAGE, SceneType.POLAROID, SceneType.PHONE,
-                    SceneType.FILMSTRIP, SceneType.MAGNIFY, SceneType.NEWS_FLASH, SceneType.CIRCLE_REVEAL, SceneType.SPLIT_DIAGONAL, SceneType.TEXT_MASK))
-                addAll(listOf(SceneType.KINETIC, SceneType.SPOTLIGHT, SceneType.PAPER_NOTE, SceneType.KEY_POINTS, SceneType.WORD_CLOUD, SceneType.STICKY_NOTES, SceneType.CHAT_CARD))
-            }.filter { !it.needsImage || hasImg }
+            // layouts that show the picture big
+            val pictureLayouts = if (!hasImg) emptyList() else buildList {
+                addAll(listOf(SceneType.KEN_BURNS, SceneType.IMAGE_BANNER, SceneType.HEADLINE_IMAGE, SceneType.POLAROID, SceneType.PHONE,
+                    SceneType.FILMSTRIP, SceneType.MAGNIFY, SceneType.NEWS_FLASH, SceneType.CIRCLE_REVEAL, SceneType.SPLIT_DIAGONAL, SceneType.KEY_POINTS))
+                if (strong.isNotEmpty()) add(SceneType.TEXT_MASK)
+            }
+            // text layouts (with a picture they are drawn over it)
+            val textLayouts = buildList {
+                addAll(listOf(SceneType.KINETIC, SceneType.SPOTLIGHT, SceneType.PAPER_NOTE, SceneType.CHAT_CARD))
+                if (!hasImg) add(SceneType.KEY_POINTS)
+                if (ScriptAnalyzer.keywords(text, 5).size >= 4) add(SceneType.WORD_CLOUD)
+                if (strong.size >= 2) add(SceneType.STICKY_NOTES)
+            }
             type = if (forced != null) forced.also { variety.use(it) }
-            else variety.layout(preferred.filter { !it.needsImage || hasImg }, generic, soft)
+            else if (ownImage) variety.layout(preferred.filter { !it.needsImage || hasImg }, pictureLayouts + textLayouts, soft, first = pictureLayouts)
+            else variety.layout(preferred.filter { !it.needsImage || hasImg }, pictureLayouts + textLayouts, soft)
 
             val filled = fill(type, text, g.chunks.map { it.text }, g.isQuestionGroup, project, analysis.chapters, chapter,
                 list, stat, date, vs, quote, cause, percent, numbers, years)
@@ -139,7 +152,12 @@ object Director {
                 chapterIndex = chapter,
             ).let { sc ->
                 // photo layouts keep their picture; text layouts may get any backdrop
-                val look = variety.look(type, if (hasImg) Backdrop.entries else Backdrop.entries.filter { it != Backdrop.IMAGE })
+                // a line with its own picture always shows it, even behind text layouts
+                val look = variety.look(type, when {
+                    ownImage && !type.needsImage -> listOf(Backdrop.IMAGE)
+                    hasImg -> Backdrop.entries
+                    else -> Backdrop.entries.filter { it != Backdrop.IMAGE }
+                })
                 sc.copy(fx = look.fx, bg = look.bg, cam = look.cam, deco = look.deco)
             }
             history.addLast(type); if (history.size > 3) history.removeFirst()
@@ -195,7 +213,7 @@ object Director {
             SceneType.CHECKLIST -> Pair(chapters.ifEmpty { kw(4) }, project.title.ifBlank { "FULL GUIDE" }.uppercase())
             SceneType.CHAPTER -> Pair(emptyList(), chapters.getOrNull(chapter) ?: ScriptAnalyzer.phrase(text, 4))
             SceneType.MINDMAP -> Pair(list?.second ?: kw(3), (list?.first?.ifBlank { null } ?: ScriptAnalyzer.phrase(text, 5)).uppercase())
-            SceneType.STEPS, SceneType.STICKY_NOTES -> Pair(list?.second?.take(5) ?: kw(4), (list?.first?.ifBlank { null } ?: ScriptAnalyzer.phrase(text, 5)).uppercase())
+            SceneType.STEPS, SceneType.STICKY_NOTES -> Pair(list?.second?.take(5) ?: ScriptAnalyzer.strongWords(text, 4).map(cap).ifEmpty { kw(3) }, (list?.first?.ifBlank { null } ?: ScriptAnalyzer.phrase(text, 5)).uppercase())
             SceneType.BIG_STAT -> stat?.let { Pair(listOf(it.prefix, it.number.toString(), it.decimals.toString(), it.grouped.toString(), it.suffix), it.label) } ?: Pair(emptyList(), ph(4))
             SceneType.DATE_STAMP -> Pair(date ?: listOf(ScriptAnalyzer.headline(text, 2), ""), ph(4))
             SceneType.VERSUS -> Pair((vs?.toList() ?: ScriptAnalyzer.keywords(text, 2).let { listOf(it.getOrElse(0) { "THIS" }, it.getOrElse(1) { "THAT" }) }).map { it.uppercase() }, "")
@@ -205,15 +223,17 @@ object Director {
             SceneType.BAR_CHART -> Pair(numbers?.map { "${it.first}|${it.second}" } ?: emptyList(), ph(5))
             SceneType.TIMELINE -> Pair(years?.map { "${it.first}|${it.second}" } ?: emptyList(), chapters.getOrNull(chapter)?.uppercase() ?: "")
             SceneType.SPLIT_ARROW -> Pair((cause?.toList() ?: ScriptAnalyzer.keywords(text, 2)).map { it.uppercase() }, "")
-            SceneType.KEY_POINTS, SceneType.SPLIT_DIAGONAL -> Pair(kw(3), ph(5))
+            // bullets only from real names/numbers; with none the layout shows the line itself
+            SceneType.KEY_POINTS, SceneType.SPLIT_DIAGONAL -> Pair(ScriptAnalyzer.strongWords(text, 3).map(cap), ph(5))
             // a question group: first question is typed, the next ones show up as results
             SceneType.SEARCH_BAR -> if (questionGroup && groupLines.size > 1) Pair(groupLines.drop(1).take(3), groupLines.first())
-                else Pair(kw(3), text)
+                else Pair(ScriptAnalyzer.strongWords(text, 3).map(cap), text)
             SceneType.WORD_CLOUD -> Pair(ScriptAnalyzer.keywords(text, 7), "")
-            SceneType.TEXT_MASK -> Pair(listOf(ScriptAnalyzer.phrase(text, 8)), (ScriptAnalyzer.keywords(text, 1).firstOrNull() ?: ScriptAnalyzer.phrase(text, 2)).uppercase())
+            SceneType.TEXT_MASK -> Pair(listOf(ScriptAnalyzer.phrase(text, 8)), (ScriptAnalyzer.strongWords(text, 1).firstOrNull() ?: ScriptAnalyzer.keywords(text, 1).firstOrNull() ?: ScriptAnalyzer.phrase(text, 2)).uppercase())
             SceneType.KEN_BURNS, SceneType.POLAROID, SceneType.IMAGE_BANNER, SceneType.PHONE, SceneType.SPOTLIGHT, SceneType.PAPER_NOTE,
             SceneType.FILMSTRIP, SceneType.MAGNIFY, SceneType.CIRCLE_REVEAL -> Pair(emptyList(), ph(5))
-            SceneType.HEADLINE_IMAGE -> Pair(emptyList(), ph(3))
+            // short lines are shown whole ("KYA AAP JAANTE HO"), long ones as their strongest run of words
+            SceneType.HEADLINE_IMAGE -> Pair(emptyList(), ph(6))
             SceneType.NEWS_FLASH -> Pair(emptyList(), ph(7))
             SceneType.OUTRO -> Pair(emptyList(), project.handle)
             SceneType.KINETIC -> Pair(emptyList(), "")
@@ -286,11 +306,11 @@ object Director {
     private class Group(val chunks: List<Chunk>, val start: Long, val end: Long, val isQuestionGroup: Boolean, val lineStarts: List<Float>, val startIdx: Int)
 
     /** Merges runs of questions into one typewriter-list scene (like a research question list). */
-    private fun group(chunks: List<Chunk>, times: List<Pair<Long, Long>>): List<Group> {
+    private fun group(chunks: List<Chunk>, times: List<Pair<Long, Long>>, mergeQuestions: Boolean = true): List<Group> {
         val out = mutableListOf<Group>()
         var i = 0
         while (i < chunks.size) {
-            if (chunks[i].isQuestion && chunks[i].forced == null) {
+            if (mergeQuestions && chunks[i].isQuestion && chunks[i].forced == null) {
                 var j = i
                 while (j + 1 < chunks.size && chunks[j + 1].isQuestion && j + 1 - i < 8 &&
                     chunks[j + 1].chapterIndex == chunks[i].chapterIndex && !chunks[j + 1].chapterStart && chunks[j + 1].forced == null) j++

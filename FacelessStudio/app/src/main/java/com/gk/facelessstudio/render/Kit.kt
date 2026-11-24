@@ -275,11 +275,14 @@ class Kit(
         c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), fill); fill.shader = null
     }
 
+    /** The scene's real picture behind text: sharp, dimmed, slowly drifting (a blur hid what the line is about). */
     fun bgImageBlur(c: Canvas, idx: Int, t: Float, dark: Float = 0.6f): Boolean {
-        val b = images.blurred(idx) ?: return false
+        val b = images.get(idx) ?: return false
         rect.set(0f, 0f, w.toFloat(), h.toFloat())
-        cover(c, b, rect, 1.15f + 0.03f * sin(t * 0.5f))
-        c.drawColor(alpha(Color.BLACK, dark))
+        cover(c, b, rect, 1.1f + 0.04f * sin(t * 0.35f), sin(t * 0.2f) * 0.4f)
+        c.drawColor(alpha(Color.BLACK, (dark - 0.05f).coerceIn(0.35f, 0.7f)))
+        fill.shader = RadialGradient(cx, cy, max(w, h) * 0.65f, intArrayOf(0, alpha(Color.BLACK, 0.55f)), floatArrayOf(0.4f, 1f), Shader.TileMode.CLAMP)
+        c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), fill); fill.shader = null
         return true
     }
 

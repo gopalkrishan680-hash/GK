@@ -38,19 +38,23 @@ class Variety(seed: Long, private val pacing: Pacing) {
      * [preferred] fit what the line says (numbers, questions, lists…); [generic] can show any line.
      * Picks the least-used allowed layout, preferring content-specific ones.
      */
-    fun layout(preferred: List<SceneType>, generic: List<SceneType>, soft: List<SceneType> = emptyList()): SceneType {
+    fun layout(preferred: List<SceneType>, generic: List<SceneType>, soft: List<SceneType> = emptyList(), first: List<SceneType> = emptyList()): SceneType {
         val all = (preferred + soft + generic).distinct()
         while (true) {
             fun ok(t: SceneType) = (layoutUse[t] ?: 0) < cap && t !in recent
             val pref = preferred.filter(::ok)
             val sft = soft.filter(::ok)
             val gen = generic.filter(::ok)
+            val top = first.filter(::ok)
             val roomy = all.filter { (layoutUse[it] ?: 0) < cap }
             val pick = when {
                 pref.isNotEmpty() -> leastUsed(pref, layoutUse)
                 sft.isNotEmpty() -> leastUsed(sft, layoutUse)
+                top.isNotEmpty() -> leastUsed(top, layoutUse)   // e.g. picture layouts before text layouts
                 gen.isNotEmpty() -> leastUsed(gen, layoutUse)
-                // only recently used ones still have room: allow them rather than raising the cap
+                // spacing matters more than the cap: if other layouts exist, give everyone one more use instead
+                all.any { it !in recent } -> null
+                // tiny candidate pool (all recent): allow a recent one
                 roomy.isNotEmpty() -> leastUsed(roomy, layoutUse)
                 else -> null
             }

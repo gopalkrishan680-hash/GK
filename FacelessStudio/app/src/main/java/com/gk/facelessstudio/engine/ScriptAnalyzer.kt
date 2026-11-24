@@ -144,18 +144,42 @@ object ScriptAnalyzer {
         "gaya", "gayi", "gaye", "raha", "rahi", "rahe", "karna", "karne", "karti", "sakte", "sakta", "sakti", "milti",
         "milta", "milte", "dikhta", "dikhti", "dikhte", "hota", "hoti", "aata", "aati", "aate", "jaata", "jaati", "jata",
         "jati", "padho", "padhte", "dekha", "dekho", "kaha", "bana", "bani", "aaya", "aayi", "laga", "lagta", "rakhti",
-        "rakhta", "batati", "batata", "diya", "diye", "kiya", "kiye", "liya", "badal", "badla", "badli", "badle", "karo", "karein",
+        "rakhta", "batati", "batata", "ne", "unhone", "unhe", "unko", "inhone", "use", "usse", "isse", "apna", "apni", "apne", "bataya", "batayi", "bada", "bade", "badi", "khud", "jaante", "jaanta", "jaanti", "diya", "diye", "kiya", "kiye", "liya", "badal", "badla", "badli", "badle", "karo", "karein",
         "chahiye", "sakte", "jaate", "jaana", "aana", "dena", "lena", "hua", "hui", "hue", "rehte", "rehti", "rehta", "lagte", "lagti", "unke", "inke", "uske", "iske", "apne", "apni", "logon", "log", "wala", "wali", "wale",
     )
 
     fun cleanWord(w: String) = w.trim { !it.isLetterOrDigit() && it != '%' && it != '₹' && it != '$' }
+
+    /** Words worth showing on their own: names / proper nouns (capitalised, not sentence-start), numbers, hyphenated terms, *marked*. */
+    fun strongWords(text: String, max: Int): List<String> {
+        val marked = Regex("\\*([^*]+)\\*").findAll(text).map { it.groupValues[1] }.toList()
+        val raw = text.split(Regex("\\s+"))
+        val out = ArrayList<String>(marked)
+        raw.forEachIndexed { i, r ->
+            val w = cleanWord(r)
+            if (w.length < 3) return@forEachIndexed
+            val sentenceStart = i == 0 || raw[i - 1].trimEnd().lastOrNull()?.let { it in ".!?।\"“" } == true
+            val proper = w.first().isUpperCase() && !sentenceStart
+            if (!proper && w.lowercase() in STOP) return@forEachIndexed
+            if (proper || w.any { it.isDigit() } || (w.contains('-') && w.length > 5)) out += w
+        }
+        return out.distinctBy { it.lowercase() }.take(max)
+    }
+
+    /** Romanised Hindi verb/auxiliary endings (jaante, bataya, chhuenge…) — weak as on-screen words. */
+    private fun verbish(w: String): Boolean {
+        val l = w.lowercase()
+        return w.first().isLowerCase() && l.length in 4..9 &&
+            listOf("te", "ta", "ti", "na", "ne", "ya", "yi", "ye", "ge", "gi", "ga", "kar", "iye", "ega", "enge", "unga", "oge").any { l.endsWith(it) }
+    }
 
     fun keywords(text: String, max: Int): List<String> {
         val words = text.split(Regex("\\s+")).map { cleanWord(it) }.filter { it.isNotEmpty() }
         val marked = Regex("\\*([^*]+)\\*").findAll(text).map { it.groupValues[1] }.toList()
         val scored = words.mapIndexed { i, w ->
             var s = w.length.toFloat()
-            if (w.lowercase() in STOP) s -= 100
+            if (w.lowercase() in STOP && !(i > 0 && w.first().isUpperCase())) s -= 100
+            if (verbish(w)) s -= 6
             if (w.any { it.isDigit() }) s += 8
             if (i > 0 && w.first().isUpperCase()) s += 5
             if (w.length > 1 && w.all { !it.isLetter() || it.isUpperCase() }) s += 6
@@ -173,9 +197,10 @@ object ScriptAnalyzer {
         val words = text.replace(Regex("[\"“”*]"), "").replace(Regex("\\[[a-zA-Z]+]"), "")
             .trim().trimEnd('.', '!', '?', ',', '।', ';', ':').split(Regex("\\s+")).filter { it.isNotBlank() }
         if (words.size <= maxWords) return words.joinToString(" ")
+        fun filler(w: String): Boolean { val c = cleanWord(w); return c.isEmpty() || (c.lowercase() in STOP && !c.first().isUpperCase()) }
         fun score(w: String): Float {
             val c = cleanWord(w)
-            if (c.isEmpty() || c.lowercase() in STOP) return 0.3f
+            if (filler(w)) return 0.3f
             var s = c.length.toFloat()
             if (c.first().isUpperCase()) s += 5
             if (c.any { it.isDigit() }) s += 4
@@ -189,8 +214,8 @@ object ScriptAnalyzer {
             if (s > bestS) { bestS = s; best = i }
         }
         var win = words.subList(best, best + maxWords)
-        while (win.size > 2 && cleanWord(win.last()).lowercase() in STOP) win = win.dropLast(1)
-        while (win.size > 2 && cleanWord(win.first()).lowercase() in STOP) win = win.drop(1)
+        while (win.size > 2 && filler(win.last())) win = win.dropLast(1)
+        while (win.size > 2 && filler(win.first())) win = win.drop(1)
         return win.joinToString(" ").trimEnd(',', ';')
     }
 
