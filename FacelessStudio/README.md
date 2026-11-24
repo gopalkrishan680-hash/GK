@@ -50,12 +50,16 @@ video a new look (timing stays the same). In the editor you can change any scene
 
 ## Clean Sketch style (like hand-drawn explainer Shorts)
 
-**Video style → Clean Sketch.** A plain white board; for each board the first line is hand-lettered as a title in
-marker capitals (names/numbers in red with a yellow outline, red scribble underline), then every line's subject is
-drawn straight on the board — outline first, then marker colour — with a price-tag for its number ("85%", "$15T")
-or a lettered name with an arrow. Every element appears when its words are spoken in **your** voiceover (cuts follow
-the pauses in the voice, words are timed by syllables). Boards stay at least ~7 s, lettering and drawing are calm,
-and boards change with a soft fade. Works best with images made in the "Whiteboard doodle" art style (subject on white).
+**Video style → Clean Sketch.** A plain white board; each board's first line is hand-lettered as a big title in
+marker capitals (names/numbers in red with a yellow outline, red scribble underline). Below it, at most **two big
+drawings** of just the subject (zig-zag in 9:16, side by side in 16:9; one line = one big drawing in the middle) are
+drawn — outline first, then marker colour. The empty white around each subject is trimmed, so the drawing itself is
+big and there is never a box. No name labels or arrows: only a line with a real number gets a yellow price tag
+("85%", "$15T") tied to its drawing, when it is spoken. Every element appears when its words are spoken in **your**
+voiceover (cuts follow the pauses in the voice), lettering and drawing are calm, boards change with a soft fade.
+
+With Clean Sketch on, the grid prompts and the AI Scene Director ask ChatGPT/Gemini for **cut-out subjects with no
+background at all** (pure white, no scenery, ground, shadow or frame) in a marker-doodle style.
 
 ## Whiteboard Doodle style
 

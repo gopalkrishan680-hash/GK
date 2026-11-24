@@ -95,7 +95,7 @@ object GridWorkflow {
         sb.append("Read order: left to right, top to bottom. ")
         sb.append("Absolutely NO text, letters, numbers, captions, labels or speech bubbles anywhere in the image.\n\n")
         sb.append("Art style (identical in every panel): ").append(styleText(p)).append(".\n")
-        if (p.doodle) sb.append(DOODLE_RULE).append("\n")
+        if (p.doodle) sb.append(if (p.clean) CLEAN_RULE else DOODLE_RULE).append("\n")
         sb.append(characterBlock(p))
         if (p.title.isNotBlank()) sb.append("Story: ").append(p.title).append(".\n")
         sb.append("\n")
@@ -113,6 +113,13 @@ object GridWorkflow {
     private const val DOODLE_RULE = "WHITEBOARD RULE for every panel: draw ONLY the main subject (characters and the key objects) in the middle of the panel " +
         "on a plain pure WHITE background — no scenery, no sky, no ground, no background colour or texture, no shadows on the background; " +
         "bold clear outlines, flat colours, lots of empty white space around the subject."
+
+    /** Clean Sketch pictures: a cut-out subject with NO background at all, like a sticker / PNG, so it can be drawn on the white board. */
+    private const val CLEAN_RULE = "NO-BACKGROUND RULE (most important) for every panel: draw ONLY the one main subject (the character(s) or the key object) " +
+        "as an isolated cut-out, like a sticker or a transparent PNG placed on pure white paper. The background of every panel must be 100% plain pure WHITE (#FFFFFF): " +
+        "NO scenery, NO sky, NO ground or floor, NO room, NO crowd, NO landscape, NO background colour, gradient, texture, glow or shadow, NO frame or border around the subject. " +
+        "Style: hand-drawn marker doodle — thick black marker outlines, bright flat marker colouring with light hatching, simple and clear like a whiteboard explainer. " +
+        "The subject is centred and fills about 80% of its panel."
 
     /** Overall image ratio so each panel keeps the video ratio, e.g. 3×3 of 16:9 -> 16:9. */
     private fun gridRatio(a: Aspect, g: Grid): String {
@@ -134,7 +141,8 @@ object GridWorkflow {
         sb.append("which characters (by name), what they are doing, the place, and the shot type (wide, medium, close-up, over-the-shoulder, top view). ")
         sb.append("Show exactly what the line is about, keep the story continuous, and vary the shots. No text in the images.\n")
         sb.append("Art style: ").append(styleText(p)).append(".\n")
-        if (p.doodle) sb.append("These pictures will be DRAWN on a whiteboard, so describe ONLY the main subject of each scene (the characters and the one or two key objects, their pose and expression) — no scenery, no landscape, no background details.\n")
+        if (p.doodle && p.clean) sb.append("These pictures will be DRAWN on a white board as cut-outs with NO background at all, so describe ONLY the one main subject of each scene (the character(s) or one key object, their pose, expression and what they hold) — never a place, scenery, sky, ground or any background. Write \"isolated on pure white background\" at the end of every description.\n")
+        else if (p.doodle) sb.append("These pictures will be DRAWN on a whiteboard, so describe ONLY the main subject of each scene (the characters and the one or two key objects, their pose and expression) — no scenery, no landscape, no background details.\n")
         sb.append(characterBlock(p))
         sb.append("\nReply ONLY with lines in the form  number: description  — one line per scene, same numbers, nothing else.\n\n")
         for (i in indices) sb.append(i + 1).append(": ").append(pieces.getOrElse(i) { "" }).append("\n")

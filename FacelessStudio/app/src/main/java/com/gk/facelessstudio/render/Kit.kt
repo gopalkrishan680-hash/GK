@@ -162,6 +162,29 @@ class ImageStore(private val paths: List<String>, private val maxEdge: Int) {
         return Bitmap.createBitmap(px, sk.width, sk.height, Bitmap.Config.ARGB_8888).also { inkCache.put(idx, it) }
     }
 
+    private val subjectBox = java.util.concurrent.ConcurrentHashMap<Int, RectF>()
+
+    /** Where the subject sits in a picture on white (fractions 0..1, with a small margin), so the empty white
+     *  around it can be skipped and the drawing itself fills its place on the board. Full-scene pictures: whole image. */
+    fun subject(i: Int): RectF {
+        val full = RectF(0f, 0f, 1f, 1f)
+        if (paths.isEmpty() || i < 0) return full
+        val idx = i % paths.size
+        subjectBox[idx]?.let { return it }
+        val b = get(idx) ?: return full
+        if (!isWhiteBackground(idx)) return full.also { subjectBox[idx] = it }
+        val step = maxOf(1, maxOf(b.width, b.height) / 160)
+        var x0 = b.width; var y0 = b.height; var x1 = -1; var y1 = -1
+        for (y in 0 until b.height step step) for (x in 0 until b.width step step) {
+            if (lum(b.getPixel(x, y)) < 228) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y }
+        }
+        if (x1 < 0) return full.also { subjectBox[idx] = it }
+        val m = 0.035f
+        val r = RectF((x0.toFloat() / b.width - m).coerceAtLeast(0f), (y0.toFloat() / b.height - m).coerceAtLeast(0f),
+            ((x1 + step).toFloat() / b.width + m).coerceAtMost(1f), ((y1 + step).toFloat() / b.height + m).coerceAtMost(1f))
+        return (if (r.width() < 0.1f || r.height() < 0.1f) full else r).also { subjectBox[idx] = it }
+    }
+
     /** True when the picture is a subject on a (near) white background — then it is drawn straight onto the board. */
     fun isWhiteBackground(i: Int): Boolean {
         if (paths.isEmpty() || i < 0) return false

@@ -43,7 +43,8 @@ object Director {
 
         val rnd = Random(project.seed)
         val times = timeChunks(analysis.chunks, voice)
-        val groups = if (project.doodle) boards(analysis.chunks, times, project.pacing, splitNumbers = !project.clean, extraMs = if (project.clean) 1500L else 0L)
+        val groups = if (project.doodle) boards(analysis.chunks, times, project.pacing, splitNumbers = !project.clean,
+                extraMs = if (project.clean) 1500L else 0L, maxLines = if (project.clean) 2 else 3)
             else group(analysis.chunks, times, mergeQuestions = !project.lineImages)
 
         val images = project.images.size
@@ -343,7 +344,7 @@ object Director {
      * Whiteboard boards: consecutive lines share one board until it has been on screen long enough
      * (so the drawing is never rushed); at most 3 lines, and a chapter always starts a new board.
      */
-    private fun boards(chunks: List<Chunk>, times: List<Pair<Long, Long>>, pacing: Pacing, splitNumbers: Boolean = true, extraMs: Long = 0L): List<Group> {
+    private fun boards(chunks: List<Chunk>, times: List<Pair<Long, Long>>, pacing: Pacing, splitNumbers: Boolean = true, extraMs: Long = 0L, maxLines: Int = 3): List<Group> {
         val minMs = extraMs + when (pacing) { Pacing.CALM -> 8000L; Pacing.BALANCED -> 6000L; Pacing.ENERGETIC -> 4200L }
         val out = mutableListOf<Group>()
         var i = 0
@@ -351,10 +352,10 @@ object Director {
         fun numeric(c: Chunk) = splitNumbers && (ScriptAnalyzer.detectStat(c.text) != null || ScriptAnalyzer.detectPercent(c.text) != null)
         while (i < chunks.size) {
             var j = i
-            while (!numeric(chunks[i]) && j + 1 < chunks.size && j + 1 - i < 3 && !chunks[j + 1].chapterStart && !numeric(chunks[j + 1]) &&
+            while (!numeric(chunks[i]) && j + 1 < chunks.size && j + 1 - i < maxLines && !chunks[j + 1].chapterStart && !numeric(chunks[j + 1]) &&
                 times[j].second - times[i].first < minMs) j++
             // don't leave a tiny last line alone at the end
-            if (j == chunks.size - 2 && j + 1 - i < 3 && times[j + 1].second - times[j + 1].first < minMs / 3 && !chunks[j + 1].chapterStart) j++
+            if (j == chunks.size - 2 && j + 1 - i < maxLines && times[j + 1].second - times[j + 1].first < minMs / 3 && !chunks[j + 1].chapterStart) j++
             val s = times[i].first; val e = times[j].second
             val starts = (i..j).map { (times[it].first - s).toFloat() / max(1L, e - s) }
             out += Group(chunks.subList(i, j + 1), s, e, false, starts, i)
