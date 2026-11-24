@@ -104,6 +104,7 @@ class FrameRenderer(
                 c.translate((r.nextFloat() - 0.5f) * amp * 2, (r.nextFloat() - 0.5f) * amp * 2)
             }
         }
+        StoryStyles.weave(k, c, tMs)
         Templates.draw(k, c, s, t, d)
         c.restore()
     }
@@ -160,6 +161,17 @@ class FrameRenderer(
                 c.drawBitmap(ba, 0f, -off, paint)
                 c.drawBitmap(bb, 0f, h - off, paint)
             }
+            Transition.PAGE -> { // book page turning from the right edge
+                c.drawBitmap(bb, 0f, 0f, paint)
+                val e2 = k.inOutCubic(pr)
+                c.save(); c.scale(1f - e2, 1f, 0f, 0f)
+                c.drawBitmap(ba, 0f, 0f, paint)
+                c.drawColor(k.alpha(Color.BLACK, e2 * 0.45f))
+                c.restore()
+                val fold = w * (1f - e2)
+                k.fill.shader = android.graphics.LinearGradient(fold, 0f, fold + 60f * k.u, 0f, 0x88000000.toInt(), 0, android.graphics.Shader.TileMode.CLAMP)
+                c.drawRect(fold, 0f, fold + 60f * k.u, h.toFloat(), k.fill); k.fill.shader = null
+            }
             Transition.DIP -> {
                 c.drawBitmap(if (pr < 0.5f) ba else bb, 0f, 0f, paint)
                 c.drawColor(k.alpha(Color.BLACK, 1f - abs(pr - 0.5f) * 2f))
@@ -214,12 +226,14 @@ class FrameRenderer(
 
     private fun overlays(c: Canvas, s: Scene, tMs: Long) {
         c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), vignette)
-        if (p.storyMode) { // cinematic letterbox
+        StoryStyles.frameFx(k, c, tMs)
+        if (p.storyMode && StoryStyles.letterbox(k.style)) { // cinematic letterbox
             val bar = h * 0.055f
             k.fill.color = Color.BLACK
             c.drawRect(0f, 0f, w.toFloat(), bar, k.fill); c.drawRect(0f, h - bar, w.toFloat(), h.toFloat(), k.fill)
         }
-        val hasSubtitle = p.storyMode && s.type == SceneType.KEN_BURNS && s.title.isNotBlank()
+        val picture = s.type == SceneType.KEN_BURNS || s.type == SceneType.HEADLINE_IMAGE
+        val hasSubtitle = p.storyMode && picture && (s.title.isNotBlank() || StoryStyles.ownsText(k.style))
         if (!s.type.showsOwnText && !hasSubtitle) when (p.captionMode) {
             com.gk.facelessstudio.model.CaptionMode.FULL -> captions(c, s, tMs)
             com.gk.facelessstudio.model.CaptionMode.KEYWORDS -> keywordPops(c, s, tMs)

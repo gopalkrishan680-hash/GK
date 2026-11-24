@@ -21,6 +21,7 @@ import kotlin.math.sin
 object Templates {
 
     fun draw(k: Kit, c: Canvas, s: Scene, t: Float, d: Float) {
+        if (k.story && StoryStyles.shot(k, c, s, t, d)) return
         when (s.type) {
             SceneType.KINETIC -> kinetic(k, c, s, t, d)
             SceneType.CHAPTER -> chapter(k, c, s, t, d)

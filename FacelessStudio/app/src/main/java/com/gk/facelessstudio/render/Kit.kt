@@ -117,6 +117,12 @@ class Kit(
 ) {
     val u = min(w, h) / 720f
     val story = project.storyMode
+    val style: com.gk.facelessstudio.model.StoryStyle? = if (story) project.storyStyle else null
+    /** "Karna" -> "young warrior, golden armour" from the character sheet (for name cards). */
+    val characterInfo: Map<String, String> = project.characters.lines().mapNotNull { l ->
+        val name = l.substringBefore(':').trim(); val desc = l.substringAfter(':', "").trim()
+        if (name.isBlank()) null else name.lowercase() to desc
+    }.toMap()
     val landscape = w > h * 1.15f
     val portrait = h > w * 1.15f
     val cx = w / 2f
@@ -125,7 +131,10 @@ class Kit(
     val fill = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND }
     val text = Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG)
-    val bmpPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    val bmpPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+        colorFilter = StoryStyles.grade(this@Kit.style)?.let { android.graphics.ColorMatrixColorFilter(it) }
+    }
+    var halftonePaint: Paint? = null
     val rect = RectF()
     val rect2 = RectF()
     val path = Path()

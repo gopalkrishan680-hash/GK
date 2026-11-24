@@ -17,7 +17,11 @@ the app does the rest: scenes, animations, transitions, captions, music ducking,
      **Share → Faceless Studio** (or Copy → Paste image) → the app cuts it into panels and puts each panel on its own scene,
      then selects the next card. Missing scenes fall back to text animations.
    - Or use your own ready-made images.
-4. **Style** – **Video type**: *Story* (default – full-screen cinematic pictures with slow camera moves, real subtitle
+4. **Style** – Story mode has 7 **story styles** (each with a live preview made from your own first picture, also
+   switchable in the editor): Cinematic, Documentary (gold frame, name cards from the character sheet), Comic Book
+   (panels, halftone, narration boxes, name bursts), Vintage Film (sepia, scratches, flicker, typewriter, title cards),
+   Storybook (picture on a book page, handwriting, page turns), Mystery Board (pinned photos, red string, camera moves
+   between clues, sticky notes) and Noir (steel-blue monochrome, rain, lightning). **Video type**: *Story* (default – full-screen cinematic pictures with slow camera moves, real subtitle
    lines, names popping up, letterbox, soft fades / dip-to-black, the hook opens on a picture) or *Explainer* (infographics:
    charts, lists, checklists, phone mockups, banners). Then size (YouTube 16:9 / Shorts 9:16 / Square), color theme, editing speed, captions, SFX, grain, channel handle.
 

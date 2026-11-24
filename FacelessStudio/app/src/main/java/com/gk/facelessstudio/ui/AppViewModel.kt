@@ -77,6 +77,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setAspect(v: Aspect) = update { it.copy(aspect = v) }
     fun setTheme(v: String) = update { it.copy(themeId = v) }
     fun setStoryMode(v: Boolean) = update { it.copy(storyMode = v) }
+    fun setStoryStyle(v: com.gk.facelessstudio.model.StoryStyle) = viewModelScope.launch {
+        // transitions belong to the style, so re-plan the scenes with the same seed (timing and images stay)
+        _project.value = _project.value.copy(storyStyle = v)
+        if (_project.value.scenes.isNotEmpty()) {
+            val voice = analyzeVoice()
+            _project.value = withContext(Dispatchers.Default) { Director.build(_project.value, voice) }
+        }
+        persist()
+    }
     fun setPacing(v: Pacing) = update { it.copy(pacing = v) }
     fun setCaptionMode(v: com.gk.facelessstudio.model.CaptionMode) = update { it.copy(captionMode = v) }
     fun setSfx(v: Boolean) = update { it.copy(sfx = v) }

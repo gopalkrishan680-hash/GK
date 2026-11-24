@@ -29,6 +29,17 @@ enum class Pacing(val label: String, val maxSceneSec: Float, val transitionSec: 
     ENERGETIC("Energetic", 3.2f, 0.32f)
 }
 
+/** Visual treatments for Story mode; each one changes colour grade, framing, text and transitions. */
+enum class StoryStyle(val label: String, val emoji: String, val sub: String) {
+    CINEMATIC("Cinematic", "🎬", "Letterbox, slow camera, film subtitles"),
+    DOCUMENTARY("Documentary", "🏛", "Gold frame, name cards like a history channel"),
+    COMIC("Comic Book", "💥", "Panels, halftone dots, narration boxes, bursts"),
+    VINTAGE("Vintage Film", "🎞", "Sepia, scratches, flicker, typewriter text"),
+    STORYBOOK("Storybook", "📖", "Picture on a book page, handwriting, page turns"),
+    MYSTERY("Mystery Board", "🧵", "Pinned photos, red string, camera moves between clues"),
+    NOIR("Noir Thriller", "🌧", "Duotone, rain, lightning flashes"),
+}
+
 enum class CaptionMode(val label: String, val sub: String) {
     KEYWORDS("Keywords", "Only key words pop up — visuals do the talking"),
     FULL("Full captions", "Word-by-word subtitles for every line"),
@@ -64,7 +75,7 @@ enum class SceneType(val label: String, val needsImage: Boolean, val showsOwnTex
 enum class Transition(val label: String) {
     FADE("Fade"), ZOOM_PUNCH("Zoom Punch"), SLIDE_LEFT("Slide"), SLIDE_UP("Slide Up"),
     WHIP("Whip Pan"), FLASH("Flash"), GLITCH("Glitch"), CIRCLE("Circle Reveal"),
-    SHUTTER("Shutter"), SPIN("Spin Zoom"), CUT("Hard Cut"), DIP("Dip to Black")
+    SHUTTER("Shutter"), SPIN("Spin Zoom"), CUT("Hard Cut"), DIP("Dip to Black"), PAGE("Page Turn")
 }
 
 data class Scene(
@@ -130,6 +141,7 @@ data class Project(
     val captionMode: CaptionMode = CaptionMode.KEYWORDS,
     /** Story mode: cinematic full-screen pictures, real subtitle lines, soft transitions, no infographics. */
     val storyMode: Boolean = true,
+    val storyStyle: StoryStyle = StoryStyle.CINEMATIC,
     /** true when images were generated one-per-script-line, so scene N uses its own image. */
     val lineImages: Boolean = false,
     val imageStep: Int = 1,
@@ -161,7 +173,7 @@ data class Project(
         put("voicePath", voicePath); put("voiceName", voiceName)
         put("musicPath", musicPath); put("musicName", musicName); put("musicVolume", musicVolume.toDouble())
         put("images", JSONArray(images)); put("aspect", aspect.name); put("theme", themeId)
-        put("pacing", pacing.name); put("captionMode", captionMode.name); put("storyMode", storyMode); put("lineImages", lineImages); put("imageStep", imageStep); put("artStyle", artStyle); put("styleDesc", styleDesc); put("characters", characters)
+        put("pacing", pacing.name); put("captionMode", captionMode.name); put("storyMode", storyMode); put("storyStyle", storyStyle.name); put("lineImages", lineImages); put("imageStep", imageStep); put("artStyle", artStyle); put("styleDesc", styleDesc); put("characters", characters)
         put("separator", separator); put("gridSize", gridSize); put("directorPart", directorPart)
         put("visuals", JSONArray(visuals)); put("panelTexts", JSONArray(panelTexts)); put("sfx", sfx); put("grain", grain)
         put("progressBar", progressBar); put("handle", handle); put("seed", seed)
@@ -187,6 +199,7 @@ data class Project(
             captionMode = runCatching { CaptionMode.valueOf(o.optString("captionMode")) }.getOrDefault(CaptionMode.KEYWORDS),
             lineImages = o.optBoolean("lineImages"),
             storyMode = o.optBoolean("storyMode", true),
+            storyStyle = runCatching { StoryStyle.valueOf(o.optString("storyStyle")) }.getOrDefault(StoryStyle.CINEMATIC),
             imageStep = o.optInt("imageStep", 1).coerceAtLeast(1),
             artStyle = o.optString("artStyle", "storybook"),
             styleDesc = o.optString("styleDesc"),
