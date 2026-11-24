@@ -37,15 +37,17 @@ class DoodleTest {
         p = Director.build(p.copy(lineImages = true, images = (0 until n).map { if (it == n - 1) "" else imgs[it % imgs.size] }), null)
         println("DOODLE " + p.scenes.joinToString(" | ") { "${it.type}/${it.transition}" })
         assertTrue(p.scenes.all { it.type.name.startsWith("DOODLE_") })
+        assertTrue("boards too short", p.scenes.dropLast(1).all { it.durationMs >= 4000 })
         val out = File(System.getProperty("fs.out") ?: return, "doodle").apply { mkdirs() }
         val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
         val r = FrameRenderer(854, 480, p, Fonts(ctx.assets), ImageStore(p.images, 1200))
         val bmp = Bitmap.createBitmap(854, 480, Bitmap.Config.ARGB_8888)
-        p.scenes.forEachIndexed { i, s ->
-            for ((tag, f) in listOf("a" to 0.18f, "b" to 0.42f, "c" to 0.95f)) {
-                r.draw(Canvas(bmp), s.startMs + (s.durationMs * f).toLong())
-                File(out, "%02d${tag}_${s.type}.png".format(i)).outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
-            }
+        val fps = 15
+        val frames = (p.durationMs * fps / 1000).toInt()
+        for (f in 0 until frames) {
+            r.draw(Canvas(bmp), f * 1000L / fps)
+            File(out, "f%04d.jpg".format(f)).outputStream().use { bmp.compress(Bitmap.CompressFormat.JPEG, 88, it) }
         }
+        println("DOODLE frames=$frames boards=${p.scenes.size} " + p.scenes.joinToString { "${it.type}:${it.lines.size}l/${it.durationMs}ms" })
     }
 }

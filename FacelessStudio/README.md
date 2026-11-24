@@ -50,11 +50,14 @@ video a new look (timing stays the same). In the editor you can change any scene
 
 ## Whiteboard Doodle style
 
-Pick **Video style → Whiteboard Doodle** (or the ✏️ chip in the editor). On a white board every picture is first
-**sketched in pencil** (made automatically from your image), then **coloured in**, and the line is **written in
-handwriting**, with marker underlines, circled numbers, arrows and stars, plus a soft marker sound. Six layouts rotate
-(picture + caption, picture left/right with text, title + picture, handwriting only, big circled number); the board
-slides or the page turns between scenes. No hand graphic is shown.
+Pick **Video style → Whiteboard Doodle** (or the ✏️ chip in the editor). Lines share a **board** (at least ~6 s,
+up to 3 lines; a chapter or a number starts a new one), so nothing is rushed: as each line is spoken, its picture is
+drawn on the board and the line is handwritten beneath it.
+
+Drawing looks natural and different every time: the **outline grows along the sketch's own lines** from 2–3 starting
+points (shortest paths through the dark pencil lines), then **colour is painted** in one of four orders — patches,
+following the pen, outward from a point, or wavy brush strokes. Numbers get a big circled handwritten board. Marker
+underlines, arrows and stars; soft marker sound; board slides or page turns between boards. No hand graphic.
 
 ## Variety engine (no boring repeats)
 

@@ -43,7 +43,8 @@ object Director {
 
         val rnd = Random(project.seed)
         val times = timeChunks(analysis.chunks, voice)
-        val groups = group(analysis.chunks, times, mergeQuestions = !project.lineImages)
+        val groups = if (project.doodle) boards(analysis.chunks, times, project.pacing)
+            else group(analysis.chunks, times, mergeQuestions = !project.lineImages)
 
         val images = project.images.size
         val total = times.last().second
@@ -122,7 +123,20 @@ object Director {
                 if (ScriptAnalyzer.keywords(text, 5).size >= 4) add(SceneType.WORD_CLOUD)
                 if (strong.size >= 2) add(SceneType.STICKY_NOTES)
             }
-            type = if (project.doodle) when {
+            // pictures for every line on a whiteboard board
+            val boardImages = g.chunks.indices.map { j ->
+                when {
+                    images == 0 -> -1
+                    project.lineImages -> min(images - 1, (g.startIdx + j) / project.imageStep.coerceAtLeast(1)).takeIf { project.images[it].isNotBlank() } ?: -1
+                    else -> min(images - 1, ((g.start + (g.end - g.start) * (j + 0.5) / g.chunks.size) / max(1, total) * images).toInt())
+                }
+            }
+            type = if (project.doodle && g.chunks.size >= 2) when {
+                boardImages.all { it < 0 } -> SceneType.DOODLE_TEXT
+                g.chunks.size == 2 -> SceneType.DOODLE_DUO
+                else -> SceneType.DOODLE_TRIO
+            }.also { variety.use(it) }
+            else if (project.doodle) when {
                 // whiteboard: the hand writes numbers big, writes lines without a picture, otherwise sketches the picture
                 stat != null || percent != null -> SceneType.DOODLE_NUMBER.also { variety.use(it) }
                 !hasImg -> SceneType.DOODLE_TEXT.also { variety.use(it) }
@@ -157,6 +171,7 @@ object Director {
                 title = title,
                 emphasis = emphasis,
                 chapterIndex = chapter,
+                images = if (project.doodle) boardImages else emptyList(),
             ).let { sc ->
                 // photo layouts keep their picture; text layouts may get any backdrop
                 // a line with its own picture always shows it, even behind text layouts
@@ -254,7 +269,8 @@ object Director {
             }
             SceneType.DOODLE_CENTER -> Pair(emptyList(), ScriptAnalyzer.phrase(text, 12))
             SceneType.DOODLE_TOP -> Pair(emptyList(), ScriptAnalyzer.phrase(text, 6))
-            SceneType.DOODLE_LEFT, SceneType.DOODLE_RIGHT, SceneType.DOODLE_TEXT -> Pair(emptyList(), "")
+            SceneType.DOODLE_DUO, SceneType.DOODLE_TRIO, SceneType.DOODLE_TEXT -> Pair(groupLines, "")
+            SceneType.DOODLE_LEFT, SceneType.DOODLE_RIGHT -> Pair(emptyList(), "")
         }
     }
 
@@ -319,6 +335,30 @@ object Director {
         }
         bounds[chunks.size] = max(voice?.durationMs ?: end, bounds[chunks.size - 1] + 800)
         return (0 until chunks.size).map { Pair(bounds[it], bounds[it + 1]) }
+    }
+
+    /**
+     * Whiteboard boards: consecutive lines share one board until it has been on screen long enough
+     * (so the drawing is never rushed); at most 3 lines, and a chapter always starts a new board.
+     */
+    private fun boards(chunks: List<Chunk>, times: List<Pair<Long, Long>>, pacing: Pacing): List<Group> {
+        val minMs = when (pacing) { Pacing.CALM -> 8000L; Pacing.BALANCED -> 6000L; Pacing.ENERGETIC -> 4200L }
+        val out = mutableListOf<Group>()
+        var i = 0
+        // a line with a number gets its own board (big circled number)
+        fun numeric(c: Chunk) = ScriptAnalyzer.detectStat(c.text) != null || ScriptAnalyzer.detectPercent(c.text) != null
+        while (i < chunks.size) {
+            var j = i
+            while (!numeric(chunks[i]) && j + 1 < chunks.size && j + 1 - i < 3 && !chunks[j + 1].chapterStart && !numeric(chunks[j + 1]) &&
+                times[j].second - times[i].first < minMs) j++
+            // don't leave a tiny last line alone at the end
+            if (j == chunks.size - 2 && j + 1 - i < 3 && times[j + 1].second - times[j + 1].first < minMs / 3 && !chunks[j + 1].chapterStart) j++
+            val s = times[i].first; val e = times[j].second
+            val starts = (i..j).map { (times[it].first - s).toFloat() / max(1L, e - s) }
+            out += Group(chunks.subList(i, j + 1), s, e, false, starts, i)
+            i = j + 1
+        }
+        return out
     }
 
     private class Group(val chunks: List<Chunk>, val start: Long, val end: Long, val isQuestionGroup: Boolean, val lineStarts: List<Float>, val startIdx: Int)

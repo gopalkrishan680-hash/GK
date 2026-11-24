@@ -169,7 +169,9 @@ class FrameRenderer(
             }
             Transition.PAGE -> {
                 c.drawBitmap(bb, 0f, 0f, paint)
-                c.save(); c.scale(1f - e, 1f, 0f, 0f); c.drawBitmap(ba, 0f, 0f, paint); c.drawColor(k.alpha(Color.BLACK, e * 0.45f)); c.restore()
+                // drawColor ignores the scale and would grey the whole frame: shade only the turning page
+                c.save(); c.scale(1f - e, 1f, 0f, 0f); c.drawBitmap(ba, 0f, 0f, paint)
+                k.fill.color = k.alpha(Color.BLACK, e * 0.35f); c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), k.fill); c.restore()
                 val fold = w * (1f - e)
                 k.fill.shader = android.graphics.LinearGradient(fold, 0f, fold + 60f * k.u, 0f, 0x88000000.toInt(), 0, Shader.TileMode.CLAMP)
                 c.drawRect(fold, 0f, fold + 60f * k.u, h.toFloat(), k.fill); k.fill.shader = null
