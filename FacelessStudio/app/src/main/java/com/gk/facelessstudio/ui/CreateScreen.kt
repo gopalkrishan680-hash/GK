@@ -288,6 +288,17 @@ private fun ImagesStep(vm: AppViewModel) {
     var selected by remember { mutableIntStateOf(-1) }
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         AiGenerateCard(vm, hasImages = p.images.isNotEmpty())
+        if (p.aiFailed.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Hot.copy(alpha = 0.15f)).padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("${p.aiFailed.size} images failed", fontWeight = FontWeight.Bold, color = Hot)
+                    Text("The free service was busy. Marked with ! below — they show a nearby image until fixed.", color = Muted, fontSize = 12.sp)
+                }
+                Button(onClick = { vm.retryFailedAi() }, shape = RoundedCornerShape(12.dp)) { Text("Retry failed") }
+            }
+        }
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Button(onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
@@ -309,6 +320,9 @@ private fun ImagesStep(vm: AppViewModel) {
                     thumb?.let { Image(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
                     Box(Modifier.padding(6.dp).size(24.dp).background(Color.Black.copy(alpha = 0.7f), CircleShape), contentAlignment = Alignment.Center) {
                         Text("${i + 1}", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                    if (i in p.aiFailed) Box(Modifier.align(Alignment.TopEnd).padding(6.dp).size(24.dp).background(Hot, CircleShape), contentAlignment = Alignment.Center) {
+                        Text("!", fontSize = 13.sp, fontWeight = FontWeight.Black)
                     }
                     if (selected == i) Row(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color.Black.copy(alpha = 0.75f)), horizontalArrangement = Arrangement.SpaceEvenly) {
                         IconButton(onClick = { vm.moveImage(i, -1); selected = (i - 1).coerceAtLeast(0) }, Modifier.size(36.dp)) { Icon(Icons.Default.ChevronLeft, null) }

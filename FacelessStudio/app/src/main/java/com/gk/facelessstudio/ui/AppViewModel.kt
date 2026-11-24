@@ -107,19 +107,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (uris.isEmpty()) return@launch
         _busy.value = "Adding images…"
         val paths = withContext(Dispatchers.IO) { uris.mapNotNull { repo.import(_project.value.id, it, "img")?.first } }
-        update { it.copy(images = it.images + paths, lineImages = false) }
+        update { it.copy(images = it.images + paths, lineImages = false, aiFailed = emptyList()) }
         _busy.value = null
     }
 
     fun removeImage(i: Int) = update { p ->
-        p.images.getOrNull(i)?.let { File(it).delete() }
-        p.copy(images = p.images.filterIndexed { idx, _ -> idx != i }, lineImages = false)
+        // AI slots that failed share a neighbour's file: only delete when nobody else uses it
+        p.images.getOrNull(i)?.takeIf { path -> p.images.count { it == path } == 1 }?.let { File(it).delete() }
+        p.copy(images = p.images.filterIndexed { idx, _ -> idx != i }, lineImages = false, aiFailed = emptyList())
     }
 
     fun moveImage(i: Int, delta: Int) = update { p ->
         val j = (i + delta).coerceIn(0, p.images.lastIndex)
         val l = p.images.toMutableList(); val x = l.removeAt(i); l.add(j, x)
-        p.copy(images = l)
+        p.copy(images = l, aiFailed = emptyList())
     }
 
     private val _voiceInfo = MutableStateFlow<VoiceInfo?>(null)
@@ -231,6 +232,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         com.gk.facelessstudio.model.Aspect.SQUARE -> 1024 to 1024
     }
 
+    private fun promptsFile(p: Project) = File(repo.dir(p.id), "prompts.txt")
+    private fun bibleFile(p: Project) = File(repo.dir(p.id), "characters.txt")
+
     /** Makes one picture for every line of the script, so each scene shows exactly what is being said. */
     fun generateAiImages(style: String) {
         if (aiJob?.isActive == true) return
@@ -242,77 +246,126 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val pieces = a.chunks.chunked(step)
             val total = pieces.size
             val topic = p0.title.ifBlank { a.chapters.firstOrNull() ?: "" }
-            _ai.value = AiProgress(0, total, "Writing image prompts from your script…")
             val lines = pieces.map { g -> g.joinToString(" ") { it.text } }
-            val prompts = withContext(Dispatchers.IO) {
-                lines.chunked(12).flatMapIndexed { bi, batch ->
-                    val enhanced = AiImages.enhancePrompts(batch, topic, style)
-                    batch.mapIndexed { j, line ->
-                        val chunk = pieces[bi * 12 + j].first()
-                        enhanced?.getOrNull(j)?.let { AiImages.finalPrompt(it, style, p0.aspect.sub) }
-                            ?: ScriptAnalyzer.imagePrompt(line, style, p0.aspect.sub, topic, a.chapters.getOrNull(chunk.chapterIndex) ?: "")
-                    }
+
+            _ai.value = AiProgress(0, total, "Reading the story: deciding how characters look…")
+            val bible = withContext(Dispatchers.IO) { AiImages.characterBible(p0.script, topic) }
+            withContext(Dispatchers.IO) { bibleFile(p0).writeText(bible ?: "") }
+
+            var aiWritten = 0
+            val prompts = ArrayList<String>()
+            for ((bi, batch) in lines.chunked(6).withIndex()) {
+                _ai.value = AiProgress(0, total, "Writing image prompts… ${prompts.size}/$total")
+                val enhanced = withContext(Dispatchers.IO) { AiImages.enhancePrompts(batch, topic, style, bible) }
+                batch.forEachIndexed { j, line ->
+                    val chunk = pieces[bi * 6 + j].first()
+                    val e = enhanced?.getOrNull(j)
+                    if (e != null) aiWritten++
+                    prompts += e?.let { AiImages.finalPrompt(it, style, p0.aspect.sub) }
+                        ?: ScriptAnalyzer.imagePrompt(line, style, p0.aspect.sub, topic, a.chapters.getOrNull(chunk.chapterIndex) ?: "")
                 }
             }
-            withContext(Dispatchers.IO) { File(repo.dir(p0.id), "prompts.txt").writeText(prompts.joinToString("\n")) }
+            withContext(Dispatchers.IO) { promptsFile(p0).writeText(prompts.joinToString("\n")) }
+
             val (w, h) = imageSize(p0)
             val results = arrayOfNulls<String>(total)
-            val done = java.util.concurrent.atomic.AtomicInteger(0)
-            val gate = kotlinx.coroutines.sync.Semaphore(2)
-            kotlinx.coroutines.coroutineScope {
-                prompts.forEachIndexed { i, prompt ->
-                    launch(Dispatchers.IO) {
-                        gate.acquire()
-                        try {
-                            val f = File(repo.dir(p0.id), "ai_${System.nanoTime()}_$i.jpg")
-                            if (AiImages.generate(prompt, w, h, (p0.seed % 100000).toInt() + i, f)) results[i] = f.absolutePath
-                        } finally { gate.release() }
-                        val n = done.incrementAndGet()
-                        _ai.value = AiProgress(n, total, "Generating image $n of $total…")
-                    }
+            val seen = HashSet<String>()
+            var failed = 0
+            try {
+                // strictly one at a time: the free service rejects or repeats images on parallel requests
+                for (i in prompts.indices) {
+                    _ai.value = AiProgress(i, total, "Generating image ${i + 1} of $total" + if (failed > 0) "  ·  $failed failed" else "")
+                    val f = File(repo.dir(p0.id), "ai_${System.nanoTime()}_$i.jpg")
+                    val ok = withContext(Dispatchers.IO) { AiImages.generate(prompts[i], w, h, (p0.seed % 100000).toInt() + i * 101, f, seen) }
+                    if (ok) results[i] = f.absolutePath else failed++
+                }
+            } finally {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) { commitAi(results, step, style, aiWritten, total) }
+            }
+        }
+    }
+
+    private suspend fun commitAi(results: Array<String?>, step: Int, style: String, aiWritten: Int, totalPrompts: Int) {
+        val ok = results.count { it != null }
+        _ai.value = null
+        if (ok == 0) { _toast.value = "Could not reach the AI image service. Check your internet and try again."; return }
+        val failedIdx = results.indices.filter { results[it] == null }
+        // a failed slot temporarily shows its nearest picture so the video still works; "Retry failed" fixes it
+        val filled = results.indices.map { i -> results[i] ?: results.indices.sortedBy { kotlin.math.abs(it - i) }.firstNotNullOf { results[it] } }
+        update { it.copy(images = filled, lineImages = true, imageStep = step, aiFailed = failedIdx, aiStyle = style) }
+        rebuildIfNeeded()
+        _toast.value = buildString {
+            append(if (failedIdx.isEmpty()) "${results.size} images ready ✅" else "$ok of ${results.size} images ready. ${failedIdx.size} failed — tap Retry failed.")
+            if (aiWritten < totalPrompts / 2) append(" (AI prompt writer was busy, basic prompts used)")
+        }
+    }
+
+    private suspend fun rebuildIfNeeded() {
+        if (_project.value.scenes.isNotEmpty()) {
+            val voice = analyzeVoice()
+            _project.value = withContext(Dispatchers.Default) { Director.build(_project.value, voice) }
+            persist()
+        }
+    }
+
+    /** Regenerates only the slots that failed last time, with the saved prompts. */
+    fun retryFailedAi() {
+        if (aiJob?.isActive == true) return
+        val p0 = _project.value
+        if (p0.aiFailed.isEmpty()) return
+        aiJob = viewModelScope.launch {
+            val prompts = withContext(Dispatchers.IO) { runCatching { promptsFile(p0).readLines() }.getOrDefault(emptyList()) }
+            val failedSet = p0.aiFailed.toSet()
+            val seen = withContext(Dispatchers.IO) {
+                p0.images.filterIndexed { i, _ -> i !in failedSet }.mapNotNull { AiImages.hashOf(it) }.toHashSet()
+            }
+            val (w, h) = imageSize(p0)
+            val stillFailed = ArrayList<Int>()
+            val replaced = HashMap<Int, String>()
+            try {
+                p0.aiFailed.forEachIndexed { n, idx ->
+                    _ai.value = AiProgress(n, p0.aiFailed.size, "Retrying image ${n + 1} of ${p0.aiFailed.size}")
+                    val prompt = prompts.getOrNull(idx) ?: return@forEachIndexed
+                    val f = File(repo.dir(p0.id), "ai_${System.nanoTime()}_$idx.jpg")
+                    if (withContext(Dispatchers.IO) { AiImages.generate(prompt, w, h, (System.nanoTime() % 100000).toInt(), f, seen) }) replaced[idx] = f.absolutePath
+                    else stillFailed += idx
+                }
+            } finally {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                    _ai.value = null
+                    val left = p0.aiFailed.filter { it !in replaced }
+                    update { p -> p.copy(images = p.images.mapIndexed { i, old -> replaced[i] ?: old }, aiFailed = left) }
+                    _toast.value = if (left.isEmpty()) "All images ready ✅" else "${replaced.size} fixed, ${left.size} still failed. Try again in a minute."
                 }
             }
-            val ok = results.count { it != null }
-            if (ok == 0) {
-                _ai.value = null
-                _toast.value = "Could not reach the AI image service. Check your internet and try again."
-                return@launch
-            }
-            // fill any failed slot with its nearest neighbour so line->image mapping stays aligned
-            val filled = results.indices.map { i -> results[i] ?: results.indices.sortedBy { kotlin.math.abs(it - i) }.firstNotNullOf { results[it] } }
-            update { it.copy(images = filled, lineImages = true, imageStep = step) }
-            if (_project.value.scenes.isNotEmpty()) {
-                val voice = analyzeVoice()
-                _project.value = withContext(Dispatchers.Default) { Director.build(_project.value, voice) }
-                persist()
-            }
-            _ai.value = null
-            _toast.value = if (ok == total) "$total images ready ✅" else "$ok of $total images ready (others reused nearby images)"
         }
     }
 
     /** New AI picture for one scene (fresh seed), keeping everything else. */
-    fun regenerateSceneImage(i: Int, style: String = "Cinematic realistic photo") {
+    fun regenerateSceneImage(i: Int) {
         val p0 = _project.value
         val s = p0.scenes.getOrNull(i) ?: return
         if (aiJob?.isActive == true) return
+        val style = p0.aiStyle.ifBlank { "Cinematic realistic photo" }
         aiJob = viewModelScope.launch {
             _ai.value = AiProgress(0, 1, "Generating a new image for this scene…")
             val topic = p0.title.ifBlank { p0.chapters.firstOrNull() ?: "" }
+            val bible = withContext(Dispatchers.IO) { runCatching { bibleFile(p0).readText() }.getOrNull()?.ifBlank { null } }
             val prompt = withContext(Dispatchers.IO) {
-                AiImages.enhancePrompts(listOf(s.text), topic, style)?.firstOrNull()?.let { AiImages.finalPrompt(it, style, p0.aspect.sub) }
+                AiImages.enhancePrompts(listOf(s.text), topic, style, bible)?.firstOrNull()?.let { AiImages.finalPrompt(it, style, p0.aspect.sub) }
                     ?: ScriptAnalyzer.imagePrompt(s.text, style, p0.aspect.sub, topic, p0.chapters.getOrNull(s.chapterIndex) ?: "")
             }
+            val seen = withContext(Dispatchers.IO) { p0.images.mapNotNull { AiImages.hashOf(it) }.toHashSet() }
             val (w, h) = imageSize(p0)
             val f = File(repo.dir(p0.id), "ai_${System.nanoTime()}.jpg")
-            val ok = withContext(Dispatchers.IO) { AiImages.generate(prompt, w, h, (System.nanoTime() % 100000).toInt(), f) }
+            val ok = withContext(Dispatchers.IO) { AiImages.generate(prompt, w, h, (System.nanoTime() % 100000).toInt(), f, seen) }
             _ai.value = null
-            if (!ok) { _toast.value = "Could not reach the AI image service"; return@launch }
+            if (!ok) { _toast.value = "The AI image service is busy. Try again in a minute."; return@launch }
             update { p ->
                 val idx = p.scenes[i].imageIndex
                 if (idx in p.images.indices) {
                     // replace in place so the line->image mapping (and Shuffle) keeps the new picture
-                    p.copy(images = p.images.toMutableList().also { it[idx] = f.absolutePath })
+                    p.copy(images = p.images.toMutableList().also { it[idx] = f.absolutePath }, aiFailed = p.aiFailed - idx)
                 } else {
                     val imgs = p.images + f.absolutePath
                     val l = p.scenes.toMutableList(); l[i] = l[i].copy(imageIndex = imgs.lastIndex)

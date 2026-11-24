@@ -131,6 +131,9 @@ data class Project(
     /** true when images were generated one-per-script-line, so scene N uses its own image. */
     val lineImages: Boolean = false,
     val imageStep: Int = 1,
+    /** AI image slots that failed and currently show a neighbour's picture. */
+    val aiFailed: List<Int> = emptyList(),
+    val aiStyle: String = "",
     val sfx: Boolean = true,
     val grain: Boolean = true,
     val progressBar: Boolean = true,
@@ -147,7 +150,7 @@ data class Project(
         put("voicePath", voicePath); put("voiceName", voiceName)
         put("musicPath", musicPath); put("musicName", musicName); put("musicVolume", musicVolume.toDouble())
         put("images", JSONArray(images)); put("aspect", aspect.name); put("theme", themeId)
-        put("pacing", pacing.name); put("captionMode", captionMode.name); put("lineImages", lineImages); put("imageStep", imageStep); put("sfx", sfx); put("grain", grain)
+        put("pacing", pacing.name); put("captionMode", captionMode.name); put("lineImages", lineImages); put("imageStep", imageStep); put("aiFailed", JSONArray(aiFailed)); put("aiStyle", aiStyle); put("sfx", sfx); put("grain", grain)
         put("progressBar", progressBar); put("handle", handle); put("seed", seed)
         put("scenes", JSONArray().also { a -> scenes.forEach { a.put(it.toJson()) } })
         put("chapters", JSONArray(chapters)); put("duration", durationMs)
@@ -171,6 +174,8 @@ data class Project(
             captionMode = runCatching { CaptionMode.valueOf(o.optString("captionMode")) }.getOrDefault(CaptionMode.KEYWORDS),
             lineImages = o.optBoolean("lineImages"),
             imageStep = o.optInt("imageStep", 1).coerceAtLeast(1),
+            aiFailed = o.optJSONArray("aiFailed").strings().mapNotNull { it.toIntOrNull() },
+            aiStyle = o.optString("aiStyle"),
             sfx = o.optBoolean("sfx", true),
             grain = o.optBoolean("grain", true),
             progressBar = o.optBoolean("progressBar", true),
