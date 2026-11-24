@@ -5,7 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.gk.facelessstudio.data.Repository
-import com.gk.facelessstudio.engine.AiImages
+import com.gk.facelessstudio.engine.GridWorkflow
 import com.gk.facelessstudio.engine.AudioDecoder
 import com.gk.facelessstudio.engine.Director
 import com.gk.facelessstudio.engine.ScriptAnalyzer
@@ -20,6 +20,7 @@ import com.gk.facelessstudio.render.Fonts
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -107,20 +108,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (uris.isEmpty()) return@launch
         _busy.value = "Adding images…"
         val paths = withContext(Dispatchers.IO) { uris.mapNotNull { repo.import(_project.value.id, it, "img")?.first } }
-        update { it.copy(images = it.images + paths, lineImages = false, aiFailed = emptyList()) }
+        update { it.copy(images = it.images.filter { p -> p.isNotBlank() } + paths, lineImages = false) }
         _busy.value = null
     }
 
     fun removeImage(i: Int) = update { p ->
         // AI slots that failed share a neighbour's file: only delete when nobody else uses it
         p.images.getOrNull(i)?.takeIf { path -> p.images.count { it == path } == 1 }?.let { File(it).delete() }
-        p.copy(images = p.images.filterIndexed { idx, _ -> idx != i }, lineImages = false, aiFailed = emptyList())
+        p.copy(images = p.images.filterIndexed { idx, _ -> idx != i }.filter { it.isNotBlank() }, lineImages = false)
     }
 
     fun moveImage(i: Int, delta: Int) = update { p ->
         val j = (i + delta).coerceIn(0, p.images.lastIndex)
         val l = p.images.toMutableList(); val x = l.removeAt(i); l.add(j, x)
-        p.copy(images = l, aiFailed = emptyList())
+        p.copy(images = l)
     }
 
     private val _voiceInfo = MutableStateFlow<VoiceInfo?>(null)
@@ -210,94 +211,142 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------------- extra outputs ----------------
 
-    fun imagePrompts(style: String): List<Pair<String, String>> {
+
+    // ---------------- grid image workflow (user's own ChatGPT / Gemini) ----------------
+
+    private val prefs by lazy { getApplication<Application>().getSharedPreferences("studio", android.content.Context.MODE_PRIVATE) }
+
+    private val _selectedGrid = MutableStateFlow(-1)
+    val selectedGrid: StateFlow<Int> = _selectedGrid
+
+    /** Fired after an image arrives through Android "Share", so the UI can open the Images step. */
+    private val openImagesChannel = kotlinx.coroutines.channels.Channel<Unit>(kotlinx.coroutines.channels.Channel.CONFLATED)
+    val openImages = openImagesChannel.receiveAsFlow()
+
+    fun setArtStyle(id: String) = update { it.copy(artStyle = id, styleDesc = GridWorkflow.preset(id).desc) }
+    fun setStyleDesc(v: String) = update { it.copy(styleDesc = v) }
+    fun setCharacters(v: String) = update { it.copy(characters = v) }
+    fun setSeparator(v: String) = update { it.copy(separator = v) }
+    fun setGridSize(v: Int) = update { it.copy(gridSize = v) }
+    fun setDirectorPart(v: Int) = update { it.copy(directorPart = v) }
+
+    /**
+     * Keeps images / visuals aligned with the current script pieces. After a script edit the old
+     * pictures are re-matched by their line text, so nothing already made is lost.
+     */
+    fun syncPanels(): List<String> {
         val p = _project.value
-        val a = Director.analysisFor(p)
-        val topic = p.title.ifBlank { a.chapters.firstOrNull() ?: "" }
-        return a.chunks.map { it.text to ScriptAnalyzer.imagePrompt(it.text, style, p.aspect.sub, topic, a.chapters.getOrNull(it.chapterIndex) ?: "") }
+        val pieces = GridWorkflow.pieces(p)
+        if (p.lineImages && p.panelTexts == pieces && p.images.size == pieces.size && p.visuals.size == pieces.size) return pieces
+        if (!p.lineImages && p.images.isNotEmpty()) return pieces   // user is using own images
+        val oldImg = HashMap<String, String>(); val oldVis = HashMap<String, String>()
+        p.panelTexts.forEachIndexed { i, t ->
+            p.images.getOrNull(i)?.takeIf { it.isNotBlank() }?.let { oldImg.putIfAbsent(t, it) }
+            p.visuals.getOrNull(i)?.takeIf { it.isNotBlank() }?.let { oldVis.putIfAbsent(t, it) }
+        }
+        val same = p.panelTexts.size == pieces.size
+        update { it.copy(
+            lineImages = true, imageStep = 1, panelTexts = pieces,
+            images = pieces.mapIndexed { i, t -> oldImg[t] ?: if (same) p.images.getOrElse(i) { "" } else "" },
+            visuals = pieces.mapIndexed { i, t -> oldVis[t] ?: if (same) p.visuals.getOrElse(i) { "" } else "" },
+        ) }
+        return pieces
     }
 
-    // ---------------- AI image generation ----------------
-
-    data class AiProgress(val done: Int, val total: Int, val message: String)
-    private val _ai = MutableStateFlow<AiProgress?>(null)
-    val ai: StateFlow<AiProgress?> = _ai
-    private var aiJob: kotlinx.coroutines.Job? = null
-
-    fun cancelAi() { aiJob?.cancel(); _ai.value = null }
-
-    private fun imageSize(p: Project) = when (p.aspect) {
-        com.gk.facelessstudio.model.Aspect.LANDSCAPE -> 1280 to 720
-        com.gk.facelessstudio.model.Aspect.PORTRAIT -> 720 to 1280
-        com.gk.facelessstudio.model.Aspect.SQUARE -> 1024 to 1024
+    fun directorPartPrompt(part: Int): String {
+        val pieces = syncPanels(); val p = _project.value
+        val per = p.directorPart
+        val idx = (part * per until minOf(pieces.size, (part + 1) * per)).toList()
+        return GridWorkflow.directorPrompt(p, pieces, idx)
     }
 
-    private fun promptsFile(p: Project) = File(repo.dir(p.id), "prompts.txt")
-    private fun bibleFile(p: Project) = File(repo.dir(p.id), "characters.txt")
+    fun directorMissingPrompt(): String? {
+        val pieces = syncPanels(); val p = _project.value
+        val idx = pieces.indices.filter { p.visuals.getOrNull(it).isNullOrBlank() }.take(p.directorPart)
+        return if (idx.isEmpty()) null else GridWorkflow.directorPrompt(p, pieces, idx)
+    }
 
-    /** Makes one picture for every line of the script, so each scene shows exactly what is being said. */
-    fun generateAiImages(style: String) {
-        if (aiJob?.isActive == true) return
-        val p0 = _project.value
-        if (p0.script.isBlank()) { _toast.value = "Write your script first"; return }
-        aiJob = viewModelScope.launch {
-            val a = Director.analysisFor(p0)
-            val step = kotlin.math.ceil(a.chunks.size / 60.0).toInt().coerceAtLeast(1)
-            val pieces = a.chunks.chunked(step)
-            val total = pieces.size
-            val topic = p0.title.ifBlank { a.chapters.firstOrNull() ?: "" }
-            val lines = pieces.map { g -> g.joinToString(" ") { it.text } }
+    fun applyDirector(reply: String) {
+        val pieces = syncPanels()
+        val parsed = GridWorkflow.parseDirector(reply).filterKeys { it in pieces.indices }
+        if (parsed.isEmpty()) { _toast.value = "No \"number: description\" lines found in the reply"; return }
+        update { p -> p.copy(visuals = p.visuals.mapIndexed { i, v -> parsed[i] ?: v }) }
+        _toast.value = "${parsed.size} scene visuals added ✅"
+    }
 
-            _ai.value = AiProgress(0, total, "Reading the story: deciding how characters look…")
-            val bible = withContext(Dispatchers.IO) { AiImages.characterBible(p0.script, topic) }
-            withContext(Dispatchers.IO) { bibleFile(p0).writeText(bible ?: "") }
+    fun gridPrompt(g: GridWorkflow.Grid): String = GridWorkflow.gridPrompt(_project.value, g, syncPanels())
 
-            var aiWritten = 0
-            val prompts = ArrayList<String>()
-            for ((bi, batch) in lines.chunked(6).withIndex()) {
-                _ai.value = AiProgress(0, total, "Writing image prompts… ${prompts.size}/$total")
-                val enhanced = withContext(Dispatchers.IO) { AiImages.enhancePrompts(batch, topic, style, bible) }
-                batch.forEachIndexed { j, line ->
-                    val chunk = pieces[bi * 6 + j].first()
-                    val e = enhanced?.getOrNull(j)
-                    if (e != null) aiWritten++
-                    prompts += e?.let { AiImages.finalPrompt(it, style, p0.aspect.sub) }
-                        ?: ScriptAnalyzer.imagePrompt(line, style, p0.aspect.sub, topic, a.chapters.getOrNull(chunk.chapterIndex) ?: "")
-                }
-            }
-            withContext(Dispatchers.IO) { promptsFile(p0).writeText(prompts.joinToString("\n")) }
-
-            val (w, h) = imageSize(p0)
-            val results = arrayOfNulls<String>(total)
-            val seen = HashSet<String>()
-            var failed = 0
-            try {
-                // strictly one at a time: the free service rejects or repeats images on parallel requests
-                for (i in prompts.indices) {
-                    _ai.value = AiProgress(i, total, "Generating image ${i + 1} of $total" + if (failed > 0) "  ·  $failed failed" else "")
-                    val f = File(repo.dir(p0.id), "ai_${System.nanoTime()}_$i.jpg")
-                    val ok = withContext(Dispatchers.IO) { AiImages.generate(prompts[i], w, h, (p0.seed % 100000).toInt() + i * 101, f, seen) }
-                    if (ok) results[i] = f.absolutePath else failed++
-                }
-            } finally {
-                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) { commitAi(results, step, style, aiWritten, total) }
-            }
+    fun allGridPrompts(): String {
+        val pieces = syncPanels(); val p = _project.value
+        return GridWorkflow.grids(pieces.size, p.gridSize).joinToString("\n\n==========\n\n") {
+            "IMAGE ${it.index + 1} (scenes ${it.from + 1}-${it.to})\n\n" + GridWorkflow.gridPrompt(p, it, pieces)
         }
     }
 
-    private suspend fun commitAi(results: Array<String?>, step: Int, style: String, aiWritten: Int, totalPrompts: Int) {
-        val ok = results.count { it != null }
-        _ai.value = null
-        if (ok == 0) { _toast.value = "Could not reach the AI image service. Check your internet and try again."; return }
-        val failedIdx = results.indices.filter { results[it] == null }
-        // a failed slot temporarily shows its nearest picture so the video still works; "Retry failed" fixes it
-        val filled = results.indices.map { i -> results[i] ?: results.indices.sortedBy { kotlin.math.abs(it - i) }.firstNotNullOf { results[it] } }
-        update { it.copy(images = filled, lineImages = true, imageStep = step, aiFailed = failedIdx, aiStyle = style) }
+    fun selectGrid(i: Int) {
+        _selectedGrid.value = i
+        prefs.edit().putString("lastProject", _project.value.id).putInt("selectedGrid", i).apply()
+        persist()
+    }
+
+    fun nextEmptyGrid(): Int {
+        val p = _project.value
+        return GridWorkflow.grids(p.images.size, p.gridSize).firstOrNull { g -> (g.from until g.to).any { p.images.getOrNull(it).isNullOrBlank() } }?.index ?: -1
+    }
+
+    /** Imports a grid picture, cuts it into panels and assigns them to that grid's scenes. */
+    fun importGrid(gridIndex: Int, uri: Uri) = viewModelScope.launch {
+        if (!_project.value.lineImages && _project.value.images.isNotEmpty()) {
+            // switching from "own images" to grids: start with empty scene slots
+            update { it.copy(images = emptyList(), lineImages = true, panelTexts = emptyList()) }
+        }
+        val pieces = syncPanels()
+        val p = _project.value
+        val g = GridWorkflow.grids(pieces.size, p.gridSize).getOrNull(gridIndex) ?: return@launch
+        _busy.value = "Cutting image ${gridIndex + 1} into ${g.count} scenes…"
+        val paths = withContext(Dispatchers.IO) {
+            runCatching {
+                val src = getApplication<Application>().contentResolver.openInputStream(uri)!!.use { android.graphics.BitmapFactory.decodeStream(it) }
+                    ?: error("not an image")
+                val panels = com.gk.facelessstudio.engine.GridCutter.cut(src, g.cols, g.rows)
+                panels.take(g.count).mapIndexed { k, bmp ->
+                    val f = File(repo.dir(p.id), "panel_${g.from + k}_${System.nanoTime()}.jpg")
+                    f.outputStream().use { bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 92, it) }
+                    if (bmp !== src) bmp.recycle()
+                    f.absolutePath
+                }.also { src.recycle() }
+            }.getOrNull()
+        }
+        _busy.value = null
+        if (paths == null) { _toast.value = "That doesn't look like an image. Try again."; return@launch }
+        update { cur ->
+            val imgs = cur.images.toMutableList()
+            paths.forEachIndexed { k, path -> if (g.from + k < imgs.size) imgs[g.from + k] = path }
+            cur.copy(images = imgs, lineImages = true)
+        }
+        _toast.value = "Image ${gridIndex + 1} → ${paths.size} scenes ✅"
+        selectGrid(nextEmptyGrid())
         rebuildIfNeeded()
-        _toast.value = buildString {
-            append(if (failedIdx.isEmpty()) "${results.size} images ready ✅" else "$ok of ${results.size} images ready. ${failedIdx.size} failed — tap Retry failed.")
-            if (aiWritten < totalPrompts / 2) append(" (AI prompt writer was busy, basic prompts used)")
-        }
+    }
+
+    /** Image pasted from the clipboard (e.g. "Copy image" in ChatGPT / Gemini). */
+    fun pasteGrid(gridIndex: Int) {
+        val cm = getApplication<Application>().getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        val clip = cm.primaryClip
+        val uri = (0 until (clip?.itemCount ?: 0)).firstNotNullOfOrNull { clip!!.getItemAt(it).uri }
+        if (uri == null) { _toast.value = "No image on the clipboard. In ChatGPT/Gemini long-press the image → Copy, or use Share."; return }
+        importGrid(gridIndex, uri)
+    }
+
+    /** Image shared from another app (ChatGPT / Gemini → Share → Faceless Studio). */
+    fun receiveShared(uri: Uri) = viewModelScope.launch {
+        val last = prefs.getString("lastProject", null)
+        if (last != null && last != _project.value.id) withContext(Dispatchers.IO) { repo.load(last) }?.let { _project.value = it }
+        if (_project.value.script.isBlank()) { _toast.value = "Open a project's Images step first, then share the image"; return@launch }
+        val g = _selectedGrid.value.takeIf { it >= 0 } ?: prefs.getInt("selectedGrid", -1).takeIf { it >= 0 } ?: nextEmptyGrid()
+        if (g < 0) { _toast.value = "All grid images are already done"; return@launch }
+        openImagesChannel.trySend(Unit)
+        importGrid(g, uri)
     }
 
     private suspend fun rebuildIfNeeded() {
@@ -305,73 +354,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val voice = analyzeVoice()
             _project.value = withContext(Dispatchers.Default) { Director.build(_project.value, voice) }
             persist()
-        }
-    }
-
-    /** Regenerates only the slots that failed last time, with the saved prompts. */
-    fun retryFailedAi() {
-        if (aiJob?.isActive == true) return
-        val p0 = _project.value
-        if (p0.aiFailed.isEmpty()) return
-        aiJob = viewModelScope.launch {
-            val prompts = withContext(Dispatchers.IO) { runCatching { promptsFile(p0).readLines() }.getOrDefault(emptyList()) }
-            val failedSet = p0.aiFailed.toSet()
-            val seen = withContext(Dispatchers.IO) {
-                p0.images.filterIndexed { i, _ -> i !in failedSet }.mapNotNull { AiImages.hashOf(it) }.toHashSet()
-            }
-            val (w, h) = imageSize(p0)
-            val stillFailed = ArrayList<Int>()
-            val replaced = HashMap<Int, String>()
-            try {
-                p0.aiFailed.forEachIndexed { n, idx ->
-                    _ai.value = AiProgress(n, p0.aiFailed.size, "Retrying image ${n + 1} of ${p0.aiFailed.size}")
-                    val prompt = prompts.getOrNull(idx) ?: return@forEachIndexed
-                    val f = File(repo.dir(p0.id), "ai_${System.nanoTime()}_$idx.jpg")
-                    if (withContext(Dispatchers.IO) { AiImages.generate(prompt, w, h, (System.nanoTime() % 100000).toInt(), f, seen) }) replaced[idx] = f.absolutePath
-                    else stillFailed += idx
-                }
-            } finally {
-                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                    _ai.value = null
-                    val left = p0.aiFailed.filter { it !in replaced }
-                    update { p -> p.copy(images = p.images.mapIndexed { i, old -> replaced[i] ?: old }, aiFailed = left) }
-                    _toast.value = if (left.isEmpty()) "All images ready ✅" else "${replaced.size} fixed, ${left.size} still failed. Try again in a minute."
-                }
-            }
-        }
-    }
-
-    /** New AI picture for one scene (fresh seed), keeping everything else. */
-    fun regenerateSceneImage(i: Int) {
-        val p0 = _project.value
-        val s = p0.scenes.getOrNull(i) ?: return
-        if (aiJob?.isActive == true) return
-        val style = p0.aiStyle.ifBlank { "Cinematic realistic photo" }
-        aiJob = viewModelScope.launch {
-            _ai.value = AiProgress(0, 1, "Generating a new image for this scene…")
-            val topic = p0.title.ifBlank { p0.chapters.firstOrNull() ?: "" }
-            val bible = withContext(Dispatchers.IO) { runCatching { bibleFile(p0).readText() }.getOrNull()?.ifBlank { null } }
-            val prompt = withContext(Dispatchers.IO) {
-                AiImages.enhancePrompts(listOf(s.text), topic, style, bible)?.firstOrNull()?.let { AiImages.finalPrompt(it, style, p0.aspect.sub) }
-                    ?: ScriptAnalyzer.imagePrompt(s.text, style, p0.aspect.sub, topic, p0.chapters.getOrNull(s.chapterIndex) ?: "")
-            }
-            val seen = withContext(Dispatchers.IO) { p0.images.mapNotNull { AiImages.hashOf(it) }.toHashSet() }
-            val (w, h) = imageSize(p0)
-            val f = File(repo.dir(p0.id), "ai_${System.nanoTime()}.jpg")
-            val ok = withContext(Dispatchers.IO) { AiImages.generate(prompt, w, h, (System.nanoTime() % 100000).toInt(), f, seen) }
-            _ai.value = null
-            if (!ok) { _toast.value = "The AI image service is busy. Try again in a minute."; return@launch }
-            update { p ->
-                val idx = p.scenes[i].imageIndex
-                if (idx in p.images.indices) {
-                    // replace in place so the line->image mapping (and Shuffle) keeps the new picture
-                    p.copy(images = p.images.toMutableList().also { it[idx] = f.absolutePath }, aiFailed = p.aiFailed - idx)
-                } else {
-                    val imgs = p.images + f.absolutePath
-                    val l = p.scenes.toMutableList(); l[i] = l[i].copy(imageIndex = imgs.lastIndex)
-                    p.copy(images = imgs, scenes = l)
-                }
-            }
         }
     }
 

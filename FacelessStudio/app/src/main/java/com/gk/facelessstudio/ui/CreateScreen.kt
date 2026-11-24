@@ -135,7 +135,6 @@ fun CreateScreen(vm: AppViewModel, startStep: Int, onBack: () -> Unit, onGenerat
                     2 -> ImagesStep(vm)
                     else -> StyleStep(vm)
                 }
-                AiOverlay(vm)
                 busy?.let { msg ->
                     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)).clickable(enabled = true) {}, contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -278,99 +277,6 @@ private fun FileRow(name: String, sub: String, onRemove: () -> Unit, onReplace: 
     }
 }
 
-// ------------------------------------------------------------------ STEP 3
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ImagesStep(vm: AppViewModel) {
-    val p by vm.project.collectAsState()
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { vm.addImages(it) }
-    var showPrompts by remember { mutableStateOf(false) }
-    var selected by remember { mutableIntStateOf(-1) }
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
-        AiGenerateCard(vm, hasImages = p.images.isNotEmpty())
-        if (p.aiFailed.isNotEmpty()) {
-            Spacer(Modifier.height(10.dp))
-            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Hot.copy(alpha = 0.15f)).padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("${p.aiFailed.size} images failed", fontWeight = FontWeight.Bold, color = Hot)
-                    Text("The free service was busy. Marked with ! below — they show a nearby image until fixed.", color = Muted, fontSize = 12.sp)
-                }
-                Button(onClick = { vm.retryFailedAi() }, shape = RoundedCornerShape(12.dp)) { Text("Retry failed") }
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                modifier = Modifier.weight(1f).height(52.dp), shape = RoundedCornerShape(14.dp)) {
-                Icon(Icons.Default.AddPhotoAlternate, null); Spacer(Modifier.width(8.dp)); Text("Add my images", fontWeight = FontWeight.Bold)
-            }
-            OutlinedButton(onClick = { showPrompts = true }, modifier = Modifier.height(52.dp), shape = RoundedCornerShape(14.dp)) {
-                Icon(Icons.Default.AutoAwesome, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("AI Prompts")
-            }
-        }
-        Text(if (p.lineImages) "${p.images.size} AI images — each one is matched to its own script line." else "Images are used in script order (1 = first). Tap an image to reorder. ${p.images.size} images",
-            color = Muted, fontSize = 12.sp, modifier = Modifier.padding(vertical = 10.dp))
-        LazyVerticalGrid(GridCells.Adaptive(104.dp), verticalArrangement = Arrangement.spacedBy(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            itemsIndexed(p.images, key = { i, path -> "$i-$path" }) { i, path ->
-                val thumb = rememberThumb(path, 300)
-                Box(Modifier.aspectRatio(1f).clip(RoundedCornerShape(12.dp)).background(Surface2)
-                    .border(2.dp, if (selected == i) Neon else Color.Transparent, RoundedCornerShape(12.dp))
-                    .clickable { selected = if (selected == i) -1 else i }) {
-                    thumb?.let { Image(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
-                    Box(Modifier.padding(6.dp).size(24.dp).background(Color.Black.copy(alpha = 0.7f), CircleShape), contentAlignment = Alignment.Center) {
-                        Text("${i + 1}", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-                    if (i in p.aiFailed) Box(Modifier.align(Alignment.TopEnd).padding(6.dp).size(24.dp).background(Hot, CircleShape), contentAlignment = Alignment.Center) {
-                        Text("!", fontSize = 13.sp, fontWeight = FontWeight.Black)
-                    }
-                    if (selected == i) Row(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color.Black.copy(alpha = 0.75f)), horizontalArrangement = Arrangement.SpaceEvenly) {
-                        IconButton(onClick = { vm.moveImage(i, -1); selected = (i - 1).coerceAtLeast(0) }, Modifier.size(36.dp)) { Icon(Icons.Default.ChevronLeft, null) }
-                        IconButton(onClick = { vm.removeImage(i); selected = -1 }, Modifier.size(36.dp)) { Icon(Icons.Default.Close, null, tint = Hot) }
-                        IconButton(onClick = { vm.moveImage(i, 1); selected = (i + 1).coerceAtMost(p.images.lastIndex) }, Modifier.size(36.dp)) { Icon(Icons.Default.ChevronRight, null) }
-                    }
-                }
-            }
-        }
-    }
-    if (showPrompts) PromptSheet(vm) { showPrompts = false }
-}
-
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
-@Composable
-private fun PromptSheet(vm: AppViewModel, onClose: () -> Unit) {
-    val styles = listOf("Cinematic realistic photo", "3D Pixar style render", "Dark documentary style", "Anime illustration", "Flat vector illustration")
-    var style by remember { mutableStateOf(styles.first()) }
-    val prompts = remember(style) { vm.imagePrompts(style) }
-    val ctx = LocalContext.current
-    fun copy(text: String) {
-        (ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("prompts", text))
-        vm.toast("Copied ✅")
-    }
-    ModalBottomSheet(onDismissRequest = onClose, containerColor = Surface1) {
-        Column(Modifier.padding(horizontal = 16.dp)) {
-            Text("AI Image Prompts", fontWeight = FontWeight.Black, fontSize = 20.sp)
-            Text("One prompt per scene — paste them into your AI image tool and add the images in the same order.", color = Muted, fontSize = 12.sp)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(vertical = 8.dp)) {
-                styles.forEach { s -> FilterChip(selected = s == style, onClick = { style = s }, label = { Text(s, fontSize = 12.sp) }) }
-            }
-            Button(onClick = { copy(prompts.mapIndexed { i, it -> "${i + 1}. ${it.second}" }.joinToString("\n\n")) }, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.ContentCopy, null); Spacer(Modifier.width(6.dp)); Text("Copy all prompts (${prompts.size})")
-            }
-            if (prompts.isEmpty()) Text("Write a script in the Script step first.", color = Muted, modifier = Modifier.padding(16.dp))
-            LazyColumn(Modifier.heightIn(max = 480.dp).padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(prompts.withIndex().toList()) { (i, pr) ->
-                    Column(Modifier.fillMaxWidth().background(Surface2, RoundedCornerShape(12.dp)).clickable { copy(pr.second) }.padding(12.dp)) {
-                        Text("${i + 1}. ${pr.first}", color = Muted, fontSize = 11.sp, maxLines = 2)
-                        Text(pr.second, fontSize = 13.sp)
-                    }
-                }
-            }
-            Spacer(Modifier.height(24.dp))
-        }
-    }
-}
-
 // ------------------------------------------------------------------ STEP 4
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -449,54 +355,3 @@ private fun ToggleRow(label: String, value: Boolean, onChange: (Boolean) -> Unit
 }
 
 
-
-internal val AI_STYLES = listOf("Cinematic realistic photo", "Dark documentary style", "3D Pixar style render", "Anime illustration", "Flat vector illustration")
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun AiGenerateCard(vm: AppViewModel, hasImages: Boolean) {
-    var style by remember { mutableStateOf(AI_STYLES.first()) }
-    var confirm by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Surface1)
-        .border(1.5.dp, Neon.copy(alpha = 0.45f), RoundedCornerShape(18.dp)).padding(14.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.AutoAwesome, null, tint = Neon); Spacer(Modifier.width(8.dp))
-            Text("Generate images from my script", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-        }
-        Text("The app writes an English visual prompt for every line of your script and creates a matching image, so each scene shows what is being said. Free (Pollinations.ai), needs internet; your script lines are sent to that service.",
-            color = Muted, fontSize = 12.sp, modifier = Modifier.padding(vertical = 8.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            AI_STYLES.forEach { st -> FilterChip(selected = st == style, onClick = { style = st }, label = { Text(st, fontSize = 12.sp) }) }
-        }
-        Spacer(Modifier.height(8.dp))
-        Box(Modifier.fillMaxWidth().height(50.dp).clip(RoundedCornerShape(14.dp)).background(BrandGradient)
-            .clickable { if (hasImages) confirm = true else vm.generateAiImages(style) }, contentAlignment = Alignment.Center) {
-            Text("✨  Generate images with AI", color = Color.Black, fontWeight = FontWeight.Black)
-        }
-    }
-    if (confirm) androidx.compose.material3.AlertDialog(
-        onDismissRequest = { confirm = false },
-        title = { Text("Replace current images?") },
-        text = { Text("AI images will replace the images already in this project.") },
-        confirmButton = { androidx.compose.material3.TextButton(onClick = { confirm = false; vm.generateAiImages(style) }) { Text("Replace") } },
-        dismissButton = { androidx.compose.material3.TextButton(onClick = { confirm = false }) { Text("Cancel") } },
-    )
-}
-
-/** Full-screen progress for AI image generation, with cancel. */
-@Composable
-internal fun AiOverlay(vm: AppViewModel) {
-    val ai by vm.ai.collectAsState()
-    val st = ai ?: return
-    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.8f)).clickable(enabled = true) {}, contentAlignment = Alignment.Center) {
-        Column(Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            if (st.total > 1 && st.done > 0) androidx.compose.material3.LinearProgressIndicator(progress = { st.done / st.total.toFloat() }, Modifier.fillMaxWidth())
-            else CircularProgressIndicator(color = Neon)
-            Spacer(Modifier.height(14.dp))
-            Text(st.message, fontWeight = FontWeight.SemiBold)
-            Text("Each image takes a few seconds. Keep the app open.", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
-            Spacer(Modifier.height(12.dp))
-            OutlinedButton(onClick = { vm.cancelAi() }) { Text("Cancel") }
-        }
-    }
-}

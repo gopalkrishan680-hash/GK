@@ -139,7 +139,7 @@ private fun Step(icon: ImageVector, n: String, label: String, modifier: Modifier
 
 @Composable
 private fun ProjectCard(p: Project, onClick: () -> Unit, onDelete: () -> Unit, onDuplicate: () -> Unit) {
-    val thumb = rememberThumb(p.images.firstOrNull())
+    val thumb = rememberThumb(p.images.firstOrNull { it.isNotBlank() })
     var menu by remember { mutableStateOf(false) }
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Surface1).clickable(onClick = onClick).padding(10.dp),

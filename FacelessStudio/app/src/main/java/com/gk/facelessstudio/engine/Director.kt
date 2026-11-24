@@ -56,6 +56,7 @@ object Director {
                 images == 0 -> -1
                 // images were generated one per script line -> each scene gets the picture made for its own words
                 project.lineImages -> min(images - 1, g.startIdx / project.imageStep.coerceAtLeast(1))
+                    .takeIf { project.images[it].isNotBlank() } ?: -1
                 else -> min(images - 1, (mid.toDouble() / max(1, total) * images).toInt())
             }
 
