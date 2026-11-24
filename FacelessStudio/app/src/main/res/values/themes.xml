@@ -1,0 +1,8 @@
+<resources>
+    <style name="Theme.FacelessStudio" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@color/bg</item>
+    </style>
+    <color name="bg">#FF0A0D12</color>
+</resources>
