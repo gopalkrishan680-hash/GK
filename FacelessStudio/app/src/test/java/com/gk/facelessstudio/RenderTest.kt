@@ -51,7 +51,7 @@ class RenderTest {
 
     private fun project(aspect: Aspect): Project {
         val imgs = (System.getProperty("fs.imgs") ?: "").let { d -> File(d).listFiles()?.sortedBy { it.name }?.map { it.absolutePath } } ?: emptyList()
-        val base = Project(id = "test", title = "Research Guide", script = script, images = imgs, aspect = aspect, handle = "@gkfacts", seed = 42, storyMode = false)
+        val base = Project(id = "test", title = "Research Guide", script = script, images = imgs, aspect = aspect, handle = "@gkfacts", seed = 42)
         return Director.build(base, null)
     }
 

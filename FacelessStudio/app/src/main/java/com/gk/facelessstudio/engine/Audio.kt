@@ -251,7 +251,7 @@ object Mixer {
             val pop = Sfx.pop()
             val boom = Sfx.boom()
             project.scenes.forEachIndexed { idx, s ->
-                if (idx > 0 && s.transition != Transition.CUT && s.transition != Transition.FADE && s.transition != Transition.DIP) {
+                if (idx > 0 && s.transition != Transition.CUT && s.transition != Transition.FADE) {
                     add(buf, whoosh, ((s.startMs - 190) * SAMPLE_RATE / 1000).toInt(), 0.32f)
                 }
                 when (s.type) {

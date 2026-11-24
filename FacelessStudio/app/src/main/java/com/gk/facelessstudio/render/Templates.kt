@@ -60,7 +60,6 @@ object Templates {
     private fun typed(text: String, p: Float) = text.take((text.length * p.coerceIn(0f, 1f)).toInt())
 
     private fun background(k: Kit, c: Canvas, s: Scene, t: Float, pick: Int) {
-        if (k.story) { if (!k.bgImageBlur(c, s.imageIndex, t, 0.62f)) k.bgBlob(c, t, s.variant); return }
         when (pick % 4) {
             0 -> k.bgBlob(c, t, s.variant)
             1 -> if (!k.bgImageBlur(c, s.imageIndex, t)) k.bgGrid(c, t)
@@ -145,11 +144,8 @@ object Templates {
     // ------------------------------------------------------------------ CHAPTER
     private fun chapter(k: Kit, c: Canvas, s: Scene, t: Float, d: Float) {
         val r = k.rnd(s)
-        if (k.story && k.bgImageBlur(c, s.imageIndex, t, 0.62f)) k.particles(c, t, s.variant, 40, k.theme.accent)
-        else {
-            if (r.nextBoolean()) k.bgBlob(c, t, s.variant) else k.bgGlow(c, t)
-            if (r.nextBoolean()) k.particles(c, t, s.variant, 50)
-        }
+        if (r.nextBoolean()) k.bgBlob(c, t, s.variant) else k.bgGlow(c, t)
+        if (r.nextBoolean()) k.particles(c, t, s.variant, 50)
         val title = s.title.uppercase().ifBlank { "NEXT" }
         val zoom = 1f + 0.05f * k.clamp01(t / max(1f, d))
         c.save(); c.scale(zoom, zoom, k.cx, k.cy)
@@ -194,24 +190,6 @@ object Templates {
         val p = k.clamp01((t + 0.4f) / (d + 0.8f))
         val e = k.inOutCubic(p) * 0.4f + p * 0.6f
         k.rect.set(0f, 0f, k.w.toFloat(), k.h.toFloat())
-        if (k.story) {
-            // slow, calm camera: push in towards a point of interest, pull back, or drift across
-            val fx = (r.nextFloat() - 0.5f) * 1.4f; val fy = (r.nextFloat() - 0.5f) * 1.0f
-            when (r.nextInt(5)) {
-                0 -> k.cover(c, bmp, k.rect, k.lerp(1.04f, 1.2f, e), fx * e, fy * e)
-                1 -> k.cover(c, bmp, k.rect, k.lerp(1.2f, 1.04f, e), fx * (1 - e), fy * (1 - e))
-                2 -> k.cover(c, bmp, k.rect, 1.14f, k.lerp(-0.8f, 0.8f, e), fy * 0.3f)
-                3 -> k.cover(c, bmp, k.rect, 1.14f, k.lerp(0.8f, -0.8f, e), fy * 0.3f)
-                else -> k.cover(c, bmp, k.rect, k.lerp(1.08f, 1.16f, e), 0f, k.lerp(0.7f, -0.7f, e))
-            }
-            if (r.nextInt(4) == 0) { // warm light drifting over the scene
-                val x = k.lerp(-k.w * 0.3f, k.w * 1.3f, p)
-                k.fill.shader = RadialGradient(x, k.h * 0.15f, k.w * 0.5f, intArrayOf(k.alpha(k.theme.accent2, 0.16f), 0), null, Shader.TileMode.CLAMP)
-                c.drawRect(0f, 0f, k.w.toFloat(), k.h.toFloat(), k.fill); k.fill.shader = null
-            }
-            k.subtitle(c, s.title, t, d)
-            return
-        }
         when (r.nextInt(6)) {
             0 -> k.cover(c, bmp, k.rect, k.lerp(1.06f, 1.28f, e))
             1 -> k.cover(c, bmp, k.rect, k.lerp(1.3f, 1.06f, e))
@@ -244,7 +222,7 @@ object Templates {
             val x = if (right) 44f * k.u else k.w - k.w * 0.42f
             val maxW = k.w * 0.40f
             val bottom = k.banner(c, s.title, x, 54f * k.u, maxW, 34f * k.u, k.seg(t, 0f, 0.4f))
-            body(k, c, s, t, d, x, bottom + 34f * k.u, maxW, 30f * k.u)
+            body(k, c, s, t, d, x, bottom + 34f * k.u, maxW, 24f * k.u)
         } else {
             k.rect.set(0f, 0f, k.w.toFloat(), k.h * 0.56f)
             k.cover(c, bmp, k.rect, zoom)
@@ -730,7 +708,6 @@ object Templates {
         c.drawColor(0x77000000)
         val title = s.title.ifBlank { s.emphasis.firstOrNull()?.uppercase() ?: "" }
         if (title.isBlank()) return
-        if (k.story) { storyHeadline(k, c, title, t); return }
         val tf = if (r.nextBoolean()) k.fonts.condensed else k.fonts.headline
         val size = k.fitSize(title, tf, k.w * 0.86f, if (k.portrait) 150f * k.u else 170f * k.u)
         val p = k.seg(t, 0f, 0.7f)
@@ -748,29 +725,6 @@ object Templates {
             k.text.clearShadowLayer()
         }
         k.text.letterSpacing = 0f; k.text.style = Paint.Style.FILL
-    }
-
-    /** Big two-line title over a darkened picture, rising softly (used for the hook and short lines). */
-    private fun storyHeadline(k: Kit, c: Canvas, title: String, t: Float) {
-        k.fadeEdgeV(c, k.h.toFloat(), k.h * 0.35f, 0xCC000000.toInt())
-        val maxW = k.w * 0.84f
-        k.setText(k.fonts.headline, 90f * k.u, Color.WHITE, title)
-        val lines = k.wrap(title, maxW).take(2)
-        val size = min(if (k.portrait) 92f * k.u else 86f * k.u, lines.minOf { k.fitSize(it, k.fonts.headline, maxW, 86f * k.u) })
-        val lh = size * 1.08f
-        val base = (if (k.portrait) k.h * 0.72f else k.h * 0.8f) - (lines.size - 1) * lh
-        lines.forEachIndexed { i, l ->
-            val p = k.outCubic(k.seg(t, 0.15f + i * 0.18f, 0.7f + i * 0.18f))
-            k.setText(k.fonts.headline, size, if (i == lines.lastIndex) k.theme.accent else Color.WHITE, l)
-            k.text.textAlign = Paint.Align.CENTER
-            k.text.alpha = (255 * p).toInt()
-            k.text.setShadowLayer(14f * k.u, 0f, 4f * k.u, 0xDD000000.toInt())
-            c.drawText(l, k.cx, base + i * lh + (1f - p) * 30f * k.u, k.text)
-        }
-        k.text.clearShadowLayer()
-        val lp = k.outCubic(k.seg(t, 0.6f, 1.2f))
-        k.fill.color = k.theme.accent
-        c.drawRect(k.cx - 60f * k.u * lp, base + (lines.size - 1) * lh + size * 0.35f, k.cx + 60f * k.u * lp, base + (lines.size - 1) * lh + size * 0.35f + 5f * k.u, k.fill)
     }
 
     // ------------------------------------------------------------------ PHONE MOCKUP
@@ -804,7 +758,7 @@ object Templates {
         } else {
             val x = k.w * 0.52f
             val bottom = k.banner(c, s.title, x, k.h * 0.18f, k.w * 0.42f, 34f * k.u, k.seg(t, 0.2f, 0.6f))
-            body(k, c, s, t, d, x, bottom + 40f * k.u, k.w * 0.42f, 30f * k.u)
+            body(k, c, s, t, d, x, bottom + 40f * k.u, k.w * 0.42f, 25f * k.u)
         }
     }
 

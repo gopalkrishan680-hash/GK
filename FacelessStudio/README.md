@@ -17,9 +17,7 @@ the app does the rest: scenes, animations, transitions, captions, music ducking,
      **Share → Faceless Studio** (or Copy → Paste image) → the app cuts it into panels and puts each panel on its own scene,
      then selects the next card. Missing scenes fall back to text animations.
    - Or use your own ready-made images.
-4. **Style** – **Video type**: *Story* (default – full-screen cinematic pictures with slow camera moves, real subtitle
-   lines, names popping up, letterbox, soft fades / dip-to-black, the hook opens on a picture) or *Explainer* (infographics:
-   charts, lists, checklists, phone mockups, banners). Then size (YouTube 16:9 / Shorts 9:16 / Square), color theme, editing speed, captions, SFX, grain, channel handle.
+4. **Style** – size (YouTube 16:9 / Shorts 9:16 / Square), color theme, editing speed, captions, SFX, grain, channel handle.
 
 Tap **Generate Video** → the editor opens → preview it → **Export** (720p / 1080p, renders in the background,
 the video is saved to `Movies/FacelessStudio`).

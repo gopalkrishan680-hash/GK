@@ -164,54 +164,6 @@ object ScriptAnalyzer {
             .distinctBy { it.lowercase() }.take(max)
     }
 
-    /**
-     * A readable on-screen phrase taken *as is* from the line (no word salad):
-     * the whole line if short, otherwise the most meaningful run of consecutive words.
-     */
-    fun phrase(text: String, maxWords: Int): String {
-        val words = text.replace(Regex("[\"“”*]"), "").replace(Regex("\\[[a-zA-Z]+]"), "")
-            .trim().trimEnd('.', '!', '?', ',', '।', ';', ':').split(Regex("\\s+")).filter { it.isNotBlank() }
-        if (words.size <= maxWords) return words.joinToString(" ")
-        fun score(w: String): Float {
-            val c = cleanWord(w)
-            if (c.isEmpty() || c.lowercase() in STOP) return 0.3f
-            var s = c.length.toFloat()
-            if (c.first().isUpperCase()) s += 5
-            if (c.any { it.isDigit() }) s += 4
-            return s
-        }
-        var best = 0; var bestS = -1f
-        for (i in 0..words.size - maxWords) {
-            var s = 0f
-            for (j in i until i + maxWords) s += score(words[j])
-            // phrases that start at a clause boundary read better
-            if (i == 0 || words[i - 1].endsWith(",")) s += 3
-            if (s > bestS) { bestS = s; best = i }
-        }
-        var win = words.subList(best, best + maxWords)
-        while (win.size > 2 && cleanWord(win.last()).lowercase() in STOP) win = win.dropLast(1)
-        return win.joinToString(" ").trimEnd(',', ';')
-    }
-
-    /** Names worth popping on screen: characters from the character sheet + capitalised words that recur in the script. */
-    fun storyNames(script: String, characters: String): Set<String> {
-        val out = HashSet<String>()
-        characters.lines().map { it.substringBefore(':').trim() }.filter { it.isNotBlank() }.forEach { n ->
-            n.split(Regex("[\\s/,]+")).map { cleanWord(it).lowercase() }.filter { it.length > 2 }.forEach { out += it }
-        }
-        val counts = HashMap<String, Int>()
-        Regex("(?<![.!?।]\\s)(?<!^)\\b([A-Z][a-z]{2,}(?:-[a-z]+)?)").findAll(script).forEach { m ->
-            val w = m.groupValues[1].lowercase()
-            if (w !in STOP) counts[w] = (counts[w] ?: 0) + 1
-        }
-        counts.filter { it.value >= 2 }.keys.forEach { out += it }
-        return out
-    }
-
-    fun storyEmphasis(text: String, names: Set<String>): List<String> =
-        text.split(Regex("\\s+")).map { cleanWord(it) }.filter { it.lowercase() in names || (it.contains('-') && it.length > 5) }
-            .distinctBy { it.lowercase() }.take(2)
-
     fun headline(text: String, maxWords: Int = 3): String {
         val kw = keywords(text, maxWords).toSet()
         // keep original order of keywords so the headline reads naturally
