@@ -140,6 +140,11 @@ object ScriptAnalyzer {
         "liye", "par", "pe", "hum", "aap", "tum", "unka", "uska", "iska", "jo", "jab", "tab", "kaise", "kyun",
         "kyunki", "isliye", "lekin", "agar", "sab", "kuch", "bahut", "very", "really", "about", "into", "from",
         "also", "all", "some", "more", "most", "been", "being", "its", "it's", "let's", "lets",
+        "jabki", "magar", "phir", "fir", "waise", "wahi", "yahi", "abhi", "aaj", "kal", "sirf", "bas", "kaafi", "jaise",
+        "gaya", "gayi", "gaye", "raha", "rahi", "rahe", "karna", "karne", "karti", "sakte", "sakta", "sakti", "milti",
+        "milta", "milte", "dikhta", "dikhti", "dikhte", "hota", "hoti", "aata", "aati", "aate", "jaata", "jaati", "jata",
+        "jati", "padho", "padhte", "dekha", "dekho", "kaha", "bana", "bani", "aaya", "aayi", "laga", "lagta", "rakhti",
+        "rakhta", "batati", "batata", "unke", "inke", "uske", "iske", "apne", "apni", "logon", "log", "wala", "wali", "wale",
     )
 
     fun cleanWord(w: String) = w.trim { !it.isLetterOrDigit() && it != '%' && it != '₹' && it != '$' }
@@ -255,9 +260,62 @@ object ScriptAnalyzer {
         return Pair(headline(a, 2), headline(b, 3))
     }
 
-    /** Ready-to-paste prompt for any AI image generator, one per scene. */
-    fun imagePrompt(sceneText: String, style: String, ratio: String): String {
-        val kw = keywords(sceneText, 5).joinToString(", ")
-        return "$style, $kw, cinematic lighting, dramatic shadows, high detail, aspect ratio $ratio, no text"
+    /** "50%" / "50 percent" -> 50 */
+    fun detectPercent(text: String): Pair<Float, String>? {
+        val m = Regex("(\\d{1,3}(?:\\.\\d+)?)\\s?(%|percent|pratishat)", RegexOption.IGNORE_CASE).find(text) ?: return null
+        val v = m.groupValues[1].toFloatOrNull() ?: return null
+        if (v <= 0f || v > 100f) return null
+        val rest = text.substring(0, m.range.first) + " " + text.substring(m.range.last + 1)
+        return Pair(v, headline(rest, 4))
+    }
+
+    private val UNITS = setOf("crore", "lakh", "million", "billion", "thousand", "hazaar", "hazar", "k", "percent", "rupees",
+        "rupaye", "dollars", "people", "users", "saal", "years", "km", "kg")
+
+    /** Two or more numbers in one line -> labelled bars ("India 140 crore, China 141 crore"). */
+    fun detectNumbers(original: String): List<Pair<String, Double>>? {
+        val text = listOf(DATE_FULL, DATE_MY, TIME, YEAR).fold(original) { acc, r -> r.replace(acc) { " ".repeat(it.value.length) } }
+        val ms = Regex("(\\d{1,3}(?:,\\d{2,3})+|\\d+(?:\\.\\d+)?)").findAll(text).toList()
+        if (ms.size < 2 || ms.size > 5) return null
+        val out = ms.mapIndexed { i, m ->
+            val v = m.value.replace(",", "").toDoubleOrNull() ?: return null
+            val from = if (i == 0) 0 else ms[i - 1].range.last + 1
+            val before = text.substring(from, m.range.first).split(Regex("\\s+")).map { cleanWord(it) }
+                .filter { it.isNotEmpty() && it.lowercase() !in STOP && it.lowercase() !in UNITS }.takeLast(2).joinToString(" ")
+            Pair(before.ifBlank { "#${i + 1}" }.uppercase(), v)
+        }
+        if (out.all { it.second == out[0].second }) return null
+        return out
+    }
+
+    /** Two or more years -> timeline points with a short label after each year. */
+    fun detectYears(text: String): List<Pair<String, String>>? {
+        val ms = YEAR.findAll(text).toList()
+        if (ms.size < 2) return null
+        // label = the words just before each year ("Internet 1983", "Google 1998 me aaya")
+        return ms.take(5).mapIndexed { i, m ->
+            val from = if (i == 0) 0 else ms[i - 1].range.last + 1
+            val before = text.substring(from, m.range.first).split(Regex("\\s+")).map { cleanWord(it) }
+                .filter { it.isNotEmpty() && it.lowercase() !in STOP }.takeLast(2).joinToString(" ")
+            Pair(m.value, before)
+        }
+    }
+
+    /**
+     * Ready-to-paste prompt for any AI image generator. Always names the subject (topic + what this line says),
+     * so the image tool never has to ask "what should I draw?".
+     */
+    fun imagePrompt(sceneText: String, style: String, ratio: String, topic: String = "", chapter: String = ""): String {
+        val scene = sceneText.replace(Regex("\\[[a-zA-Z]+]"), "").replace("*", "").trim().trimEnd('.', '!', '?')
+        val kw = keywords(sceneText, 4).joinToString(", ")
+        val ctx = listOf(topic, chapter).filter { it.isNotBlank() }.distinct().joinToString(" – ")
+        return buildString {
+            append(style)
+            if (ctx.isNotBlank()) append(" about \"").append(ctx).append("\"")
+            append(". Scene that visually shows: \"").append(scene).append("\"")
+            if (kw.isNotBlank()) append(". Main subjects: ").append(kw)
+            append(". Cinematic lighting, dramatic shadows, rich detail, faceless storytelling visual, aspect ratio ")
+            append(ratio).append(", no text, no letters, no watermark")
+        }
     }
 }

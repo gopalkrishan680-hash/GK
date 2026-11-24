@@ -40,6 +40,10 @@ object Templates {
             SceneType.PHONE -> phone(k, c, s, t, d)
             SceneType.SPOTLIGHT -> spotlight(k, c, s, t, d)
             SceneType.OUTRO -> outro(k, c, s, t, d)
+            SceneType.DONUT -> InfoTemplates.donut(k, c, s, t, d)
+            SceneType.BAR_CHART -> InfoTemplates.barChart(k, c, s, t, d)
+            SceneType.TIMELINE -> InfoTemplates.timeline(k, c, s, t, d)
+            SceneType.KEY_POINTS -> InfoTemplates.keyPoints(k, c, s, t, d)
         }
     }
 
@@ -199,9 +203,8 @@ object Templates {
             k.fill.shader = RadialGradient(x, k.h * 0.2f, k.w * 0.45f, intArrayOf(k.alpha(k.theme.accent, 0.22f), 0), null, Shader.TileMode.CLAMP)
             c.drawRect(0f, 0f, k.w.toFloat(), k.h.toFloat(), k.fill); k.fill.shader = null
         }
-        if (r.nextInt(3) == 0 && s.emphasis.isNotEmpty()) {
-            k.banner(c, s.emphasis.first().uppercase(), 40f * k.u, 40f * k.u, k.w * 0.6f, 30f * k.u, k.seg(t, 0.15f, 0.55f))
-        }
+        // every image scene also carries information, not only captions
+        InfoTemplates.infoLayer(k, c, s, t, d, r.nextInt(4))
     }
 
     // ------------------------------------------------------------------ IMAGE + BANNER
@@ -693,6 +696,7 @@ object Templates {
             c.restore()
         }
         c.restore()
+        if (s.title.isNotBlank()) k.banner(c, s.title, 40f * k.u, 40f * k.u, k.w * 0.6f, 30f * k.u, k.seg(t, 0.6f, 1f))
     }
 
     // ------------------------------------------------------------------ HEADLINE ON IMAGE

@@ -37,6 +37,9 @@ class RenderTest {
         Quora vs Reddit
         Log smoke karte hain: peer pressure, stress relief aur advertising.
         Research is fun
+        Aaj 65% log news sirf social media se padhte hain.
+        India me 140 crore log hain jabki China me 141 crore.
+        Internet 1983 me bana, Google 1998 me aaya aur YouTube 2005 me launch hua.
         Article padho kyunki usse more knowledge milti hai.
         Steve Jobs ne kaha tha "Stay hungry, stay foolish" aur ye line famous ho gayi.
         [note] Intro ke baad main content aata hai aur phir conclusion.
@@ -67,6 +70,10 @@ class RenderTest {
         assertTrue(SceneType.BIG_STAT in types)
         assertTrue(SceneType.VERSUS in types)
         assertTrue(SceneType.MINDMAP in types)
+        assertTrue(SceneType.DONUT in types)
+        assertTrue(SceneType.BAR_CHART in types)
+        assertTrue(SceneType.TIMELINE in types)
+        println("PROMPT: " + ScriptAnalyzer.imagePrompt("Ye internet ka wo hissa hai jo Google par nahi dikhta.", "Cinematic realistic photo", "16:9", "Dark Web", "Intro"))
         // scenes are contiguous
         p.scenes.zipWithNext().forEach { (x, y) -> assertEquals(x.endMs, y.startMs) }
     }

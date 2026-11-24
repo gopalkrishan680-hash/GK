@@ -210,7 +210,11 @@ class FrameRenderer(
 
     private fun overlays(c: Canvas, s: Scene, tMs: Long) {
         c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), vignette)
-        if (p.captions && !s.type.showsOwnText) captions(c, s, tMs)
+        if (!s.type.showsOwnText) when (p.captionMode) {
+            com.gk.facelessstudio.model.CaptionMode.FULL -> captions(c, s, tMs)
+            com.gk.facelessstudio.model.CaptionMode.KEYWORDS -> keywordPops(c, s, tMs)
+            com.gk.facelessstudio.model.CaptionMode.OFF -> {}
+        }
         if (p.grain) {
             val r = Random(tMs / 42)
             grainPaint.shader.setLocalMatrix(android.graphics.Matrix().apply { setTranslate(r.nextFloat() * 128, r.nextFloat() * 128); postScale(k.u * 1.5f, k.u * 1.5f) })
@@ -230,6 +234,43 @@ class FrameRenderer(
             k.setText(k.fonts.bold, 18f * k.u, k.alpha(Color.WHITE, 0.55f), handle)
             k.text.textAlign = Paint.Align.RIGHT
             c.drawText(handle, w - 24f * k.u, 38f * k.u, k.text)
+        }
+    }
+
+    /** Only the key words pop up when they are spoken – keeps the screen for the visuals. */
+    private fun keywordPops(c: Canvas, s: Scene, tMs: Long) {
+        val words = s.text.split(Regex("\\s+")).filter { it.isNotBlank() }
+        if (words.isEmpty() || s.emphasis.isEmpty()) return
+        val t = (tMs - s.startMs) / 1000f
+        val d = s.durationMs / 1000f * 0.95f
+        val weights = words.map { it.length + 2f }
+        val total = weights.sum()
+        val starts = FloatArray(words.size).also { var a = 0f; for (i in words.indices) { it[i] = a / total * d; a += weights[i] } }
+        val em = s.emphasis.map { it.lowercase() }
+        val hits = words.indices.filter { ScriptAnalyzer.cleanWord(words[it]).lowercase() in em }.distinctBy { ScriptAnalyzer.cleanWord(words[it]).lowercase() }
+        for ((n, wi) in hits.withIndex()) {
+            val st = starts[wi]
+            val life = 1.6f
+            if (t < st || t > st + life) continue
+            val pin = k.outBack(k.seg(t, st, st + 0.2f))
+            val pout = k.seg(t, st + life - 0.2f, st + life)
+            val word = ScriptAnalyzer.cleanWord(words[wi]).uppercase()
+            val size = (if (k.portrait) 54f else 44f) * k.u
+            k.setText(k.fonts.headline, size, 0xFF0A0A0A.toInt(), word)
+            val tw = k.text.measureText(word)
+            val x = k.cx + (if (n % 2 == 0) -1 else 1) * (if (k.portrait) 0f else w * 0.12f)
+            val y = if (k.portrait) h * 0.76f else h * 0.84f
+            c.save()
+            val sc = pin * (1f - pout * 0.3f)
+            c.scale(sc, sc, x, y); c.rotate(if (n % 2 == 0) -3f else 3f, x, y)
+            k.fill.color = k.alpha(if (n % 2 == 0) k.theme.accent else k.theme.accent2, 1f - pout)
+            k.rect.set(x - tw / 2 - 22f * k.u, y - size * 0.95f, x + tw / 2 + 22f * k.u, y + size * 0.35f)
+            c.drawRoundRect(k.rect, 12f * k.u, 12f * k.u, k.fill)
+            k.text.textAlign = Paint.Align.CENTER
+            k.text.color = if (n % 2 == 0) 0xFF0A0A0A.toInt() else Color.WHITE
+            k.text.alpha = (255 * (1f - pout)).toInt()
+            c.drawText(word, x, y, k.text)
+            c.restore()
         }
     }
 

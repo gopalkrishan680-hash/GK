@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.gk.facelessstudio.data.Repository
+import com.gk.facelessstudio.engine.AiImages
 import com.gk.facelessstudio.engine.AudioDecoder
 import com.gk.facelessstudio.engine.Director
 import com.gk.facelessstudio.engine.ScriptAnalyzer
@@ -75,7 +76,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setAspect(v: Aspect) = update { it.copy(aspect = v) }
     fun setTheme(v: String) = update { it.copy(themeId = v) }
     fun setPacing(v: Pacing) = update { it.copy(pacing = v) }
-    fun setCaptions(v: Boolean) = update { it.copy(captions = v) }
+    fun setCaptionMode(v: com.gk.facelessstudio.model.CaptionMode) = update { it.copy(captionMode = v) }
     fun setSfx(v: Boolean) = update { it.copy(sfx = v) }
     fun setGrain(v: Boolean) = update { it.copy(grain = v) }
     fun setProgressBar(v: Boolean) = update { it.copy(progressBar = v) }
@@ -106,13 +107,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (uris.isEmpty()) return@launch
         _busy.value = "Adding images…"
         val paths = withContext(Dispatchers.IO) { uris.mapNotNull { repo.import(_project.value.id, it, "img")?.first } }
-        update { it.copy(images = it.images + paths) }
+        update { it.copy(images = it.images + paths, lineImages = false) }
         _busy.value = null
     }
 
     fun removeImage(i: Int) = update { p ->
         p.images.getOrNull(i)?.let { File(it).delete() }
-        p.copy(images = p.images.filterIndexed { idx, _ -> idx != i })
+        p.copy(images = p.images.filterIndexed { idx, _ -> idx != i }, lineImages = false)
     }
 
     fun moveImage(i: Int, delta: Int) = update { p ->
@@ -178,6 +179,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             SceneType.SPLIT_ARROW -> lines = (ScriptAnalyzer.detectCause(s.text)?.toList() ?: ScriptAnalyzer.keywords(s.text, 2)).map { it.uppercase() }
             SceneType.CHAPTER -> title = p.chapters.getOrNull(s.chapterIndex) ?: ScriptAnalyzer.headline(s.text, 3)
             SceneType.OUTRO -> title = p.handle
+            SceneType.DONUT -> ScriptAnalyzer.detectPercent(s.text)?.let { lines = listOf(it.first.toString()); title = it.second }
+                ?: run { _toast.value = "No percentage found in this line"; return@update p }
+            SceneType.BAR_CHART -> ScriptAnalyzer.detectNumbers(s.text)?.let { n -> lines = n.map { "${it.first}|${it.second}" }; title = ScriptAnalyzer.headline(s.text, 4) }
+                ?: run { _toast.value = "This line needs at least two numbers"; return@update p }
+            SceneType.TIMELINE -> ScriptAnalyzer.detectYears(s.text)?.let { y -> lines = y.map { "${it.first}|${it.second}" } }
+                ?: run { _toast.value = "This line needs at least two years"; return@update p }
+            SceneType.KEY_POINTS -> { title = ScriptAnalyzer.headline(s.text, 4); lines = ScriptAnalyzer.keywords(s.text, 3).map { it.replaceFirstChar { c -> c.uppercase() } } }
+            SceneType.KEN_BURNS, SceneType.POLAROID -> title = ScriptAnalyzer.headline(s.text, 4)
             else -> title = if (title.isBlank()) ScriptAnalyzer.headline(s.text, if (t == SceneType.HEADLINE_IMAGE) 2 else 4) else title
         }
         if (t.needsImage && p.images.isEmpty()) { _toast.value = "This layout needs an image"; return@update p }
@@ -202,9 +211,115 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun imagePrompts(style: String): List<Pair<String, String>> {
         val p = _project.value
-        val chunks = ScriptAnalyzer.analyze(p.script, (p.pacing.maxSceneSec * 2.5f).toInt()).chunks
-        val ratio = p.aspect.sub
-        return chunks.map { it.text to ScriptAnalyzer.imagePrompt(it.text, style, ratio) }
+        val a = Director.analysisFor(p)
+        val topic = p.title.ifBlank { a.chapters.firstOrNull() ?: "" }
+        return a.chunks.map { it.text to ScriptAnalyzer.imagePrompt(it.text, style, p.aspect.sub, topic, a.chapters.getOrNull(it.chapterIndex) ?: "") }
+    }
+
+    // ---------------- AI image generation ----------------
+
+    data class AiProgress(val done: Int, val total: Int, val message: String)
+    private val _ai = MutableStateFlow<AiProgress?>(null)
+    val ai: StateFlow<AiProgress?> = _ai
+    private var aiJob: kotlinx.coroutines.Job? = null
+
+    fun cancelAi() { aiJob?.cancel(); _ai.value = null }
+
+    private fun imageSize(p: Project) = when (p.aspect) {
+        com.gk.facelessstudio.model.Aspect.LANDSCAPE -> 1280 to 720
+        com.gk.facelessstudio.model.Aspect.PORTRAIT -> 720 to 1280
+        com.gk.facelessstudio.model.Aspect.SQUARE -> 1024 to 1024
+    }
+
+    /** Makes one picture for every line of the script, so each scene shows exactly what is being said. */
+    fun generateAiImages(style: String) {
+        if (aiJob?.isActive == true) return
+        val p0 = _project.value
+        if (p0.script.isBlank()) { _toast.value = "Write your script first"; return }
+        aiJob = viewModelScope.launch {
+            val a = Director.analysisFor(p0)
+            val step = kotlin.math.ceil(a.chunks.size / 60.0).toInt().coerceAtLeast(1)
+            val pieces = a.chunks.chunked(step)
+            val total = pieces.size
+            val topic = p0.title.ifBlank { a.chapters.firstOrNull() ?: "" }
+            _ai.value = AiProgress(0, total, "Writing image prompts from your script…")
+            val lines = pieces.map { g -> g.joinToString(" ") { it.text } }
+            val prompts = withContext(Dispatchers.IO) {
+                lines.chunked(12).flatMapIndexed { bi, batch ->
+                    val enhanced = AiImages.enhancePrompts(batch, topic, style)
+                    batch.mapIndexed { j, line ->
+                        val chunk = pieces[bi * 12 + j].first()
+                        enhanced?.getOrNull(j)?.let { AiImages.finalPrompt(it, style, p0.aspect.sub) }
+                            ?: ScriptAnalyzer.imagePrompt(line, style, p0.aspect.sub, topic, a.chapters.getOrNull(chunk.chapterIndex) ?: "")
+                    }
+                }
+            }
+            withContext(Dispatchers.IO) { File(repo.dir(p0.id), "prompts.txt").writeText(prompts.joinToString("\n")) }
+            val (w, h) = imageSize(p0)
+            val results = arrayOfNulls<String>(total)
+            val done = java.util.concurrent.atomic.AtomicInteger(0)
+            val gate = kotlinx.coroutines.sync.Semaphore(2)
+            kotlinx.coroutines.coroutineScope {
+                prompts.forEachIndexed { i, prompt ->
+                    launch(Dispatchers.IO) {
+                        gate.acquire()
+                        try {
+                            val f = File(repo.dir(p0.id), "ai_${System.nanoTime()}_$i.jpg")
+                            if (AiImages.generate(prompt, w, h, (p0.seed % 100000).toInt() + i, f)) results[i] = f.absolutePath
+                        } finally { gate.release() }
+                        val n = done.incrementAndGet()
+                        _ai.value = AiProgress(n, total, "Generating image $n of $total…")
+                    }
+                }
+            }
+            val ok = results.count { it != null }
+            if (ok == 0) {
+                _ai.value = null
+                _toast.value = "Could not reach the AI image service. Check your internet and try again."
+                return@launch
+            }
+            // fill any failed slot with its nearest neighbour so line->image mapping stays aligned
+            val filled = results.indices.map { i -> results[i] ?: results.indices.sortedBy { kotlin.math.abs(it - i) }.firstNotNullOf { results[it] } }
+            update { it.copy(images = filled, lineImages = true, imageStep = step) }
+            if (_project.value.scenes.isNotEmpty()) {
+                val voice = analyzeVoice()
+                _project.value = withContext(Dispatchers.Default) { Director.build(_project.value, voice) }
+                persist()
+            }
+            _ai.value = null
+            _toast.value = if (ok == total) "$total images ready ✅" else "$ok of $total images ready (others reused nearby images)"
+        }
+    }
+
+    /** New AI picture for one scene (fresh seed), keeping everything else. */
+    fun regenerateSceneImage(i: Int, style: String = "Cinematic realistic photo") {
+        val p0 = _project.value
+        val s = p0.scenes.getOrNull(i) ?: return
+        if (aiJob?.isActive == true) return
+        aiJob = viewModelScope.launch {
+            _ai.value = AiProgress(0, 1, "Generating a new image for this scene…")
+            val topic = p0.title.ifBlank { p0.chapters.firstOrNull() ?: "" }
+            val prompt = withContext(Dispatchers.IO) {
+                AiImages.enhancePrompts(listOf(s.text), topic, style)?.firstOrNull()?.let { AiImages.finalPrompt(it, style, p0.aspect.sub) }
+                    ?: ScriptAnalyzer.imagePrompt(s.text, style, p0.aspect.sub, topic, p0.chapters.getOrNull(s.chapterIndex) ?: "")
+            }
+            val (w, h) = imageSize(p0)
+            val f = File(repo.dir(p0.id), "ai_${System.nanoTime()}.jpg")
+            val ok = withContext(Dispatchers.IO) { AiImages.generate(prompt, w, h, (System.nanoTime() % 100000).toInt(), f) }
+            _ai.value = null
+            if (!ok) { _toast.value = "Could not reach the AI image service"; return@launch }
+            update { p ->
+                val idx = p.scenes[i].imageIndex
+                if (idx in p.images.indices) {
+                    // replace in place so the line->image mapping (and Shuffle) keeps the new picture
+                    p.copy(images = p.images.toMutableList().also { it[idx] = f.absolutePath })
+                } else {
+                    val imgs = p.images + f.absolutePath
+                    val l = p.scenes.toMutableList(); l[i] = l[i].copy(imageIndex = imgs.lastIndex)
+                    p.copy(images = imgs, scenes = l)
+                }
+            }
+        }
     }
 
     fun srt(): String {

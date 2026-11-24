@@ -28,9 +28,13 @@ object Director {
     const val OUTRO_MS = 3500L
     private const val WORDS_PER_SEC = 2.5f
 
+    fun maxWords(project: Project) = (project.pacing.maxSceneSec * WORDS_PER_SEC).toInt().coerceAtLeast(5)
+
+    /** The spoken pieces exactly as [build] will cut them (used to make one AI image per piece). */
+    fun analysisFor(project: Project) = ScriptAnalyzer.analyze(project.script, maxWords(project))
+
     fun build(project: Project, voice: VoiceInfo?): Project {
-        val maxWords = (project.pacing.maxSceneSec * WORDS_PER_SEC).toInt().coerceAtLeast(5)
-        val analysis = ScriptAnalyzer.analyze(project.script, maxWords)
+        val analysis = analysisFor(project)
         if (analysis.chunks.isEmpty()) return project.copy(scenes = emptyList(), durationMs = 0, chapters = analysis.chapters)
 
         val rnd = Random(project.seed)
@@ -48,7 +52,12 @@ object Director {
             val text = g.chunks.joinToString(" ") { it.text }
             val chapter = first.chapterIndex
             val mid = (g.start + g.end) / 2
-            val imageIdx = if (images == 0) -1 else min(images - 1, (mid.toDouble() / max(1, total) * images).toInt())
+            val imageIdx = when {
+                images == 0 -> -1
+                // images were generated one per script line -> each scene gets the picture made for its own words
+                project.lineImages -> min(images - 1, g.startIdx / project.imageStep.coerceAtLeast(1))
+                else -> min(images - 1, (mid.toDouble() / max(1, total) * images).toInt())
+            }
 
             var type: SceneType
             var lines: List<String> = emptyList()
@@ -62,6 +71,9 @@ object Director {
             val vs = ScriptAnalyzer.detectVersus(text)
             val quote = ScriptAnalyzer.detectQuote(text)
             val cause = ScriptAnalyzer.detectCause(text)
+            val percent = ScriptAnalyzer.detectPercent(text)
+            val numbers = ScriptAnalyzer.detectNumbers(text)
+            val years = ScriptAnalyzer.detectYears(text)
 
             type = when {
                 forced != null -> forced
@@ -71,11 +83,14 @@ object Director {
                 vs != null -> SceneType.VERSUS
                 quote != null -> SceneType.QUOTE
                 list != null -> SceneType.MINDMAP
+                years != null -> SceneType.TIMELINE
+                percent != null && history.lastOrNull() != SceneType.DONUT -> SceneType.DONUT
+                numbers != null && history.lastOrNull() != SceneType.BAR_CHART -> SceneType.BAR_CHART
                 stat != null && history.lastOrNull() != SceneType.BIG_STAT -> SceneType.BIG_STAT
                 date != null && history.lastOrNull() != SceneType.DATE_STAMP -> SceneType.DATE_STAMP
                 cause != null && rnd.nextFloat() < 0.55f -> SceneType.SPLIT_ARROW
                 first.words.size <= 4 -> if (rnd.nextFloat() < 0.75f) SceneType.KINETIC else SceneType.SPOTLIGHT
-                else -> pickGeneric(rnd, history, images > 0, images.toFloat() / max(1, groups.size))
+                else -> pickGeneric(rnd, history, images > 0, if (project.lineImages) 1f else images.toFloat() / max(1, groups.size))
             }
             if (type.needsImage && imageIdx < 0) type = pickGeneric(rnd, history, false, 0f)
 
@@ -107,6 +122,26 @@ object Director {
                     lines = listOf(p.first.uppercase(), p.second.uppercase())
                 }
                 SceneType.QUOTE -> lines = listOf(quote ?: text)
+                SceneType.DONUT -> {
+                    val pc = percent ?: ScriptAnalyzer.detectPercent(text)
+                    if (pc != null) { lines = listOf(pc.first.toString()); title = pc.second } else type = SceneType.KEY_POINTS
+                }
+                SceneType.BAR_CHART -> {
+                    val n = numbers ?: ScriptAnalyzer.detectNumbers(text)
+                    if (n != null) { lines = n.map { "${it.first}|${it.second}" }; title = ScriptAnalyzer.headline(text, 4) } else type = SceneType.KEY_POINTS
+                }
+                SceneType.TIMELINE -> {
+                    val y = years ?: ScriptAnalyzer.detectYears(text)
+                    if (y != null) { lines = y.map { "${it.first}|${it.second}" }; title = analysis.chapters.getOrNull(chapter)?.uppercase() ?: "" } else type = SceneType.KEY_POINTS
+                }
+                else -> {}
+            }
+            when (type) {
+                SceneType.KEY_POINTS -> {
+                    title = ScriptAnalyzer.headline(text, 4)
+                    lines = ScriptAnalyzer.keywords(text, 3).map { it.replaceFirstChar { c -> c.uppercase() } }
+                }
+                SceneType.KEN_BURNS, SceneType.POLAROID -> title = ScriptAnalyzer.headline(text, 4)
                 SceneType.SPLIT_ARROW -> {
                     val c = cause ?: ScriptAnalyzer.keywords(text, 2).let { Pair(it.getOrElse(0) { "" }, it.getOrElse(1) { "" }) }
                     lines = listOf(c.first.uppercase(), c.second.uppercase())
@@ -171,14 +206,14 @@ object Director {
 
     private val IMAGE_POOL = listOf(
         SceneType.KEN_BURNS to 5f, SceneType.IMAGE_BANNER to 2.5f, SceneType.HEADLINE_IMAGE to 2f,
-        SceneType.POLAROID to 1.2f, SceneType.PHONE to 1.2f, SceneType.DATE_STAMP to 0f,
+        SceneType.POLAROID to 1.2f, SceneType.PHONE to 1.2f, SceneType.KEY_POINTS to 2f,
     )
     private val TEXT_POOL = listOf(
-        SceneType.KINETIC to 3f, SceneType.SPOTLIGHT to 2.5f, SceneType.PAPER_NOTE to 1.8f,
+        SceneType.KINETIC to 2.5f, SceneType.SPOTLIGHT to 2f, SceneType.PAPER_NOTE to 1.8f, SceneType.KEY_POINTS to 2f,
     )
 
     private fun pickGeneric(rnd: Random, history: ArrayDeque<SceneType>, hasImages: Boolean, imageRatio: Float): SceneType {
-        val imgChance = if (!hasImages) 0f else (0.45f + imageRatio * 0.5f).coerceIn(0.5f, 0.85f)
+        val imgChance = if (!hasImages) 0f else (0.6f + imageRatio * 0.4f).coerceIn(0.65f, 0.9f)
         val lastTwoText = history.takeLast(2).let { it.size == 2 && it.none { t -> t.needsImage } }
         val useImage = hasImages && (lastTwoText || rnd.nextFloat() < imgChance)
         val pool = if (useImage) IMAGE_POOL else TEXT_POOL
@@ -255,7 +290,7 @@ object Director {
         return (0 until chunks.size).map { Pair(bounds[it], bounds[it + 1]) }
     }
 
-    private class Group(val chunks: List<Chunk>, val start: Long, val end: Long, val isQuestionGroup: Boolean, val lineStarts: List<Float>)
+    private class Group(val chunks: List<Chunk>, val start: Long, val end: Long, val isQuestionGroup: Boolean, val lineStarts: List<Float>, val startIdx: Int)
 
     /** Merges runs of questions into one typewriter-list scene (like a research question list). */
     private fun group(chunks: List<Chunk>, times: List<Pair<Long, Long>>): List<Group> {
@@ -269,12 +304,12 @@ object Director {
                 if (j - i >= 1) {
                     val s = times[i].first; val e = times[j].second
                     val starts = (i..j).map { ((times[it].first - s).toFloat() / max(1L, e - s)) }
-                    out += Group(chunks.subList(i, j + 1), s, e, true, starts)
+                    out += Group(chunks.subList(i, j + 1), s, e, true, starts, i)
                     i = j + 1
                     continue
                 }
             }
-            out += Group(listOf(chunks[i]), times[i].first, times[i].second, false, listOf(0f))
+            out += Group(listOf(chunks[i]), times[i].first, times[i].second, false, listOf(0f), i)
             i++
         }
         return out

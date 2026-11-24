@@ -29,6 +29,12 @@ enum class Pacing(val label: String, val maxSceneSec: Float, val transitionSec: 
     ENERGETIC("Energetic", 3.2f, 0.32f)
 }
 
+enum class CaptionMode(val label: String, val sub: String) {
+    KEYWORDS("Keywords", "Only key words pop up — visuals do the talking"),
+    FULL("Full captions", "Word-by-word subtitles for every line"),
+    OFF("Off", "No captions"),
+}
+
 /** Every visual layout the app can generate. `needsImage` layouts fall back to text layouts when no image exists. */
 enum class SceneType(val label: String, val needsImage: Boolean, val showsOwnText: Boolean) {
     KINETIC("Kinetic Words", false, true),
@@ -48,6 +54,10 @@ enum class SceneType(val label: String, val needsImage: Boolean, val showsOwnTex
     HEADLINE_IMAGE("Headline on Image", true, true),
     PHONE("Phone Mockup", true, true),
     SPOTLIGHT("Spotlight Text", false, true),
+    DONUT("Percent Donut", false, true),
+    BAR_CHART("Bar Chart", false, true),
+    TIMELINE("Timeline", false, true),
+    KEY_POINTS("Key Points", false, true),
     OUTRO("Subscribe Outro", false, true);
 }
 
@@ -117,7 +127,10 @@ data class Project(
     val aspect: Aspect = Aspect.LANDSCAPE,
     val themeId: String = "neon",
     val pacing: Pacing = Pacing.BALANCED,
-    val captions: Boolean = true,
+    val captionMode: CaptionMode = CaptionMode.KEYWORDS,
+    /** true when images were generated one-per-script-line, so scene N uses its own image. */
+    val lineImages: Boolean = false,
+    val imageStep: Int = 1,
     val sfx: Boolean = true,
     val grain: Boolean = true,
     val progressBar: Boolean = true,
@@ -134,7 +147,7 @@ data class Project(
         put("voicePath", voicePath); put("voiceName", voiceName)
         put("musicPath", musicPath); put("musicName", musicName); put("musicVolume", musicVolume.toDouble())
         put("images", JSONArray(images)); put("aspect", aspect.name); put("theme", themeId)
-        put("pacing", pacing.name); put("captions", captions); put("sfx", sfx); put("grain", grain)
+        put("pacing", pacing.name); put("captionMode", captionMode.name); put("lineImages", lineImages); put("imageStep", imageStep); put("sfx", sfx); put("grain", grain)
         put("progressBar", progressBar); put("handle", handle); put("seed", seed)
         put("scenes", JSONArray().also { a -> scenes.forEach { a.put(it.toJson()) } })
         put("chapters", JSONArray(chapters)); put("duration", durationMs)
@@ -155,7 +168,9 @@ data class Project(
             aspect = runCatching { Aspect.valueOf(o.optString("aspect")) }.getOrDefault(Aspect.LANDSCAPE),
             themeId = o.optString("theme", "neon"),
             pacing = runCatching { Pacing.valueOf(o.optString("pacing")) }.getOrDefault(Pacing.BALANCED),
-            captions = o.optBoolean("captions", true),
+            captionMode = runCatching { CaptionMode.valueOf(o.optString("captionMode")) }.getOrDefault(CaptionMode.KEYWORDS),
+            lineImages = o.optBoolean("lineImages"),
+            imageStep = o.optInt("imageStep", 1).coerceAtLeast(1),
             sfx = o.optBoolean("sfx", true),
             grain = o.optBoolean("grain", true),
             progressBar = o.optBoolean("progressBar", true),

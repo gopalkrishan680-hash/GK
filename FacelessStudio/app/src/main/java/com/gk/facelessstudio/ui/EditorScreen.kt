@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Casino
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Download
@@ -170,6 +171,7 @@ fun EditorScreen(vm: AppViewModel, onBack: () -> Unit, onEditSetup: (Int) -> Uni
         }
     }
     if (showExport) ExportSheet(vm) { showExport = false }
+    AiOverlay(vm)
 }
 
 @Composable
@@ -194,6 +196,7 @@ private fun SceneCard(vm: AppViewModel, i: Int, active: Boolean, onJump: () -> U
                 Text("${fmtTime(s.startMs)} – ${fmtTime(s.endMs)}", color = if (active) Neon else Muted, fontSize = 11.sp)
                 Text(s.text, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
+            IconButton(onClick = { vm.regenerateSceneImage(i) }) { Icon(Icons.Default.AutoAwesome, "New AI image", tint = Violet) }
             IconButton(onClick = { vm.reroll(i) }) { Icon(Icons.Default.Casino, "Re-roll", tint = Neon) }
         }
         Row(Modifier.padding(top = 6.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {

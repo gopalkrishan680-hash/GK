@@ -135,6 +135,7 @@ fun CreateScreen(vm: AppViewModel, startStep: Int, onBack: () -> Unit, onGenerat
                     2 -> ImagesStep(vm)
                     else -> StyleStep(vm)
                 }
+                AiOverlay(vm)
                 busy?.let { msg ->
                     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)).clickable(enabled = true) {}, contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -286,19 +287,21 @@ private fun ImagesStep(vm: AppViewModel) {
     var showPrompts by remember { mutableStateOf(false) }
     var selected by remember { mutableIntStateOf(-1) }
     Column(Modifier.fillMaxSize().padding(16.dp)) {
+        AiGenerateCard(vm, hasImages = p.images.isNotEmpty())
+        Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Button(onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                 modifier = Modifier.weight(1f).height(52.dp), shape = RoundedCornerShape(14.dp)) {
-                Icon(Icons.Default.AddPhotoAlternate, null); Spacer(Modifier.width(8.dp)); Text("Add images", fontWeight = FontWeight.Bold)
+                Icon(Icons.Default.AddPhotoAlternate, null); Spacer(Modifier.width(8.dp)); Text("Add my images", fontWeight = FontWeight.Bold)
             }
             OutlinedButton(onClick = { showPrompts = true }, modifier = Modifier.height(52.dp), shape = RoundedCornerShape(14.dp)) {
                 Icon(Icons.Default.AutoAwesome, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("AI Prompts")
             }
         }
-        Text("Images are used in script order (1 = first). Tap an image to reorder. ${p.images.size} images",
+        Text(if (p.lineImages) "${p.images.size} AI images — each one is matched to its own script line." else "Images are used in script order (1 = first). Tap an image to reorder. ${p.images.size} images",
             color = Muted, fontSize = 12.sp, modifier = Modifier.padding(vertical = 10.dp))
         LazyVerticalGrid(GridCells.Adaptive(104.dp), verticalArrangement = Arrangement.spacedBy(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            itemsIndexed(p.images, key = { _, path -> path }) { i, path ->
+            itemsIndexed(p.images, key = { i, path -> "$i-$path" }) { i, path ->
                 val thumb = rememberThumb(path, 300)
                 Box(Modifier.aspectRatio(1f).clip(RoundedCornerShape(12.dp)).background(Surface2)
                     .border(2.dp, if (selected == i) Neon else Color.Transparent, RoundedCornerShape(12.dp))
@@ -406,7 +409,13 @@ private fun StyleStep(vm: AppViewModel) {
             }, color = Muted, fontSize = 12.sp)
         }
         SectionCard("Extras") {
-            ToggleRow("Animated captions (word-by-word)", p.captions, vm::setCaptions)
+            Text("Captions", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 6.dp)) {
+                com.gk.facelessstudio.model.CaptionMode.entries.forEach { m ->
+                    FilterChip(selected = p.captionMode == m, onClick = { vm.setCaptionMode(m) }, label = { Text(m.label, fontSize = 12.sp) }, modifier = Modifier.weight(1f))
+                }
+            }
+            Text(p.captionMode.sub, color = Muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 8.dp))
             ToggleRow("Auto sound effects (whoosh, pop, boom)", p.sfx, vm::setSfx)
             ToggleRow("Cinematic film grain", p.grain, vm::setGrain)
             ToggleRow("Progress bar", p.progressBar, vm::setProgressBar)
@@ -425,3 +434,55 @@ private fun ToggleRow(label: String, value: Boolean, onChange: (Boolean) -> Unit
     }
 }
 
+
+
+internal val AI_STYLES = listOf("Cinematic realistic photo", "Dark documentary style", "3D Pixar style render", "Anime illustration", "Flat vector illustration")
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AiGenerateCard(vm: AppViewModel, hasImages: Boolean) {
+    var style by remember { mutableStateOf(AI_STYLES.first()) }
+    var confirm by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Surface1)
+        .border(1.5.dp, Neon.copy(alpha = 0.45f), RoundedCornerShape(18.dp)).padding(14.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.AutoAwesome, null, tint = Neon); Spacer(Modifier.width(8.dp))
+            Text("Generate images from my script", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        }
+        Text("The app writes an English visual prompt for every line of your script and creates a matching image, so each scene shows what is being said. Free (Pollinations.ai), needs internet; your script lines are sent to that service.",
+            color = Muted, fontSize = 12.sp, modifier = Modifier.padding(vertical = 8.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            AI_STYLES.forEach { st -> FilterChip(selected = st == style, onClick = { style = st }, label = { Text(st, fontSize = 12.sp) }) }
+        }
+        Spacer(Modifier.height(8.dp))
+        Box(Modifier.fillMaxWidth().height(50.dp).clip(RoundedCornerShape(14.dp)).background(BrandGradient)
+            .clickable { if (hasImages) confirm = true else vm.generateAiImages(style) }, contentAlignment = Alignment.Center) {
+            Text("✨  Generate images with AI", color = Color.Black, fontWeight = FontWeight.Black)
+        }
+    }
+    if (confirm) androidx.compose.material3.AlertDialog(
+        onDismissRequest = { confirm = false },
+        title = { Text("Replace current images?") },
+        text = { Text("AI images will replace the images already in this project.") },
+        confirmButton = { androidx.compose.material3.TextButton(onClick = { confirm = false; vm.generateAiImages(style) }) { Text("Replace") } },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = { confirm = false }) { Text("Cancel") } },
+    )
+}
+
+/** Full-screen progress for AI image generation, with cancel. */
+@Composable
+internal fun AiOverlay(vm: AppViewModel) {
+    val ai by vm.ai.collectAsState()
+    val st = ai ?: return
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.8f)).clickable(enabled = true) {}, contentAlignment = Alignment.Center) {
+        Column(Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            if (st.total > 1 && st.done > 0) androidx.compose.material3.LinearProgressIndicator(progress = { st.done / st.total.toFloat() }, Modifier.fillMaxWidth())
+            else CircularProgressIndicator(color = Neon)
+            Spacer(Modifier.height(14.dp))
+            Text(st.message, fontWeight = FontWeight.SemiBold)
+            Text("Each image takes a few seconds. Keep the app open.", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(onClick = { vm.cancelAi() }) { Text("Cancel") }
+        }
+    }
+}
