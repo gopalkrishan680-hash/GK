@@ -291,7 +291,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 val src = getApplication<Application>().contentResolver.openInputStream(uri)!!.use { android.graphics.BitmapFactory.decodeStream(it) }
                     ?: error("not an image")
                 val panels = com.gk.facelessstudio.engine.GridCutter.cut(src, g.cols, g.rows)
-                panels.take(g.count).mapIndexed { k, bmp ->
+                // extra panels (AI drew more than asked) spill into the following scenes
+                panels.take(pieces.size - g.from).mapIndexed { k, bmp ->
                     val f = File(repo.dir(p.id), "panel_${g.from + k}_${System.nanoTime()}.jpg")
                     f.outputStream().use { bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 92, it) }
                     if (bmp !== src) bmp.recycle()
@@ -306,7 +307,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             paths.forEachIndexed { k, path -> if (g.from + k < imgs.size) imgs[g.from + k] = path }
             cur.copy(images = imgs, lineImages = true)
         }
-        _toast.value = "Image ${gridIndex + 1} → ${paths.size} scenes ✅"
+        _toast.value = if (paths.size > g.count) "Image ${gridIndex + 1} had ${paths.size} panels → filled scenes ${g.from + 1}–${g.from + paths.size} ✅"
+            else if (paths.size < g.count) "Found only ${paths.size} of ${g.count} panels in that image. The missing scenes stay empty — copy the prompt again and retry."
+            else "Image ${gridIndex + 1} → ${paths.size} scenes ✅"
         selectGrid(nextEmptyGrid())
         rebuildIfNeeded()
     }

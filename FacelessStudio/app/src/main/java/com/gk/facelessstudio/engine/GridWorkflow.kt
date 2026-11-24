@@ -56,15 +56,22 @@ object GridWorkflow {
         else -> 3 to 3
     }
 
+    /** Panel counts AI image tools draw reliably as a regular grid. */
+    private val NICE = listOf(9, 6, 4, 3, 2, 1)
+
     fun grids(total: Int, size: Int): List<Grid> {
-        val per = size.coerceIn(1, 9)
-        return (0 until total step per).mapIndexed { gi, from ->
-            val to = minOf(total, from + per)
-            val full = shape(per)
-            // a short last grid gets a smaller layout so no panels are wasted
-            val (c, r) = if (to - from == per) full else shape(to - from)
-            Grid(gi, from, to, c, r)
+        val per = NICE.firstOrNull { it <= size.coerceIn(1, 9) } ?: 1
+        val out = ArrayList<Grid>()
+        var from = 0
+        while (from < total) {
+            val left = total - from
+            // never ask for an odd leftover like 5, 7 or 8 panels: AI tools then draw uneven rows
+            val n = if (left >= per) per else NICE.first { it <= left }
+            val (c, r) = shape(n)
+            out += Grid(out.size, from, from + n, c, r)
+            from += n
         }
+        return out
     }
 
     private fun ratio(a: Aspect) = a.sub

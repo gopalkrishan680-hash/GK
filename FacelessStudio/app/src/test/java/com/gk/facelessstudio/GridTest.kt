@@ -70,6 +70,20 @@ class GridTest {
     @Test fun blackLinesWithFrame() { check(GridCutter.cut(grid(1536, 1024, 3, 3, Color.BLACK, 10, 16), 3, 3), 3, 3, 1536, 1024) }
     @Test fun twoByTwo() { check(GridCutter.cut(grid(1600, 900, 2, 2, Color.WHITE, 8, 0), 2, 2), 2, 2, 1600, 900) }
 
+    /** The real grid from the user: 3 panels on top, 2 wide panels below, black lines. */
+    @Test fun unevenRowsFromUser() {
+        val f = java.io.File("/root/.claude/uploads/d8dc5f67-1781-520f-9b01-1963982ba320/d6fb6f67-image.png")
+        if (!f.exists()) return
+        val src = android.graphics.BitmapFactory.decodeFile(f.absolutePath)
+        val panels = GridCutter.cut(src, 3, 2)
+        println("USER GRID ${src.width}x${src.height} -> " + panels.joinToString { "${it.width}x${it.height}" })
+        assertEquals(5, panels.size)
+        panels.take(3).forEach { assertTrue(it.width in 600..720) }
+        panels.drop(3).forEach { assertTrue(it.width in 940..1080) }
+        val out = System.getProperty("fs.out")?.let { java.io.File(it, "usergrid").apply { mkdirs() } }
+        panels.forEachIndexed { i, b -> out?.let { o -> java.io.File(o, "p$i.png").outputStream().use { b.compress(Bitmap.CompressFormat.PNG, 100, it) } } }
+    }
+
     @Test fun promptsLookRight() {
         val script = "# Udyog Parva\nKrishna ne Karna ko raja banne ka offer diya.\nTum Kunti ke sabse bade bete ho.\nPaanchon Pandav tumhare charan chhuenge.\nKarna ne mana kar diya."
         val p = Project(id = "t", title = "Karna ka faisla", script = script, characters = "Karna: tall warrior, golden armour\nKrishna: blue skin, peacock feather crown")
@@ -82,6 +96,8 @@ class GridTest {
         println("DIRECTOR PROMPT:\n" + GridWorkflow.directorPrompt(p, pieces, pieces.indices.toList()))
         val parsed = GridWorkflow.parseDirector("Here you go:\n**1:** Krishna talks to Karna by the river\n2. Close-up of Karna\n3) Pandavs bowing\n- 4: Karna turns away")
         assertEquals(4, parsed.size); assertEquals("Krishna talks to Karna by the river", parsed[0])
-        assertEquals(listOf(9, 9, 9, 5), GridWorkflow.grids(32, 9).map { it.count })
+        assertEquals(listOf(9, 9, 9, 4, 1), GridWorkflow.grids(32, 9).map { it.count })
+        assertEquals(listOf(9, 6, 2), GridWorkflow.grids(17, 9).map { it.count })
+        assertEquals(listOf(4, 4, 3), GridWorkflow.grids(11, 4).map { it.count })
     }
 }
