@@ -140,7 +140,7 @@ object Director {
                 // whiteboard: the hand writes numbers big, writes lines without a picture, otherwise sketches the picture
                 stat != null || percent != null -> SceneType.DOODLE_NUMBER.also { variety.use(it) }
                 !hasImg -> SceneType.DOODLE_TEXT.also { variety.use(it) }
-                else -> variety.layout(emptyList(), listOf(SceneType.DOODLE_CENTER, SceneType.DOODLE_LEFT, SceneType.DOODLE_RIGHT, SceneType.DOODLE_TOP))
+                else -> variety.layout(emptyList(), listOf(SceneType.DOODLE_CENTER, SceneType.DOODLE_LEFT, SceneType.DOODLE_RIGHT, SceneType.DOODLE_TOP, SceneType.DOODLE_FULL))
             }
             else if (forced != null) forced.also { variety.use(it) }
             else if (ownImage) variety.layout(preferred.filter { !it.needsImage || hasImg }, pictureLayouts + textLayouts, soft, first = pictureLayouts)
@@ -181,7 +181,7 @@ object Director {
                     else -> Backdrop.entries.filter { it != Backdrop.IMAGE }
                 })
                 // the whiteboard stays clean: no camera moves or motion-graphics decorations
-                if (project.doodle) sc.copy(fx = look.fx, bg = look.bg, cam = CamMove.STILL, deco = Deco.NONE)
+                if (project.doodle) sc.copy(fx = look.fx, bg = look.bg, cam = CamMove.STILL, deco = Deco.NONE, look = variety.doodleLook(type))
                 else sc.copy(fx = look.fx, bg = look.bg, cam = look.cam, deco = look.deco)
             }
             history.addLast(type); if (history.size > 3) history.removeFirst()
@@ -267,7 +267,7 @@ object Director {
                     ?: ScriptAnalyzer.strongWords(text, 1).firstOrNull() ?: "!"
                 Pair(listOf(ScriptAnalyzer.phrase(text, 9)), big)
             }
-            SceneType.DOODLE_CENTER -> Pair(emptyList(), ScriptAnalyzer.phrase(text, 12))
+            SceneType.DOODLE_CENTER, SceneType.DOODLE_FULL -> Pair(emptyList(), ScriptAnalyzer.phrase(text, 14))
             SceneType.DOODLE_TOP -> Pair(emptyList(), ScriptAnalyzer.phrase(text, 6))
             SceneType.DOODLE_DUO, SceneType.DOODLE_TRIO, SceneType.DOODLE_TEXT -> Pair(groupLines, "")
             SceneType.DOODLE_LEFT, SceneType.DOODLE_RIGHT -> Pair(emptyList(), "")

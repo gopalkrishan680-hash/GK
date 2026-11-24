@@ -79,7 +79,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Switches between animated motion graphics and the whiteboard doodle style; scenes are re-planned. */
     fun setDoodle(v: Boolean) = viewModelScope.launch {
-        _project.value = _project.value.copy(doodle = v)
+        val cur = _project.value
+        // switching to the whiteboard also switches the image prompts to "main subject on white", unless the user wrote their own style
+        val untouched = cur.styleDesc.isBlank() || cur.styleDesc == GridWorkflow.preset(cur.artStyle).desc
+        _project.value = when {
+            v && untouched -> cur.copy(doodle = true, artStyle = "whiteboard", styleDesc = GridWorkflow.preset("whiteboard").desc)
+            !v && untouched && cur.artStyle == "whiteboard" -> cur.copy(doodle = false, artStyle = "storybook", styleDesc = GridWorkflow.preset("storybook").desc)
+            else -> cur.copy(doodle = v)
+        }
         if (_project.value.scenes.isNotEmpty()) {
             val voice = analyzeVoice()
             _project.value = withContext(Dispatchers.Default) { Director.build(_project.value, voice) }

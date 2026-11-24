@@ -14,6 +14,8 @@ object GridWorkflow {
     val STYLES = listOf(
         StylePreset("storybook", "Soft 2D storybook",
             "Soft 2D storybook illustration of an Indian tale: warm pastel colours, gentle gradients, rounded friendly characters with kind expressive faces, traditional Indian clothes, light paper grain, cosy and emotional mood", false),
+        StylePreset("whiteboard", "Whiteboard doodle",
+            "Whiteboard doodle illustration: only the main subject (characters / key objects) drawn with bold clean black outlines and flat bright colours, on a plain pure white background, no scenery, no background fill, plenty of white space", false),
         StylePreset("stickman", "Stickman doodle",
             "Simple stickman doodle: clean black line-art stick figures with round heads and expressive poses, minimal flat backgrounds, white paper, a few accent colours, funny and clear", false),
         StylePreset("documentary", "Dark documentary",
@@ -35,7 +37,7 @@ object GridWorkflow {
     fun styleText(p: Project) = p.styleDesc.ifBlank { preset(p.artStyle).desc }
 
     /** Line colour actually asked for between panels. */
-    fun lineColor(p: Project): String = when (p.separator) {
+    fun lineColor(p: Project): String = if (p.doodle && p.separator == "auto") "black" else when (p.separator) {
         "white" -> "white"; "black" -> "black"; "none" -> "none"
         else -> if (preset(p.artStyle).darkLines) "black" else "white"
     }
@@ -93,6 +95,7 @@ object GridWorkflow {
         sb.append("Read order: left to right, top to bottom. ")
         sb.append("Absolutely NO text, letters, numbers, captions, labels or speech bubbles anywhere in the image.\n\n")
         sb.append("Art style (identical in every panel): ").append(styleText(p)).append(".\n")
+        if (p.doodle) sb.append(DOODLE_RULE).append("\n")
         sb.append(characterBlock(p))
         if (p.title.isNotBlank()) sb.append("Story: ").append(p.title).append(".\n")
         sb.append("\n")
@@ -105,6 +108,11 @@ object GridWorkflow {
         sb.append("\nMake each panel a different, clear composition (vary wide shots and close-ups). Generate the image now, do not ask questions.")
         return sb.toString()
     }
+
+    /** Whiteboard pictures: just the subject on white so it reads clearly when it is sketched on the board. */
+    private const val DOODLE_RULE = "WHITEBOARD RULE for every panel: draw ONLY the main subject (characters and the key objects) in the middle of the panel " +
+        "on a plain pure WHITE background — no scenery, no sky, no ground, no background colour or texture, no shadows on the background; " +
+        "bold clear outlines, flat colours, lots of empty white space around the subject."
 
     /** Overall image ratio so each panel keeps the video ratio, e.g. 3×3 of 16:9 -> 16:9. */
     private fun gridRatio(a: Aspect, g: Grid): String {
@@ -126,6 +134,7 @@ object GridWorkflow {
         sb.append("which characters (by name), what they are doing, the place, and the shot type (wide, medium, close-up, over-the-shoulder, top view). ")
         sb.append("Show exactly what the line is about, keep the story continuous, and vary the shots. No text in the images.\n")
         sb.append("Art style: ").append(styleText(p)).append(".\n")
+        if (p.doodle) sb.append("These pictures will be DRAWN on a whiteboard, so describe ONLY the main subject of each scene (the characters and the one or two key objects, their pose and expression) — no scenery, no landscape, no background details.\n")
         sb.append(characterBlock(p))
         sb.append("\nReply ONLY with lines in the form  number: description  — one line per scene, same numbers, nothing else.\n\n")
         for (i in indices) sb.append(i + 1).append(": ").append(pieces.getOrElse(i) { "" }).append("\n")

@@ -107,13 +107,40 @@ class Variety(seed: Long, private val pacing: Pacing) {
         return t
     }
 
-    /** Whiteboard: the camera pans along the board, or the page turns. */
+    /** Whiteboard: the camera pans along the board, the page turns, or the board is wiped clean. */
     fun doodleTransition(last: Transition): Transition {
-        val pool = listOf(Transition.SLIDE_LEFT, Transition.SLIDE_UP, Transition.FADE, Transition.PAGE, Transition.CUT).filter { it != last }
+        val pool = listOf(Transition.SLIDE_LEFT, Transition.SLIDE_UP, Transition.FADE, Transition.PAGE, Transition.ERASE, Transition.CUT,
+            Transition.DOORS, Transition.CIRCLE).filter { it != last }
         val t = leastUsed(pool, trUse)
         trUse[t] = (trUse[t] ?: 0) + 1
         return t
     }
 
+    private val dUse = List(6) { HashMap<Int, Int>() }
+
+    /**
+     * Whiteboard look: least-used frame, draw method, text style, doodle, camera and arrangement,
+     * never repeating a full combination for the same layout.
+     */
+    fun doodleLook(type: SceneType, sizes: IntArray = DOODLE_SIZES): List<Int> {
+        var chosen: List<Int>? = null
+        for (attempt in 0 until 80) {
+            val l = sizes.indices.map { d ->
+                val opts = (0 until sizes[d]).toList()
+                if (attempt == 0) leastUsed(opts, dUse[d]) else opts.random(rnd)
+            }
+            val key = "$type/" + l.joinToString(".")
+            if (key !in combos) { chosen = l; combos += key; break }
+        }
+        val l = chosen ?: sizes.map { rnd.nextInt(it) }
+        l.forEachIndexed { d, v -> dUse[d][v] = (dUse[d][v] ?: 0) + 1 }
+        return l
+    }
+
     fun uses(t: SceneType) = layoutUse[t] ?: 0
+
+    companion object {
+        /** frames, draw methods, text styles, doodles, cameras, arrangements */
+        val DOODLE_SIZES = intArrayOf(5, 5, 5, 7, 4, 3)
+    }
 }

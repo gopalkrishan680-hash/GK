@@ -141,6 +141,38 @@ class ImageStore(private val paths: List<String>, private val maxEdge: Int) {
         return mid
     }
 
+    private val inkCache = LruCache<Int, Bitmap>(24)
+    private val whiteBg = java.util.concurrent.ConcurrentHashMap<Int, Boolean>()
+
+    /** Bold black ink lines (thresholded pencil sketch), for the "ink" drawing method. */
+    fun ink(i: Int): Bitmap? {
+        if (paths.isEmpty() || i < 0) return null
+        val idx = i % paths.size
+        inkCache.get(idx)?.let { return it }
+        val sk = sketch(idx) ?: return null
+        val px = IntArray(sk.width * sk.height); sk.getPixels(px, 0, sk.width, 0, 0, sk.width, sk.height)
+        var dark = 0
+        for (j in px.indices) { val v = px[j] and 255; px[j] = if (v < 120) { dark++; 0xFF151515.toInt() } else if (v < 170) 0xFF8A8A8A.toInt() else -1 }
+        // dark pictures (night scenes) would turn into black blobs: use the pencil sketch for them instead
+        if (dark > px.size * 0.22f) return null
+        return Bitmap.createBitmap(px, sk.width, sk.height, Bitmap.Config.ARGB_8888).also { inkCache.put(idx, it) }
+    }
+
+    /** True when the picture is a subject on a (near) white background — then it is drawn straight onto the board. */
+    fun isWhiteBackground(i: Int): Boolean {
+        if (paths.isEmpty() || i < 0) return false
+        val idx = i % paths.size
+        whiteBg[idx]?.let { return it }
+        val b = get(idx) ?: return false
+        var bright = 0; var n = 0
+        val step = maxOf(1, (b.width + b.height) / 200)
+        for (x in 0 until b.width step step) for (y in listOf(1, b.height - 2)) { n++; if (lum(b.getPixel(x, y)) > 225) bright++ }
+        for (y in 0 until b.height step step) for (x in listOf(1, b.width - 2)) { n++; if (lum(b.getPixel(x, y)) > 225) bright++ }
+        return (bright > n * 0.7f).also { whiteBg[idx] = it }
+    }
+
+    private fun lum(c: Int) = ((c shr 16 and 255) * 30 + (c shr 8 and 255) * 59 + (c and 255) * 11) / 100
+
     companion object {
         fun decode(path: String, maxEdge: Int): Bitmap? = try {
             val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }

@@ -59,6 +59,17 @@ points (shortest paths through the dark pencil lines), then **colour is painted*
 following the pen, outward from a point, or wavy brush strokes. Numbers get a big circled handwritten board. Marker
 underlines, arrows and stars; soft marker sound; board slides or page turns between boards. No hand graphic.
 
+**Whiteboard variety:** every board is its own combination of layout (7 single-picture layouts + 2- and 3-picture
+boards in 3 arrangements each) × frame (wobbly box, frameless cut-out, polaroid with tape, circle, torn paper) ×
+draw method (outline then colour, long pencil then colour, direct brush, bold ink lines then colour, sketch dissolving
+into colour) × text style (plain, highlighter, box, speech bubble, sticky note) × doodle (stars, shine lines, arrow,
+swirl, ?/!, tick) × camera (still, zoom to the picture being drawn, pull back, drift) — never the same combination twice.
+Transitions: slide, page turn, eraser wipe, fade, doors, circle, cut.
+
+**Doodle-friendly pictures:** with Whiteboard Doodle on, the art style switches to *Whiteboard doodle* and both the AI
+Scene Director prompt and the grid prompts ask for **only the main subject on a plain white background** (no scenery).
+Pictures on white are drawn straight onto the board without a box.
+
 ## Variety engine (no boring repeats)
 
 Every scene is a **combination** of six independent choices:

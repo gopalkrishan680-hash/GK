@@ -84,6 +84,7 @@ enum class SceneType(val label: String, val needsImage: Boolean, val showsOwnTex
     DOODLE_TOP("Doodle: Title + Picture", true, true),
     DOODLE_TEXT("Doodle: Handwriting", false, true),
     DOODLE_NUMBER("Doodle: Big Number", false, true),
+    DOODLE_FULL("Doodle: Full Board", true, true),
     DOODLE_DUO("Doodle: Two Pictures", false, true),
     DOODLE_TRIO("Doodle: Three Pictures", false, true),
     DONUT("Percent Donut", false, true),
@@ -97,7 +98,7 @@ enum class Transition(val label: String) {
     FADE("Fade"), ZOOM_PUNCH("Zoom Punch"), SLIDE_LEFT("Slide"), SLIDE_UP("Slide Up"),
     WHIP("Whip Pan"), FLASH("Flash"), GLITCH("Glitch"), CIRCLE("Circle Reveal"),
     SHUTTER("Shutter"), SPIN("Spin Zoom"), CUT("Hard Cut"),
-    DIP("Dip to Black"), PAGE("Page Turn"), DOORS("Doors"), BLINDS("Blinds"), PIXEL("Pixelate")
+    DIP("Dip to Black"), PAGE("Page Turn"), ERASE("Eraser Wipe"), DOORS("Doors"), BLINDS("Blinds"), PIXEL("Pixelate")
 }
 
 data class Scene(
@@ -122,9 +123,11 @@ data class Scene(
     val deco: Deco = Deco.NONE,
     /** Whiteboard boards hold several lines: the picture for each line (index into project images, -1 = none). */
     val images: List<Int> = emptyList(),
+    /** Whiteboard look: [frame, draw method, text style, doodle, camera, arrangement] (see DoodleLook). */
+    val look: List<Int> = emptyList(),
 ) {
     /** The full animation "combination" of this scene; no two scenes in a video share one. */
-    val combo get() = "${type.name}/${fx.name}/${bg.name}/${cam.name}/${deco.name}"
+    val combo get() = "${type.name}/${fx.name}/${bg.name}/${cam.name}/${deco.name}/${look.joinToString(".")}"
 
     val durationMs get() = (endMs - startMs).coerceAtLeast(1)
 
@@ -134,7 +137,7 @@ data class Scene(
         put("variant", variant); put("lines", JSONArray(lines))
         put("lineStarts", JSONArray(lineStarts.map { it.toDouble() }))
         put("title", title); put("emph", JSONArray(emphasis)); put("chapter", chapterIndex)
-        put("locked", locked); put("fx", fx.name); put("bg", bg.name); put("cam", cam.name); put("deco", deco.name); put("images", JSONArray(images))
+        put("locked", locked); put("fx", fx.name); put("bg", bg.name); put("cam", cam.name); put("deco", deco.name); put("images", JSONArray(images)); put("look", JSONArray(look))
     }
 
     companion object {
@@ -157,6 +160,7 @@ data class Scene(
             cam = runCatching { CamMove.valueOf(o.optString("cam")) }.getOrDefault(CamMove.STILL),
             deco = runCatching { Deco.valueOf(o.optString("deco")) }.getOrDefault(Deco.NONE),
             images = o.optJSONArray("images").strings().mapNotNull { it.toIntOrNull() },
+            look = o.optJSONArray("look").strings().mapNotNull { it.toIntOrNull() },
         )
     }
 }

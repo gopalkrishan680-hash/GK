@@ -20,6 +20,7 @@ import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sin
 import kotlin.random.Random
 
 /**
@@ -162,6 +163,17 @@ class FrameRenderer(
                 val off = e * h
                 c.drawBitmap(ba, 0f, -off, paint)
                 c.drawBitmap(bb, 0f, h - off, paint)
+            }
+            Transition.ERASE -> { // a wavy eraser stroke wipes the old board away
+                c.drawBitmap(ba, 0f, 0f, paint)
+                val front = e * w * 1.2f
+                val path = Path(); path.moveTo(0f, 0f)
+                var yy = 0f
+                while (yy <= h) { path.lineTo(front + sin(yy / h * 9f + pr * 6f) * 40f * k.u - 40f * k.u, yy); yy += 12f * k.u }
+                path.lineTo(0f, h.toFloat()); path.close()
+                c.save(); c.clipPath(path); c.drawBitmap(bb, 0f, 0f, paint); c.restore()
+                k.fill.shader = android.graphics.LinearGradient(front - 120f * k.u, 0f, front, 0f, 0, 0x22888888, Shader.TileMode.CLAMP)
+                c.drawRect(front - 120f * k.u, 0f, front, h.toFloat(), k.fill); k.fill.shader = null
             }
             Transition.DIP -> {
                 c.drawBitmap(if (pr < 0.5f) ba else bb, 0f, 0f, paint)
