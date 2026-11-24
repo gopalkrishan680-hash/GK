@@ -100,17 +100,17 @@ fun CreateScreen(vm: AppViewModel, startStep: Int, onBack: () -> Unit, onGenerat
         containerColor = Bg,
         topBar = {
             TopAppBar(
-                title = { Text("Nayi Video", fontWeight = FontWeight.Bold) },
+                title = { Text("New Video", fontWeight = FontWeight.Bold) },
                 navigationIcon = { IconButton(onClick = { if (step > 0) step-- else onBack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Bg)
             )
         },
         bottomBar = {
             Row(Modifier.fillMaxWidth().background(Surface1).navigationBarsPadding().padding(14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (step > 0) OutlinedButton(onClick = { step-- }, modifier = Modifier.height(54.dp)) { Text("Peeche") }
+                if (step > 0) OutlinedButton(onClick = { step-- }, modifier = Modifier.height(54.dp)) { Text("Back") }
                 if (step < 3) {
                     Button(onClick = { step++ }, modifier = Modifier.weight(1f).height(54.dp), shape = RoundedCornerShape(16.dp)) {
-                        Text("Aage: ${STEPS[step + 1]}", fontWeight = FontWeight.Bold)
+                        Text("Next: ${STEPS[step + 1]}", fontWeight = FontWeight.Bold)
                         Spacer(Modifier.width(6.dp)); Icon(Icons.AutoMirrored.Filled.ArrowForward, null)
                     }
                 } else {
@@ -119,7 +119,7 @@ fun CreateScreen(vm: AppViewModel, startStep: Int, onBack: () -> Unit, onGenerat
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.AutoAwesome, null, tint = Color.Black)
                             Spacer(Modifier.width(8.dp))
-                            Text("Video Generate Karo", color = Color.Black, fontWeight = FontWeight.Black, fontSize = 16.sp)
+                            Text("Generate Video", color = Color.Black, fontWeight = FontWeight.Black, fontSize = 16.sp)
                         }
                     }
                 }
@@ -185,12 +185,12 @@ private fun ScriptStep(vm: AppViewModel) {
     val p by vm.project.collectAsState()
     val ctx = LocalContext.current
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        OutlinedTextField(p.title, vm::setTitle, label = { Text("Video ka title") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(p.title, vm::setTitle, label = { Text("Video title") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         Box {
             OutlinedTextField(
                 p.script, vm::setScript,
-                label = { Text("Script yahan paste karo") },
-                placeholder = { Text("# Intro\nKya aapko pata hai dark web kya hai?\nKaun use karta hai? Kab bana?\n...") },
+                label = { Text("Paste your script here") },
+                placeholder = { Text("# Intro\nWhat exactly is the dark web?\nWho uses it? When did it start?\n...") },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 280.dp)
             )
         }
@@ -205,15 +205,15 @@ private fun ScriptStep(vm: AppViewModel) {
         }
         SectionCard("Pro tips (optional)", Icons.Default.Lightbulb) {
             val tips = listOf(
-                "# Heading" to "Naya chapter → Checklist / Chapter title animation",
-                "Kya? Kab? Kaise?" to "Lagatar sawal → Typewriter question list",
+                "# Heading" to "New chapter → Checklist / chapter title",
+                "What? When? How?" to "Back-to-back questions → Typewriter list",
                 "723,335 / 50% / ₹500" to "Number → Counter animation",
                 "3 Dec 1984, 12:00 AM" to "Date → Date stamp + digital clock",
                 "A vs B" to "Versus split screen",
-                "X: a, b aur c" to "Mind-map tree",
+                "X: a, b and c" to "Mind-map tree",
                 "\"quote\"" to "Quote animation",
-                "kyunki / isliye" to "Cause → Effect arrow",
-                "[stat] [list] [quote] [note] [phone] [headline] [image]" to "Line ke shuru me tag likh kar layout khud chuno",
+                "because / so" to "Cause → Effect arrow",
+                "[stat] [list] [quote] [note] [phone] [headline] [image]" to "Start a line with a tag to pick the layout yourself",
                 "---" to "Hard cut",
             )
             tips.forEach { (a, b) ->
@@ -236,23 +236,23 @@ private fun VoiceStep(vm: AppViewModel) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         SectionCard("Voiceover", Icons.Default.Mic) {
             if (p.voiceName == null) {
-                BigPickButton("Voiceover file chuno (mp3, m4a, wav)") { voicePicker.launch("audio/*") }
-                Text("App aawaz ke pauses pakad kar har line ko sahi time par sync karega.", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+                BigPickButton("Choose voiceover file (mp3, m4a, wav)") { voicePicker.launch("audio/*") }
+                Text("The app detects pauses in your voice and syncs every line to the right moment.", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
             } else {
-                FileRow(p.voiceName!!, info?.let { "${fmtTime(it.durationMs)}  •  ${it.pauses.size} pauses mile" } ?: "", onRemove = vm::removeVoice, onReplace = { voicePicker.launch("audio/*") })
+                FileRow(p.voiceName!!, info?.let { "${fmtTime(it.durationMs)}  •  ${it.pauses.size} pauses found" } ?: "", onRemove = vm::removeVoice, onReplace = { voicePicker.launch("audio/*") })
             }
         }
         SectionCard("Background music (optional)", Icons.Default.MusicNote) {
-            if (p.musicName == null) BigPickButton("Music file chuno") { musicPicker.launch("audio/*") }
+            if (p.musicName == null) BigPickButton("Choose music file") { musicPicker.launch("audio/*") }
             else {
-                FileRow(p.musicName!!, "Voice ke time auto-ducking", onRemove = vm::removeMusic, onReplace = { musicPicker.launch("audio/*") })
+                FileRow(p.musicName!!, "Auto-ducks under the voice", onRemove = vm::removeMusic, onReplace = { musicPicker.launch("audio/*") })
                 Spacer(Modifier.height(8.dp))
                 Text("Music volume: ${(p.musicVolume * 100).toInt()}%", fontSize = 13.sp)
                 Slider(p.musicVolume, vm::setMusicVolume, valueRange = 0f..0.6f)
             }
-            Text("Tip: YouTube Audio Library se copyright-free music lo.", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+            Text("Tip: get copyright-free music from the YouTube Audio Library.", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
         }
-        if (p.voiceName == null) Text("Voiceover nahi hai? Koi baat nahi — preview auto-timing se chalega, baad me add kar sakte ho.", color = Muted, fontSize = 12.sp)
+        if (p.voiceName == null) Text("No voiceover yet? No problem — the preview uses auto timing, you can add it later.", color = Muted, fontSize = 12.sp)
     }
 }
 
@@ -272,7 +272,7 @@ private fun FileRow(name: String, sub: String, onRemove: () -> Unit, onReplace: 
             Text(name, fontWeight = FontWeight.SemiBold, maxLines = 1)
             if (sub.isNotEmpty()) Text(sub, color = Neon, fontSize = 12.sp)
         }
-        androidx.compose.material3.TextButton(onClick = onReplace) { Text("Badlo") }
+        androidx.compose.material3.TextButton(onClick = onReplace) { Text("Change") }
         IconButton(onClick = onRemove) { Icon(Icons.Default.Close, null) }
     }
 }
@@ -289,13 +289,13 @@ private fun ImagesStep(vm: AppViewModel) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Button(onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                 modifier = Modifier.weight(1f).height(52.dp), shape = RoundedCornerShape(14.dp)) {
-                Icon(Icons.Default.AddPhotoAlternate, null); Spacer(Modifier.width(8.dp)); Text("Images add karo", fontWeight = FontWeight.Bold)
+                Icon(Icons.Default.AddPhotoAlternate, null); Spacer(Modifier.width(8.dp)); Text("Add images", fontWeight = FontWeight.Bold)
             }
             OutlinedButton(onClick = { showPrompts = true }, modifier = Modifier.height(52.dp), shape = RoundedCornerShape(14.dp)) {
                 Icon(Icons.Default.AutoAwesome, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("AI Prompts")
             }
         }
-        Text("Images script ke order me lagengi (1 → pehle). Tap karke order badlo. ${p.images.size} images",
+        Text("Images are used in script order (1 = first). Tap an image to reorder. ${p.images.size} images",
             color = Muted, fontSize = 12.sp, modifier = Modifier.padding(vertical = 10.dp))
         LazyVerticalGrid(GridCells.Adaptive(104.dp), verticalArrangement = Arrangement.spacedBy(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             itemsIndexed(p.images, key = { _, path -> path }) { i, path ->
@@ -328,19 +328,19 @@ private fun PromptSheet(vm: AppViewModel, onClose: () -> Unit) {
     val ctx = LocalContext.current
     fun copy(text: String) {
         (ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("prompts", text))
-        vm.toast("Copy ho gaya ✅")
+        vm.toast("Copied ✅")
     }
     ModalBottomSheet(onDismissRequest = onClose, containerColor = Surface1) {
         Column(Modifier.padding(horizontal = 16.dp)) {
             Text("AI Image Prompts", fontWeight = FontWeight.Black, fontSize = 20.sp)
-            Text("Har scene ke liye ek prompt — apne AI image tool me paste karo, images isi order me add karo.", color = Muted, fontSize = 12.sp)
+            Text("One prompt per scene — paste them into your AI image tool and add the images in the same order.", color = Muted, fontSize = 12.sp)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(vertical = 8.dp)) {
                 styles.forEach { s -> FilterChip(selected = s == style, onClick = { style = s }, label = { Text(s, fontSize = 12.sp) }) }
             }
             Button(onClick = { copy(prompts.mapIndexed { i, it -> "${i + 1}. ${it.second}" }.joinToString("\n\n")) }, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.ContentCopy, null); Spacer(Modifier.width(6.dp)); Text("Saare prompts copy karo (${prompts.size})")
+                Icon(Icons.Default.ContentCopy, null); Spacer(Modifier.width(6.dp)); Text("Copy all prompts (${prompts.size})")
             }
-            if (prompts.isEmpty()) Text("Pehle Script step me script likho.", color = Muted, modifier = Modifier.padding(16.dp))
+            if (prompts.isEmpty()) Text("Write a script in the Script step first.", color = Muted, modifier = Modifier.padding(16.dp))
             LazyColumn(Modifier.heightIn(max = 480.dp).padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(prompts.withIndex().toList()) { (i, pr) ->
                     Column(Modifier.fillMaxWidth().background(Surface2, RoundedCornerShape(12.dp)).clickable { copy(pr.second) }.padding(12.dp)) {
@@ -400,8 +400,8 @@ private fun StyleStep(vm: AppViewModel) {
                 }
             }
             Text(when (p.pacing) {
-                Pacing.CALM -> "Lambe scenes, smooth fades — storytelling ke liye"
-                Pacing.BALANCED -> "Har 3-5 sec me naya visual — zyada tar videos ke liye best"
+                Pacing.CALM -> "Longer scenes, smooth fades — great for storytelling"
+                Pacing.BALANCED -> "New visual every 3-5 sec — best for most videos"
                 Pacing.ENERGETIC -> "Fast cuts, glitch & zoom punches — shorts / high retention"
             }, color = Muted, fontSize = 12.sp)
         }

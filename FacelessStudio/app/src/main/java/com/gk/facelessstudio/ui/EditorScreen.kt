@@ -161,7 +161,7 @@ fun EditorScreen(vm: AppViewModel, onBack: () -> Unit, onEditSetup: (Int) -> Uni
                 }
             }
             ExportBanner(vm)
-            Text("${p.scenes.size} scenes  •  tap = jump, chips se layout badlo", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp))
+            Text("${p.scenes.size} scenes  •  tap to jump, use chips to change layout", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp))
             LazyColumn(state = listState, modifier = Modifier.weight(1f), contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 itemsIndexed(p.scenes, key = { i, s -> "$i-${s.startMs}" }) { i, s ->
                     SceneCard(vm, i, active = i == curScene, onJump = { preview.seek(s.startMs) })
@@ -238,7 +238,7 @@ private fun ExportBanner(vm: AppViewModel) {
         is ExportState.Done -> if (s.projectId == p.id) Row(Modifier.fillMaxWidth().padding(12.dp).background(Neon.copy(alpha = 0.12f), RoundedCornerShape(14.dp)).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.CheckCircle, null, tint = Neon)
             Spacer(Modifier.width(8.dp))
-            Text("Video gallery me save! (Movies/FacelessStudio)", Modifier.weight(1f), fontSize = 13.sp)
+            Text("Saved to gallery! (Movies/FacelessStudio)", Modifier.weight(1f), fontSize = 13.sp)
             IconButton(onClick = {
                 ctx.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(s.uri, "video/mp4").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
             }) { Icon(Icons.Default.PlayArrow, null) }
@@ -246,7 +246,7 @@ private fun ExportBanner(vm: AppViewModel) {
         }
         is ExportState.Failed -> if (s.projectId == p.id) AlertDialog(
             onDismissRequest = { ExportManager.reset() }, confirmButton = { TextButton(onClick = { ExportManager.reset() }) { Text("OK") } },
-            title = { Text("Export fail hua") }, text = { Text(s.error) })
+            title = { Text("Export failed") }, text = { Text(s.error) })
         else -> {}
     }
 }
@@ -267,7 +267,7 @@ private fun ExportSheet(vm: AppViewModel, onClose: () -> Unit) {
     }
     fun copy(label: String, text: String) {
         (ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText(label, text))
-        vm.toast("$label copy ho gaye ✅")
+        vm.toast("$label copied ✅")
     }
     ModalBottomSheet(onDismissRequest = onClose, containerColor = Surface1) {
         Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -277,16 +277,16 @@ private fun ExportSheet(vm: AppViewModel, onClose: () -> Unit) {
             }
             val (w, h) = p.aspect.size(quality)
             Text("${w}×${h}  •  30 fps  •  ${fmtTime(p.durationMs)}  •  MP4 (H.264 + AAC)", color = Muted, fontSize = 12.sp)
-            Text("Render background me chalega — app band karke bhi kaam kar sakte ho. Notification me progress dikhega.", color = Muted, fontSize = 12.sp)
+            Text("Rendering runs in the background — you can leave the app. Progress shows in the notification.", color = Muted, fontSize = 12.sp)
             Box(Modifier.fillMaxWidth().height(54.dp).clip(RoundedCornerShape(16.dp)).background(BrandGradient).clickable {
-                if (p.scenes.isEmpty()) { vm.toast("Pehle video generate karo"); return@clickable }
+                if (p.scenes.isEmpty()) { vm.toast("Generate the video first"); return@clickable }
                 vm.saveNow()
                 if (Build.VERSION.SDK_INT >= 33) notifPerm.launch(Manifest.permission.POST_NOTIFICATIONS)
                 else { ExportManager.start(ctx, p.id, quality); onClose() }
             }, contentAlignment = Alignment.Center) {
-                Text("🎬  Render shuru karo", color = Color.Black, fontWeight = FontWeight.Black, fontSize = 16.sp)
+                Text("🎬  Start rendering", color = Color.Black, fontWeight = FontWeight.Black, fontSize = 16.sp)
             }
-            Text("YouTube upload ke liye extra", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+            Text("Extras for YouTube upload", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = {
                     val f = vm.writeShareFile("${p.title.ifBlank { "captions" }.replace(Regex("[^A-Za-z0-9]"), "_")}.srt", vm.srt())
@@ -294,11 +294,11 @@ private fun ExportSheet(vm: AppViewModel, onClose: () -> Unit) {
                 }, modifier = Modifier.weight(1f)) { Text("Captions (.srt)") }
                 OutlinedButton(onClick = {
                     val ch = vm.youtubeChapters()
-                    if (ch.isBlank()) vm.toast("Script me # headings likho to chapters banenge") else copy("Chapters", ch)
+                    if (ch.isBlank()) vm.toast("Add # headings to your script to get chapters") else copy("Chapters", ch)
                 }, modifier = Modifier.weight(1f)) { Text("YT Chapters") }
             }
             OutlinedButton(onClick = { vm.shuffle() }, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.Refresh, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Render se pehle naye animations try karo")
+                Icon(Icons.Default.Refresh, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Try new animations before rendering")
             }
         }
     }

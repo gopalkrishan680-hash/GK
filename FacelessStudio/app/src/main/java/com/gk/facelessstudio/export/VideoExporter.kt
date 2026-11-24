@@ -51,7 +51,7 @@ class VideoExporter(
         val totalMs = project.durationMs
         val frames = (totalMs * fps / 1000).toInt().coerceAtLeast(1)
 
-        onProgress(0f, "Audio mix ho raha hai…")
+        onProgress(0f, "Mixing audio…")
         val voice = project.voicePath?.let { runCatching { AudioDecoder.decode(it) }.getOrNull() }
         val music = project.musicPath?.let { runCatching { AudioDecoder.decode(it, maxMs = 10 * 60_000L) }.getOrNull() }
         val pcm = Mixer.mix(project, voice, music, totalMs)
@@ -117,7 +117,7 @@ class VideoExporter(
                 val prog = f / frames.toFloat()
                 val el = (System.currentTimeMillis() - start) / 1000f
                 val eta = if (prog > 0.02f) ((el / prog) - el).toInt() else -1
-                onProgress(0.05f + 0.93f * prog, "Frame $f / $frames" + if (eta >= 0) "  •  ~${eta / 60}m ${eta % 60}s baaki" else "")
+                onProgress(0.05f + 0.93f * prog, "Frame $f / $frames" + if (eta >= 0) "  •  ~${eta / 60}m ${eta % 60}s left" else "")
             }
             encoder.finish(sink)
             writeAudioUpTo(Long.MAX_VALUE)

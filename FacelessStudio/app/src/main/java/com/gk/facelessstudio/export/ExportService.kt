@@ -36,7 +36,7 @@ object ExportManager {
 
     fun start(context: Context, projectId: String, quality: Quality) {
         if (state.value is ExportState.Running) return
-        state.value = ExportState.Running(projectId, 0f, "Shuru ho raha hai…")
+        state.value = ExportState.Running(projectId, 0f, "Starting…")
         val i = Intent(context, ExportService::class.java).putExtra("id", projectId).putExtra("q", quality.name)
         ContextCompat.startForegroundService(context, i)
     }
@@ -55,7 +55,7 @@ class ExportService : Service() {
         val id = intent?.getStringExtra("id") ?: return START_NOT_STICKY.also { stopSelf() }
         val quality = runCatching { Quality.valueOf(intent.getStringExtra("q")!!) }.getOrDefault(Quality.HD)
         channel()
-        val notif = notification(0, "Video ban rahi hai…")
+        val notif = notification(0, "Rendering video…")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTIF_ID, notif, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         } else startForeground(NOTIF_ID, notif)
@@ -66,7 +66,7 @@ class ExportService : Service() {
                 .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "FacelessStudio:export").apply { acquire(3 * 60 * 60 * 1000L) }
             val repo = Repository(applicationContext)
             try {
-                val project = repo.load(id) ?: error("Project nahi mila")
+                val project = repo.load(id) ?: error("Project not found")
                 val out = repo.tempVideo(project)
                 val exporter = VideoExporter(project, quality, Fonts(assets))
                 ExportManager.current = exporter
@@ -81,7 +81,7 @@ class ExportService : Service() {
                 ExportManager.state.value = ExportState.Done(id, uri)
                 nm().notify(DONE_ID, NotificationCompat.Builder(this, CHANNEL)
                     .setSmallIcon(R.drawable.ic_stat).setContentTitle("Video ready! 🎉")
-                    .setContentText(project.title.ifBlank { "Aapki video" } + " gallery me save ho gayi")
+                    .setContentText(project.title.ifBlank { "Your video" } + " was saved to the gallery")
                     .setContentIntent(openApp()).setAutoCancel(true).build())
             } catch (e: ExportCancelled) {
                 ExportManager.state.value = ExportState.Idle

@@ -93,19 +93,19 @@ fun HomeScreen(vm: AppViewModel, onNew: () -> Unit, onOpen: (String) -> Unit) {
             (export as? ExportState.Running)?.let { r ->
                 item {
                     Column(Modifier.fillMaxWidth().background(Surface1, RoundedCornerShape(16.dp)).padding(14.dp)) {
-                        Text("Video render ho rahi hai… ${(r.progress * 100).toInt()}%", fontWeight = FontWeight.Bold)
+                        Text("Rendering video… ${(r.progress * 100).toInt()}%", fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(8.dp))
                         LinearProgressIndicator(progress = { r.progress }, Modifier.fillMaxWidth())
                         Text(r.message, color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
                     }
                 }
             }
-            if (projects.isNotEmpty()) item { Text("Mere Projects", fontWeight = FontWeight.Bold, fontSize = 18.sp) }
+            if (projects.isNotEmpty()) item { Text("My Projects", fontWeight = FontWeight.Bold, fontSize = 18.sp) }
             items(projects, key = { it.id }) { p ->
                 ProjectCard(p, onClick = { onOpen(p.id) }, onDelete = { vm.delete(p.id) }, onDuplicate = { vm.duplicate(p) })
             }
             if (projects.isEmpty()) item {
-                Text("Abhi koi project nahi hai. Upar \"Nayi Video Banao\" dabao 👆", color = Muted, modifier = Modifier.padding(top = 20.dp))
+                Text("No projects yet. Tap \"Create New Video\" above 👆", color = Muted, modifier = Modifier.padding(top = 20.dp))
             }
         }
     }
@@ -121,8 +121,8 @@ private fun NewVideoCard(onNew: () -> Unit) {
                 Icon(Icons.Default.Add, null, tint = Neon, modifier = Modifier.size(30.dp))
             }
             Spacer(Modifier.height(14.dp))
-            Text("Nayi Video Banao", color = Color.Black, fontSize = 22.sp, fontWeight = FontWeight.Black)
-            Text("Aap bas script, voiceover aur images do — animation, captions, transitions, music aur sound effects app khud lagayega.",
+            Text("Create New Video", color = Color.Black, fontSize = 22.sp, fontWeight = FontWeight.Black)
+            Text("Just add a script, voiceover and images — the app adds animations, captions, transitions, music and sound effects for you.",
                 color = Color.Black.copy(alpha = 0.75f), fontSize = 13.sp)
         }
     }

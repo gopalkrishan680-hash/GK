@@ -83,9 +83,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setMusicVolume(v: Float) = update { it.copy(musicVolume = v) }
 
     fun pickVoice(uri: Uri) = viewModelScope.launch {
-        _busy.value = "Voiceover load ho raha hai…"
+        _busy.value = "Loading voiceover…"
         val res = withContext(Dispatchers.IO) { repo.import(_project.value.id, uri, "voice") }
-        if (res == null) { _toast.value = "Audio file open nahi hui"; _busy.value = null; return@launch }
+        if (res == null) { _toast.value = "Could not open the audio file"; _busy.value = null; return@launch }
         update { it.copy(voicePath = res.first, voiceName = res.second) }
         analyzeVoice()
         _busy.value = null
@@ -94,9 +94,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun removeVoice() = update { it.copy(voicePath = null, voiceName = null) }
 
     fun pickMusic(uri: Uri) = viewModelScope.launch {
-        _busy.value = "Music load ho raha hai…"
+        _busy.value = "Loading music…"
         val res = withContext(Dispatchers.IO) { repo.import(_project.value.id, uri, "music") }
-        if (res == null) _toast.value = "Music file open nahi hui" else update { it.copy(musicPath = res.first, musicName = res.second) }
+        if (res == null) _toast.value = "Could not open the music file" else update { it.copy(musicPath = res.first, musicName = res.second) }
         _busy.value = null
     }
 
@@ -104,7 +104,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun addImages(uris: List<Uri>) = viewModelScope.launch {
         if (uris.isEmpty()) return@launch
-        _busy.value = "Images add ho rahi hain…"
+        _busy.value = "Adding images…"
         val paths = withContext(Dispatchers.IO) { uris.mapNotNull { repo.import(_project.value.id, it, "img")?.first } }
         update { it.copy(images = it.images + paths) }
         _busy.value = null
@@ -129,13 +129,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         voiceCache[path]?.let { _voiceInfo.value = it; return it }
         return withContext(Dispatchers.Default) {
             runCatching { VoiceAnalyzer.analyze(AudioDecoder.decode(path)) }.getOrNull()
-        }?.also { voiceCache[path] = it; _voiceInfo.value = it } ?: run { _toast.value = "Voiceover read nahi hua"; null }
+        }?.also { voiceCache[path] = it; _voiceInfo.value = it } ?: run { _toast.value = "Could not read the voiceover"; null }
     }
 
     /** Runs the auto-editor. */
     fun generate(onDone: () -> Unit) = viewModelScope.launch {
-        if (_project.value.script.isBlank()) { _toast.value = "Pehle script likho ya paste karo"; return@launch }
-        _busy.value = "Script samajh raha hoon, scenes bana raha hoon…"
+        if (_project.value.script.isBlank()) { _toast.value = "Write or paste a script first"; return@launch }
+        _busy.value = "Reading your script and building scenes…"
         val voice = analyzeVoice()
         val built = withContext(Dispatchers.Default) { Director.build(_project.value, voice) }
         _project.value = built
@@ -147,7 +147,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** New random look for the entire video, same timing. */
     fun shuffle() = viewModelScope.launch {
-        _busy.value = "Naye animations…"
+        _busy.value = "Creating new animations…"
         val voice = analyzeVoice()
         val p = _project.value.copy(seed = System.nanoTime())
         _project.value = withContext(Dispatchers.Default) { Director.build(p, voice) }
@@ -171,7 +171,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
             SceneType.BIG_STAT -> ScriptAnalyzer.detectStat(s.text)?.let { st ->
                 lines = listOf(st.prefix, st.number.toString(), st.decimals.toString(), st.grouped.toString(), st.suffix); title = st.label
-            } ?: run { _toast.value = "Is line me koi number nahi mila"; return@update p }
+            } ?: run { _toast.value = "No number found in this line"; return@update p }
             SceneType.DATE_STAMP -> lines = ScriptAnalyzer.detectDate(s.text) ?: listOf(ScriptAnalyzer.headline(s.text, 2), "")
             SceneType.VERSUS -> lines = (ScriptAnalyzer.detectVersus(s.text)?.toList() ?: ScriptAnalyzer.keywords(s.text, 2)).map { it.uppercase() }
             SceneType.QUOTE -> lines = listOf(ScriptAnalyzer.detectQuote(s.text) ?: s.text)
@@ -180,7 +180,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             SceneType.OUTRO -> title = p.handle
             else -> title = if (title.isBlank()) ScriptAnalyzer.headline(s.text, if (t == SceneType.HEADLINE_IMAGE) 2 else 4) else title
         }
-        if (t.needsImage && p.images.isEmpty()) { _toast.value = "Is layout ke liye image chahiye"; return@update p }
+        if (t.needsImage && p.images.isEmpty()) { _toast.value = "This layout needs an image"; return@update p }
         l[i] = s.copy(type = t, lines = lines, title = title, lineStarts = if (t == SceneType.QUESTION_LIST && lines.size != s.lineStarts.size) lines.indices.map { it / lines.size.toFloat() } else s.lineStarts,
             imageIndex = if (s.imageIndex < 0 && p.images.isNotEmpty()) 0 else s.imageIndex)
         p.copy(scenes = l)
