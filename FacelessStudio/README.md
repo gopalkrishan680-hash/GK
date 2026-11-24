@@ -48,6 +48,15 @@ Manual control: start a line with a tag – `[stat] [list] [quote] [note] [phone
 **22 layouts × several variants each × 11 transitions × 6 themes**, all driven by a random seed. Tap "Shuffle animations" to give the whole
 video a new look (timing stays the same). In the editor you can change any scene's layout, transition and image, or tap 🎲 to re-roll just that scene.
 
+## Clean Sketch style (like hand-drawn explainer Shorts)
+
+**Video style → Clean Sketch.** A plain white board; for each board the first line is hand-lettered as a title in
+marker capitals (names/numbers in red with a yellow outline, red scribble underline), then every line's subject is
+drawn straight on the board — outline first, then marker colour — with a price-tag for its number ("85%", "$15T")
+or a lettered name with an arrow. Every element appears when its words are spoken in **your** voiceover (cuts follow
+the pauses in the voice, words are timed by syllables). Boards stay at least ~7 s, lettering and drawing are calm,
+and boards change with a soft fade. Works best with images made in the "Whiteboard doodle" art style (subject on white).
+
 ## Whiteboard Doodle style
 
 Pick **Video style → Whiteboard Doodle** (or the ✏️ chip in the editor). Lines share a **board** (at least ~6 s,

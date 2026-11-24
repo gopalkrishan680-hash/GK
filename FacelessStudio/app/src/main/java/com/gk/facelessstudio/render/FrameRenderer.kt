@@ -272,7 +272,7 @@ class FrameRenderer(
             grainPaint.shader.setLocalMatrix(android.graphics.Matrix().apply { setTranslate(r.nextFloat() * 128, r.nextFloat() * 128); postScale(k.u * 1.5f, k.u * 1.5f) })
             c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), grainPaint)
         }
-        if (p.progressBar && p.durationMs > 0) {
+        if (p.progressBar && p.durationMs > 0 && !(p.doodle && p.clean)) {
             val prog = k.clamp01(tMs.toFloat() / p.durationMs)
             val bh = 5f * k.u
             k.fill.color = k.alpha(Color.WHITE, 0.18f)

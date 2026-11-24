@@ -77,6 +77,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setAspect(v: Aspect) = update { it.copy(aspect = v) }
     fun setTheme(v: String) = update { it.copy(themeId = v) }
 
+    /** "animated" / "whiteboard" / "clean" (sketch-notes boards like hand-drawn explainer shorts). */
+    fun setVideoStyle(style: String) = viewModelScope.launch {
+        val clean = style == "clean"
+        _project.value = _project.value.copy(clean = clean)
+        setDoodle(style != "animated").join()
+    }
+
     /** Switches between animated motion graphics and the whiteboard doodle style; scenes are re-planned. */
     fun setDoodle(v: Boolean) = viewModelScope.launch {
         val cur = _project.value

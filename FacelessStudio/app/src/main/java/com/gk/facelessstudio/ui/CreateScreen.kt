@@ -284,18 +284,24 @@ private fun StyleStep(vm: AppViewModel) {
     val p by vm.project.collectAsState()
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         SectionCard("Video style") {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                listOf(false to ("✨  Animated" to "Motion graphics: 34 layouts, charts, transitions — every scene different."),
-                    true to ("✏️  Whiteboard Doodle" to "Each picture is sketched, then coloured in, and the text is handwritten on a white board, like InstaDoodle.")).forEach { (doodle, info) ->
-                    val sel = p.doodle == doodle
-                    Column(Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).background(if (sel) Neon.copy(alpha = 0.15f) else Surface2)
-                        .border(2.dp, if (sel) Neon else Color.Transparent, RoundedCornerShape(14.dp)).clickable { vm.setDoodle(doodle) }.padding(12.dp)) {
+            val cur = if (!p.doodle) "animated" else if (p.clean) "clean" else "whiteboard"
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                listOf(
+                    "clean" to ("🖍️  Clean Sketch" to "White board, lettered titles, subject-only drawings with price tags — each appears as it is spoken (like hand-drawn explainer Shorts)."),
+                    "whiteboard" to ("✏️  Creative Whiteboard" to "Frames, polaroids, bubbles, sticky notes, camera moves — every board looks different."),
+                    "animated" to ("✨  Animated" to "Motion graphics: 34 layouts, charts and transitions."),
+                ).forEach { (id, info) ->
+                    val sel = cur == id
+                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(if (sel) Neon.copy(alpha = 0.15f) else Surface2)
+                        .border(2.dp, if (sel) Neon else Color.Transparent, RoundedCornerShape(14.dp)).clickable { vm.setVideoStyle(id) }.padding(12.dp)) {
                         Text(info.first, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                         Spacer(Modifier.height(4.dp))
                         Text(info.second, color = Muted, fontSize = 12.sp)
                     }
                 }
             }
+            if (p.doodle) Text("Tip: for whiteboard styles make your images with the \"Whiteboard doodle\" art style (main subject on plain white).",
+                color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
         }
         SectionCard("Video size") {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

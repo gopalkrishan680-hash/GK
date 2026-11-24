@@ -61,6 +61,9 @@ class Fonts(assets: AssetManager?) {
     val body: Typeface = load(assets, "poppins_semibold.ttf", Typeface.DEFAULT)
     val condensed: Typeface = load(assets, "anton_regular.ttf", Typeface.DEFAULT_BOLD)
     val hand: Typeface = load(assets, "kalam_bold.ttf", Typeface.create(Typeface.SERIF, Typeface.ITALIC))
+    /** Hand-lettered marker capitals (Latin only; Hindi falls back to Kalam). */
+    val marker: Typeface = load(assets, "permanentmarker.ttf", hand)
+    val note: Typeface = load(assets, "gochihand.ttf", hand)
 }
 
 /** Loads project images scaled for the output size and caches them (thread-safe for reading). */
@@ -108,6 +111,7 @@ class ImageStore(private val paths: List<String>, private val maxEdge: Int) {
                 val gray = g[y * tw + x]
                 var v = if (blurInv >= 255) 255 else minOf(255, gray * 255 / (256 - blurInv))
                 v = (255.0 * Math.pow(v / 255.0, 2.2)).toInt()          // darker, crisper pencil lines
+                if (v > 226) v = 255                                    // paper stays paper: no grey box around the drawing
                 out[y * tw + x] = (0xFF shl 24) or (v shl 16) or (v shl 8) or v
             }
             val b = Bitmap.createBitmap(out, tw, th, Bitmap.Config.ARGB_8888)
@@ -236,7 +240,12 @@ class Kit(
     // ---------------- text ----------------
     private fun isLatin(s: String) = s.all { it.code < 0x250 || it in "₹€£—–’‘“”…✓" }
     /** Anton/Poppins cover Latin; Poppins + Kalam also cover Devanagari, Anton does not. */
-    fun safe(tf: Typeface, s: String) = if (tf == fonts.condensed && !isLatin(s)) fonts.heavy else tf
+    fun safe(tf: Typeface, s: String) = when {
+        isLatin(s) -> tf
+        tf == fonts.condensed -> fonts.heavy
+        tf == fonts.marker || tf == fonts.note -> fonts.hand
+        else -> tf
+    }
 
     fun setText(tf: Typeface, size: Float, color: Int, s: String = "") {
         text.reset(); text.isAntiAlias = true; text.isSubpixelText = true

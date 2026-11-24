@@ -85,6 +85,7 @@ enum class SceneType(val label: String, val needsImage: Boolean, val showsOwnTex
     DOODLE_TEXT("Doodle: Handwriting", false, true),
     DOODLE_NUMBER("Doodle: Big Number", false, true),
     DOODLE_FULL("Doodle: Full Board", true, true),
+    DOODLE_STACK("Clean Sketch Board", false, true),
     DOODLE_DUO("Doodle: Two Pictures", false, true),
     DOODLE_TRIO("Doodle: Three Pictures", false, true),
     DONUT("Percent Donut", false, true),
@@ -181,6 +182,8 @@ data class Project(
     val captionMode: CaptionMode = CaptionMode.KEYWORDS,
     /** Whiteboard doodle style: a hand sketches every picture and writes the text (like InstaDoodle). */
     val doodle: Boolean = false,
+    /** Clean sketch-notes look (with [doodle]): title, subject-only drawings, tags, stacked and synced to the voice. */
+    val clean: Boolean = false,
     /** true when images were generated one-per-script-line, so scene N uses its own image. */
     val lineImages: Boolean = false,
     val imageStep: Int = 1,
@@ -212,7 +215,7 @@ data class Project(
         put("voicePath", voicePath); put("voiceName", voiceName)
         put("musicPath", musicPath); put("musicName", musicName); put("musicVolume", musicVolume.toDouble())
         put("images", JSONArray(images)); put("aspect", aspect.name); put("theme", themeId)
-        put("pacing", pacing.name); put("captionMode", captionMode.name); put("doodle", doodle); put("lineImages", lineImages); put("imageStep", imageStep); put("artStyle", artStyle); put("styleDesc", styleDesc); put("characters", characters)
+        put("pacing", pacing.name); put("captionMode", captionMode.name); put("doodle", doodle); put("clean", clean); put("lineImages", lineImages); put("imageStep", imageStep); put("artStyle", artStyle); put("styleDesc", styleDesc); put("characters", characters)
         put("separator", separator); put("gridSize", gridSize); put("directorPart", directorPart)
         put("visuals", JSONArray(visuals)); put("panelTexts", JSONArray(panelTexts)); put("sfx", sfx); put("grain", grain)
         put("progressBar", progressBar); put("handle", handle); put("seed", seed)
@@ -238,6 +241,7 @@ data class Project(
             captionMode = runCatching { CaptionMode.valueOf(o.optString("captionMode")) }.getOrDefault(CaptionMode.KEYWORDS),
             lineImages = o.optBoolean("lineImages"),
             doodle = o.optBoolean("doodle"),
+            clean = o.optBoolean("clean"),
             imageStep = o.optInt("imageStep", 1).coerceAtLeast(1),
             artStyle = o.optString("artStyle", "storybook"),
             styleDesc = o.optString("styleDesc"),

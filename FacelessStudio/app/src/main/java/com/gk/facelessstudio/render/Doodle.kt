@@ -69,12 +69,13 @@ object Doodle {
         c.drawColor(PAPER)
         k.particles(c, 0f, 5, 140, 0xFFB9B2A4.toInt())
         if (s.type == SceneType.DOODLE_NUMBER) { number(k, c, s, lk, t, d); vignette(k, c); return true }
+        if (s.type == SceneType.DOODLE_STACK) { stack(k, c, s, t, d); return true }
         val items = items(k, s, lk, d)
         c.save()
         camera(k, c, lk, items, t)
         items.forEachIndexed { i, it -> drawItem(k, c, s, lk, it, i, t) }
         // one doodle around the main picture once it is done
-        items.firstOrNull { it.rect != null }?.let { main -> doodle(k, c, s, lk, main, t) }
+        items.firstOrNull { it.rect != null }?.let { main -> doodle(k, c, s, lk, main, items.filter { it.rect != null }, t) }
         c.restore()
         vignette(k, c)
         return true
@@ -94,10 +95,10 @@ object Doodle {
         val cap = { tx: String, n: Int -> ScriptAnalyzer.phrase(tx, n) }
         when (s.type) {
             SceneType.DOODLE_CENTER -> {
-                val r = rect16x9(k.cx, if (k.portrait) k.h * 0.14f else k.h * 0.07f, if (k.portrait) k.w * 0.86f else k.w * 0.6f)
+                val r = rect16x9(k.cx, if (k.portrait) k.h * 0.14f else k.h * 0.05f, if (k.portrait) k.w * 0.9f else k.w * 0.66f)
                 val dr = drawTime(d)
-                out += Item(r, s.imageIndex, s.title.ifBlank { cap(s.text, 14) }, k.cx, r.bottom + 72f * k.u, k.w * 0.82f,
-                    (if (k.portrait) 44f else 40f) * k.u, Paint.Align.CENTER, INK, 0.15f, d, 0.15f + dr * 0.7f)
+                out += Item(r, s.imageIndex, s.title.ifBlank { cap(s.text, 14) }, k.cx, r.bottom + 78f * k.u, k.w * 0.86f,
+                    (if (k.portrait) 50f else 46f) * k.u, Paint.Align.CENTER, INK, 0.15f, d, 0.15f + dr * 0.7f, 2)
             }
             SceneType.DOODLE_LEFT, SceneType.DOODLE_RIGHT -> {
                 val left = s.type == SceneType.DOODLE_LEFT
@@ -105,21 +106,21 @@ object Doodle {
                 val pw = k.w * 0.5f
                 val r = RectF(if (left) k.w * 0.04f else k.w * 0.46f, 0f, 0f, 0f).also { it.right = it.left + pw; it.top = k.cy - pw * 9f / 32f - 10f * k.u; it.bottom = it.top + pw * 9f / 16f }
                 val dr = drawTime(d)
-                out += Item(r, s.imageIndex, s.text, if (left) k.w * 0.58f else k.w * 0.05f, k.h * 0.3f, k.w * 0.37f, 38f * k.u,
+                out += Item(r, s.imageIndex, s.text, if (left) k.w * 0.58f else k.w * 0.05f, k.h * 0.3f, k.w * 0.37f, 44f * k.u,
                     Paint.Align.LEFT, INK, 0.15f, d, 0.15f + dr * 0.6f, 6)
             }
             SceneType.DOODLE_TOP -> {
                 val title = s.title.ifBlank { cap(s.text, 6) }
                 val titleSec = min(1.6f, d * 0.25f)
-                out += Item(null, -1, title, k.cx, k.h * 0.13f, k.w * 0.86f, (if (k.portrait) 50f else 46f) * k.u, Paint.Align.CENTER, BLUE, 0.1f, 0.1f + titleSec, 0.1f, 2, boxed = false)
-                val r = rect16x9(k.cx, k.h * 0.2f, if (k.portrait) k.w * 0.86f else k.w * 0.56f)
+                out += Item(null, -1, title, k.cx, k.h * 0.14f, k.w * 0.88f, (if (k.portrait) 58f else 54f) * k.u, Paint.Align.CENTER, BLUE, 0.1f, 0.1f + titleSec, 0.1f, 2, boxed = false)
+                val r = rect16x9(k.cx, k.h * 0.21f, if (k.portrait) k.w * 0.9f else k.w * 0.6f)
                 out += Item(r, s.imageIndex, "", 0f, 0f, 0f, 0f, Paint.Align.CENTER, INK, 0.2f + titleSec * 0.6f, d, d)
             }
             SceneType.DOODLE_FULL -> {
                 val r = rect16x9(k.cx, k.h * 0.05f, if (k.portrait) k.w * 0.92f else k.w * 0.74f)
                 val dr = drawTime(d)
-                out += Item(r, s.imageIndex, s.title.ifBlank { cap(s.text, 12) }, k.cx, min(k.h - 40f * k.u, r.bottom + 60f * k.u), k.w * 0.86f,
-                    38f * k.u, Paint.Align.CENTER, INK, 0.15f, d, 0.15f + dr * 0.75f, 2)
+                out += Item(r, s.imageIndex, s.title.ifBlank { cap(s.text, 12) }, k.cx, min(k.h - 40f * k.u, r.bottom + 62f * k.u), k.w * 0.88f,
+                    44f * k.u, Paint.Align.CENTER, INK, 0.15f, d, 0.15f + dr * 0.75f, 2)
             }
             SceneType.DOODLE_DUO, SceneType.DOODLE_TRIO -> {
                 val texts = s.lines.ifEmpty { listOf(s.text) }
@@ -132,7 +133,7 @@ object Doodle {
                     val en = if (i + 1 < n) starts[i + 1] * d else d
                     val (r, capY) = slots[i]
                     val img = imgs.getOrElse(i) { -1 }
-                    val size = (if (n == 3 && !k.portrait) 27f else 33f) * k.u
+                    val size = (if (n == 3 && !k.portrait) 34f else 40f) * k.u
                     val dr = drawTime(en - st)
                     out += if (img >= 0 && k.images.get(img) != null)
                         Item(r, img, cap(text, if (n == 3) 10 else 15), r.centerX(), capY, r.width() + 20f * k.u, size, Paint.Align.CENTER,
@@ -143,7 +144,7 @@ object Doodle {
             else -> { // DOODLE_TEXT: lines written one after another, each when spoken
                 val texts = s.lines.ifEmpty { listOf(s.text) }
                 val starts = s.lineStarts.takeIf { it.size == texts.size } ?: texts.indices.map { it / texts.size.toFloat() }
-                val size = (if (k.portrait) 50f else 46f) * k.u
+                val size = (if (k.portrait) 58f else 54f) * k.u
                 var y = k.h * (if (texts.size == 1) 0.42f else 0.22f)
                 texts.forEachIndexed { i, text ->
                     k.setText(k.fonts.hand, size, INK, text)
@@ -174,13 +175,13 @@ object Doodle {
         }
         if (n == 2) when (arr) {
             0 -> for (i in 0 until 2) { // side by side, gently staggered
-                val pw = k.w * 0.42f; val ph = pw * 9f / 16f
-                val left = if (i == 0) k.w * 0.05f else k.w * 0.53f
+                val pw = k.w * 0.44f; val ph = pw * 9f / 16f
+                val left = if (i == 0) k.w * 0.04f else k.w * 0.52f
                 val top = k.cy - ph / 2 - 40f * k.u + (if (i == 0) -25f else 25f) * k.u
                 val r = RectF(left, top, left + pw, top + ph); out += Pair(r, r.bottom + 50f * k.u)
             }
-            1 -> { // diagonal: top-left then bottom-right, captions beside
-                val pw = k.w * 0.4f; val ph = pw * 9f / 16f
+            1 -> { // diagonal: top-left then bottom-right
+                val pw = k.w * 0.44f; val ph = pw * 9f / 16f
                 val a = RectF(k.w * 0.05f, k.h * 0.05f, k.w * 0.05f + pw, k.h * 0.05f + ph)
                 val b = RectF(k.w * 0.55f, k.h * 0.95f - ph - 60f * k.u, k.w * 0.55f + pw, k.h * 0.95f - 60f * k.u)
                 out += Pair(a, a.bottom + 48f * k.u); out += Pair(b, b.bottom + 48f * k.u)
@@ -201,15 +202,15 @@ object Doodle {
                 for (j in 0 until 2) { val top = k.h * 0.06f + j * (sh + 76f * k.u); val r = RectF(k.w * 0.61f, top, k.w * 0.61f + sw, top + sh); out += Pair(r, r.bottom + 38f * k.u) }
             }
             1 -> for (i in 0 until 3) { // row with the middle one lower
-                val pw = k.w * 0.29f; val ph = pw * 9f / 16f
-                val left = k.w * (0.04f + i * 0.32f); val top = k.cy - ph / 2 - 40f * k.u + (if (i == 1) 34f else 0f) * k.u
+                val pw = k.w * 0.305f; val ph = pw * 9f / 16f
+                val left = k.w * (0.03f + i * 0.325f); val top = k.cy - ph / 2 - 50f * k.u + (if (i == 1) 34f else 0f) * k.u
                 val r = RectF(left, top, left + pw, top + ph); out += Pair(r, r.bottom + 44f * k.u)
             }
             else -> { // triangle: two on top, one centred below
-                val pw = k.w * 0.32f; val ph = pw * 9f / 16f
-                val a = RectF(k.w * 0.12f, k.h * 0.05f, k.w * 0.12f + pw, k.h * 0.05f + ph)
-                val b = RectF(k.w * 0.56f, k.h * 0.05f, k.w * 0.56f + pw, k.h * 0.05f + ph)
-                val cc = RectF(k.cx - pw / 2, k.h * 0.53f, k.cx + pw / 2, k.h * 0.53f + ph)
+                val pw = k.w * 0.36f; val ph = pw * 9f / 16f
+                val a = RectF(k.w * 0.08f, k.h * 0.04f, k.w * 0.08f + pw, k.h * 0.04f + ph)
+                val b = RectF(k.w * 0.56f, k.h * 0.04f, k.w * 0.56f + pw, k.h * 0.04f + ph)
+                val cc = RectF(k.cx - pw / 2, k.h * 0.52f, k.cx + pw / 2, k.h * 0.52f + ph)
                 out += Pair(a, a.bottom + 40f * k.u); out += Pair(b, b.bottom + 40f * k.u); out += Pair(cc, cc.bottom + 40f * k.u)
             }
         }
@@ -246,7 +247,15 @@ object Doodle {
 
     // ------------------------------------------------------------------ pictures
     private val dstIn = Paint(Paint.FILTER_BITMAP_FLAG).apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN) }
-    private val multiply = Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.MULTIPLY) }
+    /**
+     * True multiply blending (white of a picture becomes the board). Old PorterDuff.MULTIPLY wiped the board wherever the
+     * picture was transparent (boards turned black), so it is only used through BlendMode on Android 10+; older phones
+     * draw normally.
+     */
+    private val canMultiply = android.os.Build.VERSION.SDK_INT >= 29
+    private val multiply: Paint? = if (canMultiply) Paint(Paint.FILTER_BITMAP_FLAG).apply { blendMode = android.graphics.BlendMode.MULTIPLY } else null
+    /** Opaque marker highlight; safe with the old mode because the source is never transparent. */
+    private val highlighter = Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.MULTIPLY) }
     private val maskPx = ThreadLocal.withInitial { IntArray(DrawOrder.W * DrawOrder.H) }
     private val maskBmp = ThreadLocal.withInitial { Bitmap.createBitmap(DrawOrder.W, DrawOrder.H, Bitmap.Config.ARGB_8888) }
 
@@ -258,12 +267,27 @@ object Doodle {
         return b
     }
 
+    /** Per-thread offscreen picture buffers, keyed by size. */
+    private val scratch = ThreadLocal.withInitial { HashMap<Long, Bitmap>() }
+    private val plain = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
+
+    /**
+     * Reveals [img] inside [r] up to [p]. The mask is applied on a separate bitmap and only the finished pixels
+     * are pasted on the board, so the board itself can never be erased (some phones' GPUs/Skia versions
+     * applied DST_IN to the whole board when it was done on the main canvas, turning boards black).
+     */
     private fun layer(k: Kit, c: Canvas, img: Bitmap, r: RectF, order: FloatArray, p: Float, soft: Float = 0.07f, blend: Paint? = null) {
         if (p <= 0f) return
-        val save = c.saveLayer(r, blend)
-        k.cover(c, img, r, 1.0f)
-        if (p < 1f) c.drawBitmap(mask(order, p * (1f + soft), soft), null, r, dstIn)
-        c.restoreToCount(save)
+        val bw = r.width().toInt().coerceAtLeast(2); val bh = r.height().toInt().coerceAtLeast(2)
+        val map = scratch.get()!!
+        val key = (bw.toLong() shl 32) or bh.toLong()
+        val buf = map.getOrPut(key) { if (map.size > 8) map.clear(); Bitmap.createBitmap(bw, bh, Bitmap.Config.ARGB_8888) }
+        buf.eraseColor(0)
+        val sc = Canvas(buf)
+        val local = RectF(0f, 0f, bw.toFloat(), bh.toFloat())
+        k.cover(sc, img, local, 1.0f)
+        if (p < 1f) sc.drawBitmap(mask(order, p * (1f + soft), soft), null, local, dstIn)
+        c.drawBitmap(buf, null, r, blend ?: plain)
     }
 
     private fun clipFor(frame: Int, r: RectF, seed: Int, k: Kit): Path? = when (frame) {
@@ -316,7 +340,7 @@ object Doodle {
                 val ink = k.images.ink(it.image) ?: sketch
                 layer(k, c, ink, r, order.outline, k.clamp01(p / 0.5f), blend = blend ?: multiply)
                 layer(k, c, color, r, order.colour, k.inOutCubic(k.clamp01((p - 0.45f) / 0.5f)), 0.08f, blend)
-                if (p > 0.45f) layer(k, c, ink, r, order.outline, 1f, blend = multiply)    // keep the ink lines on top of the colour
+                if (p > 0.45f && multiply != null) layer(k, c, ink, r, order.outline, 1f, blend = multiply)    // keep the ink lines on top of the colour
             }
             D_DISSOLVE -> {
                 layer(k, c, sketch, r, order.outline, k.clamp01(p / 0.45f), blend = blend)
@@ -385,8 +409,8 @@ object Doodle {
                 for (wd in l.split(" ")) {
                     val ww = k.text.measureText(wd)
                     if (ScriptAnalyzer.cleanWord(wd).lowercase() in em && after > 0f) {
-                        multiply.color = HIGHLIGHT
-                        c.drawRect(x - 4f * k.u, it.ty + i * lh - it.size * 0.75f, x - 4f * k.u + (ww + 8f * k.u) * after, it.ty + i * lh + it.size * 0.2f, multiply)
+                        highlighter.color = HIGHLIGHT
+                        c.drawRect(x - 4f * k.u, it.ty + i * lh - it.size * 0.75f, x - 4f * k.u + (ww + 8f * k.u) * after, it.ty + i * lh + it.size * 0.2f, highlighter)
                     }
                     x += ww + space
                 }
@@ -420,7 +444,7 @@ object Doodle {
     }
 
     // ------------------------------------------------------------------ doodles around the main picture
-    private fun doodle(k: Kit, c: Canvas, s: Scene, lk: Look, main: Item, t: Float) {
+    private fun doodle(k: Kit, c: Canvas, s: Scene, lk: Look, main: Item, pics: List<Item>, t: Float) {
         val r = main.rect ?: return
         val done = main.start + drawTime(main.end - main.start)
         val p = k.seg(t, done + 0.2f, done + 0.9f)
@@ -438,7 +462,12 @@ object Doodle {
                     c.drawLine(x0, y0, x0 + cos(a) * len, y0 + sin(a) * len, k.stroke)
                 }
             }
-            3 -> arrow(k, c, if (r.centerX() > k.cx) k.w * 0.08f else k.w * 0.92f, k.h * 0.9f, if (r.centerX() > k.cx) r.left - 10f * k.u else r.right + 10f * k.u, r.bottom - 20f * k.u, p, RED, s.variant)
+            3 -> if (pics.size >= 2) {
+                // link the first picture to the second, arcing above both (never across them)
+                val a = pics[0].rect!!; val b = pics[1].rect!!
+                val pa = k.seg(t, pics[1].start - 0.2f, pics[1].start + 0.5f)
+                arrow(k, c, a.centerX(), a.top - 12f * k.u, b.centerX(), b.top - 12f * k.u, pa, RED, s.variant)
+            } else arrow(k, c, if (r.centerX() > k.cx) k.w * 0.08f else k.w * 0.92f, k.h * 0.9f, if (r.centerX() > k.cx) r.left - 10f * k.u else r.right + 10f * k.u, r.bottom - 20f * k.u, p, RED, s.variant)
             4 -> swirl(k, c, if (r.centerX() > k.cx) r.left - 60f * k.u else r.right + 60f * k.u, r.top + 40f * k.u, 34f * k.u, p, BLUE)
             5 -> { // ? or ! next to the picture
                 val mark = if (s.text.trim().endsWith("?")) "?" else "!"
@@ -477,6 +506,173 @@ object Doodle {
         val label = s.lines.firstOrNull() ?: ScriptAnalyzer.phrase(s.text, 9)
         drawItem(k, c, s, lk, Item(null, -1, label, k.cx, k.cy + size * 0.35f + 80f * k.u, k.w * 0.8f, 40f * k.u, Paint.Align.CENTER, INK,
             done + 0.6f, d, done + 0.7f, 2), 1, t)
+    }
+
+    // ------------------------------------------------------------------ clean sketch board (stacked, voice-synced)
+    private const val TAG_YELLOW = 0xFFFFE066.toInt()
+
+    /** Rough spoken time of word [w] in [text] between [st] and [en] (syllable weighted, so long words take longer). */
+    private fun wordTime(text: String, w: Int, st: Float, en: Float): Float {
+        val words = text.split(Regex("\\s+")).filter { it.isNotBlank() }
+        if (words.isEmpty()) return st
+        fun syl(x: String) = max(1, Regex("[aeiouyAEIOUY]+").findAll(x).count())
+        val total = words.sumOf { syl(it) }.toFloat()
+        val before = words.take(w.coerceIn(0, words.size)).sumOf { syl(it) }
+        return st + (en - st) * 0.92f * before / total
+    }
+
+    /** Hand-lettered capitals: names/numbers in red with a yellow outline, the rest in ink, written letter by letter. */
+    private fun letter(k: Kit, c: Canvas, s: Scene, text: String, x: Float, y: Float, size: Float, t: Float, start: Float, cps: Float, maxW: Float, source: String = text): Float {
+        // names/numbers are found in the original line (the lettering is all capitals, so it can't tell them apart)
+        val strong = (ScriptAnalyzer.strongWords(source, 6) + s.emphasis).map { it.lowercase() }.toSet()
+        k.setText(k.fonts.marker, size, INK, text)
+        var sz = size
+        while (k.text.measureText(text) > maxW && sz > size * 0.55f) { sz *= 0.94f; k.text.textSize = sz }
+        val total = k.text.measureText(text)
+        val left = x - total / 2
+        val shown = ((t - start) * cps).toInt().coerceIn(0, text.length)
+        if (shown <= 0) return total
+        var cx = left; var count = 0
+        val space = k.text.measureText(" ")
+        for (wd in text.split(" ")) {
+            val strongW = ScriptAnalyzer.cleanWord(wd).lowercase() in strong || wd.any { it.isDigit() } || wd.startsWith("#")
+            val part = wd.take((shown - count).coerceAtLeast(0))
+            if (part.isNotEmpty()) {
+                if (strongW) {
+                    k.text.style = Paint.Style.STROKE; k.text.strokeWidth = sz * 0.16f; k.text.strokeJoin = Paint.Join.ROUND; k.text.color = TAG_YELLOW
+                    c.drawText(part, cx, y, k.text)
+                    k.text.style = Paint.Style.FILL; k.text.color = RED
+                } else k.text.color = INK
+                c.drawText(part, cx, y, k.text)
+            }
+            count += wd.length + 1
+            cx += k.text.measureText(wd) + space
+        }
+        k.text.style = Paint.Style.FILL
+        return total
+    }
+
+    /** A price-tag label (yellow tag with a hole and string) for numbers like "$15T" or "85%". */
+    private fun tag(k: Kit, c: Canvas, label: String, x: Float, y: Float, pointLeft: Boolean, p: Float, seed: Int) {
+        if (p <= 0f) return
+        k.setText(k.fonts.marker, 34f * k.u, INK, label)
+        val tw = k.text.measureText(label)
+        val w = tw + 46f * k.u; val h = 56f * k.u
+        val r = RectF(x - w / 2, y - h / 2, x + w / 2, y + h / 2)
+        val sc = k.outBack(k.clamp01(p * 1.4f))
+        c.save(); c.rotate(if (pointLeft) 4f else -4f, x, y); c.scale(sc, sc, x, y)
+        val path = Path().apply {
+            if (pointLeft) { moveTo(r.left + 18f * k.u, r.top); lineTo(r.right, r.top); lineTo(r.right, r.bottom); lineTo(r.left + 18f * k.u, r.bottom); lineTo(r.left, r.centerY()); close() }
+            else { moveTo(r.left, r.top); lineTo(r.right - 18f * k.u, r.top); lineTo(r.right, r.centerY()); lineTo(r.right - 18f * k.u, r.bottom); lineTo(r.left, r.bottom); close() }
+        }
+        k.fill.color = TAG_YELLOW; c.drawPath(path, k.fill)
+        k.stroke.color = INK; k.stroke.strokeWidth = 3.5f * k.u; c.drawPath(path, k.stroke)
+        k.fill.color = PAPER; c.drawCircle(if (pointLeft) r.left + 18f * k.u else r.right - 18f * k.u, r.centerY(), 5f * k.u, k.fill)
+        c.drawCircle(if (pointLeft) r.left + 18f * k.u else r.right - 18f * k.u, r.centerY(), 5f * k.u, k.stroke)
+        k.text.textAlign = Paint.Align.CENTER
+        c.drawText(label, r.centerX() + (if (pointLeft) 8f else -8f) * k.u, r.centerY() + 12f * k.u, k.text)
+        c.restore()
+        @Suppress("UNUSED_VARIABLE") val unused = seed
+    }
+
+    private fun shine(k: Kit, c: Canvas, r: RectF, p: Float) {
+        if (p <= 0f) return
+        k.stroke.color = 0xFFF2B705.toInt(); k.stroke.strokeWidth = 3.5f * k.u
+        for (i in 0 until 9) {
+            val a = (-PI * 0.95 + i * PI * 0.9 / 8).toFloat()
+            val rx = r.width() * 0.56f; val ry = r.height() * 0.56f
+            val x0 = r.centerX() + cos(a) * rx; val y0 = r.centerY() + sin(a) * ry
+            val len = 22f * k.u * k.seg(p, i * 0.05f, i * 0.05f + 0.4f)
+            c.drawLine(x0, y0, x0 + cos(a) * len, y0 + sin(a) * len, k.stroke)
+        }
+    }
+
+    /**
+     * Clean sketch board like hand-drawn explainer shorts: a lettered title for the first line, then for every line
+     * its subject drawn straight on the white board (outline first, then marker colour), with a tag for its number or
+     * a lettered note — each element appearing when its words are spoken.
+     */
+    private fun stack(k: Kit, c: Canvas, s: Scene, t: Float, d: Float) {
+        c.drawColor(PAPER)
+        val texts = s.lines.ifEmpty { listOf(s.text) }
+        val n = texts.size
+        val imgs = s.images.ifEmpty { List(n) { s.imageIndex } }
+        val starts = s.lineStarts.takeIf { it.size == n } ?: texts.indices.map { it / n.toFloat() }
+        val st = FloatArray(n) { starts[it] * d }
+        val en = FloatArray(n) { if (it + 1 < n) starts[it + 1] * d else d }
+        val tall = k.h > k.w * 1.1f
+
+        // ---- title (first line) written as it is spoken
+        val title = ScriptAnalyzer.phrase(texts[0], 5).uppercase()
+        val tSize = (if (tall) 66f else 58f) * k.u
+        val titleY = (if (tall) k.h * 0.075f else k.h * 0.12f) + tSize * 0.5f
+        // calm, readable lettering speed
+        val tCps = (title.length / min(2.4f, max(1.0f, (en[0] - st[0]) * 0.5f))).coerceIn(7f, 16f)
+        val tw = letter(k, c, s, title, k.cx, titleY, tSize, t, st[0] + 0.05f, tCps, k.w * 0.9f, texts[0])
+        val tDone = st[0] + 0.05f + title.length / tCps
+        val up = k.seg(t, tDone, tDone + 0.5f)
+        if (up > 0f) {
+            scribbleLine(k, c, k.cx - tw * 0.42f, titleY + tSize * 0.32f, k.cx + tw * 0.38f, titleY + tSize * 0.36f, up, RED, s.variant)
+            scribbleLine(k, c, k.cx - tw * 0.36f, titleY + tSize * 0.44f, k.cx + tw * 0.3f, titleY + tSize * 0.46f, k.seg(t, tDone + 0.2f, tDone + 0.7f), RED, s.variant + 1)
+        }
+
+        // ---- one element per line, stacked down the board
+        val top = titleY + tSize * 0.9f
+        val bottom = k.h * 0.96f
+        val slot = (bottom - top) / n
+        texts.forEachIndexed { i, text ->
+            val img = imgs.getOrElse(i) { -1 }
+            val y0 = top + i * slot
+            val side = min(if (tall) k.w * 0.62f else k.w * 0.4f, slot * 0.82f)
+            val shift = if (n == 1) 0f else (if (i % 2 == 0) -1f else 1f) * (if (tall) k.w * 0.1f else k.w * 0.16f)
+            val r = RectF(k.cx + shift - side / 2, y0 + (slot - side) / 2, k.cx + shift + side / 2, y0 + (slot + side) / 2)
+            val drawStart = if (i == 0) max(st[0] + 0.3f, tDone - 0.2f) else st[i] + 0.1f
+            val dur = ((en[i] - drawStart) * 0.75f).coerceIn(2.0f, 5.0f)
+            // label: a number becomes a price tag, a name a lettered note; it shows up when that word is spoken
+            val words = text.split(Regex("\\s+")).filter { it.isNotBlank() }
+            val numIdx = words.indexOfFirst { w -> w.any { it.isDigit() } }
+            val nameIdx = words.indexOfFirst { w -> ScriptAnalyzer.cleanWord(w).lowercase() in s.emphasis.map { it.lowercase() } }
+            if (img >= 0 && k.images.get(img) != null) {
+                val color = k.images.get(img)!!
+                val sketch = k.images.sketch(img) ?: color
+                val order = DrawOrder.of(sketch, "${k.project.images.getOrNull(img)}", (s.variant + i * 31) * 4 + 1)  // colour follows the pen
+                val p = k.seg(t, drawStart, drawStart + dur)
+                val blend = multiply  // white of the picture becomes the board
+                layer(k, c, sketch, r, order.outline, k.clamp01(p / 0.55f), blend = blend)
+                layer(k, c, color, r, order.colour, k.inOutCubic(k.clamp01((p - 0.45f) / 0.55f)), 0.1f, blend)
+                if (i == 0) shine(k, c, r, k.seg(t, drawStart + dur, drawStart + dur + 0.6f))
+                val tagSide = if (shift <= 0f) 1f else -1f
+                val lx = (r.centerX() + tagSide * (side * 0.5f + (if (tall) 95f else 120f) * k.u)).coerceIn(90f * k.u, k.w - 90f * k.u)
+                when {
+                    numIdx >= 0 -> {
+                        val raw = ScriptAnalyzer.cleanWord(words[numIdx]) + (words.getOrNull(numIdx + 1)?.let { nx -> when (nx.lowercase().trim(',', '.')) {
+                            "crore" -> " CR"; "lakh" -> " L"; "million" -> "M"; "billion" -> "B"; "trillion" -> "T"; "percent" -> "%"; else -> "" } } ?: "")
+                        val tt = wordTime(text, numIdx, st[i], en[i])
+                        val tp = k.seg(t, tt, tt + 0.5f)
+                        tag(k, c, raw.uppercase(), lx, r.centerY() - side * 0.18f, tagSide > 0, tp, s.variant)
+                        if (tp > 0f) arrow(k, c, lx - tagSide * 60f * k.u, r.centerY() - side * 0.18f, r.centerX() + tagSide * side * 0.42f, r.centerY() - side * 0.12f, k.seg(t, tt + 0.2f, tt + 0.6f), INK, s.variant + i)
+                    }
+                    nameIdx >= 0 -> {
+                        val name = ScriptAnalyzer.cleanWord(words[nameIdx]).uppercase()
+                        val tt = wordTime(text, nameIdx, st[i], en[i])
+                        k.setText(k.fonts.marker, 36f * k.u, BLUE, name)
+                        val nw = k.text.measureText(name)
+                        val shown = ((t - tt) * 12f).toInt().coerceIn(0, name.length)
+                        if (shown > 0) {
+                            k.text.textAlign = Paint.Align.CENTER
+                            c.drawText(name.take(shown), lx, r.centerY() - side * 0.2f, k.text)
+                            scribbleLine(k, c, lx - nw / 2, r.centerY() - side * 0.2f + 12f * k.u, lx + nw / 2, r.centerY() - side * 0.2f + 14f * k.u, k.seg(t, tt + name.length / 18f, tt + name.length / 18f + 0.4f), BLUE, s.variant + i)
+                            arrow(k, c, lx, r.centerY() - side * 0.2f + 30f * k.u, r.centerX() + tagSide * side * 0.35f, r.centerY(), k.seg(t, tt + 0.5f, tt + 0.9f), BLUE, s.variant + i)
+                        }
+                    }
+                    else -> {}
+                }
+            } else {
+                // a line without a picture: lettered as a second headline in its slot
+                val h2 = ScriptAnalyzer.phrase(text, 6).uppercase()
+                letter(k, c, s, h2, k.cx, y0 + slot * 0.55f, 50f * k.u, t, st[i] + 0.05f, (h2.length / max(1.0f, (en[i] - st[i]) * 0.55f)).coerceIn(7f, 16f), k.w * 0.88f, text)
+            }
+        }
     }
 
     // ------------------------------------------------------------------ marker shapes

@@ -43,7 +43,7 @@ object Director {
 
         val rnd = Random(project.seed)
         val times = timeChunks(analysis.chunks, voice)
-        val groups = if (project.doodle) boards(analysis.chunks, times, project.pacing)
+        val groups = if (project.doodle) boards(analysis.chunks, times, project.pacing, splitNumbers = !project.clean, extraMs = if (project.clean) 1500L else 0L)
             else group(analysis.chunks, times, mergeQuestions = !project.lineImages)
 
         val images = project.images.size
@@ -131,7 +131,8 @@ object Director {
                     else -> min(images - 1, ((g.start + (g.end - g.start) * (j + 0.5) / g.chunks.size) / max(1, total) * images).toInt())
                 }
             }
-            type = if (project.doodle && g.chunks.size >= 2) when {
+            type = if (project.doodle && project.clean) SceneType.DOODLE_STACK.also { variety.use(it) }
+            else if (project.doodle && g.chunks.size >= 2) when {
                 boardImages.all { it < 0 } -> SceneType.DOODLE_TEXT
                 g.chunks.size == 2 -> SceneType.DOODLE_DUO
                 else -> SceneType.DOODLE_TRIO
@@ -152,6 +153,7 @@ object Director {
 
             val transition = when {
                 gi == 0 -> Transition.FADE
+                project.doodle && project.clean -> Transition.FADE    // clean boards: a soft fade to a fresh board
                 project.doodle -> variety.doodleTransition(lastTransition)
                 first.forceCut -> Transition.CUT
                 else -> variety.transition(lastTransition, first.chapterStart)
@@ -269,7 +271,7 @@ object Director {
             }
             SceneType.DOODLE_CENTER, SceneType.DOODLE_FULL -> Pair(emptyList(), ScriptAnalyzer.phrase(text, 14))
             SceneType.DOODLE_TOP -> Pair(emptyList(), ScriptAnalyzer.phrase(text, 6))
-            SceneType.DOODLE_DUO, SceneType.DOODLE_TRIO, SceneType.DOODLE_TEXT -> Pair(groupLines, "")
+            SceneType.DOODLE_DUO, SceneType.DOODLE_TRIO, SceneType.DOODLE_TEXT, SceneType.DOODLE_STACK -> Pair(groupLines, "")
             SceneType.DOODLE_LEFT, SceneType.DOODLE_RIGHT -> Pair(emptyList(), "")
         }
     }
@@ -341,12 +343,12 @@ object Director {
      * Whiteboard boards: consecutive lines share one board until it has been on screen long enough
      * (so the drawing is never rushed); at most 3 lines, and a chapter always starts a new board.
      */
-    private fun boards(chunks: List<Chunk>, times: List<Pair<Long, Long>>, pacing: Pacing): List<Group> {
-        val minMs = when (pacing) { Pacing.CALM -> 8000L; Pacing.BALANCED -> 6000L; Pacing.ENERGETIC -> 4200L }
+    private fun boards(chunks: List<Chunk>, times: List<Pair<Long, Long>>, pacing: Pacing, splitNumbers: Boolean = true, extraMs: Long = 0L): List<Group> {
+        val minMs = extraMs + when (pacing) { Pacing.CALM -> 8000L; Pacing.BALANCED -> 6000L; Pacing.ENERGETIC -> 4200L }
         val out = mutableListOf<Group>()
         var i = 0
         // a line with a number gets its own board (big circled number)
-        fun numeric(c: Chunk) = ScriptAnalyzer.detectStat(c.text) != null || ScriptAnalyzer.detectPercent(c.text) != null
+        fun numeric(c: Chunk) = splitNumbers && (ScriptAnalyzer.detectStat(c.text) != null || ScriptAnalyzer.detectPercent(c.text) != null)
         while (i < chunks.size) {
             var j = i
             while (!numeric(chunks[i]) && j + 1 < chunks.size && j + 1 - i < 3 && !chunks[j + 1].chapterStart && !numeric(chunks[j + 1]) &&
