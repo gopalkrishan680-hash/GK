@@ -46,7 +46,7 @@ class MainActivity : ComponentActivity() {
                 val nav = rememberNavController()
                 val toast by vm.toast.collectAsState()
                 LaunchedEffect(Unit) {
-                    vm.openImages.collect { if (nav.currentDestination?.route != "create/{step}") nav.navigate("create/2") }
+                    vm.openImages.collect { if (nav.currentDestination?.route != "create/{step}") nav.navigate("create/3") }
                 }
                 LaunchedEffect(toast) {
                     toast?.let { Toast.makeText(this@MainActivity, it, Toast.LENGTH_SHORT).show(); vm.consumeToast() }

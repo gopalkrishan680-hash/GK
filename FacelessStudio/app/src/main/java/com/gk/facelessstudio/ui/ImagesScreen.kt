@@ -100,7 +100,15 @@ fun ImagesStep(vm: AppViewModel) {
     if (pieces.isEmpty() && p.elements && p.script.isNotBlank()) {
         LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             item { PlanCard(vm) }
-            item { StyleCard(vm) }
+            item {
+            val styleName = if (!p.doodle) "✨ Animated" else if (p.elements) "🎨 Explainer Canvas" else if (p.clean) "🖍️ Clean Sketch" else "✏️ Creative Whiteboard"
+            Card {
+                Text("Making images for: $styleName · ${p.aspect.sub}", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Spacer(Modifier.height(4.dp))
+                Text(styleGuide(p).first + " (Change the look in the previous step.)", color = Muted, fontSize = 12.sp)
+            }
+        }
+        item { StyleCard(vm) }
         }
         return
     }

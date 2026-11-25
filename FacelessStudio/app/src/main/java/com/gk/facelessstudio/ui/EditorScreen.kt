@@ -115,7 +115,7 @@ fun EditorScreen(vm: AppViewModel, onBack: () -> Unit, onEditSetup: (Int) -> Uni
                 title = { Text(p.title.ifBlank { "Editor" }, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold) },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) } },
                 actions = {
-                    IconButton(onClick = { preview.pause(); onEditSetup(3) }) { Icon(Icons.Default.Tune, "Settings") }
+                    IconButton(onClick = { preview.pause(); onEditSetup(2) }) { Icon(Icons.Default.Tune, "Settings") }
                     Box(Modifier.padding(end = 10.dp).clip(RoundedCornerShape(12.dp)).background(BrandGradient)
                         .clickable { preview.pause(); showExport = true }.padding(horizontal = 14.dp, vertical = 8.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {

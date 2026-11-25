@@ -87,12 +87,13 @@ import com.gk.facelessstudio.model.Aspect
 import com.gk.facelessstudio.model.Pacing
 import com.gk.facelessstudio.render.Themes
 
-private val STEPS = listOf("Script", "Voice", "Images", "Style")
+private val STEPS = listOf("Script", "Voice", "Look", "Images", "Finish")
+private val LAST = 4
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateScreen(vm: AppViewModel, startStep: Int, onBack: () -> Unit, onGenerated: () -> Unit) {
-    var step by remember { mutableIntStateOf(startStep.coerceIn(0, 3)) }
+    var step by remember { mutableIntStateOf(startStep.coerceIn(0, LAST)) }
     val busy by vm.busy.collectAsState()
     BackHandler { if (step > 0) step-- else onBack() }
 
@@ -108,7 +109,7 @@ fun CreateScreen(vm: AppViewModel, startStep: Int, onBack: () -> Unit, onGenerat
         bottomBar = {
             Row(Modifier.fillMaxWidth().background(Surface1).navigationBarsPadding().padding(14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (step > 0) OutlinedButton(onClick = { step-- }, modifier = Modifier.height(54.dp)) { Text("Back") }
-                if (step < 3) {
+                if (step < LAST) {
                     Button(onClick = { step++ }, modifier = Modifier.weight(1f).height(54.dp), shape = RoundedCornerShape(16.dp)) {
                         Text("Next: ${STEPS[step + 1]}", fontWeight = FontWeight.Bold)
                         Spacer(Modifier.width(6.dp)); Icon(Icons.AutoMirrored.Filled.ArrowForward, null)
@@ -132,7 +133,8 @@ fun CreateScreen(vm: AppViewModel, startStep: Int, onBack: () -> Unit, onGenerat
                 when (step) {
                     0 -> ScriptStep(vm)
                     1 -> VoiceStep(vm)
-                    2 -> ImagesStep(vm)
+                    2 -> LookStep(vm)
+                    3 -> ImagesStep(vm)
                     else -> StyleStep(vm)
                 }
                 busy?.let { msg ->
@@ -277,12 +279,13 @@ private fun FileRow(name: String, sub: String, onRemove: () -> Unit, onReplace: 
     }
 }
 
-// ------------------------------------------------------------------ STEP 4
+// ------------------------------------------------------------------ STEP 3: the look decides the images and animations
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun StyleStep(vm: AppViewModel) {
+private fun LookStep(vm: AppViewModel) {
     val p by vm.project.collectAsState()
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text("Choose the look first — the image prompts and the animations are made for it.", color = Muted, fontSize = 13.sp)
         SectionCard("Video style") {
             val cur = if (!p.doodle) "animated" else if (p.elements) "explainer" else if (p.clean) "clean" else "whiteboard"
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -321,6 +324,39 @@ private fun StyleStep(vm: AppViewModel) {
                 }
             }
         }
+        SectionCard("What you will make") {
+            val (imgs, anim) = styleGuide(p)
+            Text("🖼️  Images", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text(imgs, color = Muted, fontSize = 13.sp)
+            Spacer(Modifier.height(8.dp))
+            Text("🎬  Animations", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text(anim, color = Muted, fontSize = 13.sp)
+        }
+    }
+}
+
+/** What images to make and what animations come, for the chosen video style. */
+fun styleGuide(p: com.gk.facelessstudio.model.Project): Pair<String, String> = when {
+    p.doodle && p.elements -> Pair(
+        "First the AI Visual Plan (next step) designs every character and object. Then each grid panel = ONE element as a cute cut-out on plain white, square panels.",
+        "Elements are drawn one by one (outline, then colour) on an endless canvas as they are spoken; they move, get arrows and handwritten words; the camera glides and zooms.")
+    p.doodle && p.clean -> Pair(
+        "One picture for every two script lines: just the subject on plain white, no background (prompts ask for it automatically).",
+        "Endless canvas: big lettered title, the picture drawn straight in colour, handwritten notes and price tags, smooth camera glide between boards.")
+    p.doodle -> Pair(
+        "One picture per line: main subject on plain white (\"Whiteboard doodle\" art style).",
+        "Whiteboard boards: frames, polaroids, bubbles, sticky notes, natural drawing, slides and page turns — every board different.")
+    else -> Pair(
+        "One full-scene picture per line in your chosen art style, ${p.aspect.sub}.",
+        "Motion graphics: 34 layouts, charts, counters, captions and 16 transitions, never repeating.")
+}
+
+// ------------------------------------------------------------------ STEP 5
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun StyleStep(vm: AppViewModel) {
+    val p by vm.project.collectAsState()
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         SectionCard("Color theme") {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Themes.all.forEach { t ->
