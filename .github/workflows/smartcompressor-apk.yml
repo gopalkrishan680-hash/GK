@@ -1,0 +1,26 @@
+name: Build Smart Compressor APK
+
+on:
+  push:
+    paths: ["SmartCompressor/**", ".github/workflows/smartcompressor-apk.yml"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: SmartCompressor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - name: Build release APK
+        run: chmod +x gradlew && ./gradlew assembleRelease --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SmartCompressor-apk
+          path: SmartCompressor/app/build/outputs/apk/release/app-release.apk
