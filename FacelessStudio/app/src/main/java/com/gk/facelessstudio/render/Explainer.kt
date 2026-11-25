@@ -19,9 +19,13 @@ import kotlin.random.Random
 
 /**
  * Explainer Canvas: separate cartoon elements are drawn one by one on an endless white canvas while the narrator
- * speaks — outline first, then colour wiped in from the top — exactly when the AI Visual Plan says. Elements move next
- * to each other, arrows are drawn between them, key words are handwritten in colour, and the camera keeps gliding and
- * zooming so the newest things are always framed. A "new" action moves on to a fresh part of the canvas.
+ * speaks — ink outline first, then colour wiped in from the top — exactly when the AI Visual Plan says.
+ *
+ * Every part of the canvas ("board") is laid out as a balanced composition that fills the screen: each time something
+ * is added or moves, the board is re-arranged into one of several patterns (row, triangle, 2×2, zig-zag…) and the
+ * elements glide calmly to their new places. Main characters are big, props small. A character that goes to another
+ * joins it side by side (travelling along a gentle arc). Arrows bend around things, handwritten words stick to their
+ * element. The camera glides slowly; when the story moves on, the old board fades while the camera travels.
  */
 object Explainer {
 
@@ -30,38 +34,61 @@ object Explainer {
     private const val BLUE = 0xFF1F5FC8.toInt()
     private const val INK = 0xFF1B1B1B.toInt()
 
-    /** One drawn element on the canvas; [hw]/[hh] = half of its real drawn width/height. */
-    private class Inst(val elem: Int, val image: Int, val name: String, val board: Int, val home: PointF, val hw: Float, val hh: Float, var t0: Float) {
-        /** (time, target) moves; the element glides to each target. */
-        val moves = mutableListOf<Pair<Float, PointF>>()
+    /** Calm timings (seconds). */
+    private const val MOVE = 1.9f        // gliding to a new place
+    private const val REFRAME = 1.8f     // camera re-framing a board
+    private const val PAN = 2.6f         // camera travelling to a new board
+    private const val FADE_OLD = 1.6f    // old board fading while the camera travels
+    private const val OUTLINE = 1.0f
+    private const val FILL = 0.9f
+
+    /** Extra seconds at the end of an Explainer Canvas video, so the last drawing finishes and stays on screen. */
+    const val END_HOLD_MS = 2500L
+
+    private class Inst(val elem: Int, val image: Int, val name: String, val board: Int, var home: PointF, val hw: Float, val hh: Float, var t0: Float) {
+        /** (time, target, arc) moves; the element glides to each target. */
+        val moves = mutableListOf<Triple<Float, PointF, Float>>()
         val pulses = mutableListOf<Float>()
-        val size get() = max(hw, hh) * 2
+        var gone = Float.MAX_VALUE
         fun end() = moves.lastOrNull()?.second ?: home
         fun box(at: PointF = end(), pad: Float = 0f) = RectF(at.x - hw - pad, at.y - hh - pad, at.x + hw + pad, at.y + hh + pad)
         fun pos(k: Kit, t: Float): PointF {
             var p = PointF(home.x, home.y)
-            for ((mt, to) in moves) {
+            for ((mt, to, arc) in moves) {
                 if (t <= mt) break
-                val e = k.inOutCubic(k.clamp01((t - mt) / 1.3f))
-                p = PointF(p.x + (to.x - p.x) * e, p.y + (to.y - p.y) * e)
+                val e = k.inOutSine(k.clamp01((t - mt) / MOVE))
+                val lift = sin(Math.PI.toFloat() * e) * arc
+                p = PointF(p.x + (to.x - p.x) * e, p.y + (to.y - p.y) * e - lift)
             }
             return p
         }
     }
 
     private class Arrow(val a: Inst, val b: Inst, val t0: Float, val bend: Float)
-    private class Word(val text: String, val at: PointF, val size: Float, val width: Float, val color: Int, val t0: Float, val cps: Float) {
-        fun box(pad: Float = 0f) = RectF(at.x - width / 2 - pad, at.y - size * 0.8f - pad, at.x + width / 2 + pad, at.y + size * 0.25f + pad)
+    private class Word(val text: String, val anchor: Inst?, val side: Int, val fixed: PointF, val size: Float, val width: Float, val color: Int, val t0: Float, val cps: Float, val board: Int) {
+        /** Where the word sits: stuck to its element (above / below / right / left), following it when it moves. */
+        fun at(k: Kit, t: Float, gap: Float): PointF {
+            val a = anchor ?: return fixed
+            val p = if (t == Float.MAX_VALUE) a.end() else a.pos(k, t)
+            return when (side) {
+                0 -> PointF(p.x, p.y - a.hh - size * 0.3f)
+                1 -> PointF(p.x, p.y + a.hh + size * 0.95f)
+                2 -> PointF(p.x + a.hw + gap * 0.4f + width / 2, p.y)
+                else -> PointF(p.x - a.hw - gap * 0.4f - width / 2, p.y)
+            }
+        }
+        fun box(at: PointF, pad: Float = 0f) = RectF(at.x - width / 2 - pad, at.y - size * 0.8f - pad, at.x + width / 2 + pad, at.y + size * 0.25f + pad)
     }
-    private class Board(val center: PointF, val t0: Float, val tints: MutableList<Pair<Float, Int>> = mutableListOf())
-    private class Cam(val t: Float, val rect: RectF, val dur: Float)
+    private class Board(val center: PointF, val t0: Float, val variant: Int) {
+        val tints = mutableListOf<Pair<Float, Int>>()
+        /** Groups laid out as one: an element and the ones that joined it, left to right. */
+        val units = mutableListOf<MutableList<Inst>>()
+    }
+    private class Cam(val t: Float, var rect: RectF, var dur: Float, val pan: Boolean)
 
     private class Story(val boards: List<Board>, val insts: List<Inst>, val arrows: List<Arrow>, val words: List<Word>, val cams: List<Cam>)
 
     private val stories = java.util.concurrent.ConcurrentHashMap<String, Story>()
-
-    /** Extra seconds at the end of an Explainer Canvas video, so the last drawing finishes and stays on screen. */
-    const val END_HOLD_MS = 2200L
 
     private fun cueTime(text: String, cue: String, st: Float, en: Float): Float? {
         if (cue.isBlank()) return null
@@ -75,146 +102,201 @@ object Explainer {
         return st + (en - st) * 0.92f * before / total
     }
 
-    private fun story(k: Kit, scenes: List<Scene>): Story = stories.getOrPut("${k.w}x${k.h}/${k.project.plan.hashCode()}/${scenes.size}/${scenes.lastOrNull()?.endMs}/${k.project.images.hashCode()}") {
+    private val generic = setOf("young", "old", "little", "small", "big", "the", "a", "an", "happy", "sad", "angry", "baby", "child", "adult", "kid", "brave", "great")
+    /** "Karna", "young Karna", "Karna with mace" -> "karna": two versions of the same person never stand side by side. */
+    private fun person(name: String) = name.lowercase().split(Regex("[^\\p{L}]+")).firstOrNull { it.length >= 3 && it !in generic } ?: ""
+
+    private fun story(k: Kit, scenes: List<Scene>): Story = stories.getOrPut("${k.w}x${k.h}/${k.project.plan.hashCode()}/${scenes.size}/${scenes.lastOrNull()?.endMs}/${k.project.images.hashCode()}/${k.project.seed}") {
         val plan = Plan.parse(k.project.plan)
         val w = k.w.toFloat(); val h = k.h.toFloat()
         val tall = h > w * 1.1f
-        // element size, text size, rows: elements sit in rows with a band for handwriting above each row
-        val S = if (tall) w * 0.44f else h * 0.36f
-        val ts = if (tall) 64f * k.u else 58f * k.u
-        val band = ts * 1.5f
-        val gap = if (tall) w * 0.07f else w * 0.06f
-        val perRowW = if (tall) w * 0.96f else w * 0.92f
-        val maxRows = if (tall) 3 else 2
-        val rowH = S + band
+        val S = if (tall) w * 0.5f else h * 0.5f            // a "big" element's longest side
+        val ts = if (tall) 62f * k.u else 56f * k.u           // base handwriting size
+        val gap = if (tall) w * 0.07f else w * 0.05f
+        val band = ts * 1.4f                                  // room for handwriting above each element
+        val maxUnits = 6
 
         val boards = mutableListOf<Board>()
         val insts = mutableListOf<Inst>(); val arrows = mutableListOf<Arrow>(); val words = mutableListOf<Word>()
         val cams = mutableListOf<Cam>()
+        val fresh = mutableListOf<Inst>()
         val rnd = Random(k.project.seed)
-        var row = 0; var cursor = 0f
         var lastTint = -100f
-        fun left() = boards.last().center.x - perRowW / 2
-        fun rowY(r: Int) = boards.last().center.y - h * 0.5f + band + S / 2 + r * rowH + (if (tall) h * 0.06f else 0f)
+
+        fun board() = boards.last()
+        fun onBoard() = insts.filter { it.board == boards.lastIndex && it.gone == Float.MAX_VALUE }
+        fun boardWords() = words.filter { it.board == boards.lastIndex }
+
+        // ---- the composition of a board: rows of units, centred, shaped like the screen
+        fun pattern(n: Int, v: Int): List<Int> = if (tall) when (n) {
+            1 -> listOf(1); 2 -> listOf(1, 1); 3 -> if (v % 2 == 0) listOf(1, 2) else listOf(2, 1)
+            4 -> listOf(2, 2); 5 -> if (v % 2 == 0) listOf(2, 1, 2) else listOf(1, 2, 2); else -> listOf(2, 2, 2)
+        } else when (n) {
+            1 -> listOf(1); 2 -> listOf(2); 3 -> when (v % 3) { 0 -> listOf(3); 1 -> listOf(2, 1); else -> listOf(1, 2) }
+            4 -> if (v % 2 == 0) listOf(2, 2) else listOf(3, 1); 5 -> if (v % 2 == 0) listOf(3, 2) else listOf(2, 3); else -> listOf(3, 3)
+        }
+        fun unitW(u: List<Inst>) = u.sumOf { (it.hw * 2).toDouble() }.toFloat() + gap * 0.35f * (u.size - 1)
+        fun unitH(u: List<Inst>) = u.maxOf { it.hh * 2 } + band
+        /** Re-arranges the board; everything already drawn glides calmly to its new place. */
+        fun relayout(t: Float) {
+            val b = board()
+            val units = b.units.filter { it.isNotEmpty() }
+            if (units.isEmpty()) return
+            val rows = mutableListOf<List<List<Inst>>>()
+            var i = 0
+            for (cnt in pattern(units.size, b.variant)) { rows += units.subList(i, min(units.size, i + cnt)); i += cnt }
+            val rowH = rows.map { r -> r.maxOf { unitH(it) } }
+            val totalH = rowH.sum() + gap * 0.6f * (rows.size - 1)
+            var y = b.center.y - totalH / 2
+            val jr = Random(b.variant * 31 + units.size)
+            rows.forEachIndexed { ri, r ->
+                val rw = r.sumOf { unitW(it).toDouble() }.toFloat() + gap * 1.4f * (r.size - 1)
+                var x = b.center.x - rw / 2
+                r.forEachIndexed { ui, u ->
+                    // a 2-unit row on its own is a little staggered (diagonal feel)
+                    val stagger = if (!tall && r.size == 2 && rows.size == 1) (if (ui == 0) -1f else 1f) * h * 0.05f * (if (b.variant % 2 == 0) 1 else -1) else 0f
+                    val cy = y + band + (rowH[ri] - band) / 2 + stagger + (jr.nextFloat() - 0.5f) * h * 0.03f
+                    var mx = x
+                    u.forEach { m ->
+                        val target = PointF(mx + m.hw, cy)
+                        val cur = m.end()
+                        if (abs(cur.x - target.x) + abs(cur.y - target.y) > 2f) {
+                            if (m.t0 >= t) m.home = target                       // not drawn yet: just put it there
+                            else m.moves += Triple(max(t, (m.moves.lastOrNull()?.first ?: 0f) + 0.2f), target, 0f)
+                        }
+                        mx += m.hw * 2 + gap * 0.35f
+                    }
+                    x += unitW(u) + gap * 1.4f
+                }
+                y += rowH[ri] + gap * 0.6f
+            }
+        }
+
         fun newBoard(t: Float) {
             val c = if (boards.isEmpty()) PointF(w / 2, h / 2) else {
-                val prev = boards.last().center
-                if (tall) PointF(prev.x + (if (boards.size % 2 == 0) 0.3f else -0.3f) * w, prev.y + (maxRows * rowH + band) + h * 0.35f)
-                else PointF(prev.x + 1.45f * w, prev.y + (if (rnd.nextBoolean()) 0.2f else -0.2f) * h)
+                val prev = board().center
+                if (tall) PointF(prev.x + (if (boards.size % 2 == 0) 0.5f else -0.5f) * w, prev.y + 1.7f * h)
+                else PointF(prev.x + 1.7f * w, prev.y + (if (rnd.nextBoolean()) 0.3f else -0.3f) * h)
             }
-            boards += Board(c, t)
-            row = 0; cursor = 0f
-        }
-        fun onBoard() = insts.filter { it.board == boards.lastIndex }
-        fun boardWords() = words.filter { it.t0 >= boards.last().t0 }
-        fun blocked(r: RectF, except: Inst? = null) = onBoard().any { it !== except && RectF.intersects(r, it.box(pad = gap * 0.3f)) } ||
-            boardWords().any { RectF.intersects(r, it.box(ts * 0.15f)) }
-
-        // the real drawn size of an element (its subject's own shape), never bigger than S
-        fun extent(img: Int): Pair<Float, Float> {
-            val bmp = if (img >= 0) k.images.get(img) else null
-            if (bmp == null) return Pair(S * 0.4f, S * 0.4f)
-            val sub = k.images.subject(img)
-            val ar = (sub.width() * bmp.width) / (sub.height() * bmp.height)
-            val fw = if (ar >= 1f) S else S * ar
-            return Pair(fw / 2, fw / ar / 2)
+            boards += Board(c, t, rnd.nextInt(1000))
         }
 
-        var emptyCam = -1
-        /** Frames everything on the current board; returns when the camera is there (drawing waits for it). */
-        fun frame(t: Float, dur: Float = 1.1f): Float {
-            val b = boards.last()
+        /** Camera keyframe framing everything on the board. Returns the time the camera is (nearly) there. */
+        fun frame(t: Float, pan: Boolean = false): Float {
+            val b = board()
             val items = onBoard()
             val r = if (items.isEmpty()) RectF(b.center.x - w / 2, b.center.y - h / 2, b.center.x + w / 2, b.center.y + h / 2)
             else RectF(Float.MAX_VALUE, Float.MAX_VALUE, -Float.MAX_VALUE, -Float.MAX_VALUE).also { r ->
-                items.forEach { i -> r.union(i.box()); r.union(i.box(i.home)) }
-                boardWords().forEach { wd -> r.union(wd.box()) }
-                r.inset(-w * 0.05f, -h * 0.07f)
+                items.forEach { r.union(it.box()) }
+                boardWords().forEach { wd -> r.union(wd.box(wd.at(k, Float.MAX_VALUE, gap))) }
+                r.inset(-w * 0.06f, -h * 0.08f)
+                // never zoom in more than ~1.35x
+                val minW = w / 1.35f; val minH = h / 1.35f
+                if (r.width() < minW) r.inset(-(minW - r.width()) / 2, 0f)
+                if (r.height() < minH) r.inset(0f, -(minH - r.height()) / 2)
             }
-            if (items.isEmpty()) { cams += Cam(max(cams.lastOrNull()?.t?.plus(0.3f) ?: 0f, t - 0.6f), r, dur); emptyCam = cams.lastIndex; return t }
-            if (emptyCam >= 0 && t - cams[emptyCam].t < 4f) { cams[emptyCam] = Cam(cams[emptyCam].t, r, cams[emptyCam].dur); emptyCam = -1; return t }
-            emptyCam = -1
-            val ct = max(cams.lastOrNull()?.t?.plus(0.25f) ?: 0f, t - 0.8f)
-            cams += Cam(ct, r, dur)
-            return ct + dur * 0.8f
+            val last = cams.lastOrNull()
+            val start = max(last?.t?.plus(0.4f) ?: 0f, t - (if (pan) 0.8f else 1.0f))
+            // keyframes close together are merged, so the camera never jitters
+            if (last != null && !pan && !last.pan && start < last.t + 1.2f) { last.rect = r; last.dur = max(last.dur, REFRAME); return last.t + last.dur * 0.7f }
+            if (last != null && !pan && last.pan && start < last.t + 1.0f) { last.rect = r; return last.t + last.dur * 0.75f }
+            val dur = if (pan) PAN else REFRAME
+            cams += Cam(start, r, dur, pan)
+            return start + dur * 0.7f
         }
+
         newBoard(0f)
-        frame(0f)
+        cams += Cam(0f, RectF(0f, 0f, w, h), 1f, true)
         var last: Inst? = null
         var first = true
-        val fresh = mutableListOf<Inst>()
         for (i in scenes.indices) {
             val s = scenes[i]
             val st = s.startMs / 1000f
-            // the last scene also holds the end pause: its words are spoken before that
             val en = (s.startMs + s.durationMs) / 1000f - (if (i == scenes.lastIndex) END_HOLD_MS / 1000f else 0f)
             val acts = plan.lines[i] ?: continue
             acts.forEachIndexed { ai, act ->
                 var t = (cueTime(s.text, act.cue, st, en) ?: (st + 0.15f + (en - st) * 0.75f * ai / max(1, acts.size)))
-                if (first) { t = min(t, 0.25f); first = false }   // never start on an empty screen
-                /** The element on this board, or a new one placed in the next free place of the rows. */
+                if (first) { t = min(t, 0.25f); first = false }
+
+                /** The element on this board, or a new one (placed by re-arranging the board). */
                 fun inst(id: String, at: Float): Inst? {
                     val e = plan.index(id); if (e < 0) return null
                     onBoard().firstOrNull { it.elem == e }?.let { return it }
+                    val el = plan.elements[e]
+                    // the same person in another version replaces the one on the board instead of standing next to it
+                    val same = person(el.name).takeIf { it.isNotEmpty() }?.let { pn -> onBoard().firstOrNull { person(it.name) == pn } }
+                    if (same == null && board().units.count { it.isNotEmpty() } >= maxUnits) { newBoard(at); frame(at, pan = true) }
                     val img = if (e < k.project.images.size && k.project.images[e].isNotBlank()) e else -1
-                    val (hw, hh) = extent(img)
-                    var spot: PointF? = null
-                    var tries = 0
-                    while (spot == null && tries++ < 40) {
-                        if (cursor + 2 * hw > perRowW) { row++; cursor = 0f }
-                        if (row >= maxRows) { newBoard(at); frame(at, 1.6f) }
-                        val c = PointF(left() + cursor + hw, rowY(row))
-                        val r = RectF(c.x - hw, c.y - hh, c.x + hw, c.y + hh)
-                        if (!blocked(r)) spot = c
-                        cursor += 2 * hw + gap
+                    val side = S * when (el.scale) { "big" -> 1f; "small" -> 0.52f; else -> 0.78f }
+                    val bmp = if (img >= 0) k.images.get(img) else null
+                    val (hw, hh) = if (bmp == null) Pair(side * 0.42f, side * 0.42f) else {
+                        val sub = k.images.subject(img)
+                        val ar = (sub.width() * bmp.width) / (sub.height() * bmp.height)
+                        val fw = if (ar >= 1f) side else side * ar
+                        Pair(fw / 2, fw / ar / 2)
                     }
-                    val home = spot ?: PointF(left() + cursor + hw, rowY(row)).also { cursor += 2 * hw + gap }
-                    return Inst(e, img, plan.elements[e].name, boards.lastIndex, home, hw, hh, at).also { insts += it; fresh += it }
+                    val n = Inst(e, img, el.name, boards.lastIndex, same?.end() ?: board().center, hw, hh, at)
+                    insts += n
+                    if (same != null) {
+                        same.gone = at + 0.2f
+                        board().units.forEach { u -> val j = u.indexOf(same); if (j >= 0) u[j] = n }
+                    } else board().units += mutableListOf(n)
+                    fresh += n
+                    return n
                 }
-                /** New elements are drawn once the camera has arrived to frame them. */
-                fun settle() { if (fresh.isNotEmpty()) { val ready = frame(fresh.minOf { it.t0 }); fresh.forEach { it.t0 = max(it.t0, ready) }; fresh.clear() } }
+                fun settle(t0: Float) {
+                    if (fresh.isEmpty()) return
+                    relayout(t0)
+                    val ready = frame(t0)
+                    fresh.forEach { it.t0 = max(it.t0, ready) }
+                    fresh.clear()
+                }
                 when (act.kind) {
-                    Plan.Kind.NEW -> if (onBoard().isNotEmpty()) { newBoard(t); frame(t, 1.6f) }
+                    Plan.Kind.NEW -> if (onBoard().isNotEmpty()) { newBoard(t); frame(t, pan = true) }
                     Plan.Kind.BG -> {
-                        // soft paper tints only, and not too often (no dark boards: drawings are made on white)
                         val col = when (act.text.trim().lowercase()) {
                             "blue", "cool", "sky" -> 0xFFEEF4FB.toInt(); "yellow", "warm" -> 0xFFFFF8E6.toInt()
                             "green" -> 0xFFEFF8EC.toInt(); "pink", "red" -> 0xFFFCEEF2.toInt(); "grey", "gray", "dark", "night", "black" -> 0xFFF0F0F0.toInt()
                             else -> Color.WHITE
                         }
-                        if (t - lastTint > 10f) { boards.last().tints += t to col; lastTint = t }
+                        if (t - lastTint > 10f) { board().tints += t to col; lastTint = t }
                     }
                     Plan.Kind.DRAW -> {
                         val e = plan.index(act.a)
                         val existing = onBoard().firstOrNull { it.elem == e }
                         if (existing != null) { existing.pulses += t; last = existing }
-                        else inst(act.a, t)?.let { last = it; settle() }
+                        else inst(act.a, t)?.let { last = it; settle(t) }
                     }
                     Plan.Kind.MOVE -> {
-                        val a = inst(act.a, t - 1.2f); val b = inst(act.b, t - 1.2f)
-                        settle()
+                        val a = inst(act.a, t - 1.4f); val b = inst(act.b, t - 1.4f)
+                        settle(t - 1.4f)
                         if (a != null && b != null && a !== b) {
-                            val ap = a.end(); val bp = b.end()
-                            val side = if (ap.x <= bp.x) -1f else 1f
-                            // next to b, on a free side (never on top of anything)
-                            val cands = listOf(PointF(bp.x + side * (b.hw + a.hw + gap * 0.5f), bp.y), PointF(bp.x - side * (b.hw + a.hw + gap * 0.5f), bp.y),
-                                PointF(bp.x, bp.y - b.hh - a.hh - gap * 0.5f), PointF(bp.x, bp.y + b.hh + a.hh + gap * 0.5f))
-                            val to = cands.firstOrNull { q -> !blocked(RectF(q.x - a.hw, q.y - a.hh, q.x + a.hw, q.y + a.hh), except = a) }
-                            val mt = max(t, a.t0 + 1.6f)   // it moves once it has been drawn
-                            if (to != null) { a.moves += mt to to; frame(mt) } else a.pulses += mt
+                            val mt = max(t, a.t0 + OUTLINE + FILL + 0.2f)
+                            val units = board().units
+                            val ua = units.firstOrNull { a in it }; val ub = units.firstOrNull { b in it }
+                            if (ua != null && ub != null && ua !== ub) {
+                                val fromLeft = a.end().x < b.end().x
+                                ua.remove(a); units.removeAll { it.isEmpty() }
+                                if (fromLeft) ub.add(ub.indexOf(b), a) else ub.add(ub.indexOf(b) + 1, a)
+                                val before = a.moves.size
+                                relayout(mt)
+                                // the travelling element goes along a gentle arc over the others
+                                if (a.moves.size > before) { val m = a.moves.last(); a.moves[a.moves.lastIndex] = Triple(m.first, m.second, S * 0.35f) }
+                                frame(mt)
+                            } else a.pulses += mt
                             last = a
                         }
                     }
                     Plan.Kind.ARROW -> {
-                        val a = inst(act.a, t - 1.2f); val b = inst(act.b, t - 1.2f)
-                        settle()
+                        val a = inst(act.a, t - 1.4f); val b = inst(act.b, t - 1.4f)
+                        settle(t - 1.4f)
                         if (a != null && b != null && a !== b) {
                             val pa = a.end(); val pb = b.end()
                             val d = kotlin.math.hypot(pb.x - pa.x, pb.y - pa.y) - (a.hw + b.hw)
-                            if (d < S * 0.35f) b.pulses += t   // too close for an arrow: the target just bounces
+                            val at = max(t, max(a.t0, b.t0) + OUTLINE + FILL)
+                            if (d < S * 0.3f) b.pulses += at
                             else {
                                 // bend away from anything in between
-                                // try gentle to strong bends on both sides; keep the first whose curve misses everything else
                                 val bend = listOf(0.22f, -0.22f, 0.45f, -0.45f, 0.7f, -0.7f, 0.9f, -0.9f).firstOrNull { bd ->
                                     val dx = pb.x - pa.x; val dy = pb.y - pa.y
                                     val mx = (pa.x + pb.x) / 2 - dy * bd * 0.5f; val my = (pa.y + pb.y) / 2 + dx * bd * 0.5f
@@ -223,8 +305,7 @@ object Explainer {
                                         val y = (1 - u) * (1 - u) * pa.y + 2 * (1 - u) * u * my + u * u * pb.y
                                         onBoard().any { o -> o !== a && o !== b && o.box(pad = gap * 0.45f).contains(x, y) } }
                                 } ?: 0.9f
-                                val at = max(t, max(a.t0, b.t0) + 1.5f)
-                                arrows += Arrow(a, b, at, bend); frame(at)
+                                arrows += Arrow(a, b, at, bend)
                             }
                             last = b
                         }
@@ -232,19 +313,28 @@ object Explainer {
                     Plan.Kind.TEXT -> {
                         val txt = act.text.trim().take(24)
                         if (txt.isNotEmpty()) {
-                            k.setText(k.fonts.marker, ts, INK, txt)
+                            val anchor = last?.takeIf { it.board == boards.lastIndex && it.gone == Float.MAX_VALUE }
+                            // the word is sized to its element, so it never looks lost
+                            val size = if (anchor == null) ts * 1.3f else (anchor.hh * 2 * 0.24f).coerceIn(ts, ts * 1.6f)
+                            k.setText(k.fonts.marker, size, INK, txt)
                             val tw = k.text.measureText(txt)
-                            val anchor = last?.takeIf { it.board == boards.lastIndex }
-                            val cands = if (anchor == null) listOf(PointF(boards.last().center.x, rowY(0) - S / 2 - ts * 0.3f)) else {
-                                val p = anchor.end()
-                                listOf(PointF(p.x, p.y - anchor.hh - ts * 0.3f), PointF(p.x, p.y + anchor.hh + ts * 0.95f),
-                                    PointF(p.x + anchor.hw + gap * 0.4f + tw / 2, p.y), PointF(p.x - anchor.hw - gap * 0.4f - tw / 2, p.y),
-                                    PointF(p.x, p.y - anchor.hh - ts * 1.4f))
-                            }
-                            val at = cands.firstOrNull { q -> !blocked(RectF(q.x - tw / 2, q.y - ts * 0.8f, q.x + tw / 2, q.y + ts * 0.25f)) } ?: cands[0]
                             val colors = intArrayOf(PINK, ORANGE, BLUE)
-                            words += Word(txt, at, ts, tw, colors[words.size % 3], t, max(14f, txt.length / 0.5f))
-                            frame(t)
+                            val wt = max(t, (anchor?.t0 ?: t) + 0.4f)
+                            val cps = max(14f, txt.length / 0.5f)
+                            val wd = if (anchor == null) {
+                                val top = onBoard().minOfOrNull { it.box().top } ?: (board().center.y - h * 0.3f)
+                                Word(txt, null, 0, PointF(board().center.x, top - size * 0.4f), size, tw, colors[words.size % 3], wt, cps, boards.lastIndex)
+                            } else {
+                                val side = (0..3).firstOrNull { sd ->
+                                    val cand = Word(txt, anchor, sd, PointF(), size, tw, 0, 0f, 0f, 0)
+                                    val bx = cand.box(cand.at(k, Float.MAX_VALUE, gap))
+                                    onBoard().none { o -> o !== anchor && RectF.intersects(bx, o.box()) } &&
+                                        boardWords().none { o -> RectF.intersects(bx, o.box(o.at(k, Float.MAX_VALUE, gap), ts * 0.15f)) }
+                                } ?: 0
+                                Word(txt, anchor, side, PointF(), size, tw, colors[words.size % 3], wt, cps, boards.lastIndex)
+                            }
+                            words += wd
+                            frame(wt)
                         }
                     }
                 }
@@ -254,39 +344,52 @@ object Explainer {
     }
 
     fun draw(k: Kit, c: Canvas, scenes: List<Scene>, tMs: Long) {
-        val sto = story(k, scenes)
+        val sto = synchronized(stories) { story(k, scenes) }
         val t = tMs / 1000f
         // ---- camera: glide between the framings, never jumps
         var from = sto.cams.first().rect; var to = from; var t0 = 0f; var dur = 1f
-        fun at(x: Float): RectF { val e = k.inOutCubic(k.clamp01((x - t0) / dur)); return lerp(from, to, e) }
+        fun at(x: Float): RectF { val e = k.inOutSine(k.clamp01((x - t0) / dur)); return lerp(from, to, e) }
         for (cm in sto.cams) {
             if (cm.t > t) break
             from = at(cm.t); to = cm.rect; t0 = cm.t; dur = cm.dur
         }
         val view = at(t)
-        val zoom = min(k.w / (view.width() * 1.0f), k.h / view.height()).coerceIn(0.45f, 1.5f) * (1f + 0.012f * sin(t * 0.35f))
+        val zoom = min(k.w / view.width(), k.h / view.height()).coerceIn(0.35f, 1.4f) * (1f + 0.01f * sin(t * 0.3f))
         val camX = view.centerX(); val camY = view.centerY()
 
         // ---- paper: the current board's tint (soft cross-fade)
         val bi = sto.boards.indexOfLast { it.t0 <= t }.coerceAtLeast(0)
         var paper = Doodle.PAPER
-        for ((tt, col) in sto.boards[bi].tints) if (tt <= t) paper = k.mix(paper, if (col == Color.WHITE) Doodle.PAPER else col, k.clamp01((t - tt) / 1.6f))
+        for ((tt, col) in sto.boards[bi].tints) if (tt <= t) paper = k.mix(paper, if (col == Color.WHITE) Doodle.PAPER else col, k.clamp01((t - tt) / 2f))
         c.drawColor(paper)
-        val dark = Color.red(paper) < 90
 
         c.save()
         c.translate(k.cx, k.cy); c.scale(zoom, zoom); c.translate(-camX, -camY)
         val vw = k.w / zoom; val vh = k.h / zoom
         val visible = RectF(camX - vw / 2, camY - vh / 2, camX + vw / 2, camY + vh / 2)
+        val gap = if (k.h > k.w * 1.1f) k.w * 0.07f else k.w * 0.05f
 
-        for (i in sto.insts) {
-            if (t < i.t0) continue
-            val p = i.pos(k, t)
-            if (p.x + i.hw < visible.left || p.x - i.size > visible.right || p.y + i.size < visible.top || p.y - i.size > visible.bottom) continue
-            element(k, c, i, p, t, dark)
+        // the old board fades away while the camera travels to the new one (no half-cut things at the edges)
+        for (b in max(0, bi - 1)..bi) {
+            val alpha = if (b >= bi) 1f else 1f - k.clamp01((t - sto.boards[bi].t0) / FADE_OLD)
+            if (alpha <= 0.01f) continue
+            val layered = alpha < 0.99f
+            if (layered) c.saveLayerAlpha(visible, (255 * alpha).toInt())
+            // still elements first, travelling ones on top
+            val items = sto.insts.filter { it.board == b && t >= it.t0 && t < it.gone + 0.7f }
+            val (moving, still) = items.partition { i -> i.moves.any { t > it.first && t < it.first + MOVE } }
+            for (i in still + moving) {
+                val p = i.pos(k, t)
+                if (p.x + i.hw < visible.left || p.x - i.hw > visible.right || p.y + i.hh < visible.top || p.y - i.hh > visible.bottom) continue
+                val fade = if (t > i.gone) 1f - k.clamp01((t - i.gone) / 0.6f) else 1f
+                if (fade < 0.99f) c.saveLayerAlpha(RectF(p.x - i.hw * 1.2f, p.y - i.hh * 1.2f, p.x + i.hw * 1.2f, p.y + i.hh * 1.2f), (255 * fade).toInt())
+                element(k, c, i, p, t)
+                if (fade < 0.99f) c.restore()
+            }
+            for (a in sto.arrows) if (a.a.board == b && t >= a.t0 && t < min(a.a.gone, a.b.gone)) arrow(k, c, a, t)
+            for (wd in sto.words) if (wd.board == b && t >= wd.t0 && t < (wd.anchor?.gone ?: Float.MAX_VALUE)) word(k, c, wd, t, gap)
+            if (layered) c.restore()
         }
-        for (a in sto.arrows) if (t >= a.t0) arrow(k, c, a, t)   // arrows on top, so their heads are never hidden
-        for (wd in sto.words) if (t >= wd.t0) word(k, c, wd, t)
         c.restore()
     }
 
@@ -300,41 +403,38 @@ object Explainer {
         }
     }
 
-    private fun element(k: Kit, c: Canvas, i: Inst, p: PointF, t: Float, dark: Boolean) {
+    private fun element(k: Kit, c: Canvas, i: Inst, p: PointF, t: Float) {
         val age = t - i.t0
-        // a gentle idle bob so the characters feel alive
-        val bob = sin(t * 1.6f + i.elem * 1.7f) * 3f * k.u * k.clamp01((age - 2f) / 1f)
+        val bob = sin(t * 1.4f + i.elem * 1.7f) * 3f * k.u * k.clamp01((age - 2.5f) / 1f)
         var sc = 1f
-        for (pt in i.pulses) if (t >= pt && t < pt + 0.6f) sc = 1f + 0.1f * sin(Math.PI.toFloat() * (t - pt) / 0.6f)
+        for (pt in i.pulses) if (t >= pt && t < pt + 0.7f) sc = 1f + 0.08f * sin(Math.PI.toFloat() * (t - pt) / 0.7f)
         c.save(); c.translate(p.x, p.y + bob); c.scale(sc, sc)
         val color = if (i.image >= 0) k.images.get(i.image) else null
         if (color == null) {
             // no picture yet: the element's name in a sketched circle (so the plan can be previewed)
             val r = i.hw * 0.95f
-            k.stroke.color = if (dark) Color.WHITE else INK; k.stroke.strokeWidth = 3f * k.u
+            k.stroke.color = INK; k.stroke.strokeWidth = 3f * k.u
             val path = Path().apply { addCircle(0f, 0f, r, Path.Direction.CW) }
-            val pm = PathMeasure(path, false); val seg = Path(); pm.getSegment(0f, pm.length * k.clamp01(age / 0.9f), seg, true)
+            val pm = PathMeasure(path, false); val seg = Path(); pm.getSegment(0f, pm.length * k.clamp01(age / OUTLINE), seg, true)
             c.drawPath(seg, k.stroke)
-            k.setText(k.fonts.note, 34f * k.u, if (dark) Color.WHITE else INK, i.name)
+            k.setText(k.fonts.note, 34f * k.u, INK, i.name)
             k.text.textAlign = Paint.Align.CENTER
             k.text.alpha = (255 * k.clamp01((age - 0.5f) / 0.5f)).toInt()
             c.drawText(i.name.take(16), 0f, 12f * k.u, k.text)
             c.restore(); return
         }
         val sub = k.images.subject(i.image)
-        val ar = (sub.width() * color.width) / (sub.height() * color.height)
-        @Suppress("UNUSED_VARIABLE") val unusedAr = ar
         val r = RectF(-i.hw, -i.hh, i.hw, i.hh)
-        val outline = k.clamp01(age / 0.9f)
-        val fill = k.clamp01((age - 0.75f) / 0.75f)
-        val blend = if (dark) null else Doodle.multiply
+        val outline = k.clamp01(age / OUTLINE)
+        val fill = k.clamp01((age - OUTLINE * 0.85f) / FILL)
         if (fill < 1f) {
             // crisp black ink outline first (falls back to the pencil sketch for very dark pictures)
-            val sketch = k.images.ink(i.image) ?: k.images.sketch(i.image) ?: color
-            val ord = DrawOrder.of(sketch, "${k.project.images.getOrNull(i.image)}", i.elem * 4 + 1)
-            Doodle.layer(k, c, sketch, r, ord.outline, outline, 0.08f, blend, sub)
+            val pencil = k.images.sketch(i.image) ?: color
+            val lines = k.images.ink(i.image) ?: pencil
+            val ord = DrawOrder.of(pencil, "${k.project.images.getOrNull(i.image)}", i.elem * 4 + 1)
+            Doodle.layer(k, c, lines, r, ord.outline, outline, 0.08f, Doodle.multiply, sub)
         }
-        if (fill > 0f) Doodle.layer(k, c, color, r, wipe, fill, 0.06f, blend, sub)
+        if (fill > 0f) Doodle.layer(k, c, color, r, wipe, fill, 0.06f, Doodle.multiply, sub)
         c.restore()
     }
 
@@ -350,7 +450,7 @@ object Explainer {
         val mx = (sx + ex) / 2 - uy * d * 0.5f * a.bend; val my = (sy + ey) / 2 + ux * d * 0.5f * a.bend
         val path = Path().apply { moveTo(sx, sy); quadTo(mx, my, ex, ey) }
         val pm = PathMeasure(path, false)
-        val p = k.inOutSine(k.clamp01((t - a.t0) / 0.8f))
+        val p = k.inOutSine(k.clamp01((t - a.t0) / 1.2f))
         val seg = Path(); pm.getSegment(0f, pm.length * p, seg, true)
         k.stroke.color = BLUE; k.stroke.strokeWidth = 6f * k.u; k.stroke.strokeCap = Paint.Cap.ROUND
         c.drawPath(seg, k.stroke)
@@ -367,11 +467,12 @@ object Explainer {
         }
     }
 
-    private fun word(k: Kit, c: Canvas, wd: Word, t: Float) {
+    private fun word(k: Kit, c: Canvas, wd: Word, t: Float, gap: Float) {
         val shown = ((t - wd.t0) * wd.cps).toInt().coerceIn(0, wd.text.length)
         if (shown <= 0) return
+        val at = wd.at(k, t, gap)
         k.setText(k.fonts.marker, wd.size, wd.color, wd.text)
         k.text.textAlign = Paint.Align.LEFT
-        c.drawText(wd.text.substring(0, shown), wd.at.x - wd.width / 2, wd.at.y, k.text)
+        c.drawText(wd.text.substring(0, shown), at.x - wd.width / 2, at.y, k.text)
     }
 }

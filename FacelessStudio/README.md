@@ -67,13 +67,21 @@ How to make one:
    cute explainer-doodle style, so ChatGPT/Gemini draws exactly what the plan needs. Share/paste the grid as usual.
 3. Before the pictures arrive, the preview shows each element's name in a sketched circle, so the plan can be checked.
 
-Layout rules the renderer follows: elements sit in rows with a band for handwriting above each row, so **nothing is
-drawn on top of anything else** (moves go to a free side of the target; arrows bend around things in between and are
-skipped when two things already touch); the **camera arrives first, then the drawing starts**, and everything on the
-current part of the canvas stays in frame; the outline is a **crisp black ink line**; paper tints are soft, never dark,
-and change at most every ~10 s; the first drawing starts right away; the video ends with a ~2 s hold so the last
-drawing finishes. The prompts ask for one element per person (no duplicate versions) and full-body characters with
-white margin on every side.
+Layout rules the renderer follows: every part of the canvas is a **balanced composition that fills the screen** —
+each time something is added or moves, the board is re-arranged into a pattern that suits the number of things (one
+big in the middle, side by side with a slight stagger, a triangle, 2×2, 3+2…, different per board) and everything
+glides calmly (~2 s) to its new place, so there are no gaps or lopsided lines. **Sizes follow the plan**: main
+characters big, other characters normal, props small (the plan prompt asks the AI for big / normal / small). A
+character that goes to another joins it side by side, travelling along a gentle arc over the others. Nothing is drawn
+on top of anything else; arrows bend around things in between and are skipped when two things already touch.
+Handwritten words are sized to their element and stick to it when it moves. Two versions of the same person (e.g.
+"Karna" and "Karna with mace") never stand side by side: the new one replaces the old with a soft cross-fade.
+
+Calm transitions: the camera re-frames over ~1.8 s and travels to a new part of the canvas over ~2.6 s while the old
+board fades out (no half-cut things at the edges); camera moves that come close together are merged so it never
+jitters. The camera arrives first, then the drawing starts (ink outline ~1 s, colour ~0.9 s). Soft paper tints only,
+at most every ~10 s; the first drawing starts right away; a ~2.5 s hold at the end lets the last drawing finish.
+The prompts ask for one element per person and full-body characters with white margin on every side.
 
 ## Clean Sketch style (like hand-drawn explainer Shorts)
 

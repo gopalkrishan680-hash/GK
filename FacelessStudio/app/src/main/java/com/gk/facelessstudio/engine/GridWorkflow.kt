@@ -154,7 +154,8 @@ object GridWorkflow {
         sb.append(" (cute doodle characters and objects drawn one by one on a white canvas while the narrator speaks). ")
         sb.append("The narration lines are below (they may be in Hindi, Hinglish or English).\n\n")
         sb.append("1) Design the ELEMENTS: every character or object the video needs, each one a separate small drawing on white. ")
-        sb.append("Give each an id E1, E2, … a short name and an English drawing description (10-25 words: what it is, colours, face/expression). ")
+        sb.append("Give each an id E1, E2, … a short name, an English drawing description (10-25 words: what it is, colours, face/expression) and a size: " +
+            "big (the main characters), normal (other characters, animals, buildings) or small (objects, props, symbols like a crown, heart, scroll, coin). ")
         sb.append("Re-use the same element whenever the same thing appears again. ONE person = ONE element for the whole video: never make a second element for the same person " +
             "(no 'young X', 'X with sword', 'X sad'); objects they hold or use are separate elements. Personify abstract things (cells, germs, money, ideas, emotions) as cute characters. ")
         sb.append("Use about one new element for every 2-3 lines; not every line needs a new drawing.\n")
@@ -167,14 +168,15 @@ object GridWorkflow {
         sb.append("   bg blue       -> softly tint the paper (white, blue, yellow, green, pink, grey) — use it RARELY, only for a big change of mood or place (at most once every 8-10 lines)\n")
         sb.append("   Add @word after an action to start it exactly when that word of the line is spoken, e.g.  E2 @virus\n")
         sb.append("Keep 2-5 elements on one part of the canvas, then use new. Things must match exactly what each line says. " +
-            "Use an arrow only between two different elements that are both on the canvas, for a real cause/flow. Every line's actions should start early in the line.\n")
+            "Use an arrow only between two different elements that are both on the canvas, for a real cause/flow. Every line's actions should start early in the line. " +
+            "Make it lively: in most lines something should HAPPEN — a character goes to another (E2 > E1), gives or receives something, an arrow shows cause → effect, or a key word is written — not only new drawings.\n")
         sb.append("Art style for every element: ").append(styleText(p)).append(".\n")
         sb.append(characterBlock(p))
         if (old.elements.isNotEmpty()) {
             sb.append("\nElements already designed (re-use them, new ids start at E${old.elements.size + 1}):\n")
-            old.elements.forEach { sb.append(it.id).append(": ").append(it.name).append(" | ").append(it.desc).append("\n") }
+            old.elements.forEach { sb.append(it.id).append(": ").append(it.name).append(" | ").append(it.desc).append(" | ").append(it.scale).append("\n") }
         }
-        sb.append("\nReply ONLY in this exact format, nothing else:\nELEMENTS\nE1: name | description\n…\nLINES\n1: actions\n…\n\n")
+        sb.append("\nReply ONLY in this exact format, nothing else:\nELEMENTS\nE1: name | description | big\nE2: name | description | small\n…\nLINES\n1: actions\n…\n\n")
         sb.append("Narration lines:\n")
         for (i in indices) sb.append(i + 1).append(": ").append(lines.getOrElse(i) { "" }).append("\n")
         return sb.toString()

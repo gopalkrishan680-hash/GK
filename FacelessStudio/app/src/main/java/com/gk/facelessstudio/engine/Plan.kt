@@ -20,7 +20,8 @@ package com.gk.facelessstudio.engine
  */
 object Plan {
 
-    data class Element(val id: String, val name: String, val desc: String)
+    /** [scale]: "big" (main character), "normal", "small" (props / objects). */
+    data class Element(val id: String, val name: String, val desc: String, val scale: String = "normal")
 
     enum class Kind { DRAW, MOVE, ARROW, TEXT, NEW, BG }
 
@@ -48,10 +49,17 @@ object Plan {
             elemRe.find(ln)?.let { m ->
                 val id = m.groupValues[1].uppercase()
                 val body = m.groupValues[2].trim()
-                val parts = body.split("|", limit = 2)
-                val name = if (parts.size == 2) parts[0].trim() else body.split(Regex("[,(]")).first().trim().take(30)
-                val desc = (if (parts.size == 2) parts[1] else body).trim().trimEnd('.')
-                if (desc.isNotEmpty()) elems[id] = Element(id, name.trim('*', ' '), desc)
+                val parts = body.split("|").map { it.trim() }
+                fun sizeWord(x: String) = x.lowercase().trim('(', ')', '[', ']', ' ', '.').takeIf { it in setOf("big", "large", "main", "small", "tiny", "normal", "medium") }
+                val tail = parts.lastOrNull()?.let { sizeWord(it) }
+                val core = if (tail != null && parts.size >= 3) parts.dropLast(1) else parts
+                val name = if (core.size >= 2) core[0] else body.split(Regex("[,(]")).first().trim().take(30)
+                var desc = (if (core.size >= 2) core.drop(1).joinToString(" ") else body).trim().trimEnd('.')
+                var scale = when (tail) { "big", "large", "main" -> "big"; "small", "tiny" -> "small"; else -> "normal" }
+                Regex("""\((big|small|main|large|tiny)\)""", RegexOption.IGNORE_CASE).find(desc)?.let {
+                    scale = if (it.groupValues[1].lowercase() in setOf("small", "tiny")) "small" else "big"; desc = desc.replace(it.value, "").trim()
+                }
+                if (desc.isNotEmpty()) elems[id] = Element(id, name.trim('*', ' '), desc, scale)
                 return@let
             } ?: lineRe.find(ln)?.let { m ->
                 val n = m.groupValues[1].toInt() - 1
@@ -92,7 +100,7 @@ object Plan {
 
     fun format(p: Parsed): String = buildString {
         append("ELEMENTS\n")
-        p.elements.forEach { append(it.id).append(": ").append(it.name).append(" | ").append(it.desc).append('\n') }
+        p.elements.forEach { append(it.id).append(": ").append(it.name).append(" | ").append(it.desc).append(" | ").append(it.scale).append('\n') }
         append("LINES\n")
         p.lines.keys.sorted().forEach { n ->
             append(n + 1).append(": ").append(p.lines[n]!!.joinToString("; ") { act ->

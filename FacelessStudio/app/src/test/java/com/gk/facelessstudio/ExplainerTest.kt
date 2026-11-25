@@ -37,9 +37,9 @@ class ExplainerTest {
     private val reply = """
         Sure! Here is the plan.
         ELEMENTS
-        **E1**: macrophage | big round friendly cyan immune cell with a smiling face
+        **E1**: macrophage | big round friendly cyan immune cell with a smiling face | big
         E2: virus | small orange spiky virus
-        E3: vaccine | small glass vaccine vial with blue liquid
+        E3: vaccine | small glass vaccine vial with blue liquid | small
         E4: B cell | blue oval cell with a happy face
         E5: helper cell | green round cell with a happy face
         E6: angry virus | orange virus with an angry face
@@ -57,6 +57,7 @@ class ExplainerTest {
         val p = Plan.parse(reply)
         assertEquals(6, p.elements.size)
         assertEquals("macrophage", p.elements[0].name)
+        assertEquals("big", p.elements[0].scale); assertEquals("small", p.elements[2].scale); assertEquals("normal", p.elements[1].scale)
         assertEquals(Plan.Kind.MOVE, p.lines[1]!![1].kind)
         assertEquals("pakad", p.lines[1]!![1].cue)
         assertEquals(Plan.Kind.ARROW, p.lines[2]!![1].kind)
