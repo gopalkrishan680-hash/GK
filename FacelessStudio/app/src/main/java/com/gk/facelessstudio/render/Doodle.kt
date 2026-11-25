@@ -10,6 +10,7 @@ import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
 import android.graphics.RadialGradient
 import android.graphics.Rect
+import android.graphics.PointF
 import android.graphics.RectF
 import android.graphics.LinearGradient
 import android.graphics.Shader
@@ -17,6 +18,7 @@ import com.gk.facelessstudio.engine.ScriptAnalyzer
 import com.gk.facelessstudio.model.Scene
 import com.gk.facelessstudio.model.SceneType
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
@@ -280,6 +282,10 @@ object Doodle {
      */
     private fun layer(k: Kit, c: Canvas, img: Bitmap, r: RectF, order: FloatArray, p: Float, soft: Float = 0.07f, blend: Paint? = null, src: RectF? = null) {
         if (p <= 0f) return
+        if (p >= 1f && src != null) {   // finished: paste straight onto the board (no buffer needed)
+            c.drawBitmap(img, Rect((src.left * img.width).toInt(), (src.top * img.height).toInt(), (src.right * img.width).toInt(), (src.bottom * img.height).toInt()), r, blend ?: plain)
+            return
+        }
         val bw = r.width().toInt().coerceAtLeast(2); val bh = r.height().toInt().coerceAtLeast(2)
         val map = scratch.get()!!
         val key = (bw.toLong() shl 32) or bh.toLong()
@@ -601,8 +607,88 @@ object Doodle {
      * its subject drawn straight on the white board (outline first, then marker colour), with a tag for its number or
      * a lettered note — each element appearing when its words are spoken.
      */
-    private fun stack(k: Kit, c: Canvas, s: Scene, t: Float, d: Float) {
+    // ------------------------------------------------------------------ Clean Sketch: endless canvas
+
+    private class World(val centers: List<PointF>, val bounds: RectF)
+    private val worlds = java.util.concurrent.ConcurrentHashMap<String, World>()
+
+    /** Where each board sits on the endless sheet: a wandering path (right, diagonal, down…) that never overlaps itself. */
+    private fun world(k: Kit, n: Int, seed: Int): World = worlds.getOrPut("${k.w}x${k.h}/$n/$seed") {
+        val rnd = Random(seed * 7919 + 13)
+        val w = k.w.toFloat(); val h = k.h.toFloat()
+        val tall = h > w * 1.1f
+        val dirs = if (tall) listOf(PointF(0f, 1.08f), PointF(1.1f, 0.35f), PointF(1.1f, -0.35f), PointF(0.75f, 1.05f), PointF(-0.75f, 1.05f), PointF(1.12f, 0f))
+            else listOf(PointF(1.12f, 0f), PointF(1.08f, 0.6f), PointF(1.08f, -0.6f), PointF(0f, 1.1f), PointF(0.7f, 1.1f), PointF(-0.7f, 1.1f))
+        val out = mutableListOf(PointF(w / 2, h / 2))
+        var last = -1
+        for (i in 1 until n) {
+            val prev = out.last()
+            val order = dirs.indices.shuffled(rnd).sortedBy { if (it == last) 1 else 0 }   // change direction often
+            var pick: PointF? = null
+            for (di in order) {
+                val cand = PointF(prev.x + dirs[di].x * w, prev.y + dirs[di].y * h)
+                if (out.none { abs(it.x - cand.x) < w * 1.02f && abs(it.y - cand.y) < h * 1.02f }) { pick = cand; last = di; break }
+            }
+            out += pick ?: PointF(out.maxOf { it.x } + 1.12f * w, prev.y)
+        }
+        val b = RectF(out.minOf { it.x } - w / 2, out.minOf { it.y } - h / 2, out.maxOf { it.x } + w / 2, out.maxOf { it.y } + h / 2)
+        World(out, b)
+    }
+
+    /**
+     * Clean Sketch video: every board lives on ONE endless sheet. While a board is spoken its title and drawings
+     * appear on it; then the camera glides (with a gentle zoom-out) to the next empty spot, the old boards stay on the
+     * sheet. At the end the camera pulls back to show the whole sheet.
+     */
+    fun canvas(k: Kit, c: Canvas, scenes: List<Scene>, tMs: Long, seed: Int) {
         c.drawColor(PAPER)
+        if (scenes.isEmpty()) return
+        val wd = world(k, scenes.size, seed)
+        val pos = wd.centers
+        val tt = tMs / 1000f
+        fun start(i: Int) = scenes[i].startMs / 1000f
+        fun end(i: Int) = (scenes[i].startMs + scenes[i].durationMs) / 1000f
+        val pan = 1.8f; val lead = 0.6f
+        fun idxAt(x: Float): Int { var i = 0; while (i + 1 < scenes.size && start(i + 1) <= x) i++; return i }
+        fun holdZoom(i: Int, x: Float) = 1f + 0.03f * k.inOutSine(k.seg(x, start(i) + pan - lead, end(i)))
+        val i = idxAt(tt + lead)
+        var camX: Float; var camY: Float; var zoom: Float
+        val ps = start(i) - lead
+        if (i > 0 && tt < ps + pan) {
+            val e = k.inOutCubic(k.clamp01((tt - ps) / pan))
+            camX = pos[i - 1].x + (pos[i].x - pos[i - 1].x) * e
+            camY = pos[i - 1].y + (pos[i].y - pos[i - 1].y) * e
+            zoom = (holdZoom(i - 1, ps) * (1f - e) + e) * (1f - 0.2f * sin(PI.toFloat() * e))
+        } else { camX = pos[i].x; camY = pos[i].y; zoom = holdZoom(i, tt) }
+        // finale: pull back to show the whole sheet
+        val total = end(scenes.lastIndex)
+        if (scenes.size >= 2 && tt > total - 3.2f) {
+            val e = k.inOutCubic(k.clamp01((tt - (total - 3.2f)) / 2.4f))
+            val fit = min(k.w * 0.92f / wd.bounds.width(), k.h * 0.92f / wd.bounds.height())
+            camX += (wd.bounds.centerX() - camX) * e; camY += (wd.bounds.centerY() - camY) * e
+            zoom = zoom * (1f - e) + fit * e
+        }
+        val view = RectF(camX - k.cx / zoom, camY - k.cy / zoom, camX + k.cx / zoom, camY + k.cy / zoom)
+        c.save()
+        c.translate(k.cx, k.cy); c.scale(zoom, zoom); c.translate(-camX, -camY)
+        for (j in scenes.indices) {
+            if (start(j) > tt + 0.05f) break
+            val p = pos[j]
+            if (p.x + k.cx < view.left || p.x - k.cx > view.right || p.y + k.cy < view.top || p.y - k.cy > view.bottom) continue
+            c.save(); c.translate(p.x - k.cx, p.y - k.cy)
+            stack(k, c, scenes[j], tt - start(j), end(j) - start(j), paper = false)
+            c.restore()
+        }
+        c.restore()
+    }
+
+    /**
+     * One Clean Sketch board: the title is lettered as it is spoken; the board's picture(s) — just the subject,
+     * drawn straight in colour — appear when their line is spoken; lines without a picture of their own are written
+     * as short handwritten notes. Not every line needs a picture.
+     */
+    private fun stack(k: Kit, c: Canvas, s: Scene, t: Float, d: Float, paper: Boolean = true) {
+        if (paper) c.drawColor(PAPER)
         val texts = s.lines.ifEmpty { listOf(s.text) }
         val n = texts.size
         val imgs = s.images.ifEmpty { List(n) { s.imageIndex } }
@@ -611,77 +697,90 @@ object Doodle {
         val en = FloatArray(n) { if (it + 1 < n) starts[it + 1] * d else d }
         val tall = k.h > k.w * 1.1f
 
-        // ---- title (first line) written as it is spoken
+        // ---- title (first line), lettered calmly while it is spoken
         val title = ScriptAnalyzer.phrase(texts[0], if (tall) 4 else 5).uppercase()
         val tSize = (if (tall) 84f else 64f) * k.u
         val titleY = (if (tall) k.h * 0.075f else k.h * 0.12f) + tSize * 0.5f
-        // calm, readable lettering speed
-        val tCps = (title.length / min(2.4f, max(1.0f, (en[0] - st[0]) * 0.5f))).coerceIn(7f, 16f)
-        val tw = letter(k, c, s, title, k.cx, titleY, tSize, t, st[0] + 0.05f, tCps, k.w * 0.84f, texts[0])
-        val tDone = st[0] + 0.05f + title.length / tCps
-        val up = k.seg(t, tDone, tDone + 0.5f)
+        val tCps = (title.length / min(2.6f, max(1.2f, (en[0] - st[0]) * 0.6f))).coerceIn(6f, 13f)
+        val tw = letter(k, c, s, title, k.cx, titleY, tSize, t, st[0] + 0.1f, tCps, k.w * 0.84f, texts[0])
+        val tDone = st[0] + 0.1f + title.length / tCps
+        val up = k.seg(t, tDone, tDone + 0.6f)
         if (up > 0f) {
             scribbleLine(k, c, k.cx - tw * 0.42f, titleY + tSize * 0.32f, k.cx + tw * 0.38f, titleY + tSize * 0.36f, up, RED, s.variant)
-            scribbleLine(k, c, k.cx - tw * 0.36f, titleY + tSize * 0.44f, k.cx + tw * 0.3f, titleY + tSize * 0.46f, k.seg(t, tDone + 0.2f, tDone + 0.7f), RED, s.variant + 1)
+            scribbleLine(k, c, k.cx - tw * 0.36f, titleY + tSize * 0.44f, k.cx + tw * 0.3f, titleY + tSize * 0.46f, k.seg(t, tDone + 0.25f, tDone + 0.85f), RED, s.variant + 1)
         }
 
-        // ---- one or two BIG drawings of just the subject, drawn straight on the board (like the reference):
-        // one line -> one big drawing in the middle; two lines -> zig-zag (left/up, then right/down) in 9:16,
-        // side by side in 16:9. A line with a number gets a price tag on the free side, tied to its drawing.
+        // which lines bring a picture, which are written as notes
+        val pics = (0 until n).filter { imgs.getOrElse(it) { -1 } >= 0 && k.images.get(imgs[it]) != null }.take(2)
+        val notes = (1 until n).filter { it !in pics }
         val top = titleY + tSize * 0.8f
-        val bottom = k.h * 0.965f
+        val noteSize = (if (tall) 58f else 46f) * k.u
+        val noteGap = noteSize * 1.45f
+        val notesH = if (pics.isEmpty()) 0f else notes.size * noteGap
+        val bottom = k.h * 0.965f - notesH
         val areaH = bottom - top
-        texts.forEachIndexed { i, text ->
-            val img = imgs.getOrElse(i) { -1 }
+        val m = pics.size
+
+        pics.forEachIndexed { q, li ->
+            val text = texts[li]; val img = imgs[li]
             val words = text.split(Regex("\\s+")).filter { it.isNotBlank() }
             val numIdx = words.indexOfFirst { w -> w.any { it.isDigit() } }
             val hasTag = numIdx >= 0
-            val tagLeft = i % 2 == 1          // first drawing leans left (tag on its right), second leans right
+            val tagLeft = q % 2 == 1
             val slot = when {
-                n == 1 -> if (hasTag) RectF(k.w * 0.04f, top, k.w * 0.74f, bottom) else RectF(k.w * 0.05f, top, k.w * 0.95f, bottom)
-                tall -> { val y0 = top + i * areaH / 2; val y1 = top + (i + 1) * areaH / 2 - 10f * k.u
-                    if (!hasTag) RectF(k.w * (if (i == 0) 0.03f else 0.17f), y0, k.w * (if (i == 0) 0.83f else 0.97f), y1)
+                m == 1 -> if (hasTag) RectF(k.w * 0.04f, top, k.w * 0.74f, bottom) else RectF(k.w * 0.06f, top, k.w * 0.94f, bottom)
+                tall -> { val y0 = top + q * areaH / 2; val y1 = top + (q + 1) * areaH / 2 - 10f * k.u
+                    if (!hasTag) RectF(k.w * (if (q == 0) 0.03f else 0.17f), y0, k.w * (if (q == 0) 0.83f else 0.97f), y1)
                     else if (tagLeft) RectF(k.w * 0.30f, y0, k.w * 0.97f, y1) else RectF(k.w * 0.03f, y0, k.w * 0.70f, y1) }
-                else -> RectF(if (i == 0) k.w * 0.03f else k.w * 0.51f, top, if (i == 0) k.w * 0.49f else k.w * 0.97f, bottom)
+                else -> RectF(if (q == 0) k.w * 0.03f else k.w * 0.51f, top, if (q == 0) k.w * 0.49f else k.w * 0.97f, bottom)
             }
-            val drawStart = if (i == 0) max(st[0] + 0.3f, tDone - 0.2f) else st[i] + 0.1f
-            val dur = ((en[i] - drawStart) * 0.75f).coerceIn(2.0f, 5.0f)
-            val color = if (img >= 0) k.images.get(img) else null
-            if (color != null) {
-                // only the subject (the empty white around it is trimmed), whole and in its own shape — no box
-                val sub = k.images.subject(img)
-                val ar = (sub.width() * color.width) / (sub.height() * color.height)
-                val fw = min(slot.width(), slot.height() * ar); val fh = fw / ar
-                val r = RectF(slot.centerX() - fw / 2, slot.centerY() - fh / 2, slot.centerX() + fw / 2, slot.centerY() + fh / 2)
-                val sketch = k.images.sketch(img) ?: color
-                val order = DrawOrder.of(sketch, "${k.project.images.getOrNull(img)}", (s.variant + i * 31) * 4 + 1)  // colour follows the pen
-                val p = k.seg(t, drawStart, drawStart + dur)
-                layer(k, c, sketch, r, order.outline, k.clamp01(p / 0.55f), blend = multiply, src = sub)
-                layer(k, c, color, r, order.colour, k.inOutCubic(k.clamp01((p - 0.45f) / 0.55f)), 0.1f, multiply, sub)
-                if (i == 0 && n == 1 && !hasTag) shine(k, c, r, k.seg(t, drawStart + dur * 0.8f, drawStart + dur * 0.8f + 0.8f))
-                if (hasTag) {
-                    val raw = ScriptAnalyzer.cleanWord(words[numIdx]) + (words.getOrNull(numIdx + 1)?.let { nx -> when (nx.lowercase().trim(',', '.')) {
-                        "crore" -> " CR"; "lakh" -> " L"; "million" -> "M"; "billion" -> "B"; "trillion" -> "T"; "percent" -> "%"; else -> "" } } ?: "")
-                    val tt = max(wordTime(text, numIdx, st[i], en[i]), drawStart + 0.6f)
-                    val tp = k.seg(t, tt, tt + 0.5f)
-                    val side = if (n == 1 || !tall) false else tagLeft
-                    val tx = if (side) max(k.w * 0.15f, r.left - 70f * k.u) else min(k.w * 0.85f, r.right + 70f * k.u)
-                    val ty = r.centerY() - r.height() * 0.12f
-                    // the tag's string to the drawing
-                    if (tp > 0f) {
-                        k.stroke.color = INK; k.stroke.strokeWidth = 2.5f * k.u
-                        val sx = if (side) tx + 60f * k.u else tx - 60f * k.u
-                        val ex = if (side) r.left + r.width() * 0.06f else r.right - r.width() * 0.06f
-                        c.drawLine(sx, ty, sx + (ex - sx) * k.clamp01(tp * 1.5f), ty, k.stroke)
-                    }
-                    tag(k, c, raw.uppercase(), tx, ty, !side, tp, s.variant)
+            val drawStart = if (li == 0) max(st[0] + 0.4f, tDone - 0.3f) else st[li] + 0.2f
+            val dur = ((en[li] - drawStart) * 0.8f).coerceIn(2.2f, 4.5f)
+            val color = k.images.get(img)!!
+            val sub = k.images.subject(img)
+            val ar = (sub.width() * color.width) / (sub.height() * color.height)
+            val fw = min(slot.width(), slot.height() * ar); val fh = fw / ar
+            val r = RectF(slot.centerX() - fw / 2, slot.centerY() - fh / 2, slot.centerX() + fw / 2, slot.centerY() + fh / 2)
+            // drawn straight in full colour, along the picture's own lines or in brush patches (varies per picture)
+            val p = k.seg(t, drawStart, drawStart + dur)
+            if (p > 0f) {
+                val ord = if (p >= 1f) null else {
+                    val sketch = k.images.sketch(img) ?: color
+                    val o = DrawOrder.of(sketch, "${k.project.images.getOrNull(img)}", s.variant + li * 31)
+                    if ((s.variant + li).mod(2) == 0) o.outline else o.colour
                 }
-            } else {
-                // a line without a picture: lettered as a second headline (like "AI: $15 TRILLION")
-                val h2 = ScriptAnalyzer.phrase(text, 6).uppercase()
-                val hy = if (n == 1) top + areaH * 0.3f else slot.centerY()
-                letter(k, c, s, h2, k.cx, hy, (if (tall) 64f else 54f) * k.u, t, st[i] + 0.05f, (h2.length / max(1.0f, (en[i] - st[i]) * 0.55f)).coerceIn(7f, 16f), k.w * 0.86f, text)
+                layer(k, c, color, r, ord ?: FloatArray(0), k.inOutSine(p), 0.16f, multiply, sub)
             }
+            if (m == 1 && !hasTag) shine(k, c, r, k.seg(t, drawStart + dur * 0.85f, drawStart + dur * 0.85f + 0.9f))
+            if (hasTag) {
+                val raw = ScriptAnalyzer.cleanWord(words[numIdx]) + (words.getOrNull(numIdx + 1)?.let { nx -> when (nx.lowercase().trim(',', '.')) {
+                    "crore" -> " CR"; "lakh" -> " L"; "million" -> "M"; "billion" -> "B"; "trillion" -> "T"; "percent" -> "%"; else -> "" } } ?: "")
+                val tt = max(wordTime(text, numIdx, st[li], en[li]), drawStart + 0.6f)
+                val tp = k.seg(t, tt, tt + 0.5f)
+                val side = if (m == 1 || !tall) false else tagLeft
+                val tx = if (side) max(k.w * 0.15f, r.left - 70f * k.u) else min(k.w * 0.85f, r.right + 70f * k.u)
+                val ty = r.centerY() - r.height() * 0.12f
+                if (tp > 0f) {
+                    k.stroke.color = INK; k.stroke.strokeWidth = 2.5f * k.u
+                    val sx = if (side) tx + 60f * k.u else tx - 60f * k.u
+                    val ex = if (side) r.left + r.width() * 0.06f else r.right - r.width() * 0.06f
+                    c.drawLine(sx, ty, sx + (ex - sx) * k.clamp01(tp * 1.5f), ty, k.stroke)
+                }
+                tag(k, c, raw.uppercase(), tx, ty, !side, tp, s.variant)
+            }
+        }
+
+        // ---- notes: the other lines' key phrase, handwritten as it is spoken
+        notes.forEachIndexed { q, li ->
+            val text = texts[li]
+            val h2 = ScriptAnalyzer.phrase(text, if (tall) 4 else 6).uppercase()
+            val y = if (pics.isEmpty()) top + (k.h * 0.9f - top) * (q + 0.5f) / notes.size else bottom + noteGap * (q + 0.6f)
+            val size = if (pics.isEmpty()) noteSize * 1.15f else noteSize
+            val cps = (h2.length / max(1.2f, (en[li] - st[li]) * 0.6f)).coerceIn(6f, 13f)
+            val nw = letter(k, c, s, h2, k.cx, y, size, t, st[li] + 0.15f, cps, k.w * 0.86f, text)
+            val done = st[li] + 0.15f + h2.length / cps
+            // a calm blue marker underline under a note once it is written
+            scribbleLine(k, c, k.cx - nw * 0.3f, y + size * 0.36f, k.cx + nw * 0.3f, y + size * 0.4f, k.seg(t, done, done + 0.5f), BLUE, s.variant + li)
         }
     }
 

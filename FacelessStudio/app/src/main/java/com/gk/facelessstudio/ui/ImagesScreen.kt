@@ -88,7 +88,7 @@ fun ImagesStep(vm: AppViewModel) {
     val p by vm.project.collectAsState()
     val selected by vm.selectedGrid.collectAsState()
     val ctx = LocalContext.current
-    val pieces = remember(p.script, p.pacing) { GridWorkflow.pieces(p) }
+    val pieces = remember(p.script, p.pacing, p.clean, p.doodle) { GridWorkflow.pieces(p) }
     LaunchedEffect(pieces) { vm.syncPanels() }
     val grids = remember(pieces.size, p.gridSize) { GridWorkflow.grids(pieces.size, p.gridSize) }
     val usingOwn = !p.lineImages && p.images.isNotEmpty()

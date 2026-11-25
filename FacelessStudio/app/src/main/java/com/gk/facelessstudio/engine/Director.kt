@@ -43,8 +43,8 @@ object Director {
 
         val rnd = Random(project.seed)
         val times = timeChunks(analysis.chunks, voice)
-        val groups = if (project.doodle) boards(analysis.chunks, times, project.pacing, splitNumbers = !project.clean,
-                extraMs = if (project.clean) 1500L else 0L, maxLines = if (project.clean) 2 else 3)
+        val groups = if (project.doodle && project.clean) beats(analysis.chunks, times, project.pacing, project.imageStep.coerceAtLeast(1))
+            else if (project.doodle) boards(analysis.chunks, times, project.pacing)
             else group(analysis.chunks, times, mergeQuestions = !project.lineImages)
 
         val images = project.images.size
@@ -53,6 +53,7 @@ object Director {
         val history = ArrayDeque<SceneType>()
         var lastTransition = Transition.CUT
         val variety = Variety(project.seed, project.pacing)
+        val shown = HashSet<Int>()   // Clean Sketch: each picture is drawn once, later lines are handwritten
 
         groups.forEachIndexed { gi, g ->
             val first = g.chunks.first()
@@ -132,6 +133,7 @@ object Director {
                     else -> min(images - 1, ((g.start + (g.end - g.start) * (j + 0.5) / g.chunks.size) / max(1, total) * images).toInt())
                 }
             }
+            val stackImages = if (project.doodle && project.clean) boardImages.map { if (it >= 0 && shown.add(it)) it else -1 } else boardImages
             type = if (project.doodle && project.clean) SceneType.DOODLE_STACK.also { variety.use(it) }
             else if (project.doodle && g.chunks.size >= 2) when {
                 boardImages.all { it < 0 } -> SceneType.DOODLE_TEXT
@@ -174,7 +176,7 @@ object Director {
                 title = title,
                 emphasis = emphasis,
                 chapterIndex = chapter,
-                images = if (project.doodle) boardImages else emptyList(),
+                images = if (project.doodle) stackImages else emptyList(),
             ).let { sc ->
                 // photo layouts keep their picture; text layouts may get any backdrop
                 // a line with its own picture always shows it, even behind text layouts
@@ -344,6 +346,27 @@ object Director {
      * Whiteboard boards: consecutive lines share one board until it has been on screen long enough
      * (so the drawing is never rushed); at most 3 lines, and a chapter always starts a new board.
      */
+    /**
+     * Clean Sketch boards follow the pictures: one board per picture (its [step] lines). A board that would be over
+     * too fast (< ~5 s) takes the next picture too, so the video never feels rushed.
+     */
+    private fun beats(chunks: List<Chunk>, times: List<Pair<Long, Long>>, pacing: Pacing, step: Int): List<Group> {
+        val minMs = when (pacing) { Pacing.CALM -> 6500L; Pacing.BALANCED -> 5000L; Pacing.ENERGETIC -> 3800L }
+        val out = mutableListOf<Group>()
+        var i = 0
+        while (i < chunks.size) {
+            var j = min(chunks.size - 1, i + step - 1)
+            while (j + 1 < chunks.size && j + 1 - i < 2 * step && times[j].second - times[i].first < minMs && !chunks[j + 1].chapterStart)
+                j = min(chunks.size - 1, j + step)
+            // don't leave a tiny last board alone
+            if (j + 1 < chunks.size && j + 1 + step >= chunks.size && times.last().second - times[j + 1].first < minMs / 2 && j + 1 - i < 2 * step) j = chunks.size - 1
+            val s0 = times[i].first; val e = times[j].second
+            out += Group(chunks.subList(i, j + 1), s0, e, false, (i..j).map { (times[it].first - s0).toFloat() / max(1L, e - s0) }, i)
+            i = j + 1
+        }
+        return out
+    }
+
     private fun boards(chunks: List<Chunk>, times: List<Pair<Long, Long>>, pacing: Pacing, splitNumbers: Boolean = true, extraMs: Long = 0L, maxLines: Int = 3): List<Group> {
         val minMs = extraMs + when (pacing) { Pacing.CALM -> 8000L; Pacing.BALANCED -> 6000L; Pacing.ENERGETIC -> 4200L }
         val out = mutableListOf<Group>()

@@ -44,6 +44,10 @@ object GridWorkflow {
 
     /** Script pieces exactly as the video will be cut (one image each). */
     fun pieces(p: Project): List<String> = Director.analysisFor(p).chunks.map { it.text }
+        .let { if (step(p) > 1) it.chunked(step(p)) { g -> g.joinToString(" ") } else it }
+
+    /** Script lines per picture: Clean Sketch needs one picture per two lines (the other line is handwritten). */
+    fun step(p: Project) = if (p.doodle && p.clean) 2 else 1
 
     data class Grid(val index: Int, val from: Int, val to: Int, val cols: Int, val rows: Int) {
         val count get() = to - from

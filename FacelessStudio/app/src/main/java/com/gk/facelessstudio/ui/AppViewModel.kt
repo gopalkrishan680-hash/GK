@@ -243,7 +243,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun syncPanels(): List<String> {
         val p = _project.value
         val pieces = GridWorkflow.pieces(p)
-        if (p.lineImages && p.panelTexts == pieces && p.images.size == pieces.size && p.visuals.size == pieces.size) return pieces
+        if (p.lineImages && p.imageStep == GridWorkflow.step(p) && p.panelTexts == pieces && p.images.size == pieces.size && p.visuals.size == pieces.size) return pieces
         if (!p.lineImages && p.images.isNotEmpty()) return pieces   // user is using own images
         val oldImg = HashMap<String, String>(); val oldVis = HashMap<String, String>()
         p.panelTexts.forEachIndexed { i, t ->
@@ -252,7 +252,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         val same = p.panelTexts.size == pieces.size
         update { it.copy(
-            lineImages = true, imageStep = 1, panelTexts = pieces,
+            lineImages = true, imageStep = GridWorkflow.step(p), panelTexts = pieces,
             images = pieces.mapIndexed { i, t -> oldImg[t] ?: if (same) p.images.getOrElse(i) { "" } else "" },
             visuals = pieces.mapIndexed { i, t -> oldVis[t] ?: if (same) p.visuals.getOrElse(i) { "" } else "" },
         ) }

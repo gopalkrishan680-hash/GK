@@ -28,6 +28,9 @@ class CleanTest {
         Adhirath aur Radha ne use apna beta maana.
         Rangbhoomi me Duryodhan ne use Ang desh ka raja banaya.
         Aaj 85% log Karna ko sabse bada daani maante hain.
+        Krishna ne use raja banne ka offer diya.
+        Tum Kunti ke sabse bade bete ho.
+        Paanchon Pandav tumhare charan chhuenge.
         Lekin Karna ne mana kar diya.
     """.trimIndent()
 
@@ -37,12 +40,15 @@ class CleanTest {
     private fun run(aspect: Aspect, w: Int, h: Int, dir: String) {
         val imgs = File(System.getProperty("fs.imgs") ?: return).listFiles()?.sortedBy { it.name }?.map { it.absolutePath } ?: return
         var p = Project(id = "c", script = script, seed = 2, doodle = true, clean = true, aspect = aspect)
-        val n = Director.analysisFor(p).chunks.size
-        p = Director.build(p.copy(lineImages = true, images = (0 until n).map { imgs[it % imgs.size] }), null)
+        val n = com.gk.facelessstudio.engine.GridWorkflow.pieces(p).size
+        p = Director.build(p.copy(lineImages = true, imageStep = 2, images = (0 until n).map { imgs[it % imgs.size] }), null)
         println("CLEAN " + p.scenes.joinToString { "${it.type}:${it.lines.size}l/${it.durationMs}ms/${it.transition}" })
         assertTrue(p.scenes.all { it.type == SceneType.DOODLE_STACK })
-        assertTrue(p.scenes.dropLast(1).all { it.durationMs >= 4500 })
-        assertTrue(p.scenes.all { it.lines.size <= 2 })
+        assertTrue(p.scenes.dropLast(1).all { it.durationMs >= 4000 })
+        assertTrue(p.scenes.all { it.lines.size <= 4 })
+        // every picture is drawn exactly once
+        val used = p.scenes.flatMap { it.images }.filter { it >= 0 }
+        assertTrue(used.size == used.toSet().size && used.size == n)
         val out = File(System.getProperty("fs.out") ?: return, dir).apply { mkdirs() }
         val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
         val r = FrameRenderer(w, h, p, Fonts(ctx.assets), ImageStore(p.images, 900))

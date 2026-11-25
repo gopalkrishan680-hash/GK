@@ -243,6 +243,7 @@ class Kit(
     fun clamp01(v: Float) = v.coerceIn(0f, 1f)
     fun seg(t: Float, a: Float, b: Float) = clamp01((t - a) / max(0.0001f, b - a))
     fun outCubic(x: Float) = 1f - (1f - x).pow(3)
+    fun inOutSine(x: Float) = ((1.0 - kotlin.math.cos(Math.PI * x)) / 2.0).toFloat()
     fun inOutCubic(x: Float) = if (x < 0.5f) 4f * x * x * x else 1f - (-2f * x + 2f).pow(3) / 2f
     fun outBack(x: Float, s: Float = 1.70158f): Float { val c3 = s + 1f; val y = x - 1f; return 1f + c3 * y * y * y + s * y * y }
     fun outExpo(x: Float) = if (x >= 1f) 1f else 1f - 2f.pow(-10f * x)

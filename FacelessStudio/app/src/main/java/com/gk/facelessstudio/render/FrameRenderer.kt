@@ -71,6 +71,11 @@ class FrameRenderer(
 
     fun draw(c: Canvas, tMs: Long) {
         if (scenes.isEmpty()) { c.drawColor(k.theme.bg); return }
+        if (p.doodle && p.clean) {   // Clean Sketch: the whole video is one endless canvas
+            Doodle.canvas(k, c, scenes, tMs, p.seed.toInt())
+            overlays(c, scenes[sceneIndexAt(tMs)], tMs)
+            return
+        }
         val i = sceneIndexAt(tMs)
         val cur = scenes[i]
 

@@ -50,13 +50,17 @@ video a new look (timing stays the same). In the editor you can change any scene
 
 ## Clean Sketch style (like hand-drawn explainer Shorts)
 
-**Video style → Clean Sketch.** A plain white board; each board's first line is hand-lettered as a big title in
-marker capitals (names/numbers in red with a yellow outline, red scribble underline). Below it, at most **two big
-drawings** of just the subject (zig-zag in 9:16, side by side in 16:9; one line = one big drawing in the middle) are
-drawn — outline first, then marker colour. The empty white around each subject is trimmed, so the drawing itself is
-big and there is never a box. No name labels or arrows: only a line with a real number gets a yellow price tag
-("85%", "$15T") tied to its drawing, when it is spoken. Every element appears when its words are spoken in **your**
-voiceover (cuts follow the pauses in the voice), lettering and drawing are calm, boards change with a soft fade.
+**Video style → Clean Sketch.** The whole video is drawn on **one endless canvas**. Each board sits at its own
+spot on a big white sheet; when the next board starts, the camera glides there (smooth ease with a gentle zoom-out) and
+the old boards stay on the sheet. At the end the camera pulls back to show the whole canvas.
+
+On every board, things appear **as they are spoken**: the first line is hand-lettered as a big title (names/numbers in
+red with a yellow outline, red scribble underline); the board's picture — just the subject, trimmed of empty white —
+is **drawn straight in full colour** (no outline-first pass), following the picture's own lines or in brush patches;
+the other line is written as a short handwritten note with a blue underline. Not every line gets a picture: Clean
+Sketch uses **one picture per two script lines**, so the grid workflow asks for half as many pictures. A line with a
+real number gets a yellow price tag ("85%", "$15T") tied to its drawing. Boards last at least ~5 s, and cuts follow the
+pauses in your voiceover, so the video stays calm.
 
 With Clean Sketch on, the grid prompts and the AI Scene Director ask ChatGPT/Gemini for **cut-out subjects with no
 background at all** (pure white, no scenery, ground, shadow or frame) in a marker-doodle style.
