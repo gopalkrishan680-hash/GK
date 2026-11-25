@@ -16,6 +16,8 @@ object GridWorkflow {
             "Soft 2D storybook illustration of an Indian tale: warm pastel colours, gentle gradients, rounded friendly characters with kind expressive faces, traditional Indian clothes, light paper grain, cosy and emotional mood", false),
         StylePreset("whiteboard", "Whiteboard doodle",
             "Whiteboard doodle illustration: only the main subject (characters / key objects) drawn with bold clean black outlines and flat bright colours, on a plain pure white background, no scenery, no background fill, plenty of white space", false),
+        StylePreset("explainer", "Cute explainer doodle",
+            "Cute hand-drawn cartoon doodle like an animated explainer video: clean black ink outlines, bright coloured-pencil and marker colouring with visible texture, friendly characters with big eyes and simple smiles, isolated on plain white", false),
         StylePreset("stickman", "Stickman doodle",
             "Simple stickman doodle: clean black line-art stick figures with round heads and expressive poses, minimal flat backgrounds, white paper, a few accent colours, funny and clear", false),
         StylePreset("documentary", "Dark documentary",
@@ -43,11 +45,15 @@ object GridWorkflow {
     }
 
     /** Script pieces exactly as the video will be cut (one image each). */
-    fun pieces(p: Project): List<String> = Director.analysisFor(p).chunks.map { it.text }
+    fun pieces(p: Project): List<String> = if (p.elements) Plan.parse(p.plan).elements.map { "${it.id} ${it.name}: ${it.desc}" }
+        else Director.analysisFor(p).chunks.map { it.text }
         .let { if (step(p) > 1) it.chunked(step(p)) { g -> g.joinToString(" ") } else it }
 
     /** Script lines per picture: Clean Sketch needs one picture per two lines (the other line is handwritten). */
-    fun step(p: Project) = if (p.doodle && p.clean) 2 else 1
+    fun step(p: Project) = if (p.doodle && p.clean && !p.elements) 2 else 1
+
+    /** Explainer Canvas elements are drawn as square cut-outs, whatever the video size. */
+    private fun panelAspect(p: Project) = if (p.elements) Aspect.SQUARE else p.aspect
 
     data class Grid(val index: Int, val from: Int, val to: Int, val cols: Int, val rows: Int) {
         val count get() = to - from
@@ -90,26 +96,29 @@ object GridWorkflow {
     /** Prompt for one grid image. */
     fun gridPrompt(p: Project, g: Grid, pieces: List<String>): String {
         val line = lineColor(p)
-        val ratio = ratio(p.aspect)
+        val ratio = ratio(panelAspect(p))
         val sb = StringBuilder()
         sb.append("Create ONE single image that is a storyboard grid of ${g.count} equal panels: ${g.cols} columns × ${g.rows} rows. ")
-        sb.append("The whole image must have aspect ratio ${gridRatio(p.aspect, g)} so that EVERY panel is exactly $ratio. ")
+        sb.append("The whole image must have aspect ratio ${gridRatio(panelAspect(p), g)} so that EVERY panel is exactly $ratio. ")
         if (line == "none") sb.append("Panels touch each other with no gaps or borders. ")
         else sb.append("Separate the panels with thin straight $line lines of equal width, with NO outer margin or frame. ")
         sb.append("Read order: left to right, top to bottom. ")
         sb.append("Absolutely NO text, letters, numbers, captions, labels or speech bubbles anywhere in the image.\n\n")
         sb.append("Art style (identical in every panel): ").append(styleText(p)).append(".\n")
-        if (p.doodle) sb.append(if (p.clean) CLEAN_RULE else DOODLE_RULE).append("\n")
+        if (p.elements) sb.append(ELEMENT_RULE).append("\n")
+        else if (p.doodle) sb.append(if (p.clean) CLEAN_RULE else DOODLE_RULE).append("\n")
         sb.append(characterBlock(p))
         if (p.title.isNotBlank()) sb.append("Story: ").append(p.title).append(".\n")
         sb.append("\n")
         for (i in g.from until g.to) {
             val visual = p.visuals.getOrNull(i)?.takeIf { it.isNotBlank() }
             sb.append("Panel ${i - g.from + 1}: ")
-            if (visual != null) sb.append(visual) else sb.append("illustrate this narration line: \"").append(pieces.getOrElse(i) { "" }).append("\"")
+            if (p.elements) sb.append(pieces.getOrElse(i) { "" }.substringAfter(": ").ifBlank { pieces.getOrElse(i) { "" } })
+            else if (visual != null) sb.append(visual) else sb.append("illustrate this narration line: \"").append(pieces.getOrElse(i) { "" }).append("\"")
             sb.append("\n")
         }
-        sb.append("\nMake each panel a different, clear composition (vary wide shots and close-ups). Generate the image now, do not ask questions.")
+        if (p.elements) sb.append("\nEach panel shows ONLY its one element, whole and centred, same drawing style in every panel; a character that appears in several panels must look exactly the same. Generate the image now, do not ask questions.")
+        else sb.append("\nMake each panel a different, clear composition (vary wide shots and close-ups). Generate the image now, do not ask questions.")
         return sb.toString()
     }
 
@@ -124,6 +133,49 @@ object GridWorkflow {
         "NO scenery, NO sky, NO ground or floor, NO room, NO crowd, NO landscape, NO background colour, gradient, texture, glow or shadow, NO frame or border around the subject. " +
         "Style: hand-drawn marker doodle — thick black marker outlines, bright flat marker colouring with light hatching, simple and clear like a whiteboard explainer. " +
         "The subject is centred and fills about 80% of its panel."
+
+    /** Explainer Canvas: every panel is ONE separate element (a character or an object) as a cut-out on white. */
+    private const val ELEMENT_RULE = "ELEMENT RULE (most important): every panel is ONE separate drawing element — a single character or a single object — " +
+        "isolated like a sticker on a 100% plain pure WHITE (#FFFFFF) background: NO scenery, NO ground, NO shadow, NO frame, NO other objects. " +
+        "Style: cute hand-drawn cartoon doodle like an animated explainer video — clean black ink outline, bright marker/coloured-pencil colouring with " +
+        "visible hand-coloured texture, friendly big eyes and a simple smile on characters (and on living things like cells, germs, animals). " +
+        "The element fills about 75% of its panel."
+
+    /**
+     * The AI Visual Plan prompt: the AI chat reads the narration and designs the cast of elements and, line by line,
+     * what is drawn, moved, pointed at or written while it is spoken.
+     */
+    fun planPrompt(p: Project, lines: List<String>, indices: List<Int>): String {
+        val sb = StringBuilder()
+        val old = Plan.parse(p.plan)
+        sb.append("You are the visual director of a hand-drawn animated explainer video")
+        if (p.title.isNotBlank()) sb.append(" called \"").append(p.title).append("\"")
+        sb.append(" (cute doodle characters and objects drawn one by one on a white canvas while the narrator speaks). ")
+        sb.append("The narration lines are below (they may be in Hindi, Hinglish or English).\n\n")
+        sb.append("1) Design the ELEMENTS: every character or object the video needs, each one a separate small drawing on white. ")
+        sb.append("Give each an id E1, E2, … a short name and an English drawing description (10-25 words: what it is, colours, face/expression). ")
+        sb.append("Re-use the same element whenever the same thing appears again. Personify abstract things (cells, germs, money, ideas) as cute characters. ")
+        sb.append("Use about one new element for every 2-3 lines; not every line needs a new drawing.\n")
+        sb.append("2) For EVERY line write the ACTIONS that happen while it is spoken, separated by ';' (1-3 actions per line):\n")
+        sb.append("   E3            -> draw element E3\n")
+        sb.append("   E2 > E1       -> E2 moves next to E1 (attacks, joins, gives, goes to)\n")
+        sb.append("   arrow E3 > E1 -> a hand-drawn arrow from E3 to E1 (cause, flow, sends)\n")
+        sb.append("   text \"memory\" -> a key word handwritten in colour (only important words or numbers, max 2 words)\n")
+        sb.append("   new           -> start a fresh empty part of the canvas (a new idea or topic)\n")
+        sb.append("   bg blue       -> tint the paper (white, blue, yellow, green, pink, grey, dark) when the mood/place changes\n")
+        sb.append("   Add @word after an action to start it exactly when that word of the line is spoken, e.g.  E2 @virus\n")
+        sb.append("Keep 2-5 elements on one part of the canvas, then use new. Things must match exactly what each line says.\n")
+        sb.append("Art style for every element: ").append(styleText(p)).append(".\n")
+        sb.append(characterBlock(p))
+        if (old.elements.isNotEmpty()) {
+            sb.append("\nElements already designed (re-use them, new ids start at E${old.elements.size + 1}):\n")
+            old.elements.forEach { sb.append(it.id).append(": ").append(it.name).append(" | ").append(it.desc).append("\n") }
+        }
+        sb.append("\nReply ONLY in this exact format, nothing else:\nELEMENTS\nE1: name | description\n…\nLINES\n1: actions\n…\n\n")
+        sb.append("Narration lines:\n")
+        for (i in indices) sb.append(i + 1).append(": ").append(lines.getOrElse(i) { "" }).append("\n")
+        return sb.toString()
+    }
 
     /** Overall image ratio so each panel keeps the video ratio, e.g. 3×3 of 16:9 -> 16:9. */
     private fun gridRatio(a: Aspect, g: Grid): String {

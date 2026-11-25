@@ -36,7 +36,7 @@ object Doodle {
     const val RED = 0xFFD8342C.toInt()
     const val BLUE = 0xFF1F5FC8.toInt()
     const val GREEN = 0xFF2E8B3E.toInt()
-    private const val PAPER = 0xFFFBFAF5.toInt()
+    internal const val PAPER = 0xFFFBFAF5.toInt()
     private const val STICKY = 0xFFFFE97A.toInt()
     private const val HIGHLIGHT = 0xFFFFE45C.toInt()
 
@@ -257,7 +257,7 @@ object Doodle {
      * draw normally.
      */
     private val canMultiply = android.os.Build.VERSION.SDK_INT >= 29
-    private val multiply: Paint? = if (canMultiply) Paint(Paint.FILTER_BITMAP_FLAG).apply { blendMode = android.graphics.BlendMode.MULTIPLY } else null
+    internal val multiply: Paint? = if (canMultiply) Paint(Paint.FILTER_BITMAP_FLAG).apply { blendMode = android.graphics.BlendMode.MULTIPLY } else null
     /** Opaque marker highlight; safe with the old mode because the source is never transparent. */
     private val highlighter = Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.MULTIPLY) }
     private val maskPx = ThreadLocal.withInitial { IntArray(DrawOrder.W * DrawOrder.H) }
@@ -280,7 +280,7 @@ object Doodle {
      * are pasted on the board, so the board itself can never be erased (some phones' GPUs/Skia versions
      * applied DST_IN to the whole board when it was done on the main canvas, turning boards black).
      */
-    private fun layer(k: Kit, c: Canvas, img: Bitmap, r: RectF, order: FloatArray, p: Float, soft: Float = 0.07f, blend: Paint? = null, src: RectF? = null) {
+    internal fun layer(k: Kit, c: Canvas, img: Bitmap, r: RectF, order: FloatArray, p: Float, soft: Float = 0.07f, blend: Paint? = null, src: RectF? = null) {
         if (p <= 0f) return
         if (p >= 1f && src != null) {   // finished: paste straight onto the board (no buffer needed)
             c.drawBitmap(img, Rect((src.left * img.width).toInt(), (src.top * img.height).toInt(), (src.right * img.width).toInt(), (src.bottom * img.height).toInt()), r, blend ?: plain)

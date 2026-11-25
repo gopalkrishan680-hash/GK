@@ -79,8 +79,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** "animated" / "whiteboard" / "clean" (sketch-notes boards like hand-drawn explainer shorts). */
     fun setVideoStyle(style: String) = viewModelScope.launch {
-        val clean = style == "clean"
-        _project.value = _project.value.copy(clean = clean)
+        val clean = style == "clean" || style == "explainer"
+        _project.value = _project.value.copy(clean = clean, elements = style == "explainer")
         setDoodle(style != "animated").join()
     }
 
@@ -90,8 +90,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // switching to the whiteboard also switches the image prompts to "main subject on white", unless the user wrote their own style
         val untouched = cur.styleDesc.isBlank() || cur.styleDesc == GridWorkflow.preset(cur.artStyle).desc
         _project.value = when {
+            v && untouched && cur.elements -> cur.copy(doodle = true, artStyle = "explainer", styleDesc = GridWorkflow.preset("explainer").desc)
             v && untouched -> cur.copy(doodle = true, artStyle = "whiteboard", styleDesc = GridWorkflow.preset("whiteboard").desc)
-            !v && untouched && cur.artStyle == "whiteboard" -> cur.copy(doodle = false, artStyle = "storybook", styleDesc = GridWorkflow.preset("storybook").desc)
+            !v && untouched && (cur.artStyle == "whiteboard" || cur.artStyle == "explainer") -> cur.copy(doodle = false, artStyle = "storybook", styleDesc = GridWorkflow.preset("storybook").desc)
             else -> cur.copy(doodle = v)
         }
         if (_project.value.scenes.isNotEmpty()) {
@@ -257,6 +258,35 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             visuals = pieces.mapIndexed { i, t -> oldVis[t] ?: if (same) p.visuals.getOrElse(i) { "" } else "" },
         ) }
         return pieces
+    }
+
+    // ---- AI Visual Plan (Explainer Canvas)
+    private fun scriptLines() = Director.analysisFor(_project.value).chunks.map { it.text }
+
+    fun planParts(): Int { val n = scriptLines().size; val per = _project.value.directorPart; return maxOf(1, (n + per - 1) / per) }
+
+    fun planPrompt(part: Int): String {
+        val lines = scriptLines(); val per = _project.value.directorPart
+        return GridWorkflow.planPrompt(_project.value, lines, (part * per until minOf(lines.size, (part + 1) * per)).toList())
+    }
+
+    fun applyPlan(reply: String) {
+        val parsed = com.gk.facelessstudio.engine.Plan.parse(reply)
+        if (parsed.elements.isEmpty() && parsed.lines.isEmpty()) { _toast.value = "No ELEMENTS / LINES found in the reply"; return }
+        update { it.copy(plan = com.gk.facelessstudio.engine.Plan.merge(it.plan, reply)) }
+        syncPanels()
+        rebuildIfPlanned()
+        _toast.value = "Plan applied: ${parsed.elements.size} elements, ${parsed.lines.size} lines ✅"
+    }
+
+    fun clearPlan() { update { it.copy(plan = "") }; syncPanels() }
+
+    private fun rebuildIfPlanned() = viewModelScope.launch {
+        if (_project.value.scenes.isNotEmpty()) {
+            val voice = analyzeVoice()
+            _project.value = withContext(Dispatchers.Default) { Director.build(_project.value, voice) }
+            persist()
+        }
     }
 
     fun directorPartPrompt(part: Int): String {

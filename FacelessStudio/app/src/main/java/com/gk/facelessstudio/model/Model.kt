@@ -184,6 +184,10 @@ data class Project(
     val doodle: Boolean = false,
     /** Clean sketch-notes look (with [doodle]): title, subject-only drawings, tags, stacked and synced to the voice. */
     val clean: Boolean = false,
+    /** Explainer Canvas (with [doodle] + [clean]): separate drawn elements directed by the AI Visual Plan ([plan]). */
+    val elements: Boolean = false,
+    /** AI Visual Plan text (elements + what happens on each line), see engine/Plan. */
+    val plan: String = "",
     /** true when images were generated one-per-script-line, so scene N uses its own image. */
     val lineImages: Boolean = false,
     val imageStep: Int = 1,
@@ -215,7 +219,7 @@ data class Project(
         put("voicePath", voicePath); put("voiceName", voiceName)
         put("musicPath", musicPath); put("musicName", musicName); put("musicVolume", musicVolume.toDouble())
         put("images", JSONArray(images)); put("aspect", aspect.name); put("theme", themeId)
-        put("pacing", pacing.name); put("captionMode", captionMode.name); put("doodle", doodle); put("clean", clean); put("lineImages", lineImages); put("imageStep", imageStep); put("artStyle", artStyle); put("styleDesc", styleDesc); put("characters", characters)
+        put("pacing", pacing.name); put("captionMode", captionMode.name); put("doodle", doodle); put("clean", clean); put("elements", elements); put("plan", plan); put("lineImages", lineImages); put("imageStep", imageStep); put("artStyle", artStyle); put("styleDesc", styleDesc); put("characters", characters)
         put("separator", separator); put("gridSize", gridSize); put("directorPart", directorPart)
         put("visuals", JSONArray(visuals)); put("panelTexts", JSONArray(panelTexts)); put("sfx", sfx); put("grain", grain)
         put("progressBar", progressBar); put("handle", handle); put("seed", seed)
@@ -242,6 +246,8 @@ data class Project(
             lineImages = o.optBoolean("lineImages"),
             doodle = o.optBoolean("doodle"),
             clean = o.optBoolean("clean"),
+            elements = o.optBoolean("elements"),
+            plan = o.optString("plan"),
             imageStep = o.optInt("imageStep", 1).coerceAtLeast(1),
             artStyle = o.optString("artStyle", "storybook"),
             styleDesc = o.optString("styleDesc"),

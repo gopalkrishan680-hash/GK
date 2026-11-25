@@ -43,7 +43,9 @@ object Director {
 
         val rnd = Random(project.seed)
         val times = timeChunks(analysis.chunks, voice)
-        val groups = if (project.doodle && project.clean) beats(analysis.chunks, times, project.pacing, project.imageStep.coerceAtLeast(1))
+        val groups = if (project.doodle && project.clean && project.elements)
+                chunks1(analysis.chunks, times)   // Explainer Canvas: one scene per spoken line, the plan says what happens
+            else if (project.doodle && project.clean) beats(analysis.chunks, times, project.pacing, project.imageStep.coerceAtLeast(1))
             else if (project.doodle) boards(analysis.chunks, times, project.pacing)
             else group(analysis.chunks, times, mergeQuestions = !project.lineImages)
 
@@ -193,7 +195,7 @@ object Director {
         }
 
         var duration = max(total, voice?.durationMs ?: 0L)
-        if (project.handle.isNotBlank()) {
+        if (project.handle.isNotBlank() && !(project.doodle && project.clean)) {
             scenes += Scene(
                 text = "Subscribe", startMs = duration, endMs = duration + OUTRO_MS,
                 type = SceneType.OUTRO, transition = Transition.ZOOM_PUNCH, variant = rnd.nextInt(1_000_000),
@@ -350,6 +352,9 @@ object Director {
      * Clean Sketch boards follow the pictures: one board per picture (its [step] lines). A board that would be over
      * too fast (< ~5 s) takes the next picture too, so the video never feels rushed.
      */
+    private fun chunks1(chunks: List<Chunk>, times: List<Pair<Long, Long>>) =
+        chunks.indices.map { Group(chunks.subList(it, it + 1), times[it].first, times[it].second, false, listOf(0f), it) }
+
     private fun beats(chunks: List<Chunk>, times: List<Pair<Long, Long>>, pacing: Pacing, step: Int): List<Group> {
         val minMs = when (pacing) { Pacing.CALM -> 6500L; Pacing.BALANCED -> 5000L; Pacing.ENERGETIC -> 3800L }
         val out = mutableListOf<Group>()

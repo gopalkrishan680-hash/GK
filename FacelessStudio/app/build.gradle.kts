@@ -56,6 +56,7 @@ tasks.withType<Test>().configureEach {
     systemProperty("robolectric.dependency.repo.url", "https://maven-central.storage-download.googleapis.com/maven2")
     System.getenv("FS_TEST_OUT")?.let { systemProperty("fs.out", it) }
     System.getenv("FS_TEST_IMGS")?.let { systemProperty("fs.imgs", it) }
+    System.getenv("FS_FPS")?.let { systemProperty("FS_FPS", it) }
     maxHeapSize = "3g"
     testLogging { events("passed", "failed"); showStandardStreams = true; exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL }
 }

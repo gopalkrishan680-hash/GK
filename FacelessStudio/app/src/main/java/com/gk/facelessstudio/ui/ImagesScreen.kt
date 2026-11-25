@@ -88,7 +88,7 @@ fun ImagesStep(vm: AppViewModel) {
     val p by vm.project.collectAsState()
     val selected by vm.selectedGrid.collectAsState()
     val ctx = LocalContext.current
-    val pieces = remember(p.script, p.pacing, p.clean, p.doodle) { GridWorkflow.pieces(p) }
+    val pieces = remember(p.script, p.pacing, p.clean, p.doodle, p.elements, p.plan) { GridWorkflow.pieces(p) }
     LaunchedEffect(pieces) { vm.syncPanels() }
     val grids = remember(pieces.size, p.gridSize) { GridWorkflow.grids(pieces.size, p.gridSize) }
     val usingOwn = !p.lineImages && p.images.isNotEmpty()
@@ -97,6 +97,13 @@ fun ImagesStep(vm: AppViewModel) {
     val listState = rememberLazyListState()
     LaunchedEffect(Unit) { if (selected < 0) vm.selectGrid(vm.nextEmptyGrid()) }
 
+    if (pieces.isEmpty() && p.elements && p.script.isNotBlank()) {
+        LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            item { PlanCard(vm) }
+            item { StyleCard(vm) }
+        }
+        return
+    }
     if (pieces.isEmpty()) {
         Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
             Text("Write your script in step 1 first. Every line becomes a scene that needs a picture.", color = Muted)
@@ -107,14 +114,14 @@ fun ImagesStep(vm: AppViewModel) {
     LazyColumn(state = listState, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Stat("${pieces.size} scenes", Neon)
+                Stat(if (p.elements) "${pieces.size} elements" else "${pieces.size} scenes", Neon)
                 if (!usingOwn) Stat("Grids $gridsDone/${grids.size}", if (gridsDone == grids.size) Neon else Color(0xFFFFB020))
                 if (!usingOwn) Stat(if (missing == 0) "All images ready" else "$missing images missing", if (missing == 0) Neon else Color(0xFFFFB020))
                 if (usingOwn) Stat("Using my own ${p.images.size} images", Violet)
             }
         }
         item { StyleCard(vm) }
-        item { DirectorCard(vm, pieces.size) }
+        item { if (p.elements) PlanCard(vm) else DirectorCard(vm, pieces.size) }
         item {
             Card {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -269,6 +276,58 @@ private fun DirectorCard(vm: AppViewModel, total: Int) {
     }
 }
 
+/** Explainer Canvas: the AI Visual Plan decides the cast of elements and what happens on every line. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PlanCard(vm: AppViewModel) {
+    val p by vm.project.collectAsState()
+    val ctx = LocalContext.current
+    var reply by remember { mutableStateOf("") }
+    val plan = remember(p.plan) { com.gk.facelessstudio.engine.Plan.parse(p.plan) }
+    val parts = remember(p.script, p.pacing, p.directorPart) { vm.planParts() }
+    Card {
+        Text("AI Visual Plan (required for Explainer Canvas)", fontWeight = FontWeight.Black, fontSize = 18.sp)
+        Spacer(Modifier.height(8.dp))
+        Text("1. Copy the plan prompt → paste it in ChatGPT/Gemini. 2. Copy its whole reply → Paste reply → Apply. " +
+            "The AI designs every character/object (elements) and decides, line by line, what is drawn, moved, pointed at with an arrow, " +
+            "written, or when the canvas moves on. 3. Then make the element grids below — each panel is one element on white.",
+            color = Muted, fontSize = 13.sp)
+        Spacer(Modifier.height(10.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Stat("${plan.elements.size} elements", if (plan.elements.isEmpty()) Color(0xFFFFB020) else Neon)
+            Stat("${plan.lines.size} lines planned", if (plan.lines.isEmpty()) Color(0xFFFFB020) else Neon)
+        }
+        Spacer(Modifier.height(10.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (part in 0 until parts) {
+                Button(onClick = { copyText(ctx, "plan", vm.planPrompt(part)); vm.toast("Plan prompt ${if (parts > 1) "part ${part + 1} " else ""}copied ✅") },
+                    shape = RoundedCornerShape(12.dp)) {
+                    Icon(Icons.Default.ContentCopy, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp))
+                    Text(if (parts > 1) "Copy plan prompt · part ${part + 1}" else "Copy plan prompt")
+                }
+            }
+            if (p.plan.isNotBlank()) OutlinedButton(onClick = { vm.clearPlan() }) { Text("Clear plan") }
+        }
+        if (parts > 1) Text("Long script: do the parts in order — each part re-uses the elements already designed.", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+        Spacer(Modifier.height(10.dp))
+        OutlinedTextField(reply, { reply = it }, modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+            placeholder = { Text("ELEMENTS\nE1: macrophage | big friendly cyan cell…\nLINES\n1: E1 @cell\n2: E2; E2 > E1 @attacks") },
+            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp))
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { vm.applyPlan(reply); reply = "" }, enabled = reply.isNotBlank(), shape = RoundedCornerShape(12.dp)) { Text("Apply", fontWeight = FontWeight.Bold) }
+            OutlinedButton(onClick = {
+                val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                cm.primaryClip?.getItemAt(0)?.coerceToText(ctx)?.toString()?.let { reply = it }
+            }) { Icon(Icons.Default.ContentPaste, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Paste reply") }
+        }
+        if (plan.elements.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            Text(plan.elements.joinToString("   ") { "${it.id} ${it.name}" }, color = Color(0xFFB8C4D4), fontSize = 12.sp)
+        }
+    }
+}
+
 @Composable
 private fun GridCard(vm: AppViewModel, g: GridWorkflow.Grid, total: Int, selected: Boolean) {
     val p by vm.project.collectAsState()
@@ -280,7 +339,7 @@ private fun GridCard(vm: AppViewModel, g: GridWorkflow.Grid, total: Int, selecte
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Image ${g.index + 1}", fontWeight = FontWeight.Black, fontSize = 20.sp)
             Text(" of $total", color = Muted, fontSize = 14.sp, modifier = Modifier.weight(1f))
-            Stat("Scenes ${g.from + 1}–${g.to} · ${g.cols}×${g.rows}", Muted)
+            Stat((if (p.elements) "Elements " else "Scenes ") + "${g.from + 1}–${g.to} · ${g.cols}×${g.rows}", Muted)
         }
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

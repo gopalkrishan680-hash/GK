@@ -155,7 +155,8 @@ fun EditorScreen(vm: AppViewModel, onBack: () -> Unit, onEditSetup: (Int) -> Uni
                 Button(onClick = { preview.pause(); vm.shuffle() }, enabled = busy == null, shape = RoundedCornerShape(12.dp)) {
                     Icon(Icons.Default.Shuffle, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Shuffle animations")
                 }
-                FilterChip(selected = p.doodle && p.clean, onClick = { preview.pause(); vm.setVideoStyle(if (p.doodle && p.clean) "animated" else "clean") }, label = { Text("🖍️ Clean Sketch", fontSize = 12.sp) })
+                FilterChip(selected = p.doodle && p.elements, onClick = { preview.pause(); vm.setVideoStyle(if (p.doodle && p.elements) "animated" else "explainer") }, label = { Text("🎨 Explainer Canvas", fontSize = 12.sp) })
+                FilterChip(selected = p.doodle && p.clean && !p.elements, onClick = { preview.pause(); vm.setVideoStyle(if (p.doodle && p.clean && !p.elements) "animated" else "clean") }, label = { Text("🖍️ Clean Sketch", fontSize = 12.sp) })
                 FilterChip(selected = p.doodle && !p.clean, onClick = { preview.pause(); vm.setVideoStyle(if (p.doodle && !p.clean) "animated" else "whiteboard") }, label = { Text("✏️ Whiteboard", fontSize = 12.sp) })
                 Themes.all.forEach { t ->
                     Box(Modifier.size(34.dp).clip(CircleShape).background(Color(t.accent)).clickable { vm.setTheme(t.id) }, contentAlignment = Alignment.Center) {

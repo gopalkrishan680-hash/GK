@@ -48,6 +48,26 @@ Manual control: start a line with a tag – `[stat] [list] [quote] [note] [phone
 **22 layouts × several variants each × 11 transitions × 6 themes**, all driven by a random seed. Tap "Shuffle animations" to give the whole
 video a new look (timing stays the same). In the editor you can change any scene's layout, transition and image, or tap 🎲 to re-roll just that scene.
 
+## Explainer Canvas style (AI Visual Plan)
+
+**Video style → Explainer Canvas.** Like hand-drawn animated explainers: cute characters and objects are drawn
+**one by one on an endless white canvas** while you speak — first the ink outline, then the colour is wiped in from the
+top like a marker. Elements **move** next to each other (a virus attacks a cell, money goes to a bank), hand-drawn
+**arrows** connect them, **key words** are handwritten in pink / orange / blue, and the **camera keeps gliding and
+zooming** so the newest things are always framed. A `new` step moves the camera to a fresh part of the canvas; `bg`
+tints the paper when the mood or place changes. Characters gently bob, and an element that is mentioned again gives a
+small bounce. Not every line needs a drawing.
+
+How to make one:
+1. Images step → **AI Visual Plan** → *Copy plan prompt* → paste into ChatGPT/Gemini → copy the whole reply →
+   *Paste reply* → *Apply*. The AI designs the **elements** (E1, E2 … each with a drawing description, re-used whenever
+   the same thing comes back) and, for every line, the actions:
+   `E3` draw · `E2 > E1` move · `arrow E3 > E1` · `text "memory"` · `new` · `bg blue` · `@word` = start on that spoken word.
+   Long scripts are split into parts; later parts re-use the elements already designed.
+2. The grid cards now ask for **elements**: each square panel is one character/object as a cut-out on plain white, in a
+   cute explainer-doodle style, so ChatGPT/Gemini draws exactly what the plan needs. Share/paste the grid as usual.
+3. Before the pictures arrive, the preview shows each element's name in a sketched circle, so the plan can be checked.
+
 ## Clean Sketch style (like hand-drawn explainer Shorts)
 
 **Video style → Clean Sketch.** The whole video is drawn on **one endless canvas**. Each board sits at its own

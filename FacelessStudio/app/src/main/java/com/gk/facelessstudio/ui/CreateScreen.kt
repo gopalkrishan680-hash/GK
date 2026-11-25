@@ -284,9 +284,10 @@ private fun StyleStep(vm: AppViewModel) {
     val p by vm.project.collectAsState()
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         SectionCard("Video style") {
-            val cur = if (!p.doodle) "animated" else if (p.clean) "clean" else "whiteboard"
+            val cur = if (!p.doodle) "animated" else if (p.elements) "explainer" else if (p.clean) "clean" else "whiteboard"
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 listOf(
+                    "explainer" to ("🎨  Explainer Canvas (AI plan)" to "Cute characters and objects are drawn one by one on an endless canvas as they are spoken — they move, point with arrows and get handwritten words, the camera glides smoothly. An AI Visual Plan decides what appears on every line."),
                     "clean" to ("🖍️  Clean Sketch" to "White board, lettered titles, subject-only drawings with price tags — each appears as it is spoken (like hand-drawn explainer Shorts)."),
                     "whiteboard" to ("✏️  Creative Whiteboard" to "Frames, polaroids, bubbles, sticky notes, camera moves — every board looks different."),
                     "animated" to ("✨  Animated" to "Motion graphics: 34 layouts, charts and transitions."),
