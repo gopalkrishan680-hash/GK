@@ -195,6 +195,8 @@ object Director {
         }
 
         var duration = max(total, voice?.durationMs ?: 0L)
+        // Explainer Canvas: a short hold at the end so the last drawing finishes and stays on screen
+        if (project.doodle && project.clean && project.elements) duration += com.gk.facelessstudio.render.Explainer.END_HOLD_MS
         if (project.handle.isNotBlank() && !(project.doodle && project.clean)) {
             scenes += Scene(
                 text = "Subscribe", startMs = duration, endMs = duration + OUTRO_MS,

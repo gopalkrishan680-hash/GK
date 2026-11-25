@@ -139,7 +139,8 @@ object GridWorkflow {
         "isolated like a sticker on a 100% plain pure WHITE (#FFFFFF) background: NO scenery, NO ground, NO shadow, NO frame, NO other objects. " +
         "Style: cute hand-drawn cartoon doodle like an animated explainer video — clean black ink outline, bright marker/coloured-pencil colouring with " +
         "visible hand-coloured texture, friendly big eyes and a simple smile on characters (and on living things like cells, germs, animals). " +
-        "The element fills about 75% of its panel."
+        "FULL element: a character is drawn FULL BODY from head to feet (never cut at the waist or knees), an object is drawn whole. " +
+        "Nothing touches the panel edges: leave at least 10% empty white margin on every side; the element fills about 70% of its panel."
 
     /**
      * The AI Visual Plan prompt: the AI chat reads the narration and designs the cast of elements and, line by line,
@@ -154,7 +155,8 @@ object GridWorkflow {
         sb.append("The narration lines are below (they may be in Hindi, Hinglish or English).\n\n")
         sb.append("1) Design the ELEMENTS: every character or object the video needs, each one a separate small drawing on white. ")
         sb.append("Give each an id E1, E2, … a short name and an English drawing description (10-25 words: what it is, colours, face/expression). ")
-        sb.append("Re-use the same element whenever the same thing appears again. Personify abstract things (cells, germs, money, ideas) as cute characters. ")
+        sb.append("Re-use the same element whenever the same thing appears again. ONE person = ONE element for the whole video: never make a second element for the same person " +
+            "(no 'young X', 'X with sword', 'X sad'); objects they hold or use are separate elements. Personify abstract things (cells, germs, money, ideas, emotions) as cute characters. ")
         sb.append("Use about one new element for every 2-3 lines; not every line needs a new drawing.\n")
         sb.append("2) For EVERY line write the ACTIONS that happen while it is spoken, separated by ';' (1-3 actions per line):\n")
         sb.append("   E3            -> draw element E3\n")
@@ -162,9 +164,10 @@ object GridWorkflow {
         sb.append("   arrow E3 > E1 -> a hand-drawn arrow from E3 to E1 (cause, flow, sends)\n")
         sb.append("   text \"memory\" -> a key word handwritten in colour (only important words or numbers, max 2 words)\n")
         sb.append("   new           -> start a fresh empty part of the canvas (a new idea or topic)\n")
-        sb.append("   bg blue       -> tint the paper (white, blue, yellow, green, pink, grey, dark) when the mood/place changes\n")
+        sb.append("   bg blue       -> softly tint the paper (white, blue, yellow, green, pink, grey) — use it RARELY, only for a big change of mood or place (at most once every 8-10 lines)\n")
         sb.append("   Add @word after an action to start it exactly when that word of the line is spoken, e.g.  E2 @virus\n")
-        sb.append("Keep 2-5 elements on one part of the canvas, then use new. Things must match exactly what each line says.\n")
+        sb.append("Keep 2-5 elements on one part of the canvas, then use new. Things must match exactly what each line says. " +
+            "Use an arrow only between two different elements that are both on the canvas, for a real cause/flow. Every line's actions should start early in the line.\n")
         sb.append("Art style for every element: ").append(styleText(p)).append(".\n")
         sb.append(characterBlock(p))
         if (old.elements.isNotEmpty()) {

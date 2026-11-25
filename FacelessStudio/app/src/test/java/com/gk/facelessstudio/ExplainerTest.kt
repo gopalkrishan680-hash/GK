@@ -44,12 +44,12 @@ class ExplainerTest {
         E5: helper cell | green round cell with a happy face
         E6: angry virus | orange virus with an angry face
         LINES
-        1: E1 @cell
-        2: E2 @virus; E2 > E1 @pakad
+        1: E1 @cell; bg pink
+        2: E2 @virus; E2 > E1 @pakad; bg blue
         3: E3 @Vaccine; arrow E3 > E1
-        4: text "weak" @kamzor
-        5: new; E4 @cells; E5
-        6: text "memory" @memory
+        4: text "weak" @kamzor; arrow E2 > E1
+        5: new; E4 @cells; E5; bg dark
+        6: text "memory" @memory; E5 > E4
         7: E6 @virus; arrow E5 > E6 @ladti; bg yellow
     """.trimIndent()
 
@@ -63,6 +63,7 @@ class ExplainerTest {
         assertEquals("weak", p.lines[3]!![0].text)
         assertEquals(Plan.Kind.NEW, p.lines[4]!![0].kind)
         assertEquals(Plan.Kind.BG, p.lines[6]!![2].kind)
+        assertEquals(Plan.Kind.BG, p.lines[0]!![1].kind)
         // merging keeps both parts
         val merged = Plan.parse(Plan.merge(reply, "ELEMENTS\nE7: sun | yellow sun\nLINES\n8: E7"))
         assertEquals(7, merged.elements.size); assertEquals(8, merged.lines.size)

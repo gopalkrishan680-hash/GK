@@ -67,6 +67,14 @@ How to make one:
    cute explainer-doodle style, so ChatGPT/Gemini draws exactly what the plan needs. Share/paste the grid as usual.
 3. Before the pictures arrive, the preview shows each element's name in a sketched circle, so the plan can be checked.
 
+Layout rules the renderer follows: elements sit in rows with a band for handwriting above each row, so **nothing is
+drawn on top of anything else** (moves go to a free side of the target; arrows bend around things in between and are
+skipped when two things already touch); the **camera arrives first, then the drawing starts**, and everything on the
+current part of the canvas stays in frame; the outline is a **crisp black ink line**; paper tints are soft, never dark,
+and change at most every ~10 s; the first drawing starts right away; the video ends with a ~2 s hold so the last
+drawing finishes. The prompts ask for one element per person (no duplicate versions) and full-body characters with
+white margin on every side.
+
 ## Clean Sketch style (like hand-drawn explainer Shorts)
 
 **Video style → Clean Sketch.** The whole video is drawn on **one endless canvas**. Each board sits at its own
