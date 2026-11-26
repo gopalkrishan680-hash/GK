@@ -363,21 +363,30 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
         if (layers.isEmpty()) say("No separate elements found – the scene will animate as one picture. Try tap-to-cut.")
     }
 
+    /**
+     * Animation plan for a freshly separated scene:
+     *  - set pieces (pillars, floors) and the crowd are on stage from the first frame, so the
+     *    repainted background behind them is never shown;
+     *  - up to 3 "heroes" (elements the script mentions, else the biggest) make an entrance right at
+     *    the scene start and react (hop) when their word is spoken.
+     */
     private fun buildLayers(p: Project, scene: Scene, cuts: List<CutOut>, w: Int, h: Int): List<Layer> {
-        // Assign the script's element hints to cut-outs from left to right.
         val hints = scene.elementsHint.sortedBy { if (it.wordIndex < 0) Int.MAX_VALUE else it.wordIndex }
         val byX = cuts.sortedBy { it.x + it.bitmap.width / 2 }
-        var actor = 0
+        val actors = byX.filter { !isSetPiece(it, w, h) }
+        val heroCount = minOf(3, maxOf(hints.size, 1), actors.size)
+        val heroes = actors.sortedByDescending { it.bitmap.width * it.bitmap.height }.take(heroCount).toSet()
+        var heroIdx = 0
         val layers = byX.mapIndexed { i, c ->
             val name = repo.saveBitmap(p.id, "s_${scene.id}_l${i}_${UUID.randomUUID().toString().take(4)}.png", c.bitmap)
-            val setPiece = isSetPiece(c, w, h)
-            val hint = if (setPiece) null else hints.getOrNull(actor++)
+            val hero = c in heroes
+            val hint = if (hero) hints.getOrNull(heroIdx++) else null
             Layer(
                 id = UUID.randomUUID().toString().take(8), file = name,
                 x = c.x.toFloat(), y = c.y.toFloat(), w = c.bitmap.width.toFloat(), h = c.bitmap.height.toFloat(),
-                label = hint?.name ?: "Element ${i + 1}",
-                enter = hint?.enter ?: if (setPiece) EnterAnim.NONE else defaultEnter(c, w, h),
-                idle = hint?.idle ?: if (setPiece) IdleAnim.NONE else IdleAnim.BOB,
+                label = hint?.name ?: if (hero) "Hero ${heroIdx}" else if (isSetPiece(c, w, h)) "Set piece ${i + 1}" else "Crowd ${i + 1}",
+                enter = if (hero) hint?.enter ?: defaultEnter(c, w, h) else EnterAnim.NONE,
+                idle = if (hero) hint?.idle ?: IdleAnim.BOB else IdleAnim.NONE,
                 keywordIndex = hint?.wordIndex ?: -1,
             )
         }

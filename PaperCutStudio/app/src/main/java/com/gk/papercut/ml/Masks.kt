@@ -149,8 +149,14 @@ object PlainBackground {
         for (y in 0 until h step 4) { samples += bmp.getPixel(0, y); samples += bmp.getPixel(w - 1, y) }
         fun med(shift: Int) = samples.map { (it shr shift) and 255 }.sorted()[samples.size / 2]
         val c = Color.rgb(med(16), med(8), med(0))
-        val frac = samples.count { near(it, c) } / samples.size.toFloat()
-        return if (frac > 0.6f) c else null
+        if (samples.count { near(it, c) } < samples.size * 0.6f) return null
+        // The border colour must also be a real backdrop (>= 12 % of the picture, connected to the edge).
+        // A thin white line left over from a grid gutter is only ~2 %, so a painted scene is not "plain".
+        val s = 200f / maxOf(w, h)
+        val lw = maxOf(8, (w * s).toInt()); val lh = maxOf(8, (h * s).toInt())
+        val fg = foreground(bmp, c, lw, lh)
+        val bgFrac = fg.count { !it } / fg.size.toFloat()
+        return if (bgFrac >= 0.12f) c else null
     }
 
     /** Foreground map at [w]x[h]: everything except background-coloured pixels connected to the border. */

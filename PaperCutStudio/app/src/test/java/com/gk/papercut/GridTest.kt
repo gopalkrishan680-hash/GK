@@ -95,5 +95,18 @@ class GridTest {
         sheet.compress(Bitmap.CompressFormat.PNG, 100, File(out, "grid_cells.png").outputStream())
     }
 
+    /** A painted panel with a thin white gutter remnant must NOT be treated as a plain background. */
+    @Test fun thinWhiteBorderIsNotPlainBackground() {
+        val b = Bitmap.createBitmap(800, 450, Bitmap.Config.ARGB_8888)
+        val c = Canvas(b); c.drawColor(Color.WHITE)
+        val p = Paint().apply { shader = android.graphics.LinearGradient(0f, 0f, 800f, 450f, Color.rgb(180, 120, 60), Color.rgb(90, 60, 140), android.graphics.Shader.TileMode.CLAMP) }
+        c.drawRect(6f, 6f, 794f, 444f, p)
+        assertNull(com.gk.papercut.ml.PlainBackground.detect(b))
+        val plain = Bitmap.createBitmap(800, 450, Bitmap.Config.ARGB_8888)
+        Canvas(plain).apply { drawColor(Color.rgb(252, 250, 246)); drawCircle(400f, 225f, 150f, Paint().apply { color = Color.RED }) }
+        assertNotNull(com.gk.papercut.ml.PlainBackground.detect(plain))
+        System.getProperty("seg.image")?.takeIf { File(it).exists() }?.let { assertNotNull(com.gk.papercut.ml.PlainBackground.detect(BitmapFactory.decodeFile(it))) }
+    }
+
     private fun <T> assertNotNullGet(v: T?): T { assertNotNull(v); return v!! }
 }

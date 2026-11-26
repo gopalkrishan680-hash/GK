@@ -75,6 +75,17 @@ object Motion {
         }
     }
 
+    /** Quick "look at me" hop when the element's word is spoken. [t] = seconds since the word. */
+    fun react(t: Float, eh: Float, xf: Xf) {
+        if (t < 0f || t > 0.55f) return
+        val q = t / 0.55f
+        val bump = kotlin.math.sin(q * Math.PI.toFloat())
+        xf.dy -= bump * eh * 0.06f
+        val s = 1f + bump * 0.08f
+        xf.sx *= s; xf.sy *= s
+        xf.rot += kotlin.math.sin(q * Math.PI.toFloat() * 2) * 3f
+    }
+
     /** "Boiling" stop-motion jitter: tiny random wobble that changes every animation step. */
     fun boil(seed: Int, step: Int, xf: Xf) {
         var x = seed * 73856093 xor step * 19349663

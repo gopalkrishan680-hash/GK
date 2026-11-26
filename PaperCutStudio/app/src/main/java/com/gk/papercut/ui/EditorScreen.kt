@@ -465,7 +465,7 @@ private fun LayerEditor(vm: StudioViewModel, p: Project, s: Scene, useSam: Boole
             FlowRowButtons {
                 Picker("In", l.enter, EnterAnim.entries, { it.label }, { e -> vm.updateLayer(s.id, l.id) { it.copy(enter = e) } })
                 Picker("Loop", l.idle, IdleAnim.entries, { it.label }, { e -> vm.updateLayer(s.id, l.id) { it.copy(idle = e) } })
-                Picker("Appears on word", l.keywordIndex, listOf(-1) + words.indices.toList(),
+                Picker("Reacts on word", l.keywordIndex, listOf(-1) + words.indices.toList(),
                     { if (it < 0) "auto" else "“${words.getOrElse(it) { "?" }}”" },
                     { k -> vm.updateLayer(s.id, l.id) { it.copy(keywordIndex = k) } })
             }

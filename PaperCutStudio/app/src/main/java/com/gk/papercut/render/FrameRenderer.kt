@@ -33,7 +33,7 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
     val outH = project.aspect.h
     val duration: Double = max(project.audioDuration, project.scenes.lastOrNull()?.end ?: 0.0)
 
-    private class PLayer(val layer: Layer, val styled: PaperStyle.Styled, val enterAt: Float, val seed: Int)
+    private class PLayer(val layer: Layer, val styled: PaperStyle.Styled, val enterAt: Float, val reactAt: Float, val seed: Int)
     private class Prepared(val scene: Scene, val bg: Bitmap?, val layers: List<PLayer>)
 
     private val cache = object : LinkedHashMap<String, Prepared>(4, 0.75f, true) {
@@ -88,17 +88,17 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
         val bg = bgRaw?.let { PaperStyle.styleBackground(it, grain).also { _ -> it.recycle() } }
         val visible = if (scene.backgroundFile != null) scene.layers.filter { it.visible } else emptyList()
         val dur = scene.duration.toFloat().coerceAtLeast(1f)
-        val stagger = min(0.6f, dur * 0.4f / max(1, visible.size))
-        val autoOrder = visible.filter { it.keywordIndex < 0 }
+        val autoOrder = visible.filter { it.enter != EnterAnim.NONE }
+        val stagger = min(0.2f, dur * 0.2f / max(1, autoOrder.size))
         val layers = visible.mapNotNull { l ->
             val bmp = repo.loadBitmap(project.id, l.file) ?: return@mapNotNull null
-            val enterAt = when {
-                l.enter == EnterAnim.NONE -> -10f
-                l.keywordIndex >= 0 && l.keywordIndex < scene.words.size ->
-                    (scene.words[l.keywordIndex].start - scene.start).toFloat() - 0.15f
-                else -> 0.25f + autoOrder.indexOf(l) * stagger
-            }
-            PLayer(l, PaperStyle.style(bmp, grain).also { bmp.recycle() }, enterAt, l.id.hashCode())
+            // Entrances happen right at the scene start (while the transition is still moving), so the
+            // repainted background behind an element is never left on screen waiting for a word.
+            val enterAt = if (l.enter == EnterAnim.NONE) -10f else 0.05f + autoOrder.indexOf(l).coerceAtLeast(0) * stagger
+            // The element's word makes it react (hop) exactly when it is spoken.
+            val reactAt = if (l.keywordIndex >= 0 && l.keywordIndex < scene.words.size)
+                (scene.words[l.keywordIndex].start - scene.start).toFloat() - 0.05f else -1f
+            PLayer(l, PaperStyle.style(bmp, grain).also { bmp.recycle() }, enterAt, reactAt, l.id.hashCode())
         }
         Prepared(scene, bg, layers).also { cache[key] = it }
     }
@@ -135,7 +135,7 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
         place(1f) { canvas.drawBitmap(bg, 0f, 0f, bmpPaint) }
 
         val s = base * zoom
-        place(1.25f) {
+        place(1.06f) {
             for (pl in p.layers) {
                 val local = stepT - pl.enterAt
                 if (local < 0f) continue
@@ -144,6 +144,7 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
                 // Movement amounts are in output pixels; divide by scale because we draw in image space.
                 Motion.enter(l.enter, local / Motion.ENTER_SEC, outW / s, outH / s, xf)
                 if (local > Motion.ENTER_SEC) Motion.idle(l.idle, local - Motion.ENTER_SEC, l.h, outW / s, xf)
+                if (pl.reactAt >= 0f) Motion.react(stepT - pl.reactAt, l.h, xf)
                 if (project.stopMotion) Motion.boil(pl.seed, step / 2, xf)
                 drawLayer(canvas, pl, xf)
             }
@@ -235,14 +236,39 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
     }
     private val markPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(255, 196, 46) }
 
+    /**
+     * Caption groups of up to [per] words that break after sentence ends and never leave a
+     * lonely 1-2 word group at the end ("पा रहा।" is merged into the group before it).
+     */
+    private fun captionChunks(ws: List<String>, per: Int): List<Pair<Int, Int>> {
+        val out = mutableListOf<Pair<Int, Int>>()
+        var start = 0
+        for (i in ws.indices) {
+            val n = i - start + 1
+            val sentenceEnd = ws[i].last() in ".!?।|"
+            if (n >= per || (sentenceEnd && n >= 2) || i == ws.lastIndex) { out += start to i + 1; start = i + 1 }
+        }
+        // Merge short trailing pieces (and sentence leftovers of 1 word) into the previous group.
+        var k = out.size - 1
+        while (k > 0) {
+            val (a, b) = out[k]
+            if (b - a <= 2 && out[k - 1].second - out[k - 1].first + (b - a) <= per + 2) {
+                out[k - 1] = out[k - 1].first to b; out.removeAt(k)
+            }
+            k--
+        }
+        return out
+    }
+
     private fun drawCaption(canvas: Canvas, scene: Scene, t: Double) {
         val words = scene.words
         if (words.isEmpty()) return
         val cur = words.indexOfLast { it.start <= t }.coerceAtLeast(0)
         if (t > words.last().end + 0.6) return
         val per = if (outW < outH) 3 else 5
-        val chunkStart = cur / per * per
-        val chunk = words.subList(chunkStart, min(words.size, chunkStart + per))
+        val chunks = captionChunks(words.map { it.text }, per)
+        val (chunkStart, chunkEnd) = chunks.first { cur < it.second }
+        val chunk = words.subList(chunkStart, chunkEnd)
         val appear = ((t - chunk.first().start) / 0.15).toFloat().coerceIn(0f, 1f)
 
         capPaint.textSize = min(outW, outH) * 0.058f
@@ -255,7 +281,7 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
 
         canvas.save()
         canvas.translate(cx, cy)
-        canvas.rotate(if ((chunkStart / per) % 2 == 0) -1.5f else 1.2f)
+        canvas.rotate(if (chunks.indexOfFirst { it.first == chunkStart } % 2 == 0) -1.5f else 1.2f)
         val s = Ease.outBack(appear, 2f)
         canvas.scale(s, s)
         val box = RectF(-boxW / 2, -boxH / 2, boxW / 2, boxH / 2)
