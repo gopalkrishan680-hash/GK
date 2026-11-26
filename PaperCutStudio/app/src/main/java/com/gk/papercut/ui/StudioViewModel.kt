@@ -49,7 +49,7 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
     val repo = ProjectRepository(app)
     val settings = Settings(app)
     val models = ModelManager(app)
-    private val separator = LayerSeparator(models)
+    private val separator = LayerSeparator(app, models)
 
     private val _projects = MutableStateFlow(repo.list())
     val projects: StateFlow<List<Project>> = _projects.asStateFlow()
@@ -189,6 +189,35 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
         say("Imported ${minOf(sorted.size, targets.size)} images")
     }
 
+    /** Pastes an image copied from ChatGPT, Gemini, Chrome, Gallery… into a scene (or the next empty one). */
+    fun pasteImage(sceneId: String?) {
+        val p = _project.value ?: return
+        val cm = getApplication<Application>().getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        val clip = cm.primaryClip
+        val uri = clip?.let { c -> (0 until c.itemCount).firstNotNullOfOrNull { c.getItemAt(it).uri } }
+        if (uri == null) { say("No image on the clipboard – long-press the image and choose Copy"); return }
+        val target = sceneId ?: p.scenes.firstOrNull { it.imageFile == null }?.id
+            ?: run { say("Every scene already has an image – use Paste on a scene card to replace one"); return }
+        val n = p.scenes.indexOfFirst { it.id == target } + 1
+        task("Pasting image…") {
+            // Decode right away: clipboard read permission is temporary.
+            val bmp = withContext(Dispatchers.IO) { repo.decodeScaled(uri) }
+            withContext(Dispatchers.IO) { saveSceneImage(_project.value!!, target, bmp) }
+            say("Pasted into scene $n")
+        }
+    }
+
+    /** Images shared to the app from another app ("Share → PaperCut Studio"). */
+    fun importShared(uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        if (_project.value == null) {
+            val recent = repo.list().firstOrNull() ?: run { say("Create a project first, then share the images again"); return }
+            open(recent.id)
+        }
+        if (_project.value!!.scenes.isEmpty()) { say("Create scenes in step 1 first, then share the images again"); return }
+        importMany(uris)
+    }
+
     private fun saveSceneImage(p: Project, sceneId: String, bmp: Bitmap) {
         val name = repo.saveBitmap(p.id, "s_${sceneId}_img_${System.currentTimeMillis() % 100000}.png", bmp)
         updateScene(sceneId) { it.copy(imageFile = name, backgroundFile = null, layers = emptyList(), imageW = bmp.width, imageH = bmp.height) }
@@ -224,20 +253,30 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
         // Assign the script's element hints to cut-outs from left to right.
         val hints = scene.elementsHint.sortedBy { if (it.wordIndex < 0) Int.MAX_VALUE else it.wordIndex }
         val byX = cuts.sortedBy { it.x + it.bitmap.width / 2 }
+        var actor = 0
         val layers = byX.mapIndexed { i, c ->
             val name = repo.saveBitmap(p.id, "s_${scene.id}_l${i}_${UUID.randomUUID().toString().take(4)}.png", c.bitmap)
-            val hint = hints.getOrNull(i)
+            val setPiece = isSetPiece(c, w, h)
+            val hint = if (setPiece) null else hints.getOrNull(actor++)
             Layer(
                 id = UUID.randomUUID().toString().take(8), file = name,
                 x = c.x.toFloat(), y = c.y.toFloat(), w = c.bitmap.width.toFloat(), h = c.bitmap.height.toFloat(),
                 label = hint?.name ?: "Element ${i + 1}",
-                enter = hint?.enter ?: defaultEnter(c, w, h),
-                idle = hint?.idle ?: IdleAnim.BOB,
+                enter = hint?.enter ?: if (setPiece) EnterAnim.NONE else defaultEnter(c, w, h),
+                idle = hint?.idle ?: if (setPiece) IdleAnim.NONE else IdleAnim.BOB,
                 keywordIndex = hint?.wordIndex ?: -1,
             )
         }
         // Big pieces go underneath, small ones on top.
         return layers.sortedByDescending { it.w * it.h }
+    }
+
+    /** Pillars hanging from the top edge and wide floors on the bottom edge stay in place (they still get parallax). */
+    private fun isSetPiece(c: CutOut, w: Int, h: Int): Boolean {
+        val m = 4
+        val top = c.y <= m
+        val bottomWide = c.y + c.bitmap.height >= h - m && c.bitmap.width > w * 0.3f
+        return top || bottomWide
     }
 
     private fun defaultEnter(c: CutOut, w: Int, h: Int): EnterAnim {
@@ -270,8 +309,8 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
                 sam = MobileSam(models.file(OfflineModel.SAM_ENCODER), models.file(OfflineModel.SAM_DECODER)).also { it.setImage(img) }
                 samSceneId = sceneId
             }
-            val (mask, _) = sam!!.segment(listOf(x to y), listOf(1f))
-            val cut = Cutter.cut(img, mask) ?: run { say("Nothing found there"); return@withContext }
+            val mask = sam!!.segment(x, y)
+            val cut = mask?.let { Cutter.cut(img, it) } ?: run { say("Nothing found there"); return@withContext }
             val name = repo.saveBitmap(p.id, "s_${sceneId}_t_${UUID.randomUUID().toString().take(6)}.png", cut.bitmap)
             val layer = Layer(
                 id = UUID.randomUUID().toString().take(8), file = name,

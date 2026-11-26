@@ -71,7 +71,7 @@ object ScriptPlanner {
     const val STYLE_SUFFIX =
         "Handmade colored construction paper with visible paper grain, flat colors, soft drop shadows between paper layers. " +
             "Every character and object is a separate clean cut-out with a thin white paper edge, placed apart from each other " +
-            "(not overlapping), with empty space around them, over a simple uncluttered paper background. " +
+            "(not overlapping), with empty space around them, on a plain off-white paper background. " +
             "No text, no letters, no captions, no watermark."
 
     /** A prompt the user can paste into any chatbot to get richer per-scene prompts back. */

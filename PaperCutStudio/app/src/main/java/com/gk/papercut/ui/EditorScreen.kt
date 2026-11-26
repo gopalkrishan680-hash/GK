@@ -207,7 +207,9 @@ private fun PromptsTab(vm: StudioViewModel, p: Project) {
                     }) { Text("Share") }
                     OutlinedButton(onClick = { copy(ctx, ScriptPlanner.chatbotHelperPrompt(p, p.scenes)) }) { Text("Copy chatbot helper") }
                     FilledTonalButton(onClick = { many.launch("image/*") }) { Text("Import all images") }
+                    FilledTonalButton(onClick = { vm.pasteImage(null) }) { Text("Paste image") }
                 }
+                Hint("Tip: in ChatGPT/Gemini long-press the image → Copy, then tap “Paste image” (fills the next empty scene). Or use Share → PaperCut Studio.")
                 Hint("“Chatbot helper” is one message you can paste into ChatGPT/Gemini chat to get even more detailed prompts for all scenes.")
             }
         }
@@ -238,7 +240,8 @@ private fun SceneCard(vm: StudioViewModel, p: Project, i: Int, s: Scene, onImpor
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = onCopy) { Text("Copy") }
-            OutlinedButton(onClick = onImport) { Text(if (img == null) "Import image" else "Replace") }
+            OutlinedButton(onClick = onImport) { Text(if (img == null) "Import" else "Replace") }
+            OutlinedButton(onClick = { vm.pasteImage(s.id) }) { Text("Paste") }
             if (img != null) Image(img.asImageBitmap(), null, Modifier.size(64.dp))
         }
         if (i > 0) Row(verticalAlignment = Alignment.CenterVertically) {
@@ -254,18 +257,29 @@ private fun SceneCard(vm: StudioViewModel, p: Project, i: Int, s: Scene, onImpor
 @Composable
 private fun LayersTab(vm: StudioViewModel, p: Project) {
     if (p.scenes.isEmpty()) { EmptyState("Create scenes in step 1 first."); return }
-    var useSam by remember { mutableStateOf(vm.models.samReady) }
+    val modelsVersion by vm.modelsVersion.collectAsStateWithLifecycle()
+    val downloads by vm.modelProgress.collectAsStateWithLifecycle()
+    val samReady = remember(modelsVersion) { vm.models.samReady }
+    var useSam by remember { mutableStateOf(true) }
     var open by remember { mutableStateOf<String?>(null) }
     LazyColumn(Modifier.padding(horizontal = 12.dp)) {
         item {
             SectionCard("Separate elements (offline)") {
                 Hint("ML Kit finds the main subjects; MobileSAM finds extra objects; the background behind them is repainted (LaMa if downloaded). Then every element animates on its own, timed to the words of your voice-over.")
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Switch(useSam && vm.models.samReady, { useSam = it }, enabled = vm.models.samReady)
+                    Switch(useSam && samReady, { useSam = it }, enabled = samReady)
                     Spacer(Modifier.width(8.dp))
-                    Text(if (vm.models.samReady) "Deep scan with MobileSAM" else "MobileSAM not downloaded (Settings)", fontSize = 14.sp)
+                    Text(if (samReady) "Deep scan with MobileSAM" else "MobileSAM not downloaded", fontSize = 14.sp)
                 }
-                Button(onClick = { vm.separateAll(useSam) }, enabled = p.scenes.any { it.imageFile != null }) { Text("Separate all scenes") }
+                if (!samReady && downloads.isNotEmpty()) {
+                    Hint("Downloading MobileSAM… ${(downloads.values.average() * 100).toInt()}%")
+                } else if (!samReady) {
+                    Hint("Strongly recommended: MobileSAM separates crowded scenes (people touching each other, thrones, pillars…). Without it only ML Kit's main subjects are found.")
+                    FilledTonalButton(onClick = { vm.downloadModel(com.gk.papercut.ml.OfflineModel.SAM_ENCODER); vm.downloadModel(com.gk.papercut.ml.OfflineModel.SAM_DECODER) }) {
+                        Text("Download MobileSAM (45 MB)")
+                    }
+                }
+                Button(onClick = { vm.separateAll(useSam && samReady) }, enabled = p.scenes.any { it.imageFile != null }) { Text("Separate all scenes") }
             }
         }
         itemsIndexed(p.scenes, key = { _, s -> s.id }) { i, s ->
@@ -281,7 +295,7 @@ private fun LayersTab(vm: StudioViewModel, p: Project) {
                     )
                     Icon(if (open == s.id) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, null)
                 }
-                if (open == s.id) LayerEditor(vm, p, s, useSam)
+                if (open == s.id) LayerEditor(vm, p, s, useSam && samReady)
             }
         }
         item { Spacer(Modifier.height(40.dp)) }

@@ -12,8 +12,8 @@ enum class OfflineModel(val label: String, val fileName: String, val url: String
         "https://huggingface.co/Acly/MobileSAM/resolve/main/mobile_sam_image_encoder.onnx", 28,
     ),
     SAM_DECODER(
-        "MobileSAM decoder", "sam_mask_decoder_single.onnx",
-        "https://huggingface.co/Acly/MobileSAM/resolve/main/sam_mask_decoder_single.onnx", 17,
+        "MobileSAM decoder", "sam_mask_decoder_multi.onnx",
+        "https://huggingface.co/Acly/MobileSAM/resolve/main/sam_mask_decoder_multi.onnx", 17,
     ),
     LAMA(
         "LaMa in-painting", "lama_fp32.onnx",

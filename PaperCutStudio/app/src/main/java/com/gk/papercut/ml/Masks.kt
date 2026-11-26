@@ -22,6 +22,28 @@ class Mask(val w: Int, val h: Int, val a: FloatArray = FloatArray(w * h)) {
         return if (r < 0) null else intArrayOf(l, t, r + 1, b + 1)
     }
 
+    /** Removes stray islands: keeps connected parts at least [minFrac] of the biggest part. */
+    fun keepMainParts(minFrac: Float = 0.15f): Mask {
+        val bits = BooleanArray(w * h) { a[it] > 0.5f }
+        val (labels, sizes) = Blobs.label(bits, w, h)
+        if (sizes.size <= 1) return this
+        val biggest = sizes.max()
+        val keep = BooleanArray(w * h) { labels[it] > 0 && sizes[labels[it] - 1] >= biggest * minFrac }
+        // Keep the soft edge around kept parts (pixels within 2 px of a kept pixel).
+        val out = Mask(w, h)
+        for (y in 0 until h) for (x in 0 until w) {
+            val i = y * w + x
+            if (a[i] <= 0f) continue
+            var near = keep[i]
+            if (!near) loop@ for (dy in -2..2) for (dx in -2..2) {
+                val xx = x + dx; val yy = y + dy
+                if (xx in 0 until w && yy in 0 until h && keep[yy * w + xx]) { near = true; break@loop }
+            }
+            if (near) out.a[i] = a[i]
+        }
+        return out
+    }
+
     fun union(o: Mask) { for (i in a.indices) a[i] = max(a[i], o.a[i]) }
 
     fun iou(o: Mask, step: Int = 4): Float {
@@ -104,5 +126,47 @@ object Cutter {
             px[i] = (px[i] and 0x00FFFFFF) or ((alpha * 255).toInt() shl 24)
         }
         return CutOut(Bitmap.createBitmap(px, cw, ch, Bitmap.Config.ARGB_8888), l, t)
+    }
+}
+
+/**
+ * Many AI "paper cut-out" images sit on a plain white (or flat) background. Detecting that gives a
+ * perfect foreground map for free and a perfect background plate (just the colour).
+ */
+object PlainBackground {
+    private const val TOL = 40
+
+    private fun near(a: Int, b: Int) =
+        kotlin.math.abs(((a shr 16) and 255) - ((b shr 16) and 255)) +
+            kotlin.math.abs(((a shr 8) and 255) - ((b shr 8) and 255)) +
+            kotlin.math.abs((a and 255) - (b and 255)) < TOL
+
+    /** The background colour, or null if the border is not mostly one flat colour. */
+    fun detect(bmp: Bitmap): Int? {
+        val w = bmp.width; val h = bmp.height
+        val samples = ArrayList<Int>()
+        for (x in 0 until w step 4) { samples += bmp.getPixel(x, 0); samples += bmp.getPixel(x, h - 1) }
+        for (y in 0 until h step 4) { samples += bmp.getPixel(0, y); samples += bmp.getPixel(w - 1, y) }
+        fun med(shift: Int) = samples.map { (it shr shift) and 255 }.sorted()[samples.size / 2]
+        val c = Color.rgb(med(16), med(8), med(0))
+        val frac = samples.count { near(it, c) } / samples.size.toFloat()
+        return if (frac > 0.6f) c else null
+    }
+
+    /** Foreground map at [w]x[h]: everything except background-coloured pixels connected to the border. */
+    fun foreground(bmp: Bitmap, color: Int, w: Int, h: Int): BooleanArray {
+        val small = if (bmp.width == w && bmp.height == h) bmp else Bitmap.createScaledBitmap(bmp, w, h, true)
+        val px = IntArray(w * h); small.getPixels(px, 0, w, 0, 0, w, h)
+        val bg = BooleanArray(w * h)
+        val stack = IntArray(w * h); var sp = 0
+        fun push(i: Int) { if (!bg[i] && near(px[i], color)) { bg[i] = true; stack[sp++] = i } }
+        for (x in 0 until w) { push(x); push((h - 1) * w + x) }
+        for (y in 0 until h) { push(y * w); push(y * w + w - 1) }
+        while (sp > 0) {
+            val i = stack[--sp]; val x = i % w; val y = i / w
+            if (x > 0) push(i - 1); if (x < w - 1) push(i + 1)
+            if (y > 0) push(i - w); if (y < h - 1) push(i + w)
+        }
+        return BooleanArray(w * h) { !bg[it] }
     }
 }

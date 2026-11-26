@@ -55,9 +55,13 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("com.microsoft.onnxruntime:onnxruntime:1.20.0")
 }
 
 tasks.withType<Test>().configureEach {
+    systemProperty("seg.image", System.getenv("SEG_IMAGE") ?: "")
+    systemProperty("seg.models", System.getenv("SEG_MODELS") ?: "")
+    maxHeapSize = "4g"
     systemProperty("render.out", System.getenv("RENDER_OUT") ?: layout.buildDirectory.dir("render-test").get().asFile.path)
     testLogging { showStandardStreams = true; exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL }
 }

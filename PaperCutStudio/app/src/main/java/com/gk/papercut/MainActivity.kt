@@ -1,6 +1,9 @@
 package com.gk.papercut
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import androidx.core.content.IntentCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -25,6 +28,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        if (savedInstanceState == null) handleShare(intent)
         setContent {
             MaterialTheme(colorScheme = PaperColors) {
                 val project by vm.project.collectAsStateWithLifecycle()
@@ -36,6 +40,21 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleShare(intent)
+    }
+
+    private fun handleShare(intent: Intent?) {
+        intent ?: return
+        val uris: List<Uri> = when (intent.action) {
+            Intent.ACTION_SEND -> listOfNotNull(IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java))
+            Intent.ACTION_SEND_MULTIPLE -> IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
+            else -> emptyList()
+        }
+        vm.importShared(uris)
     }
 }
 

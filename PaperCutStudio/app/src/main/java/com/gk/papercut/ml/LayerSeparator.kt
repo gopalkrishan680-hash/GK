@@ -1,34 +1,53 @@
 package com.gk.papercut.ml
 
+import android.content.Context
 import android.graphics.Bitmap
+import com.google.android.gms.common.moduleinstall.ModuleInstall
+import com.google.android.gms.common.moduleinstall.ModuleInstallRequest
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmentation
+import com.google.mlkit.vision.segmentation.subject.SubjectSegmenter
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmenterOptions
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
+import kotlin.math.roundToInt
 
 /**
  * Splits a scene image into cut-outs + a clean background.
- *  1. ML Kit Subject Segmentation (fast, on-device) finds the main subjects.
- *  2. MobileSAM (if downloaded) scans the picture for any extra objects ML Kit missed.
- *  3. LaMa (if downloaded) paints the background where the cut-outs were.
+ *  - MobileSAM (if downloaded) scans the whole picture: best for crowded scenes where things touch.
+ *  - ML Kit Subject Segmentation adds any main subject SAM missed (or does the job alone without SAM).
+ *  - Plain backgrounds (white etc.) are detected: free foreground map + perfect background plate.
+ *  - Otherwise the holes are repainted with LaMa (if downloaded) or a quick fill.
  */
-class LayerSeparator(private val models: ModelManager) {
+class LayerSeparator(private val context: Context, private val models: ModelManager) {
 
     class Result(val cutOuts: List<CutOut>, val background: Bitmap)
 
-    suspend fun mlKitSubjects(img: Bitmap): List<CutOut> {
-        val opts = SubjectSegmenterOptions.Builder()
-            .enableMultipleSubjects(
-                SubjectSegmenterOptions.SubjectResultOptions.Builder().enableSubjectBitmap().build()
-            )
+    private fun segmenter(): SubjectSegmenter = SubjectSegmentation.getClient(
+        SubjectSegmenterOptions.Builder()
+            .enableMultipleSubjects(SubjectSegmenterOptions.SubjectResultOptions.Builder().enableSubjectBitmap().build())
             .build()
-        val client = SubjectSegmentation.getClient(opts)
+    )
+
+    /** ML Kit's model is delivered by Google Play services; make sure it is installed before use. */
+    private suspend fun ensureMlKitModule(client: SubjectSegmenter, progress: (String) -> Unit) {
+        val installer = ModuleInstall.getClient(context)
+        if (installer.areModulesAvailable(client).await().areModulesAvailable()) return
+        progress("Downloading ML Kit model (one time, needs internet)…")
+        installer.installModules(ModuleInstallRequest.newBuilder().addApi(client).build()).await()
+        repeat(90) {
+            if (installer.areModulesAvailable(client).await().areModulesAvailable()) return
+            delay(1000)
+        }
+        error("ML Kit model is still downloading – try again in a minute")
+    }
+
+    private suspend fun mlKitSubjects(img: Bitmap, progress: (String) -> Unit): List<CutOut> {
+        val client = segmenter()
         try {
+            ensureMlKitModule(client, progress)
             val res = client.process(InputImage.fromBitmap(img, 0)).await()
-            return res.subjects.mapNotNull { s ->
-                val b = s.bitmap ?: return@mapNotNull null
-                CutOut(b, s.startX, s.startY)
-            }
+            return res.subjects.mapNotNull { s -> s.bitmap?.let { CutOut(it, s.startX, s.startY) } }
         } finally {
             client.close()
         }
@@ -38,33 +57,50 @@ class LayerSeparator(private val models: ModelManager) {
         val w = img.width; val h = img.height
         val masks = mutableListOf<Mask>()
         val cuts = mutableListOf<CutOut>()
-
-        progress("Finding subjects (ML Kit)…")
-        val mlkit = runCatching { mlKitSubjects(img) }.getOrElse {
-            progress("ML Kit unavailable (${it.message}); using MobileSAM only"); emptyList()
-        }
-        for (c in mlkit) {
-            val m = Mask.fromAlpha(w, h, c.bitmap, c.x, c.y)
-            if (m.area() < 400) continue
-            masks += m; cuts += c
+        val plain = PlainBackground.detect(img)
+        fun add(m: Mask): Boolean {
+            if (masks.any { it.iou(m) > 0.4f || covered(m, it) }) return false
+            val c = Cutter.cut(img, m) ?: return false
+            masks += m; cuts += c; return true
         }
 
         if (useSam && models.samReady) {
-            progress("Scanning for more elements (MobileSAM)…")
+            progress("Scanning every element (MobileSAM)…")
+            val s = 480f / maxOf(w, h)
+            val lw = (w * s).roundToInt(); val lh = (h * s).roundToInt()
+            val fg = plain?.let { PlainBackground.foreground(img, it, lw, lh) }
             MobileSam(models.file(OfflineModel.SAM_ENCODER), models.file(OfflineModel.SAM_DECODER)).use { sam ->
                 sam.setImage(img)
-                val extra = sam.autoSegment { p -> progress("MobileSAM scan ${(p * 100).toInt()}%") }
-                for (m in extra) {
-                    // Skip anything already covered by ML Kit.
-                    if (masks.any { it.iou(m) > 0.4f || covered(m, it) }) continue
-                    Cutter.cut(img, m)?.let { masks += m; cuts += it }
-                }
+                sam.autoSegment(fg, lw, lh) { p -> progress("MobileSAM scan ${(p * 100).toInt()}%") }.forEach { add(it) }
             }
         }
 
-        progress(if (models.lamaReady) "Repainting background (LaMa)…" else "Filling background…")
-        val background = background(img, masks)
-        return Result(cuts, background)
+        progress("Finding main subjects (ML Kit)…")
+        runCatching { mlKitSubjects(img, progress) }
+            .onFailure { progress("ML Kit unavailable: ${it.message}") }
+            .getOrNull()?.forEach { c ->
+                val m = Mask.fromAlpha(w, h, c.bitmap, c.x, c.y)
+                // When SAM already split the scene, ignore ML Kit's "everything together" blob.
+                if (cuts.isNotEmpty() && m.area() > w * h * 0.35f) return@forEach
+                add(m)
+            }
+
+        if (cuts.isEmpty() && plain != null) {
+            progress("Cutting shapes from the plain background…")
+            val fg = PlainBackground.foreground(img, plain, w, h)
+            Blobs.find(fg, w, h, (w * h * 0.003f).toInt()).forEach { b ->
+                add(Mask(w, h, FloatArray(w * h) { if (b[it]) 1f else 0f }))
+            }
+        }
+
+        progress(
+            when {
+                plain != null -> "Building background…"
+                models.lamaReady -> "Repainting background (LaMa)…"
+                else -> "Filling background…"
+            }
+        )
+        return Result(cuts, background(img, masks))
     }
 
     fun background(img: Bitmap, masks: List<Mask>): Bitmap {
@@ -72,6 +108,12 @@ class LayerSeparator(private val models: ModelManager) {
         val union = Mask(img.width, img.height)
         masks.forEach { union.union(it) }
         val holes = union.dilated(maxOf(4, minOf(img.width, img.height) / 80))
+        val plain = PlainBackground.detect(img)
+        if (plain != null) {
+            val px = IntArray(img.width * img.height); img.getPixels(px, 0, img.width, 0, 0, img.width, img.height)
+            for (i in px.indices) if (holes.a[i] > 0.3f) px[i] = plain or (0xFF shl 24)
+            return Bitmap.createBitmap(px, img.width, img.height, Bitmap.Config.ARGB_8888)
+        }
         return Inpainter.inpaint(img, holes, if (models.lamaReady) models.file(OfflineModel.LAMA) else null)
     }
 
