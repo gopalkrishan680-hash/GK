@@ -109,12 +109,42 @@ class LayerSeparator(private val context: Context, private val models: ModelMana
         masks.forEach { union.union(it) }
         val holes = union.dilated(maxOf(4, minOf(img.width, img.height) / 80))
         val plain = PlainBackground.detect(img)
-        if (plain != null) {
+        val holeFrac = holes.area(0.3f) / (img.width.toFloat() * img.height)
+        // Plain backdrop -> its colour. A crowd covering much of the picture -> clean paper "stage" in the
+        // picture's own paper colour (no AI can invent that much hidden background; it only makes smudges).
+        val fillColor = plain ?: if (holeFrac > 0.35f) paperColor(img, holes) else null
+        if (fillColor != null) {
             val px = IntArray(img.width * img.height); img.getPixels(px, 0, img.width, 0, 0, img.width, img.height)
-            for (i in px.indices) if (holes.a[i] > 0.3f) px[i] = plain or (0xFF shl 24)
+            val r0 = (fillColor shr 16) and 255; val g0 = (fillColor shr 8) and 255; val b0 = fillColor and 255
+            for (i in px.indices) {
+                val m = holes.a[i].coerceIn(0f, 1f)
+                if (m <= 0f) continue
+                val p = px[i]
+                fun mix(c: Int, f: Int) = (c * (1 - m) + f * m).toInt()
+                px[i] = (0xFF shl 24) or (mix((p shr 16) and 255, r0) shl 16) or (mix((p shr 8) and 255, g0) shl 8) or mix(p and 255, b0)
+            }
             return Bitmap.createBitmap(px, img.width, img.height, Bitmap.Config.ARGB_8888)
         }
         return Inpainter.inpaint(img, holes, if (models.lamaReady) models.file(OfflineModel.LAMA) else null)
+    }
+
+    /** The picture's own paper colour: median of light, low-saturation pixels outside the holes; else cream. */
+    private fun paperColor(img: Bitmap, holes: Mask): Int {
+        val w = img.width; val h = img.height
+        val rs = ArrayList<Int>(); val gs = ArrayList<Int>(); val bs = ArrayList<Int>()
+        var i = 0
+        while (i < w * h) {
+            if (holes.a[i] < 0.1f) {
+                val p = img.getPixel(i % w, i / w)
+                val r = (p shr 16) and 255; val g = (p shr 8) and 255; val b = p and 255
+                val mx = maxOf(r, g, b); val mn = minOf(r, g, b)
+                if (mx > 200 && mx - mn < 40) { rs += r; gs += g; bs += b }
+            }
+            i += 7
+        }
+        if (rs.size < (w * h / 7) * 0.03f) return android.graphics.Color.rgb(246, 238, 220)
+        rs.sort(); gs.sort(); bs.sort()
+        return android.graphics.Color.rgb(rs[rs.size / 2], gs[gs.size / 2], bs[bs.size / 2])
     }
 
     /** True if most of [m] lies inside [other]. */

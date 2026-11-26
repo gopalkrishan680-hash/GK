@@ -212,13 +212,16 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
             val mid = words.size / 2
             starts += mid to (words[mid].start - scene.start).toFloat() - 0.15f
         }
+        // Don't zoom past the picture's real resolution (grid panels are small): <= ~2x pixel upscale.
+        val base = max(outW / iw, outH / ih)
+        val maxZoom = (2.0f / base).coerceIn(1.1f, 1.6f)
         var heroTurn = 0
         return starts.mapIndexed { k, (firstWord, t) ->
             if (k == 0) return@mapIndexed wide
             if (k % 2 == 0) return@mapIndexed Shot(t, iw / 2, ih / 2, 1.06f) // back to a (slightly closer) wide
             val lastWord = starts.getOrNull(k + 1)?.first ?: words.size
             val target = heroes.firstOrNull { it.keywordIndex in firstWord until lastWord } ?: heroes[heroTurn++ % heroes.size]
-            val z = min(ih / (target.h * 1.15f), iw / (target.w * 1.7f)).coerceIn(1.18f, 1.6f)
+            val z = min(ih / (target.h * 1.15f), iw / (target.w * 1.7f)).coerceIn(1.1f, maxZoom)
             Shot(t, target.x + target.w / 2, target.y + target.h * 0.42f, z)
         }
     }
