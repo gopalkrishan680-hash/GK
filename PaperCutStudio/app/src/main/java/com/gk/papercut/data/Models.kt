@@ -101,5 +101,6 @@ data class Project(
     val captions: Boolean = true,
     val stopMotion: Boolean = true,
     val paperTexture: Boolean = true,
+    val grid: GridLayout = GridLayout.SINGLE,
     val updatedAt: Long = System.currentTimeMillis(),
 )

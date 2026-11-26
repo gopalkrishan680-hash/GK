@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -80,6 +81,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gk.papercut.data.CameraMove
 import com.gk.papercut.data.EnterAnim
+import com.gk.papercut.data.GridBatch
+import com.gk.papercut.data.GridLayout
+import com.gk.papercut.data.GridPlanner
 import com.gk.papercut.data.IdleAnim
 import com.gk.papercut.data.Project
 import com.gk.papercut.data.Scene
@@ -195,29 +199,120 @@ private fun PromptsTab(vm: StudioViewModel, p: Project) {
     val one = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> val t = target; if (uri != null && t != null) vm.importImage(t, uri) }
     val many = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { if (it.isNotEmpty()) vm.importMany(it) }
 
+    var gridTarget by remember { mutableStateOf<Int?>(null) }
+    val gridOne = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> val t = gridTarget; if (uri != null && t != null) vm.importGrid(t, uri) }
+    val gridMany = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { if (it.isNotEmpty()) vm.importGridMany(it) }
+    val gridMode = p.grid != GridLayout.SINGLE
+    val batches = remember(p) { GridPlanner.batches(p) }
+
     LazyColumn(Modifier.padding(horizontal = 12.dp)) {
         item {
             SectionCard("Image prompts") {
-                Hint("Copy each prompt into any image generator (Gemini, ChatGPT, Ideogram, Leonardo…). Save the images as scene_1, scene_2 … and import them – one by one or all together.")
-                FlowRowButtons {
-                    Button(onClick = { copy(ctx, ScriptPlanner.allPromptsText(p)) }) { Text("Copy all prompts") }
-                    OutlinedButton(onClick = {
-                        ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain")
-                            .putExtra(Intent.EXTRA_TEXT, ScriptPlanner.allPromptsText(p)), "Share prompts"))
-                    }) { Text("Share") }
-                    OutlinedButton(onClick = { copy(ctx, ScriptPlanner.chatbotHelperPrompt(p, p.scenes)) }) { Text("Copy chatbot helper") }
-                    FilledTonalButton(onClick = { many.launch("image/*") }) { Text("Import all images") }
-                    FilledTonalButton(onClick = { vm.pasteImage(null) }) { Text("Paste image") }
+                Picker("Mode", p.grid, GridLayout.entries, { it.label }, { vm.setGrid(it) })
+                if (gridMode) {
+                    Hint("Faster: one image holds ${p.grid.cells} scenes. ${batches.size} grid prompts for ${p.scenes.size} scenes. The app finds the panel lines and cuts them for you. If the last grid has fewer scenes, its prompt uses a smaller layout so nothing is cut wrong.")
+                    FlowRowButtons {
+                        Button(onClick = { copy(ctx, GridPlanner.allPrompts(p)) }) { Text("Copy all grid prompts") }
+                        OutlinedButton(onClick = {
+                            ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain")
+                                .putExtra(Intent.EXTRA_TEXT, GridPlanner.allPrompts(p)), "Share prompts"))
+                        }) { Text("Share") }
+                        FilledTonalButton(onClick = { gridMany.launch("image/*") }) { Text("Import grid images") }
+                        FilledTonalButton(onClick = { vm.pasteGrid(null) }) { Text("Paste grid") }
+                    }
+                    Hint("Each panel has fewer pixels than a full image: 2×2 gives the best quality, 3×3 is the fastest.")
+                } else {
+                    Hint("Copy each prompt into any image generator (Gemini, ChatGPT, Ideogram, Leonardo…). Save the images as scene_1, scene_2 … and import them – one by one or all together.")
+                    FlowRowButtons {
+                        Button(onClick = { copy(ctx, ScriptPlanner.allPromptsText(p)) }) { Text("Copy all prompts") }
+                        OutlinedButton(onClick = {
+                            ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain")
+                                .putExtra(Intent.EXTRA_TEXT, ScriptPlanner.allPromptsText(p)), "Share prompts"))
+                        }) { Text("Share") }
+                        OutlinedButton(onClick = { copy(ctx, ScriptPlanner.chatbotHelperPrompt(p, p.scenes)) }) { Text("Copy chatbot helper") }
+                        FilledTonalButton(onClick = { many.launch("image/*") }) { Text("Import all images") }
+                        FilledTonalButton(onClick = { vm.pasteImage(null) }) { Text("Paste image") }
+                    }
+                    Hint("“Chatbot helper” is one message you can paste into ChatGPT/Gemini chat to get even more detailed prompts for all scenes.")
                 }
-                Hint("Tip: in ChatGPT/Gemini long-press the image → Copy, then tap “Paste image” (fills the next empty scene). Or use Share → PaperCut Studio.")
-                Hint("“Chatbot helper” is one message you can paste into ChatGPT/Gemini chat to get even more detailed prompts for all scenes.")
+                Hint("Tip: in ChatGPT/Gemini long-press the image → Copy, then tap Paste. Or use Share → PaperCut Studio.")
             }
+        }
+        if (gridMode) {
+            items(batches, key = { "g${it.index}" }) { b ->
+                GridCard(vm, p, b, onImport = { gridTarget = b.index; gridOne.launch("image/*") }, onCopy = { copy(ctx, GridPlanner.prompt(p, b)) })
+            }
+            item { Text("Scenes", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp)) }
         }
         itemsIndexed(p.scenes, key = { _, s -> s.id }) { i, s ->
             SceneCard(vm, p, i, s, onImport = { target = s.id; one.launch("image/*") }, onCopy = { copy(ctx, s.prompt) })
         }
         item { Spacer(Modifier.height(40.dp)) }
     }
+    GridCheckDialog(vm, p)
+}
+
+@Composable
+private fun GridCard(vm: StudioViewModel, p: Project, b: GridBatch, onImport: () -> Unit, onCopy: () -> Unit) {
+    var show by remember(b.index) { mutableStateOf(false) }
+    val done = b.scenes.count { it.imageFile != null }
+    SectionCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Grid ${b.index + 1} · scenes ${b.first + 1}–${b.last + 1}", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Text("${b.cols}×${b.rows} · $done/${b.scenes.size} images", fontSize = 13.sp)
+        }
+        if (b.cells != p.grid.cells) Hint("Last grid: only ${b.scenes.size} scenes left, so this prompt asks for a ${b.cols}×${b.rows} layout.")
+        val prompt = remember(p, b) { GridPlanner.prompt(p, b) }
+        Text(if (show) prompt else prompt.take(220) + "…", fontSize = 12.sp, color = Color(0xFF5A4A3A),
+            modifier = Modifier.background(Color(0xFFF3EAD8)).padding(8.dp).clickable { show = !show })
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = onCopy) { Text("Copy") }
+            OutlinedButton(onClick = onImport) { Text("Import") }
+            OutlinedButton(onClick = { vm.pasteGrid(b.index) }) { Text("Paste") }
+        }
+    }
+}
+
+/** Shows how a grid image was cut before the panels are saved, with a layout override. */
+@Composable
+private fun GridCheckDialog(vm: StudioViewModel, p: Project) {
+    val pg by vm.pendingGrid.collectAsStateWithLifecycle()
+    val g = pg ?: return
+    val b = GridPlanner.batches(p).getOrNull(g.batch) ?: return
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = { vm.cancelGrid() },
+        title = { Text("Grid ${g.batch + 1}: check the cut") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                Hint("Panel order is left→right, top→bottom. If the AI drew a different layout, change it here.")
+                FlowRowButtons {
+                    Picker("Columns", g.cols, (1..4).toList(), { "$it" }, { vm.resplitGrid(it, g.rows) })
+                    Picker("Rows", g.rows, (1..4).toList(), { "$it" }, { vm.resplitGrid(g.cols, it) })
+                }
+                g.cells.chunked(g.cols).forEachIndexed { r, row ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        row.forEachIndexed { c, cell ->
+                            val i = r * g.cols + c
+                            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                                val bmp = cell.bitmap
+                                if (bmp != null) Image(bmp.asImageBitmap(), null, Modifier.fillMaxWidth().aspectRatio(bmp.width / bmp.height.toFloat()))
+                                else Box(Modifier.fillMaxWidth().aspectRatio(16 / 9f).background(Color(0xFFE6DCC8)))
+                                Text(
+                                    when {
+                                        i >= b.scenes.size -> "extra – skipped"
+                                        bmp == null -> "empty – skipped"
+                                        else -> "Scene ${b.first + i + 1}"
+                                    }, fontSize = 11.sp,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { Button(onClick = { vm.confirmGrid() }) { Text("Use panels") } },
+        dismissButton = { TextButton(onClick = { vm.cancelGrid() }) { Text("Cancel") } },
+    )
 }
 
 @Composable

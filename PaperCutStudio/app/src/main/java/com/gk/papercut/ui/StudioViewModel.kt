@@ -13,6 +13,9 @@ import androidx.lifecycle.viewModelScope
 import com.gk.papercut.data.Aspect
 import com.gk.papercut.data.EnterAnim
 import com.gk.papercut.data.GeminiDirector
+import com.gk.papercut.data.GridBatch
+import com.gk.papercut.data.GridLayout
+import com.gk.papercut.data.GridPlanner
 import com.gk.papercut.data.IdleAnim
 import com.gk.papercut.data.Layer
 import com.gk.papercut.data.Project
@@ -23,6 +26,7 @@ import com.gk.papercut.data.Settings
 import com.gk.papercut.export.VideoExporter
 import com.gk.papercut.ml.CutOut
 import com.gk.papercut.ml.Cutter
+import com.gk.papercut.ml.GridSplitter
 import com.gk.papercut.ml.LayerSeparator
 import com.gk.papercut.ml.Mask
 import com.gk.papercut.ml.MobileSam
@@ -192,9 +196,7 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
     /** Pastes an image copied from ChatGPT, Gemini, Chrome, Gallery… into a scene (or the next empty one). */
     fun pasteImage(sceneId: String?) {
         val p = _project.value ?: return
-        val cm = getApplication<Application>().getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-        val clip = cm.primaryClip
-        val uri = clip?.let { c -> (0 until c.itemCount).firstNotNullOfOrNull { c.getItemAt(it).uri } }
+        val uri = clipboardImage()
         if (uri == null) { say("No image on the clipboard – long-press the image and choose Copy"); return }
         val target = sceneId ?: p.scenes.firstOrNull { it.imageFile == null }?.id
             ?: run { say("Every scene already has an image – use Paste on a scene card to replace one"); return }
@@ -207,6 +209,96 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // Grid images ---------------------------------------------------------------------------
+
+    /** A grid image waiting for the user to check how it was cut. */
+    data class PendingGrid(val batch: Int, val source: Bitmap, val cols: Int, val rows: Int, val cells: List<GridSplitter.Cell>)
+
+    private val _pendingGrid = MutableStateFlow<PendingGrid?>(null)
+    val pendingGrid: StateFlow<PendingGrid?> = _pendingGrid.asStateFlow()
+
+    fun setGrid(g: GridLayout) = update { it.copy(grid = g) }
+
+    fun batches(): List<GridBatch> = _project.value?.let { GridPlanner.batches(it) }.orEmpty()
+
+    private fun nextOpenBatch(): Int? = batches().firstOrNull { b -> b.scenes.any { it.imageFile == null } }?.index
+
+    fun importGrid(batch: Int, uri: Uri) = task("Cutting grid…") {
+        val bmp = withContext(Dispatchers.IO) { repo.decodeScaled(uri, 4096) }
+        prepareGrid(batch, bmp, null, null)
+    }
+
+    fun pasteGrid(batch: Int?) {
+        val uri = clipboardImage() ?: run { say("No image on the clipboard – long-press the image and choose Copy"); return }
+        val b = batch ?: nextOpenBatch() ?: run { say("Every grid already has images – use Paste on a grid card to replace one"); return }
+        task("Cutting grid…") {
+            val bmp = withContext(Dispatchers.IO) { repo.decodeScaled(uri, 4096) }
+            prepareGrid(b, bmp, null, null)
+        }
+    }
+
+    /** Re-cut the waiting grid with a different layout (when the AI drew e.g. 2x3 instead of 3x2). */
+    fun resplitGrid(cols: Int, rows: Int) {
+        val pg = _pendingGrid.value ?: return
+        task("Cutting grid…") { prepareGrid(pg.batch, pg.source, cols, rows) }
+    }
+
+    private suspend fun prepareGrid(batch: Int, bmp: Bitmap, cols: Int?, rows: Int?) {
+        val b = batches().getOrNull(batch) ?: return
+        val c = cols ?: b.cols; val r = rows ?: b.rows
+        val cells = withContext(Dispatchers.Default) { GridSplitter.split(bmp, c, r) }
+        _pendingGrid.value = PendingGrid(batch, bmp, c, r, cells)
+    }
+
+    fun cancelGrid() { _pendingGrid.value = null }
+
+    fun confirmGrid() {
+        val pg = _pendingGrid.value ?: return
+        _pendingGrid.value = null
+        task("Saving panels…") { assignGrid(pg.batch, pg.cells) }
+    }
+
+    /** Panel i goes to scene i of the batch; empty panels and extra panels are skipped. */
+    private suspend fun assignGrid(batch: Int, cells: List<GridSplitter.Cell>) {
+        val b = batches().getOrNull(batch) ?: return
+        var filled = 0
+        withContext(Dispatchers.IO) {
+            b.scenes.forEachIndexed { i, scene ->
+                val bmp = cells.getOrNull(i)?.bitmap ?: return@forEachIndexed
+                saveSceneImage(_project.value!!, scene.id, scaleDown(bmp, 1600)); filled++
+            }
+        }
+        val missing = b.scenes.size - filled
+        say("Grid ${batch + 1}: $filled scenes filled" + if (missing > 0) ", $missing panels empty – add those scenes one by one" else "")
+    }
+
+    /** Several grid images at once (sorted by name), each auto-cut into the next open grid. */
+    fun importGridMany(uris: List<Uri>) = task("Cutting grids…") {
+        val sorted = uris.sortedWith(compareBy(NaturalOrder) { displayName(it) })
+        var batch = nextOpenBatch() ?: 0
+        sorted.forEachIndexed { i, uri ->
+            val b = batches().getOrNull(batch) ?: return@forEachIndexed
+            progress("Cutting grid ${i + 1} / ${sorted.size}", i / sorted.size.toFloat())
+            val bmp = withContext(Dispatchers.IO) { repo.decodeScaled(uri, 4096) }
+            val cells = withContext(Dispatchers.Default) { GridSplitter.split(bmp, b.cols, b.rows) }
+            assignGrid(batch, cells)
+            batch++
+        }
+    }
+
+    private fun scaleDown(b: Bitmap, max: Int): Bitmap {
+        val l = maxOf(b.width, b.height)
+        if (l <= max) return b
+        val k = max.toFloat() / l
+        return Bitmap.createScaledBitmap(b, (b.width * k).toInt(), (b.height * k).toInt(), true)
+    }
+
+    private fun clipboardImage(): Uri? {
+        val cm = getApplication<Application>().getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        val clip = cm.primaryClip ?: return null
+        return (0 until clip.itemCount).firstNotNullOfOrNull { clip.getItemAt(it).uri }
+    }
+
     /** Images shared to the app from another app ("Share → PaperCut Studio"). */
     fun importShared(uris: List<Uri>) {
         if (uris.isEmpty()) return
@@ -215,7 +307,7 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
             open(recent.id)
         }
         if (_project.value!!.scenes.isEmpty()) { say("Create scenes in step 1 first, then share the images again"); return }
-        importMany(uris)
+        if (_project.value!!.grid != GridLayout.SINGLE) importGridMany(uris) else importMany(uris)
     }
 
     private fun saveSceneImage(p: Project, sceneId: String, bmp: Bitmap) {

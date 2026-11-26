@@ -12,6 +12,8 @@ This app turns a script and a voice-over into a **paper cut-out animation video*
 | **4 Export** | Preview, then tap **Export video** | Renders an MP4 (H.264 + AAC voice-over) with the phone's hardware encoder. Save it to the gallery or share it |
 
 ## Features
+- **Grid mode (2×2, 3×2, 3×3)**: one AI image holds 4, 6 or 9 scenes. The app finds the real panel lines, trims the gutters and puts each panel into the right scene. The last grid automatically gets a smaller layout when fewer scenes are left (e.g. 5 scenes → 3×2 with one empty panel). Empty panels are detected and skipped, and a preview lets you fix the layout before anything is saved.
+- **Paste & share**: copy an image in ChatGPT or Gemini and tap Paste, or use Share → PaperCut Studio.
 - **Offline element separation**: ML Kit Subject Segmentation, plus MobileSAM (deep scan and tap-to-cut) and LaMa in-painting through ONNX Runtime. Download the models once in **Settings** (~45 MB SAM, ~208 MB LaMa). Without LaMa, a fast built-in fill is used.
 - **Voice-over sync**: the app detects pauses in the voice-over, so scene cuts land on real pauses and words are spread over spoken time only. With an SRT the timing is exact. You can fine-tune each scene's start in ±0.2 s steps.
 - **Word-triggered animation**: each element appears on the word that mentions it ("…*sooraj* nikla" makes the sun rise at that moment). You can change the trigger word for any layer.
