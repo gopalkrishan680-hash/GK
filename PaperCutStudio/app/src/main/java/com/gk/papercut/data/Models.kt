@@ -102,5 +102,6 @@ data class Project(
     val stopMotion: Boolean = true,
     val paperTexture: Boolean = true,
     val grid: GridLayout = GridLayout.SINGLE,
+    val youtube: YoutubeKit = YoutubeKit(),
     val updatedAt: Long = System.currentTimeMillis(),
 )

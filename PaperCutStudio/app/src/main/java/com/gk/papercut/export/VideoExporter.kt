@@ -30,7 +30,9 @@ class VideoExporter(private val renderer: FrameRenderer, private val audio: File
         val audioSamples = ArrayList<Sample>()
         if (audio != null && audio.exists()) {
             progress(0f, "Encoding voice-over…")
-            encodeAac(audio) { fmt, s -> if (fmt != null) audioFormat = fmt; if (s != null) audioSamples += s }
+            encodeAac(audio, { sec -> progress((sec / duration).toFloat().coerceIn(0f, 1f) * 0.1f, "Encoding voice-over… %.0f s".format(sec)) }) { fmt, s ->
+                if (fmt != null) audioFormat = fmt; if (s != null) audioSamples += s
+            }
         }
 
         // 2) Video encoder
@@ -56,10 +58,11 @@ class VideoExporter(private val renderer: FrameRenderer, private val audio: File
         val total = (duration * fps).toInt()
 
         fun drain(endOfStream: Boolean) {
+            var waits = 0
             while (true) {
                 val idx = enc.dequeueOutputBuffer(info, if (endOfStream) 10_000 else 0)
                 when {
-                    idx == MediaCodec.INFO_TRY_AGAIN_LATER -> if (!endOfStream) return
+                    idx == MediaCodec.INFO_TRY_AGAIN_LATER -> if (!endOfStream || ++waits > 500) return
                     idx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                         videoTrack = muxer.addTrack(enc.outputFormat)
                         val at = audioFormat?.let { muxer.addTrack(it) } ?: -1
@@ -106,7 +109,7 @@ class VideoExporter(private val renderer: FrameRenderer, private val audio: File
                 val last = i == total
                 enc.queueInputBuffer(inIdx, 0, w * h * 3 / 2, pts, if (last) MediaCodec.BUFFER_FLAG_END_OF_STREAM else 0)
                 drain(false)
-                if (i % 10 == 0) progress(i / total.toFloat(), "Rendering frame $i / $total")
+                if (i % 10 == 0) progress(0.1f + 0.9f * i / total, "Rendering frame $i / $total")
             }
             drain(true)
             progress(1f, "Done")
@@ -142,7 +145,7 @@ class VideoExporter(private val renderer: FrameRenderer, private val audio: File
     }
 
     /** Decodes the voice-over and re-encodes it as AAC-LC. */
-    private fun encodeAac(file: File, sink: (MediaFormat?, Sample?) -> Unit) {
+    private fun encodeAac(file: File, onProgress: (Double) -> Unit, sink: (MediaFormat?, Sample?) -> Unit) {
         var enc: MediaCodec? = null
         var sampleRate = 44100; var channels = 1; var isFloat = false
         var framesWritten = 0L
@@ -150,9 +153,10 @@ class VideoExporter(private val renderer: FrameRenderer, private val audio: File
 
         fun drain(eos: Boolean) {
             val e = enc ?: return
+            var waits = 0
             while (true) {
                 val idx = e.dequeueOutputBuffer(info, if (eos) 10_000 else 0)
-                if (idx == MediaCodec.INFO_TRY_AGAIN_LATER) { if (!eos) return else continue }
+                if (idx == MediaCodec.INFO_TRY_AGAIN_LATER) { if (!eos || ++waits > 500) return else continue }
                 if (idx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) { sink(e.outputFormat, null); continue }
                 if (idx < 0) continue
                 val b = e.getOutputBuffer(idx)!!
@@ -169,19 +173,24 @@ class VideoExporter(private val renderer: FrameRenderer, private val audio: File
         fun feed(pcm16: ByteArray, len: Int, eos: Boolean) {
             val e = enc!!
             var off = 0
-            do {
+            var eosSent = false
+            // Loop until every byte is queued AND (for the last call) the end-of-stream flag went in.
+            // (Earlier version could skip the EOS buffer when the encoder was busy -> export hung forever.)
+            while (off < len || (eos && !eosSent)) {
                 val idx = e.dequeueInputBuffer(10_000)
                 if (idx < 0) { drain(false); continue }
                 val buf = e.getInputBuffer(idx)!!
                 val n = minOf(buf.capacity(), len - off)
-                buf.clear(); buf.put(pcm16, off, n)
+                buf.clear(); if (n > 0) buf.put(pcm16, off, n)
                 val pts = framesWritten * 1_000_000L / sampleRate
                 framesWritten += n / (2 * channels)
                 off += n
                 val last = eos && off >= len
                 e.queueInputBuffer(idx, 0, n, pts, if (last) MediaCodec.BUFFER_FLAG_END_OF_STREAM else 0)
+                if (last) eosSent = true
                 drain(false)
-            } while (off < len)
+                if (framesWritten % (sampleRate * 2L) < n / (2 * channels)) onProgress(framesWritten.toDouble() / sampleRate)
+            }
         }
 
         try {

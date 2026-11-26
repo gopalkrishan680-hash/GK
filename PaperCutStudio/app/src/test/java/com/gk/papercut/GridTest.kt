@@ -46,7 +46,9 @@ class GridTest {
         assertTrue(prompt.contains("Panel 6 (row 2, column 3): leave completely empty"))
         assertEquals(listOf(2 to 2, 2 to 1), GridPlanner.batches(project(6, GridLayout.G2X2)).map { it.cols to it.rows })
         assertEquals(listOf(3 to 3, 2 to 2), GridPlanner.batches(project(13, GridLayout.G3X3)).map { it.cols to it.rows })
-        assertEquals(listOf(3 to 2, 1 to 1), GridPlanner.batches(project(7, GridLayout.G3X2)).map { it.cols to it.rows })
+        assertEquals(listOf(5, 2), GridPlanner.batches(project(7, GridLayout.G3X2)).map { it.scenes.size }) // no lonely 1x1 grid
+        assertEquals(listOf(3 to 2, 2 to 1), GridPlanner.batches(project(7, GridLayout.G3X2)).map { it.cols to it.rows })
+        assertEquals(listOf(0, 5), GridPlanner.batches(project(7, GridLayout.G3X2)).map { it.first })
         assertEquals(listOf(2 to 2, 1 to 2), GridPlanner.batches(project(6, GridLayout.G2X2, Aspect.PORTRAIT)).map { it.cols to it.rows })
     }
 

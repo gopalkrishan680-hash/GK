@@ -48,7 +48,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -105,8 +105,8 @@ fun EditorScreen(vm: StudioViewModel, project: Project) {
                 title = { Text(project.name, fontWeight = FontWeight.Bold) },
                 navigationIcon = { IconButton(onClick = { vm.close() }) { Icon(Icons.Default.ArrowBack, "Back") } },
             )
-            TabRow(selectedTabIndex = tab) {
-                listOf("1 Script", "2 Prompts", "3 Layers", "4 Export").forEachIndexed { i, t ->
+            ScrollableTabRow(selectedTabIndex = tab, edgePadding = 8.dp) {
+                listOf("1 Script", "2 Prompts", "3 Layers", "4 Export", "5 YouTube").forEachIndexed { i, t ->
                     Tab(selected = tab == i, onClick = { tab = i }, text = { Text(t, fontSize = 13.sp) })
                 }
             }
@@ -118,7 +118,8 @@ fun EditorScreen(vm: StudioViewModel, project: Project) {
                 0 -> ScriptTab(vm, project) { tab = 1 }
                 1 -> PromptsTab(vm, project)
                 2 -> LayersTab(vm, project)
-                else -> ExportTab(vm, project)
+                3 -> ExportTab(vm, project)
+                else -> YoutubeTab(vm, project)
             }
         }
     }
@@ -240,12 +241,13 @@ private fun PromptsTab(vm: StudioViewModel, p: Project) {
         }
         if (gridMode) {
             items(batches, key = { "g${it.index}" }) { b ->
-                GridCard(vm, p, b, onImport = { gridTarget = b.index; gridOne.launch("image/*") }, onCopy = { copy(ctx, GridPlanner.prompt(p, b)) })
+                GridCard(vm, p, b, onImport = { gridTarget = b.index; gridOne.launch("image/*") }, onCopy = { copy(ctx, GridPlanner.prompt(p, b)) },
+                    onReplaceScene = { id -> target = id; one.launch("image/*") })
             }
-            item { Text("Scenes", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp)) }
-        }
-        itemsIndexed(p.scenes, key = { _, s -> s.id }) { i, s ->
-            SceneCard(vm, p, i, s, onImport = { target = s.id; one.launch("image/*") }, onCopy = { copy(ctx, s.prompt) })
+        } else {
+            itemsIndexed(p.scenes, key = { _, s -> s.id }) { i, s ->
+                SceneCard(vm, p, i, s, onImport = { target = s.id; one.launch("image/*") }, onCopy = { copy(ctx, s.prompt) })
+            }
         }
         item { Spacer(Modifier.height(40.dp)) }
     }
@@ -253,7 +255,9 @@ private fun PromptsTab(vm: StudioViewModel, p: Project) {
 }
 
 @Composable
-private fun GridCard(vm: StudioViewModel, p: Project, b: GridBatch, onImport: () -> Unit, onCopy: () -> Unit) {
+private fun GridCard(vm: StudioViewModel, p: Project, b: GridBatch, onImport: () -> Unit, onCopy: () -> Unit, onReplaceScene: (String) -> Unit) {
+    val srcVersion by vm.gridSourcesVersion.collectAsStateWithLifecycle()
+    val canFix = remember(srcVersion, b.index) { vm.hasGridSource(b.index) }
     var show by remember(b.index) { mutableStateOf(false) }
     val done = b.scenes.count { it.imageFile != null }
     SectionCard {
@@ -270,6 +274,26 @@ private fun GridCard(vm: StudioViewModel, p: Project, b: GridBatch, onImport: ()
             OutlinedButton(onClick = onImport) { Text("Import") }
             OutlinedButton(onClick = { vm.pasteGrid(b.index) }) { Text("Paste") }
         }
+        if (done > 0) {
+            // Panels already placed, in order. Tap one to replace just that scene.
+            b.scenes.chunked(b.cols).forEach { row ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    row.forEach { sc ->
+                        val thumb = rememberProjectBitmap(vm, p.id, sc.imageFile)
+                        Column(Modifier.weight(1f).clickable { onReplaceScene(sc.id) }, horizontalAlignment = Alignment.CenterHorizontally) {
+                            if (thumb != null) Image(thumb.asImageBitmap(), null, Modifier.fillMaxWidth().aspectRatio(16 / 9f), contentScale = ContentScale.Crop)
+                            else Box(Modifier.fillMaxWidth().aspectRatio(16 / 9f).background(Color(0xFFE6DCC8)))
+                            Text("Scene ${p.scenes.indexOf(sc) + 1}", fontSize = 11.sp)
+                        }
+                    }
+                    repeat(b.cols - row.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Hint("Tap a panel to replace that scene.")
+                if (canFix) TextButton(onClick = { vm.fixGridCut(b.index) }) { Text("Fix cut") }
+            }
+        }
     }
 }
 
@@ -281,10 +305,10 @@ private fun GridCheckDialog(vm: StudioViewModel, p: Project) {
     val b = GridPlanner.batches(p).getOrNull(g.batch) ?: return
     androidx.compose.material3.AlertDialog(
         onDismissRequest = { vm.cancelGrid() },
-        title = { Text("Grid ${g.batch + 1}: check the cut") },
+        title = { Text("Grid ${g.batch + 1}: fix the cut") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
-                Hint("Panel order is left→right, top→bottom. If the AI drew a different layout, change it here.")
+                Hint("Only needed if the AI drew a different layout than asked. Set the columns and rows you see in the image.")
                 FlowRowButtons {
                     Picker("Columns", g.cols, (1..4).toList(), { "$it" }, { vm.resplitGrid(it, g.rows) })
                     Picker("Rows", g.rows, (1..4).toList(), { "$it" }, { vm.resplitGrid(g.cols, it) })
@@ -526,5 +550,50 @@ private fun Toggle(label: String, value: Boolean, onChange: (Boolean) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { onChange(!value) }) {
         Text(label, Modifier.weight(1f), fontSize = 14.sp)
         Switch(value, onChange)
+    }
+}
+
+// =============================================================================== 5. YouTube kit
+
+@Composable
+private fun YoutubeTab(vm: StudioViewModel, p: Project) {
+    val ctx = LocalContext.current
+    val k = p.youtube
+    Column(Modifier.verticalScroll(rememberScrollState()).padding(12.dp)) {
+        SectionCard("YouTube kit") {
+            Hint("Titles, an English description, chapters with exact times from your voice-over, hashtags (always starting with a small letter), tags and a thumbnail prompt.")
+            FlowRowButtons {
+                Button(onClick = { vm.generateYoutube() }) { Text(if (vm.settings.geminiKey.isBlank()) "Generate (needs Gemini key)" else "Generate with AI") }
+                OutlinedButton(onClick = { copy(ctx, com.gk.papercut.data.YoutubeKitBuilder.chatbotPrompt(p)) }) { Text("Copy ChatGPT prompt") }
+                FilledTonalButton(onClick = { vm.pasteYoutubeAnswer() }) { Text("Paste ChatGPT answer") }
+            }
+            Hint("No key? Tap “Copy ChatGPT prompt”, paste it in ChatGPT, copy its whole answer, then tap “Paste ChatGPT answer”.")
+        }
+        KitField("Titles", k.titles.joinToString("\n"), ctx, lines = 3) { v -> vm.setYoutube(k.copy(titles = v.lines().filter { it.isNotBlank() })) }
+        KitField("Description (English)", k.description, ctx, lines = 8) { v -> vm.setYoutube(k.copy(description = v)) }
+        KitField("Chapters", k.chapters, ctx, lines = 5, extra = { TextButton(onClick = { vm.offlineChapters() }) { Text("Rebuild from timing") } }) { v -> vm.setYoutube(k.copy(chapters = v)) }
+        KitField("Hashtags", k.hashtags.joinToString(" "), ctx, lines = 3) { v ->
+            vm.setYoutube(k.copy(hashtags = v.split(Regex("\\s+")).map(com.gk.papercut.data.YoutubeKitBuilder::hashtag).filter { it.length > 1 }.distinct()))
+        }
+        KitField("Tags", k.tags.joinToString(", "), ctx, lines = 3) { v -> vm.setYoutube(k.copy(tags = v.split(",").map { it.trim() }.filter { it.isNotEmpty() })) }
+        KitField("Thumbnail prompt", k.thumbnailPrompt, ctx, lines = 4) { v -> vm.setYoutube(k.copy(thumbnailPrompt = v)) }
+        SectionCard {
+            Button(onClick = { copy(ctx, com.gk.papercut.data.YoutubeKitBuilder.fullDescription(k)) }) { Text("Copy full description box") }
+            Hint("Description + chapters + hashtags, ready to paste into YouTube.")
+        }
+        Spacer(Modifier.height(40.dp))
+    }
+}
+
+@Composable
+private fun KitField(title: String, value: String, ctx: Context, lines: Int, extra: (@Composable () -> Unit)? = null, onSave: (String) -> Unit) {
+    var text by remember(value) { mutableStateOf(value) }
+    SectionCard(title) {
+        OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth(), minLines = lines)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Button(onClick = { copy(ctx, text) }, enabled = text.isNotBlank()) { Text("Copy") }
+            if (text != value) TextButton(onClick = { onSave(text) }) { Text("Save") }
+            extra?.invoke()
+        }
     }
 }

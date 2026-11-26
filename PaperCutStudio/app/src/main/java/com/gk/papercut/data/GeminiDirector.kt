@@ -55,6 +55,14 @@ class GeminiDirector(private val apiKey: String, private val model: String) {
         }
     }
 
+    /** Any JSON answer from the text model. */
+    fun generateJson(prompt: String): String {
+        val body = JSONObject()
+            .put("contents", JSONArray().put(JSONObject().put("parts", JSONArray().put(JSONObject().put("text", prompt)))))
+            .put("generationConfig", JSONObject().put("responseMimeType", "application/json").put("temperature", 0.8))
+        return post(body)
+    }
+
     private inline fun <reified T : Enum<T>> enumOr(name: String, def: T): T =
         runCatching { enumValueOf<T>(name.trim().uppercase()) }.getOrDefault(def)
 

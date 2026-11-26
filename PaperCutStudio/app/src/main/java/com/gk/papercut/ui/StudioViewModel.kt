@@ -23,6 +23,8 @@ import com.gk.papercut.data.ProjectRepository
 import com.gk.papercut.data.Scene
 import com.gk.papercut.data.ScriptPlanner
 import com.gk.papercut.data.Settings
+import com.gk.papercut.data.YoutubeKit
+import com.gk.papercut.data.YoutubeKitBuilder
 import com.gk.papercut.export.VideoExporter
 import com.gk.papercut.ml.CutOut
 import com.gk.papercut.ml.Cutter
@@ -223,9 +225,16 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun nextOpenBatch(): Int? = batches().firstOrNull { b -> b.scenes.any { it.imageFile == null } }?.index
 
+    /** Last grid image per batch, kept in memory so "Fix cut" can re-cut it with another layout. */
+    private val gridSources = HashMap<Int, Bitmap>()
+    private val _gridSourcesVersion = MutableStateFlow(0)
+    val gridSourcesVersion = _gridSourcesVersion.asStateFlow()
+    fun hasGridSource(batch: Int) = gridSources.containsKey(batch)
+
+    /** Cuts the grid and fills the scenes straight away, in panel order (left→right, top→bottom). */
     fun importGrid(batch: Int, uri: Uri) = task("Cutting grid…") {
         val bmp = withContext(Dispatchers.IO) { repo.decodeScaled(uri, 4096) }
-        prepareGrid(batch, bmp, null, null)
+        autoGrid(batch, bmp)
     }
 
     fun pasteGrid(batch: Int?) {
@@ -233,8 +242,22 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
         val b = batch ?: nextOpenBatch() ?: run { say("Every grid already has images – use Paste on a grid card to replace one"); return }
         task("Cutting grid…") {
             val bmp = withContext(Dispatchers.IO) { repo.decodeScaled(uri, 4096) }
-            prepareGrid(b, bmp, null, null)
+            autoGrid(b, bmp)
         }
+    }
+
+    private suspend fun autoGrid(batch: Int, bmp: Bitmap) {
+        val b = batches().getOrNull(batch) ?: return
+        gridSources[batch] = bmp; _gridSourcesVersion.update { it + 1 }
+        val cells = withContext(Dispatchers.Default) { GridSplitter.split(bmp, b.cols, b.rows) }
+        assignGrid(batch, cells)
+    }
+
+    /** Opens the cut preview for a grid that was already imported (only needed if the AI drew another layout). */
+    fun fixGridCut(batch: Int) {
+        val src = gridSources[batch] ?: return
+        val b = batches().getOrNull(batch) ?: return
+        task("Cutting grid…") { prepareGrid(batch, src, b.cols, b.rows) }
     }
 
     /** Re-cut the waiting grid with a different layout (when the AI drew e.g. 2x3 instead of 3x2). */
@@ -280,8 +303,7 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
             val b = batches().getOrNull(batch) ?: return@forEachIndexed
             progress("Cutting grid ${i + 1} / ${sorted.size}", i / sorted.size.toFloat())
             val bmp = withContext(Dispatchers.IO) { repo.decodeScaled(uri, 4096) }
-            val cells = withContext(Dispatchers.Default) { GridSplitter.split(bmp, b.cols, b.rows) }
-            assignGrid(batch, cells)
+            autoGrid(b.index, bmp)
             batch++
         }
     }
@@ -444,6 +466,30 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setScene(sceneId: String, transform: (Scene) -> Scene) = updateScene(sceneId, transform)
+
+    // ------------------------------------------------------------------ step 5: YouTube kit
+
+    fun setYoutube(k: YoutubeKit) = update { it.copy(youtube = k) }
+
+    fun generateYoutube() = task("Writing your YouTube kit…") {
+        val p = _project.value ?: return@task
+        if (settings.geminiKey.isBlank()) { say("Add a Gemini key in Settings, or use “Copy ChatGPT prompt”"); return@task }
+        val kit = withContext(Dispatchers.IO) { YoutubeKitBuilder.generateWithGemini(p, GeminiDirector(settings.geminiKey, settings.textModel)) }
+        setYoutube(kit); say("YouTube kit ready")
+    }
+
+    /** Reads ChatGPT's answer from the clipboard and fills the kit (hashtags fixed to a small first letter). */
+    fun pasteYoutubeAnswer() {
+        val p = _project.value ?: return
+        val cm = getApplication<Application>().getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        val text = cm.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(getApplication())?.toString().orEmpty()
+        if (text.isBlank()) { say("Copy ChatGPT's whole answer first"); return }
+        val kit = YoutubeKitBuilder.parseChatbotAnswer(text, p)
+        setYoutube(kit)
+        say("Filled: ${kit.titles.size} titles, ${kit.hashtags.size} hashtags, ${kit.tags.size} tags")
+    }
+
+    fun offlineChapters() = update { it.copy(youtube = it.youtube.copy(chapters = YoutubeKitBuilder.chapters(it, null))) }
 
     // ------------------------------------------------------------------ step 4: export
 

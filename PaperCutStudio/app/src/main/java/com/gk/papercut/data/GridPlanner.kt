@@ -32,9 +32,16 @@ object GridPlanner {
      */
     fun batches(project: Project): List<GridBatch> {
         val g = project.grid
-        return project.scenes.chunked(g.cells).mapIndexed { i, chunk ->
+        val chunks = project.scenes.chunked(g.cells).map { it.toMutableList() }.toMutableList()
+        // Never end with a lonely single-scene "grid": borrow one scene from the previous grid.
+        if (g.cells > 1 && chunks.size >= 2 && chunks.last().size == 1) {
+            val moved = chunks[chunks.size - 2].removeAt(chunks[chunks.size - 2].lastIndex)
+            chunks.last().add(0, moved)
+        }
+        var first = 0
+        return chunks.mapIndexed { i, chunk ->
             val (c, r) = if (chunk.size == g.cells) g.cols to g.rows else fit(chunk.size, g.cells, project.aspect)
-            GridBatch(i, i * g.cells, chunk, c, r)
+            GridBatch(i, first, chunk, c, r).also { first += chunk.size }
         }
     }
 
