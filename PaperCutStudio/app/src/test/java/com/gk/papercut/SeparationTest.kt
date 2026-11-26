@@ -88,7 +88,7 @@ class SeparationTest {
         val project = repo.save(p0.copy(scenes = scenes, audioDuration = scenes.last().end))
         val r = com.gk.papercut.render.FrameRenderer(project, repo)
         val frame = Bitmap.createBitmap(r.outW, r.outH, Bitmap.Config.ARGB_8888)
-        for (t in listOf(0.6, 1.4, 6.0)) {
+        for (t in listOf(0.6, 1.4, 3.0, 4.6, 5.2, 6.5)) {
             r.render(Canvas(frame), t)
             frame.compress(Bitmap.CompressFormat.PNG, 100, File(out, "sep_frame_%.1f.png".format(t)).outputStream())
         }

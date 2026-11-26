@@ -34,7 +34,9 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
     val duration: Double = max(project.audioDuration, project.scenes.lastOrNull()?.end ?: 0.0)
 
     private class PLayer(val layer: Layer, val styled: PaperStyle.Styled, val enterAt: Float, val reactAt: Float, val seed: Int)
-    private class Prepared(val scene: Scene, val bg: Bitmap?, val layers: List<PLayer>)
+    /** A camera framing inside one scene: centre (image px) and zoom on top of "cover" scale. */
+    private class Shot(val start: Float, val cx: Float, val cy: Float, val zoom: Float)
+    private class Prepared(val scene: Scene, val bg: Bitmap?, val layers: List<PLayer>, val shots: List<Shot>)
 
     private val cache = object : LinkedHashMap<String, Prepared>(4, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Prepared>?) = size > 3
@@ -100,7 +102,7 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
                 (scene.words[l.keywordIndex].start - scene.start).toFloat() - 0.05f else -1f
             PLayer(l, PaperStyle.style(bmp, grain).also { bmp.recycle() }, enterAt, reactAt, l.id.hashCode())
         }
-        Prepared(scene, bg, layers).also { cache[key] = it }
+        Prepared(scene, bg, layers, planShots(scene, bg, layers)).also { cache[key] = it }
     }
 
     /** Draws one scene at local time [tl] (seconds since the scene started). */
@@ -113,22 +115,16 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
         val step = (tl * 12f).toInt()
         val u = (tl / scene.duration.toFloat().coerceAtLeast(0.5f)).coerceIn(0f, 1f)
 
-        // Camera (Ken Burns) + parallax: cut-outs move slightly more than the background.
+        // Camera: shot framing (wide / close-up per sentence) + gentle drift, parallax on the cut-outs.
         val base = max(outW / bg.width.toFloat(), outH / bg.height.toFloat())
-        var zoom = 1f; var panX = 0f
-        when (scene.camera) {
-            CameraMove.ZOOM_IN -> zoom = 1f + 0.08f * Ease.inOut(u)
-            CameraMove.ZOOM_OUT -> zoom = 1.08f - 0.08f * Ease.inOut(u)
-            CameraMove.PAN_LEFT -> { zoom = 1.08f; panX = (0.5f - u) * 0.06f * outW }
-            CameraMove.PAN_RIGHT -> { zoom = 1.08f; panX = (u - 0.5f) * 0.06f * outW }
-            CameraMove.STATIC -> {}
-        }
+        val cam = camera(p, tl, base)
+        val zoom = cam[2]
         fun place(parallax: Float, block: () -> Unit) {
             canvas.save()
-            canvas.translate(outW / 2f - panX * parallax, outH / 2f)
+            canvas.translate(outW / 2f, outH / 2f)
             val z = 1f + (zoom - 1f) * parallax
             canvas.scale(base * z, base * z)
-            canvas.translate(-bg.width / 2f, -bg.height / 2f)
+            canvas.translate(-cam[0], -cam[1])
             block()
             canvas.restore()
         }
@@ -149,6 +145,70 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
                 drawLayer(canvas, pl, xf)
             }
         }
+    }
+
+    /**
+     * Splits a long scene into shots at sentence ends: wide → close-up on the element the sentence
+     * talks about (or the next hero) → wide … so a 9-second image never feels frozen.
+     */
+    private fun planShots(scene: Scene, bg: Bitmap?, layers: List<PLayer>): List<Shot> {
+        if (bg == null) return emptyList()
+        val iw = bg.width.toFloat(); val ih = bg.height.toFloat()
+        val wide = Shot(0f, iw / 2, ih / 2, 1f)
+        val words = scene.words
+        if (words.isEmpty() || scene.duration < 4.5) return listOf(wide)
+        val heroes = layers.map { it.layer }.filter { it.w < iw * 0.8f && it.h < ih * 0.95f }
+            .sortedWith(compareBy({ if (it.enter == EnterAnim.NONE) 1 else 0 }, { -(it.w * it.h) }))
+        if (heroes.isEmpty()) return listOf(wide)
+        // Sentence boundaries -> shot starts (at least 2.5 s per shot, 2 s left at the end).
+        val starts = mutableListOf(0 to 0f)
+        for (i in 0 until words.size - 1) {
+            if (words[i].text.last() !in ".!?।|") continue
+            val t = (words[i + 1].start - scene.start).toFloat() - 0.15f
+            if (t - starts.last().second >= 2.5f && scene.duration - t >= 2.0f) starts += (i + 1) to t
+        }
+        if (starts.size == 1 && scene.duration >= 7.0) {
+            // One long sentence: cut to a close-up halfway.
+            val mid = words.size / 2
+            starts += mid to (words[mid].start - scene.start).toFloat() - 0.15f
+        }
+        var heroTurn = 0
+        return starts.mapIndexed { k, (firstWord, t) ->
+            if (k == 0) return@mapIndexed wide
+            if (k % 2 == 0) return@mapIndexed Shot(t, iw / 2, ih / 2, 1.06f) // back to a (slightly closer) wide
+            val lastWord = starts.getOrNull(k + 1)?.first ?: words.size
+            val target = heroes.firstOrNull { it.keywordIndex in firstWord until lastWord } ?: heroes[heroTurn++ % heroes.size]
+            val z = min(ih / (target.h * 1.15f), iw / (target.w * 1.7f)).coerceIn(1.18f, 1.6f)
+            Shot(t, target.x + target.w / 2, target.y + target.h * 0.42f, z)
+        }
+    }
+
+    /** Camera centre x, y (image px) and zoom at local time [tl]; glides 0.7 s between shots. */
+    private fun camera(p: Prepared, tl: Float, base: Float): FloatArray {
+        val bg = p.bg!!
+        val shots = p.shots.ifEmpty { listOf(Shot(0f, bg.width / 2f, bg.height / 2f, 1f)) }
+        val j = shots.indexOfLast { tl >= it.start }.coerceAtLeast(0)
+        val cur = shots[j]
+        val prev = shots.getOrNull(j - 1) ?: cur
+        val e = Ease.inOut(((tl - cur.start) / 0.7f).coerceIn(0f, 1f))
+        var cx = prev.cx + (cur.cx - prev.cx) * e
+        var cy = prev.cy + (cur.cy - prev.cy) * e
+        var z = prev.zoom + (cur.zoom - prev.zoom) * e
+        // Gentle drift inside the shot, using the scene's camera move.
+        val shotEnd = shots.getOrNull(j + 1)?.start ?: p.scene.duration.toFloat()
+        val u = ((tl - cur.start) / (shotEnd - cur.start).coerceAtLeast(0.5f)).coerceIn(0f, 1f)
+        when (p.scene.camera) {
+            CameraMove.ZOOM_IN -> z *= 1f + 0.05f * u
+            CameraMove.ZOOM_OUT -> z *= 1.05f - 0.05f * u
+            CameraMove.PAN_LEFT -> { z *= 1.06f; cx += (0.5f - u) * 0.05f * bg.width }
+            CameraMove.PAN_RIGHT -> { z *= 1.06f; cx += (u - 0.5f) * 0.05f * bg.width }
+            CameraMove.STATIC -> {}
+        }
+        // Keep the view inside the picture.
+        val hw = outW / (2 * base * z); val hh = outH / (2 * base * z)
+        cx = if (bg.width > 2 * hw) cx.coerceIn(hw, bg.width - hw) else bg.width / 2f
+        cy = if (bg.height > 2 * hh) cy.coerceIn(hh, bg.height - hh) else bg.height / 2f
+        return floatArrayOf(cx, cy, z)
     }
 
     private fun drawLayer(canvas: Canvas, pl: PLayer, xf: Xf) {
@@ -185,11 +245,19 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
                 canvas.restore()
             }
             Transition.PAPER_FLIP -> {
-                val first = p < 0.5f
-                val sx = abs(cos(p * PI.toFloat()))
-                canvas.save(); canvas.scale(max(sx, 0.001f), 1f, outW / 2f, outH / 2f)
-                if (first) drawScene(canvas, prev, prevT) else drawScene(canvas, cur, tl)
-                canvas.restore()
+                // Page turn: the old page folds away to the left, revealing the new one underneath
+                // (no empty frame in between).
+                drawScene(canvas, cur, tl)
+                val wLeft = (1 - e) * outW
+                if (wLeft > 1f) {
+                    canvas.save()
+                    canvas.clipRect(0f, 0f, wLeft, outH.toFloat())
+                    canvas.scale(1f - e * 0.35f, 1f, 0f, outH / 2f)
+                    drawScene(canvas, prev, prevT)
+                    canvas.restore()
+                    fill.shader = LinearGradient(wLeft, 0f, wLeft + 40f, 0f, Color.argb(110, 0, 0, 0), Color.TRANSPARENT, Shader.TileMode.CLAMP)
+                    canvas.drawRect(wLeft, 0f, wLeft + 40f, outH.toFloat(), fill); fill.shader = null
+                }
             }
             Transition.FOLD -> {
                 drawScene(canvas, prev, prevT)
@@ -271,7 +339,7 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
         val chunk = words.subList(chunkStart, chunkEnd)
         val appear = ((t - chunk.first().start) / 0.15).toFloat().coerceIn(0f, 1f)
 
-        capPaint.textSize = min(outW, outH) * 0.058f
+        capPaint.textSize = min(outW, outH) * 0.066f
         val space = capPaint.measureText(" ")
         val widths = chunk.map { capPaint.measureText(it.text) }
         val total = widths.sum() + space * (chunk.size - 1)
