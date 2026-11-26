@@ -19,15 +19,20 @@ enum class OfflineModel(val label: String, val fileName: String, val url: String
         "LaMa in-painting", "lama_fp32.onnx",
         "https://huggingface.co/Carve/LaMa-ONNX/resolve/main/lama_fp32.onnx", 208,
     ),
+    UPSCALER(
+        "AI upscaler (Real-ESRGAN)", "realesr_animevideov3_256.onnx",
+        "https://huggingface.co/Tomoali/realesr-animevideov3-onnx/resolve/main/animevideov3_nchw_256x256_fp32.onnx", 3,
+    ),
 }
 
 class ModelManager(context: Context) {
     private val dir = File(context.filesDir, "models").apply { mkdirs() }
 
     fun file(m: OfflineModel) = File(dir, m.fileName)
-    fun isReady(m: OfflineModel) = file(m).let { it.exists() && it.length() > 1_000_000 }
+    fun isReady(m: OfflineModel) = file(m).let { it.exists() && it.length() > 1_000_000 && !File(dir, m.fileName + ".part").exists() }
     val samReady get() = isReady(OfflineModel.SAM_ENCODER) && isReady(OfflineModel.SAM_DECODER)
     val lamaReady get() = isReady(OfflineModel.LAMA)
+    val upscalerReady get() = isReady(OfflineModel.UPSCALER)
 
     fun delete(m: OfflineModel) { file(m).delete() }
 

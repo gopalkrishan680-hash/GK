@@ -399,6 +399,14 @@ private fun LayersTab(vm: StudioViewModel, p: Project) {
                     }
                 }
                 Button(onClick = { vm.separateAll(useSam && samReady) }, enabled = p.scenes.any { it.imageFile != null }) { Text("Separate all scenes") }
+                val upReady = remember(modelsVersion) { vm.models.upscalerReady }
+                val small = p.scenes.count { it.imageFile != null && maxOf(it.imageW, it.imageH) in 1 until 1400 }
+                if (!upReady) {
+                    Hint("Images look soft? The offline AI upscaler (3 MB) makes grid panels sharp. New imports are upscaled automatically once it is downloaded.")
+                    OutlinedButton(onClick = { vm.downloadModel(com.gk.papercut.ml.OfflineModel.UPSCALER) }) { Text("Download AI upscaler (3 MB)") }
+                } else if (small > 0) {
+                    FilledTonalButton(onClick = { vm.upscaleAll(useSam && samReady) }) { Text("Sharpen $small small images (AI) & separate again") }
+                }
             }
         }
         itemsIndexed(p.scenes, key = { _, s -> s.id }) { i, s ->

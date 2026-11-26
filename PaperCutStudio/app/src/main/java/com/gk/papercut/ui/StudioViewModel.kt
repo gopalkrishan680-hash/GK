@@ -29,6 +29,7 @@ import com.gk.papercut.export.VideoExporter
 import com.gk.papercut.ml.CutOut
 import com.gk.papercut.ml.Cutter
 import com.gk.papercut.ml.GridSplitter
+import com.gk.papercut.ml.Upscaler
 import com.gk.papercut.ml.LayerSeparator
 import com.gk.papercut.ml.Mask
 import com.gk.papercut.ml.MobileSam
@@ -332,10 +333,35 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
         if (_project.value!!.grid != GridLayout.SINGLE) importGridMany(uris) else importMany(uris)
     }
 
-    private fun saveSceneImage(p: Project, sceneId: String, bmp: Bitmap) {
+    private fun saveSceneImage(p: Project, sceneId: String, original: Bitmap) {
+        // Small pictures (grid panels) are sharpened with the offline AI upscaler when it is downloaded.
+        val bmp = if (models.upscalerReady && Upscaler.needsUpscale(original))
+            runCatching { Upscaler.upscale(original, models.file(OfflineModel.UPSCALER)) }.getOrDefault(original) else original
         val name = repo.saveBitmap(p.id, "s_${sceneId}_img_${System.currentTimeMillis() % 100000}.png", bmp)
         updateScene(sceneId) { it.copy(imageFile = name, backgroundFile = null, layers = emptyList(), imageW = bmp.width, imageH = bmp.height) }
         if (samSceneId == sceneId) closeSam()
+    }
+
+    /** Sharpens every small scene image already imported, then separates the scenes again. */
+    fun upscaleAll(useSam: Boolean) = task("AI upscaling…") {
+        if (!models.upscalerReady) { say("Download the AI upscaler first (3 MB)"); return@task }
+        val p = _project.value ?: return@task
+        val todo = p.scenes.filter { it.imageFile != null && maxOf(it.imageW, it.imageH) in 1 until 1400 }
+        if (todo.isEmpty()) { say("All images are already sharp enough"); return@task }
+        todo.forEachIndexed { i, sc ->
+            withContext(Dispatchers.Default) {
+                val img = repo.loadBitmap(p.id, sc.imageFile) ?: return@withContext
+                val up = Upscaler.upscale(img, models.file(OfflineModel.UPSCALER)) { f ->
+                    progress("Upscaling scene ${p.scenes.indexOf(sc) + 1} (${i + 1}/${todo.size})", (i + f) / todo.size)
+                }
+                saveSceneImage(_project.value!!, sc.id, up)
+            }
+        }
+        val again = _project.value!!.scenes.filter { it.imageFile != null }
+        again.forEachIndexed { i, s ->
+            separateScene(s.id, useSam) { msg -> progress("Separating scene ${i + 1}/${again.size}: $msg", i / again.size.toFloat()) }
+        }
+        say("${todo.size} images sharpened and separated again")
     }
 
     // ------------------------------------------------------------------ step 3: separation
