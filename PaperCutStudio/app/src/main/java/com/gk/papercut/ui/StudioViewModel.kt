@@ -385,6 +385,7 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
                 id = UUID.randomUUID().toString().take(8), file = name,
                 x = c.x.toFloat(), y = c.y.toFloat(), w = c.bitmap.width.toFloat(), h = c.bitmap.height.toFloat(),
                 label = hint?.name ?: if (hero) "Hero ${heroIdx}" else if (isSetPiece(c, w, h)) "Set piece ${i + 1}" else "Crowd ${i + 1}",
+                role = if (hero) "hero" else if (isSetPiece(c, w, h)) "set" else "crowd",
                 enter = if (hero) hint?.enter ?: defaultEnter(c, w, h) else EnterAnim.NONE,
                 idle = if (hero) hint?.idle ?: IdleAnim.BOB else IdleAnim.NONE,
                 keywordIndex = hint?.wordIndex ?: -1,

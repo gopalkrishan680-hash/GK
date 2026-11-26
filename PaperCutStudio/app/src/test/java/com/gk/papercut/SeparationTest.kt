@@ -75,12 +75,14 @@ class SeparationTest {
         val p0 = repo.create("court")
         repo.saveBitmap(p0.id, "img.png", img); repo.saveBitmap(p0.id, "bg.png", bg)
         val anims = com.gk.papercut.data.EnterAnim.entries.filter { it != com.gk.papercut.data.EnterAnim.NONE }
+        val heroIds = cuts.filter { it.y > 4 }.sortedByDescending { it.bitmap.width * it.bitmap.height }.take(3).toSet()
         val layers = cuts.mapIndexed { i, cut ->
             val setPiece = cut.y <= 4 || (cut.y + cut.bitmap.height >= h - 4 && cut.bitmap.width > w * 0.3f)
             com.gk.papercut.data.Layer("L$i", repo.saveBitmap(p0.id, "l$i.png", cut.bitmap), cut.x.toFloat(), cut.y.toFloat(),
                 cut.bitmap.width.toFloat(), cut.bitmap.height.toFloat(),
-                enter = if (setPiece) com.gk.papercut.data.EnterAnim.NONE else anims[i % anims.size],
-                idle = if (setPiece) com.gk.papercut.data.IdleAnim.NONE else com.gk.papercut.data.IdleAnim.BOB)
+                enter = if (setPiece || cut !in heroIds) com.gk.papercut.data.EnterAnim.NONE else anims[i % anims.size],
+                idle = if (setPiece) com.gk.papercut.data.IdleAnim.NONE else com.gk.papercut.data.IdleAnim.BOB,
+                role = if (setPiece) "set" else if (cut in heroIds) "hero" else "crowd")
         }.sortedByDescending { it.w * it.h }
         val text = "Raja ne gusse se dekha, aur sainik rani ko darbar mein kheench laaye. Sab darbari chup baithe rahe."
         val scenes = com.gk.papercut.sync.SyncEngine.syncByReadingSpeed(listOf(
@@ -88,7 +90,7 @@ class SeparationTest {
         val project = repo.save(p0.copy(scenes = scenes, audioDuration = scenes.last().end))
         val r = com.gk.papercut.render.FrameRenderer(project, repo)
         val frame = Bitmap.createBitmap(r.outW, r.outH, Bitmap.Config.ARGB_8888)
-        for (t in listOf(0.6, 1.4, 3.0, 4.6, 5.2, 6.5)) {
+        for (t in listOf(0.2, 0.6, 1.0, 1.4, 1.9, 2.4)) {
             r.render(Canvas(frame), t)
             frame.compress(Bitmap.CompressFormat.PNG, 100, File(out, "sep_frame_%.1f.png".format(t)).outputStream())
         }

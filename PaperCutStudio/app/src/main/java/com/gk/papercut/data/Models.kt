@@ -50,6 +50,8 @@ data class Layer(
     /** Word index (within the scene) that triggers the entrance, or -1 for automatic stagger. */
     val keywordIndex: Int = -1,
     val visible: Boolean = true,
+    /** "hero", "crowd" or "set" (pillars/floors). Empty for layers from older versions. */
+    val role: String = "",
 )
 
 /** An element the script mentions; used for the prompt and to time the matching cut-out. */
@@ -101,6 +103,8 @@ data class Project(
     val captions: Boolean = true,
     val stopMotion: Boolean = true,
     val paperTexture: Boolean = true,
+    /** Elements build the scene one after another (true) or are all on stage from the start (false). */
+    val buildUp: Boolean = true,
     val grid: GridLayout = GridLayout.SINGLE,
     val youtube: YoutubeKit = YoutubeKit(),
     val updatedAt: Long = System.currentTimeMillis(),

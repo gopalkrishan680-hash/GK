@@ -33,7 +33,7 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
     val outH = project.aspect.h
     val duration: Double = max(project.audioDuration, project.scenes.lastOrNull()?.end ?: 0.0)
 
-    private class PLayer(val layer: Layer, val styled: PaperStyle.Styled, val enterAt: Float, val reactAt: Float, val seed: Int)
+    private class PLayer(val layer: Layer, val styled: PaperStyle.Styled, val enterAt: Float, val reactAt: Float, val seed: Int, val anim: EnterAnim)
     /** A camera framing inside one scene: centre (image px) and zoom on top of "cover" scale. */
     private class Shot(val start: Float, val cx: Float, val cy: Float, val zoom: Float)
     private class Prepared(val scene: Scene, val bg: Bitmap?, val layers: List<PLayer>, val shots: List<Shot>)
@@ -90,17 +90,14 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
         val bg = bgRaw?.let { PaperStyle.styleBackground(it, grain).also { _ -> it.recycle() } }
         val visible = if (scene.backgroundFile != null) scene.layers.filter { it.visible } else emptyList()
         val dur = scene.duration.toFloat().coerceAtLeast(1f)
-        val autoOrder = visible.filter { it.enter != EnterAnim.NONE }
-        val stagger = min(0.2f, dur * 0.2f / max(1, autoOrder.size))
+        val timing = entranceTimes(scene, visible, dur)
         val layers = visible.mapNotNull { l ->
             val bmp = repo.loadBitmap(project.id, l.file) ?: return@mapNotNull null
-            // Entrances happen right at the scene start (while the transition is still moving), so the
-            // repainted background behind an element is never left on screen waiting for a word.
-            val enterAt = if (l.enter == EnterAnim.NONE) -10f else 0.05f + autoOrder.indexOf(l).coerceAtLeast(0) * stagger
+            val (enterAt, anim) = timing[l.id] ?: (-10f to EnterAnim.NONE)
             // The element's word makes it react (hop) exactly when it is spoken.
             val reactAt = if (l.keywordIndex >= 0 && l.keywordIndex < scene.words.size)
                 (scene.words[l.keywordIndex].start - scene.start).toFloat() - 0.05f else -1f
-            PLayer(l, PaperStyle.style(bmp, grain).also { bmp.recycle() }, enterAt, reactAt, l.id.hashCode())
+            PLayer(l, PaperStyle.style(bmp, grain).also { bmp.recycle() }, enterAt, reactAt, l.id.hashCode(), anim)
         }
         Prepared(scene, bg, layers, planShots(scene, bg, layers)).also { cache[key] = it }
     }
@@ -138,13 +135,56 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
                 val l = pl.layer
                 val xf = Xf()
                 // Movement amounts are in output pixels; divide by scale because we draw in image space.
-                Motion.enter(l.enter, local / Motion.ENTER_SEC, outW / s, outH / s, xf)
+                Motion.enter(pl.anim, local / Motion.ENTER_SEC, outW / s, outH / s, xf)
                 if (local > Motion.ENTER_SEC) Motion.idle(l.idle, local - Motion.ENTER_SEC, l.h, outW / s, xf)
                 if (pl.reactAt >= 0f) Motion.react(stepT - pl.reactAt, l.h, xf)
                 if (project.stopMotion) Motion.boil(pl.seed, step / 2, xf)
                 drawLayer(canvas, pl, xf)
             }
         }
+    }
+
+    private fun roleOf(l: Layer) = l.role.ifEmpty {
+        when {
+            l.label.startsWith("Set piece") -> "set"
+            l.label.startsWith("Crowd") -> "crowd"
+            l.enter == EnterAnim.NONE -> "crowd"
+            else -> "hero"
+        }
+    }
+
+    /**
+     * When each element arrives and how.
+     * Build-up mode (default): set pieces are there from the start; the heroes enter one after another,
+     * then the crowd pops/grows in place one after another (left → right, fast, so each element covers
+     * its own spot right away). Heroes still hop on their word, so the scene stays in sync.
+     * Otherwise: only layers with an entrance animate, all at the scene start.
+     */
+    private fun entranceTimes(scene: Scene, visible: List<Layer>, dur: Float): Map<String, Pair<Float, EnterAnim>> {
+        val out = HashMap<String, Pair<Float, EnterAnim>>()
+        if (!project.buildUp) {
+            val movers = visible.filter { it.enter != EnterAnim.NONE }
+            val st = min(0.2f, dur * 0.2f / max(1, movers.size))
+            visible.forEach { l -> out[l.id] = if (l.enter == EnterAnim.NONE) -10f to EnterAnim.NONE else (0.05f + movers.indexOf(l) * st) to l.enter }
+            return out
+        }
+        val crowd = visible.filter { roleOf(it) == "crowd" }.sortedBy { it.x + it.w / 2 }
+        val heroes = visible.filter { roleOf(it) == "hero" }
+            .sortedBy { if (it.keywordIndex >= 0) it.keywordIndex else Int.MAX_VALUE / 2 + (it.x).toInt() }
+        visible.filter { roleOf(it) == "set" }.forEach { out[it.id] = -10f to EnterAnim.NONE }
+        // Heroes first (they leave the biggest empty spots), then the crowd fills in, one after another.
+        var t = 0.05f
+        heroes.forEach { l ->
+            out[l.id] = t to (if (l.enter == EnterAnim.NONE) EnterAnim.POP else l.enter)
+            t += 0.4f
+        }
+        val inPlace = listOf(EnterAnim.POP, EnterAnim.GROW_UP, EnterAnim.WOBBLE_IN)
+        val crowdStagger = min(0.2f, 1.6f / max(1, crowd.size))
+        crowd.forEachIndexed { i, l ->
+            val anim = if (l.enter == EnterAnim.NONE) inPlace[i % inPlace.size] else l.enter
+            out[l.id] = (t + i * crowdStagger) to anim
+        }
+        return out
     }
 
     /**
