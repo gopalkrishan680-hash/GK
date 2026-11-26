@@ -1,0 +1,5 @@
+<resources>
+    <style name="Theme.PaperCut" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">#FFF6EEDC</item>
+    </style>
+</resources>
