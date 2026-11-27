@@ -188,36 +188,23 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
             visible.forEach { l -> out[l.id] = if (l.enter == EnterAnim.NONE) -10f to EnterAnim.NONE else (0.05f + movers.indexOf(l) * st) to l.enter }
             return out
         }
-        // The whole build must fit in the first ~30 % of the scene (max ~1.4 s of start times), so a
-        // scene never sits half-empty and a short last scene still completes before the video ends.
-        val budget = min(1.4f, dur * 0.3f)
-        if (project.popupBook) {
-            // Pop-up book: the main characters fold up first (they are talked about right away), then
-            // everything else (pillars too) back to front — farthest first.
-            val heroesFirst = visible.filter { roleOf(it) == "hero" }.sortedByDescending { it.w * it.h }
-            val rest = visible.filter { roleOf(it) != "hero" }.sortedBy { it.y + it.h }
-            val order = heroesFirst + rest
-            val st = min(0.16f, budget / max(1, order.size))
-            order.forEachIndexed { i, l -> out[l.id] = (0.02f + i * st) to EnterAnim.POPUP_FOLD }
-            return out
-        }
-        val crowd = visible.filter { roleOf(it) == "crowd" }.sortedBy { it.x + it.w / 2 }
-        val heroes = visible.filter { roleOf(it) == "hero" }
-            .sortedBy { if (it.keywordIndex >= 0) it.keywordIndex else Int.MAX_VALUE / 2 + (it.x).toInt() }
-        visible.filter { roleOf(it) == "set" }.forEach { out[it.id] = -10f to EnterAnim.NONE }
-        // Heroes first (they leave the biggest empty spots), then the crowd fills in, one after another.
-        val n = heroes.size + crowd.size
-        val heroGap = min(0.3f, budget * 0.5f / max(1, heroes.size))
-        var t = 0.02f
-        heroes.forEach { l ->
-            out[l.id] = t to (if (l.enter == EnterAnim.NONE) EnterAnim.POP else l.enter)
-            t += heroGap
-        }
+        // The scene builds DURING the incoming transition and is complete ~0.9 s after the cut, biggest
+        // pieces first: the page never sits half-empty (a full scene turning into an empty page that slowly
+        // refills is what read as "stuck" at every scene change), and the main characters — the biggest
+        // cut-outs — are there right away.
+        val budget = min(0.9f, dur * 0.25f)
+        val order = visible.filter { project.popupBook || roleOf(it) != "set" }.sortedByDescending { it.w * it.h }
+        if (!project.popupBook) visible.filter { roleOf(it) == "set" }.forEach { out[it.id] = -10f to EnterAnim.NONE }
+        val st = min(0.1f, budget / max(1, order.size))
         val inPlace = listOf(EnterAnim.POP, EnterAnim.GROW_UP, EnterAnim.WOBBLE_IN)
-        val crowdStagger = if (n == 0) 0f else min(0.15f, max(0f, budget - t) / max(1, crowd.size))
-        crowd.forEachIndexed { i, l ->
-            val anim = if (l.enter == EnterAnim.NONE) inPlace[i % inPlace.size] else l.enter
-            out[l.id] = (t + i * crowdStagger) to anim
+        order.forEachIndexed { i, l ->
+            val anim = when {
+                project.popupBook -> EnterAnim.POPUP_FOLD
+                roleOf(l) == "hero" -> if (l.enter == EnterAnim.NONE) EnterAnim.POP else l.enter
+                l.enter == EnterAnim.NONE -> inPlace[i % inPlace.size]
+                else -> l.enter
+            }
+            out[l.id] = (i * st) to anim
         }
         return out
     }

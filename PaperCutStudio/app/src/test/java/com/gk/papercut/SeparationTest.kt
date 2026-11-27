@@ -90,6 +90,19 @@ class SeparationTest {
         val project = repo.save(p0.copy(scenes = scenes, audioDuration = scenes.last().end))
         val r = com.gk.papercut.render.FrameRenderer(project, repo)
         val frame = Bitmap.createBitmap(r.outW, r.outH, Bitmap.Config.ARGB_8888)
+        // Scene change: two scenes with the real layers, frames across the cut.
+        run {
+            val a = scenes[0].copy(id = "S1", start = 0.0, end = 4.0)
+            val b = scenes[0].copy(id = "S2", start = 4.0, end = 10.0, transition = com.gk.papercut.data.Transition.PAPER_SLIDE)
+            val tp = repo.save(project.copy(scenes = listOf(a, b), audioDuration = 10.0, captions = false, stopMotion = true))
+            val tr = com.gk.papercut.render.FrameRenderer(tp, repo)
+            val dir = File(out, "cut_frames").apply { deleteRecursively(); mkdirs() }
+            val fb = Bitmap.createBitmap(tr.outW, tr.outH, Bitmap.Config.ARGB_8888)
+            for (fi in 0 until 48) {
+                tr.render(Canvas(fb), 3.8 + fi / 30.0)
+                Bitmap.createScaledBitmap(fb, 320, 180, true).compress(Bitmap.CompressFormat.JPEG, 90, File(dir, "f%03d.jpg".format(fi)).outputStream())
+            }
+        }
         // Pop-up book style clip (frames written for a preview video).
         val pb = com.gk.papercut.render.FrameRenderer(repo.save(project.copy(popupBook = true, captions = false)), repo)
         val pbDir = File(out, "popup_frames").apply { deleteRecursively(); mkdirs() }
