@@ -90,6 +90,20 @@ class SeparationTest {
         val project = repo.save(p0.copy(scenes = scenes, audioDuration = scenes.last().end))
         val r = com.gk.papercut.render.FrameRenderer(project, repo)
         val frame = Bitmap.createBitmap(r.outW, r.outH, Bitmap.Config.ARGB_8888)
+        // 1080p + depth + keyword pop-up with the real Hindi narration.
+        val hindi = "भरी सभा में द्रौपदी का अपमान हो रहा था, और भीष्म चुप थे। क्यों? इसका जवाब खुद महाभारत में है।"
+        val hs = com.gk.papercut.sync.SyncEngine.syncByReadingSpeed(listOf(scenes[0].copy(text = hindi, words = emptyList())))
+        val hp = repo.save(project.copy(scenes = hs, audioDuration = hs.last().end, resolution = 1080))
+        val popIdx = com.gk.papercut.render.Keywords.popIndex(hs[0])
+        println("pop-up word: " + hs[0].words.getOrNull(popIdx)?.text + " at %.2fs".format(hs[0].words.getOrNull(popIdx)?.start ?: -1.0))
+        val hr = com.gk.papercut.render.FrameRenderer(hp, repo)
+        org.junit.Assert.assertEquals(1920, hr.outW)
+        val hf = Bitmap.createBitmap(hr.outW, hr.outH, Bitmap.Config.ARGB_8888)
+        val popT = hs[0].words[popIdx].start
+        for ((name, tt) in listOf("hd_cap1" to hs[0].words[8].start + 0.1, "hd_cap2" to hs[0].words[9].start + 0.1, "hd_build" to 1.0, "hd_pop" to popT + 0.3, "hd_end" to hs[0].end - 0.2)) {
+            hr.render(Canvas(hf), tt)
+            hf.compress(Bitmap.CompressFormat.PNG, 100, File(out, "$name.png").outputStream())
+        }
         // Camera smoothness: no single-frame jump when a new shot starts (captions/stop-motion off here).
         val smooth = com.gk.papercut.render.FrameRenderer(project.copy(captions = false, stopMotion = false), repo)
         val shotFrames = (3.0 * 30).toInt()..(scenes[0].duration * 30).toInt().coerceAtMost(210)

@@ -81,6 +81,43 @@ object PaperStyle {
         return out
     }
 
+    /** 2.5D depth: soft blur + slight dim and desaturation, so the sharp cut-outs stand in front. */
+    fun depth(bg: Bitmap): Bitmap {
+        val w = bg.width; val h = bg.height
+        val px = IntArray(w * h); bg.getPixels(px, 0, w, 0, 0, w, h)
+        val r = maxOf(2, minOf(w, h) / 260)
+        val tmp = IntArray(w * h)
+        boxBlur(px, tmp, w, h, r, true); boxBlur(tmp, px, w, h, r, false)
+        boxBlur(px, tmp, w, h, r, true); boxBlur(tmp, px, w, h, r, false)
+        for (i in px.indices) {
+            val p = px[i]
+            val rr = (p shr 16) and 255; val gg = (p shr 8) and 255; val bb = p and 255
+            val grey = (rr * 30 + gg * 59 + bb * 11) / 100
+            fun f(c: Int) = ((c * 0.85f + grey * 0.15f) * 0.9f + 8).toInt().coerceIn(0, 255)
+            px[i] = (0xFF shl 24) or (f(rr) shl 16) or (f(gg) shl 8) or f(bb)
+        }
+        return Bitmap.createBitmap(px, w, h, Bitmap.Config.ARGB_8888)
+    }
+
+    /** One pass of a running-sum box blur, horizontal or vertical. */
+    private fun boxBlur(src: IntArray, dst: IntArray, w: Int, h: Int, r: Int, horizontal: Boolean) {
+        val len = if (horizontal) w else h
+        val lines = if (horizontal) h else w
+        val win = 2 * r + 1
+        for (l in 0 until lines) {
+            var sr = 0; var sg = 0; var sb = 0
+            fun idx(k: Int) = if (horizontal) l * w + k.coerceIn(0, len - 1) else k.coerceIn(0, len - 1) * w + l
+            for (k in -r..r) { val p = src[idx(k)]; sr += (p shr 16) and 255; sg += (p shr 8) and 255; sb += p and 255 }
+            for (k in 0 until len) {
+                dst[idx(k)] = (0xFF shl 24) or ((sr / win) shl 16) or ((sg / win) shl 8) or (sb / win)
+                val a = src[idx(k - r)]; val b = src[idx(k + r + 1)]
+                sr += ((b shr 16) and 255) - ((a shr 16) and 255)
+                sg += ((b shr 8) and 255) - ((a shr 8) and 255)
+                sb += (b and 255) - (a and 255)
+            }
+        }
+    }
+
     private fun makeTexture(): Bitmap {
         val s = 512
         val rnd = Random(7)

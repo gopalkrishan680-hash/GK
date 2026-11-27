@@ -84,6 +84,8 @@ data class Scene(
     val layers: List<Layer> = emptyList(),
     val camera: CameraMove = CameraMove.ZOOM_IN,
     val transition: Transition = Transition.PAPER_SLIDE,
+    /** Keyword pop-up: -2 = automatic, -1 = none, otherwise the word index in this scene. */
+    val popWord: Int = -2,
 ) {
     val duration get() = (end - start).coerceAtLeast(0.0)
 }
@@ -107,6 +109,12 @@ data class Project(
     val buildUp: Boolean = true,
     /** Camera zooms/pans and close-up shots. Off = steady full-frame picture. */
     val cameraMoves: Boolean = true,
+    /** Background slightly blurred and dimmed so the cut-outs stand out (2.5D depth). */
+    val depthEffect: Boolean = true,
+    /** Big paper-cut letters for one important word per scene. */
+    val keywordPopups: Boolean = true,
+    /** Export height: 720 or 1080 (landscape), width for portrait. */
+    val resolution: Int = 720,
     val grid: GridLayout = GridLayout.SINGLE,
     val youtube: YoutubeKit = YoutubeKit(),
     val updatedAt: Long = System.currentTimeMillis(),

@@ -457,6 +457,11 @@ private fun LayerEditor(vm: StudioViewModel, p: Project, s: Scene, useSam: Boole
     FlowRowButtons {
         Picker("Camera", s.camera, CameraMove.entries, { it.label }, { c -> vm.setScene(s.id) { it.copy(camera = c) } })
         Picker("Transition in", s.transition, Transition.entries, { it.label }, { t -> vm.setScene(s.id) { it.copy(transition = t) } })
+        val popWords = s.words.map { it.text }.ifEmpty { ScriptPlanner.words(s.text) }
+        val autoPop = remember(s) { com.gk.papercut.render.Keywords.auto(s) }
+        Picker("Pop-up word", s.popWord, listOf(-2, -1) + popWords.indices.toList(),
+            { when (it) { -2 -> "auto (" + (popWords.getOrNull(autoPop) ?: "none") + ")"; -1 -> "none"; else -> popWords.getOrElse(it) { "?" } } },
+            { k -> vm.setScene(s.id) { it.copy(popWord = k) } })
     }
     val words = s.words.map { it.text }.ifEmpty { ScriptPlanner.words(s.text) }
     s.layers.asReversed().forEach { l ->
@@ -539,9 +544,12 @@ private fun ExportTab(vm: StudioViewModel, p: Project) {
             Toggle("Paper texture, white edges & shadows", p.paperTexture) { v -> vm.update { it.copy(paperTexture = v) } }
             Toggle("Build each scene: elements come in one after another", p.buildUp) { v -> vm.update { it.copy(buildUp = v) } }
             Toggle("Camera zoom & close-up shots", p.cameraMoves) { v -> vm.update { it.copy(cameraMoves = v) } }
+            Toggle("Depth effect (soft background, cut-outs pop)", p.depthEffect) { v -> vm.update { it.copy(depthEffect = v) } }
+            Toggle("Keyword pop-ups (big paper letters)", p.keywordPopups) { v -> vm.update { it.copy(keywordPopups = v) } }
         }
         SectionCard("Export MP4") {
-            Hint("${p.aspect.w}×${p.aspect.h}, 30 fps, voice-over included. Rendering runs on the phone; keep the app open.")
+            Picker("Quality", p.resolution, listOf(720, 1080), { if (it >= 1080) "1080p (sharper, ~2x slower)" else "720p (fast)" }, { r -> vm.update { it.copy(resolution = r) } })
+            Hint("${renderer.outW}×${renderer.outH}, 30 fps, voice-over included. Rendering runs on the phone; keep the app open.")
             Button(onClick = { playing = false; vm.export() }) { Text("Export video") }
             exported?.let { f ->
                 Text("Ready: ${f.name} (${f.length() / 1_000_000} MB)")

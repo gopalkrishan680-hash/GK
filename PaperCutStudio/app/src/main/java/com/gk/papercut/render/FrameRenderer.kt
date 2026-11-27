@@ -29,8 +29,10 @@ import kotlin.math.min
  */
 class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
 
-    val outW = project.aspect.w
-    val outH = project.aspect.h
+    /** 1080p = 1.5x the 720p layout; everything else scales from the frame size. */
+    private val resScale = if (project.resolution >= 1080) 1.5f else 1f
+    val outW = (project.aspect.w * resScale).toInt() / 2 * 2
+    val outH = (project.aspect.h * resScale).toInt() / 2 * 2
     val duration: Double = max(project.audioDuration, project.scenes.lastOrNull()?.end ?: 0.0)
 
     private class PLayer(val layer: Layer, val styled: PaperStyle.Styled, val enterAt: Float, val reactAt: Float, val seed: Int, val anim: EnterAnim)
@@ -77,6 +79,7 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
         } else {
             drawScene(canvas, cur, tl)
         }
+        if (project.keywordPopups) drawPopup(canvas, cur, t)
         if (project.captions) drawCaption(canvas, cur, t)
     }
 
@@ -87,7 +90,10 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
         cache[key]?.let { return it }
         val grain = project.paperTexture
         val bgRaw = repo.loadBitmap(project.id, scene.backgroundFile ?: scene.imageFile)
-        val bg = bgRaw?.let { PaperStyle.styleBackground(it, grain).also { _ -> it.recycle() } }
+        val bg = bgRaw?.let { raw ->
+            val styled = PaperStyle.styleBackground(raw, grain).also { raw.recycle() }
+            if (project.depthEffect) PaperStyle.depth(styled).also { styled.recycle() } else styled
+        }
         val visible = if (scene.backgroundFile != null) scene.layers.filter { it.visible } else emptyList()
         val dur = scene.duration.toFloat().coerceAtLeast(1f)
         val timing = entranceTimes(scene, visible, dur)
@@ -341,6 +347,48 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
         canvas.restore()
     }
 
+    // ------------------------------------------------------------------ keyword pop-ups
+
+    private val popFill = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD) }
+    private val popEdge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD); style = Paint.Style.STROKE; strokeJoin = Paint.Join.ROUND
+        color = Color.rgb(253, 251, 245)
+    }
+    private val popColors = intArrayOf(Color.rgb(214, 64, 46), Color.rgb(36, 110, 160), Color.rgb(222, 140, 20), Color.rgb(40, 130, 90))
+
+    /** Big cut-paper word: pops in when it is spoken, holds ~1.2 s, then folds away. */
+    private fun drawPopup(canvas: Canvas, scene: Scene, t: Double) {
+        val idx = Keywords.popIndex(scene)
+        if (idx < 0 || idx >= scene.words.size) return
+        val w = scene.words[idx]
+        val start = w.start - 0.05
+        val hold = maxOf(1.2, w.end - w.start + 0.9)
+        val lt = (t - start).toFloat()
+        if (lt < 0f || lt > hold + 0.25) return
+        val inP = (lt / 0.35f).coerceIn(0f, 1f)
+        val outP = ((lt - hold.toFloat()) / 0.25f).coerceIn(0f, 1f)
+        val s = Ease.outBack(inP, 2.4f) * (1f - Ease.inOut(outP))
+        if (s <= 0.01f) return
+        val text = w.text.trim { !it.isLetterOrDigit() && Character.getType(it) != Character.NON_SPACING_MARK.toInt() && Character.getType(it) != Character.COMBINING_SPACING_MARK.toInt() }
+        if (text.isEmpty()) return
+        val size = min(outW, outH) * 0.15f
+        popFill.textSize = size; popEdge.textSize = size; popEdge.strokeWidth = size * 0.16f
+        val tw = popFill.measureText(text)
+        val fit = min(1f, outW * 0.8f / tw)
+        val sceneIdx = project.scenes.indexOfFirst { it.id == scene.id }.coerceAtLeast(0)
+        canvas.save()
+        canvas.translate(outW / 2f, outH * (if (outW < outH) 0.24f else 0.27f))
+        canvas.rotate(if (sceneIdx % 2 == 0) -4f else 3f)
+        canvas.scale(s * fit, s * fit)
+        val y = size * 0.35f
+        // shadow, white paper edge, coloured letters
+        popEdge.color = Color.argb(90, 40, 25, 10); canvas.drawText(text, -tw / 2 + size * 0.06f, y + size * 0.08f, popEdge)
+        popEdge.color = Color.rgb(253, 251, 245); canvas.drawText(text, -tw / 2, y, popEdge)
+        popFill.color = popColors[sceneIdx % popColors.size]
+        canvas.drawText(text, -tw / 2, y, popFill)
+        canvas.restore()
+    }
+
     // ------------------------------------------------------------------ captions
 
     private val capPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -358,14 +406,18 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
         for (i in ws.indices) {
             val n = i - start + 1
             val sentenceEnd = ws[i].last() in ".!?।|"
-            if (n >= per || (sentenceEnd && n >= 2) || i == ws.lastIndex) { out += start to i + 1; start = i + 1 }
+            if (n >= per || sentenceEnd || i == ws.lastIndex) { out += start to i + 1; start = i + 1 }
         }
-        // Merge short trailing pieces (and sentence leftovers of 1 word) into the previous group.
+        // Never show a full line: groups stay at most [per] words. A lonely 1-word group is either merged
+        // (when that still fits in [per]) or gets one word from the group before it (4+1 -> 3+2).
         var k = out.size - 1
         while (k > 0) {
             val (a, b) = out[k]
-            if (b - a <= 2 && out[k - 1].second - out[k - 1].first + (b - a) <= per + 2) {
-                out[k - 1] = out[k - 1].first to b; out.removeAt(k)
+            val (pa, pb) = out[k - 1]
+            // Never join words across a sentence end ("थे। क्यों?" -> "क्यों?" stays on its own).
+            if (b - a == 1 && ws[pb - 1].last() !in ".!?।|") {
+                if ((pb - pa) + 1 <= per) { out[k - 1] = pa to b; out.removeAt(k) }
+                else if (pb - pa >= 3) { out[k - 1] = pa to pb - 1; out[k] = pb - 1 to b }
             }
             k--
         }
@@ -377,7 +429,7 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
         if (words.isEmpty()) return
         val cur = words.indexOfLast { it.start <= t }.coerceAtLeast(0)
         if (t > words.last().end + 0.6) return
-        val per = if (outW < outH) 3 else 5
+        val per = if (outW < outH) 3 else 4
         val chunks = captionChunks(words.map { it.text }, per)
         val (chunkStart, chunkEnd) = chunks.first { cur < it.second }
         val chunk = words.subList(chunkStart, chunkEnd)

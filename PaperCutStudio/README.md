@@ -20,7 +20,10 @@ This app turns a script and a voice-over into a **paper cut-out animation video*
 - **Word-triggered animation**: each element appears on the word that mentions it ("…*sooraj* nikla" makes the sun rise at that moment). You can change the trigger word for any layer.
 - **Paper look**: white cut edges, paper grain, soft drop shadows, a vignette, and an optional **stop-motion** feel (12 fps steps plus paper "boil" wobble).
 - **Animations**: 11 entrances (pop, slide, drop with bounce, grow-up, spin, paper flip, wobble…), 8 loops (bob, sway, walk, float, pulse, shake, spin…), camera moves with parallax (zoom or pan) and 5 scene transitions (paper slide, paper flip, fold, zoom, cut).
-- **Animated captions**: a paper-strip subtitle with the current word highlighted.
+- **Animated captions**: a short paper-strip subtitle (at most 4 words, 3 in portrait, never across a sentence end) with the current word highlighted.
+- **Keyword pop-ups**: one important word per scene (chosen automatically, or picked per scene in Layers) pops up in big cut-paper letters exactly when it is spoken.
+- **Depth effect**: the background is softly blurred and dimmed so the sharp cut-outs stand in front (2.5D).
+- **720p / 1080p export.**
 - **Formats**: 16:9 (YouTube), 9:16 (Shorts/Reels) and 1:1.
 - **Optional AI Director**: with a free Gemini API key, the app writes richer English prompts and picks animations. Without a key, everything is offline. There is also a "chatbot helper" message you can paste into ChatGPT or Gemini chat.
 
