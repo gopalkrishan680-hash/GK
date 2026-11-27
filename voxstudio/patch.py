@@ -302,5 +302,38 @@ rep("\\n\\nIs video mein:\\n${pick.map(s => '• ' + s).join('\\n')}\\n\\nChapte
     "\\n\\nIn this video:\\n${pick.map(s => '• ' + s).join('\\n')}\\n\\nChapters\\n${chapters}\\n\\n${ch ? `Like the video and subscribe to ${ch} for more stories like this.` : 'Like the video and subscribe to the channel for more stories like this.'}")
 rep("else if (k === 'hashtags') S.yt.hashtags = v.split(/\\s+/).filter(Boolean);", "else if (k === 'hashtags') S.yt.hashtags = v.split(/\\s+/).filter(Boolean).map(hashLow);")
 
+# ---------------------------------------------------------------- 8. kits saved before: fix hashtags on open + one-tap English description
+rep("""function renderYT() {
+  const box = $('#ytOut'); if (!box) return; const y = S.yt;""", """function renderYT() {
+  const box = $('#ytOut'); if (!box) return; const y = S.yt;
+  if (y) { const h0 = (y.hashtags || []).join(' '), d0 = y.description || ''; y.hashtags = (y.hashtags || []).map(hashLow); y.description = hashLow(d0); if (h0 !== y.hashtags.join(' ') || d0 !== y.description) save(); }""")
+rep("""      <div class="row">${cpy('description', 'Copy description')}<span class="muted" id="ytDescN">""",
+    """      <div class="row">${cpy('description', 'Copy description')}<button class="btn small primary" id="ytEn">🌐 Make it English</button><span class="muted" id="ytDescN">""")
+rep("  $$('#ytOut [data-open]').forEach(b => b.onclick = () => openApp(b.dataset.open));\n}\nfunction ytValue(id) {",
+    """  $$('#ytOut [data-open]').forEach(b => b.onclick = () => openApp(b.dataset.open));
+  if ($('#ytEn')) $('#ytEn').onclick = ytMakeEnglish;
+}
+// rewrite the current description in English (Gemini key: automatic; else: copy a request for ChatGPT / Gemini / Claude)
+function ytEnglishPrompt() {
+  return `Rewrite this YouTube video description in natural, fluent English. Keep the same meaning and structure: hook lines, summary, the "Chapters" list with the SAME timestamps (translate only the chapter names), the like/subscribe line and the hashtags on the last line. Names of people, places and gods stay as they are. Every hashtag starts with a small (lowercase) letter, no spaces. Return ONLY the new description text, nothing else.\\n\\nDESCRIPTION:\\n${S.yt.description}`;
+}
+async function ytMakeEnglish() {
+  if (!S.yt || !S.yt.description) return toast('Make the YouTube kit first');
+  const btn = $('#ytEn'), hasKey = !!(localStorage.getItem('vox-gem-key') || '').trim();
+  if (!hasKey) { copyText(ytEnglishPrompt()); $('#ytInfo').textContent = '📋 Request copied. Paste it in ChatGPT / Gemini / Claude, then paste the English answer into the Description box below. (With a Gemini API key in the Plan tab this happens automatically.)'; return; }
+  gemStop = false; btn.disabled = true; $('#ytInfo').textContent = 'Making the description English…';
+  try { const models = await gemTextModel(); let txt = '', lastErr;
+    for (const m of models.slice(0, 3)) { try { const j = await gemFetch(`/models/${m}:generateContent`, { contents: [{ role: 'user', parts: [{ text: ytEnglishPrompt() }] }], generationConfig: { temperature: 0.4 } }); txt = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim(); if (txt) break; } catch (e) { lastErr = e; if (/Stopped|API key/i.test(e.message)) throw e; } }
+    if (!txt) throw lastErr || new Error('Gemini did not answer');
+    S.yt.description = hashLow(txt.replace(/^```[a-z]*\\n?|```$/g, '').trim()); save(); renderYT(); $('#ytInfo').textContent = '✔ The description is now in English.';
+  } catch (e) { $('#ytInfo').textContent = '⚠ ' + e.message; } finally { if ($('#ytEn')) $('#ytEn').disabled = false; }
+}
+function ytValue(id) {""")
+# the request also says it inside the JSON shape, so chat AIs do not miss it
+rep(' "description": "...",\n', ' "description": "... (in English)",\n')
+# quick kit cannot translate (offline): say so
+rep("<p class=\"muted\">Keywords, chapters and tags straight from the script. Simple, but instant.</p>",
+    "<p class=\"muted\">Keywords, chapters and tags straight from the script. Simple, but instant. Offline it cannot translate: the story lines stay in the script's language — use <b>🌐 Make it English</b> after.</p>")
+
 open(dst, 'w', encoding='utf-8').write(h)
 print('ok', len(h))
