@@ -255,5 +255,24 @@ details.more > .form, details.more > .row { margin-top: 12px; }
 '''
 rep('\n</style>\n</head>', css + '</style>\n</head>')
 
+# ---------------------------------------------------------------- 5. sheet cutting: never trim thin parts (a pointing hand, a spear) off the edge
+# trim only columns / rows that are really empty (every pixel checked, a few noisy pixels allowed), not "96 % white"
+rep("""      const colW = xx => { let n = 0, m = 0; for (let yy = 0; yy < ch; yy += 3) { n += white(xx, yy); m++; } return n / m > 0.96; };
+      const rowW = yy => { let n = 0, m = 0; for (let xx = 0; xx < cw; xx += 3) { n += white(xx, yy); m++; } return n / m > 0.96; };""",
+"""      const tolC = Math.max(2, ch * 0.003), tolR = Math.max(2, cw * 0.003);
+      const colW = xx => { let k = 0; for (let yy = 0; yy < ch; yy++) if (!white(xx, yy) && ++k > tolC) return false; return true; };
+      const rowW = yy => { let k = 0; for (let xx = 0; xx < cw; xx++) if (!white(xx, yy) && ++k > tolR) return false; return true; };""")
+# keep a little white around the picture instead of cutting 3 px into it
+rep("""      const m = trim ? 3 : 0, o = cv(Math.max(4, r - l + 1 - m * 2), Math.max(4, b - tp + 1 - m * 2)); o.getContext('2d').drawImage(tc, l + m, tp + m, o.width, o.height, 0, 0, o.width, o.height);""",
+"""      if (trim) { const pd = Math.round(Math.min(cw, ch) * 0.015); l = Math.max(0, l - pd); r = Math.min(cw - 1, r + pd); tp = Math.max(0, tp - pd); b = Math.min(ch - 1, b + pd); }
+      const o = cv(Math.max(4, r - l + 1), Math.max(4, b - tp + 1)); o.getContext('2d').drawImage(tc, l, tp, o.width, o.height, 0, 0, o.width, o.height);""")
+# finding the gaps: a column with a thin arm / finger in it is not a "white gap" (was: up to 1.2 % ink allowed)
+rep("zero[xx] = ink <= bh * 0.012 ? 1 : 0; cover[xx] = ed / bh; }\n    const cc = pickCuts(zero, cover, w, cols);",
+    "zero[xx] = ink <= Math.max(1, bh * 0.002) ? 1 : 0; loose[xx] = ink <= bh * 0.012 ? 1 : 0; cover[xx] = ed / bh; }\n    let cc = pickCuts(zero, cover, w, cols); if (cols > 1 && !cc) cc = pickCuts(loose, cover, w, cols);")
+rep("const zero = new Uint8Array(w), cover = new Float32Array(w), bh =", "const zero = new Uint8Array(w), loose = new Uint8Array(w), cover = new Float32Array(w), bh =")
+rep("rowZero[y] = ink <= w * 0.012 ? 1 : 0; rowCover[y] = ed / w; }\n  let sc = 0; const rc = pickCuts(rowZero, rowCover, h, rows);",
+    "rowZero[y] = ink <= Math.max(1, w * 0.002) ? 1 : 0; rowLoose[y] = ink <= w * 0.012 ? 1 : 0; rowCover[y] = ed / w; }\n  let sc = 0; const rc = pickCuts(rowZero, rowCover, h, rows) || (rows > 1 ? pickCuts(rowLoose, rowCover, h, rows) : null);")
+rep("const rowZero = new Uint8Array(h), rowCover", "const rowZero = new Uint8Array(h), rowLoose = new Uint8Array(h), rowCover")
+
 open(dst, 'w', encoding='utf-8').write(h)
 print('ok', len(h))
