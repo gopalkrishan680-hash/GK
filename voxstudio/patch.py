@@ -325,7 +325,7 @@ async function ytMakeEnglish() {
   try { const models = await gemTextModel(); let txt = '', lastErr;
     for (const m of models.slice(0, 3)) { try { const j = await gemFetch(`/models/${m}:generateContent`, { contents: [{ role: 'user', parts: [{ text: ytEnglishPrompt() }] }], generationConfig: { temperature: 0.4 } }); txt = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim(); if (txt) break; } catch (e) { lastErr = e; if (/Stopped|API key/i.test(e.message)) throw e; } }
     if (!txt) throw lastErr || new Error('Gemini did not answer');
-    S.yt.description = hashLow(txt.replace(/^```[a-z]*\\n?|```$/g, '').trim()); save(); renderYT(); $('#ytInfo').textContent = '✔ The description is now in English.';
+    S.yt.description = hashLow(txt.replace(/^```[a-z]*\\n?|```$/g, '').trim()); S.yt.autoEn = S.yt.description; save(); renderYT(); $('#ytInfo').textContent = '✔ The description is now in English.';
   } catch (e) { $('#ytInfo').textContent = '⚠ ' + e.message; } finally { if ($('#ytEn')) $('#ytEn').disabled = false; }
 }
 function ytValue(id) {""")
@@ -335,5 +335,24 @@ rep(' "description": "...",\n', ' "description": "... (in English)",\n')
 rep("<p class=\"muted\">Keywords, chapters and tags straight from the script. Simple, but instant.</p>",
     "<p class=\"muted\">Keywords, chapters and tags straight from the script. Simple, but instant. Offline it cannot translate: the story lines stay in the script's language — use <b>🌐 Make it English</b> after.</p>")
 
+# ---------------------------------------------------------------- 9. hashtags all small letters; English description automatic where possible
+rep("const hashLow = s => String(s || '').replace(/#(\\p{Lu})/gu, (m, c) => '#' + c.toLowerCase());",
+    """const hashLow = s => String(s || '').replace(/#([\\p{L}\\p{N}\\p{M}_]+)/gu, (m, w) => '#' + w.toLowerCase());
+// is a text (mostly) not English? Devanagari, or many Hinglish words
+const notEnglish = t => /[\\u0900-\\u097F]/.test(t || '') || (String(t || '').match(/\\b(hai|hain|nahi|nahin|kya|aur|mein|tha|thi|the|kar|karein|karte|ki|ka|ke|ko|se|ye|yeh|woh|kaise|kyun)\\b/gi) || []).length >= 4;""")
+rep("Every hashtag starts with a small (lowercase) letter, no spaces, e.g. #mahabharat #draupadiStory — also on the last line of the description.",
+    "Every hashtag is written in small (lowercase) letters only, no spaces, e.g. #mahabharat #draupadistory — also on the last line of the description.")
+rep("Every hashtag starts with a small (lowercase) letter, no spaces. Return ONLY", "Every hashtag is in small (lowercase) letters only, no spaces. Return ONLY")
+# quick kit: without AI the story lines would stay Hindi, so the description is built from English lines only
+rep("const description = `${title}\\n\\n${sents.slice(0, 2).join(' ')}\\n\\nIn this video:\\n${pick.map(s => '• ' + s).join('\\n')}\\n\\nChapters",
+    "const engScript = !notEnglish(sents.join(' '));\n  const description = `${title}\\n\\n${engScript ? sents.slice(0, 2).join(' ') : `The full story of ${main}${second ? ' and ' + second : ''}, explained step by step.`}\\n\\n${engScript ? `In this video:\\n${pick.map(s => '• ' + s).join('\\n')}\\n\\n` : ''}Chapters")
+# YouTube tab: warn when the description is not English, translate it by itself when a Gemini key is there
+rep("""  if (y) { const h0 = (y.hashtags || []).join(' '), d0 = y.description || ''; y.hashtags = (y.hashtags || []).map(hashLow); y.description = hashLow(d0); if (h0 !== y.hashtags.join(' ') || d0 !== y.description) save(); }""",
+"""  if (y) { const h0 = (y.hashtags || []).join(' '), d0 = y.description || ''; y.hashtags = (y.hashtags || []).map(hashLow); y.description = hashLow(d0); if (h0 !== y.hashtags.join(' ') || d0 !== y.description) save(); }
+  const nonEn = !!(y && y.description && notEnglish(y.description)), hasKey = !!(localStorage.getItem('vox-gem-key') || '').trim();
+  if (nonEn && hasKey && y.autoEn !== y.description) { y.autoEn = y.description; setTimeout(ytMakeEnglish, 50); }""")
+rep("""    <div class="card"><h3>📝 Description</h3><textarea data-yedit="description" rows="14">""",
+    """    <div class="card"><h3>📝 Description</h3>${nonEn ? `<p class="info">⚠ This description is not in English yet. ${hasKey ? 'Making it English with Gemini…' : 'Tap <b>🌐 Make it English</b>: it copies a request — paste it in ChatGPT / Gemini, then paste the answer here. (Add a free Gemini API key in the Plan tab and this happens by itself.)'}</p>` : ''}<textarea data-yedit="description" rows="14">""")
+# after a translation the warning must go: render again (ytMakeEnglish already calls renderYT)
 open(dst, 'w', encoding='utf-8').write(h)
 print('ok', len(h))
