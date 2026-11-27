@@ -90,6 +90,22 @@ class SeparationTest {
         val project = repo.save(p0.copy(scenes = scenes, audioDuration = scenes.last().end))
         val r = com.gk.papercut.render.FrameRenderer(project, repo)
         val frame = Bitmap.createBitmap(r.outW, r.outH, Bitmap.Config.ARGB_8888)
+        // Camera smoothness: no single-frame jump when a new shot starts (captions/stop-motion off here).
+        val smooth = com.gk.papercut.render.FrameRenderer(project.copy(captions = false, stopMotion = false), repo)
+        val shotFrames = (3.0 * 30).toInt()..(scenes[0].duration * 30).toInt().coerceAtMost(210)
+        var prevPx: IntArray? = null
+        val diffs = ArrayList<Double>()
+        val f2 = Bitmap.createBitmap(smooth.outW, smooth.outH, Bitmap.Config.ARGB_8888)
+        val small = IntArray(160 * 90)
+        for (fi in shotFrames) {
+            smooth.render(Canvas(f2), fi / 30.0)
+            Bitmap.createScaledBitmap(f2, 160, 90, true).getPixels(small, 0, 160, 0, 0, 160, 90)
+            prevPx?.let { pp -> diffs += small.indices.sumOf { kotlin.math.abs((small[it] and 255) - (pp[it] and 255)).toDouble() } / small.size }
+            prevPx = small.copyOf()
+        }
+        val sorted = diffs.sorted(); val median = sorted[sorted.size / 2]
+        println("camera diffs: max=%.2f median=%.2f".format(sorted.last(), median))
+        diffs.forEachIndexed { i, d -> if (i > 0 && i < diffs.size - 1) org.junit.Assert.assertTrue("jump of %.1f at frame %d".format(d, shotFrames.first + i + 1), d < 3 * maxOf(diffs[i - 1], diffs[i + 1]) + 2.0) }
         for (t in listOf(0.2, 0.6, 1.0, 1.4, 1.9, 2.4)) {
             r.render(Canvas(frame), t)
             frame.compress(Bitmap.CompressFormat.PNG, 100, File(out, "sep_frame_%.1f.png".format(t)).outputStream())

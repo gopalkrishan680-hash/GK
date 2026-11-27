@@ -229,6 +229,7 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
     /** Camera centre x, y (image px) and zoom at local time [tl]; glides 0.7 s between shots. */
     private fun camera(p: Prepared, tl: Float, base: Float): FloatArray {
         val bg = p.bg!!
+        if (!project.cameraMoves) return floatArrayOf(bg.width / 2f, bg.height / 2f, 1f)
         val shots = p.shots.ifEmpty { listOf(Shot(0f, bg.width / 2f, bg.height / 2f, 1f)) }
         val j = shots.indexOfLast { tl >= it.start }.coerceAtLeast(0)
         val cur = shots[j]
@@ -237,9 +238,9 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
         var cx = prev.cx + (cur.cx - prev.cx) * e
         var cy = prev.cy + (cur.cy - prev.cy) * e
         var z = prev.zoom + (cur.zoom - prev.zoom) * e
-        // Gentle drift inside the shot, using the scene's camera move.
-        val shotEnd = shots.getOrNull(j + 1)?.start ?: p.scene.duration.toFloat()
-        val u = ((tl - cur.start) / (shotEnd - cur.start).coerceAtLeast(0.5f)).coerceIn(0f, 1f)
+        // Gentle drift over the WHOLE scene (continuous across shot changes — resetting it per shot made
+        // the picture jump by ~5 % in a single frame whenever a new shot started).
+        val u = (tl / p.scene.duration.toFloat().coerceAtLeast(0.5f)).coerceIn(0f, 1f)
         when (p.scene.camera) {
             CameraMove.ZOOM_IN -> z *= 1f + 0.05f * u
             CameraMove.ZOOM_OUT -> z *= 1.05f - 0.05f * u

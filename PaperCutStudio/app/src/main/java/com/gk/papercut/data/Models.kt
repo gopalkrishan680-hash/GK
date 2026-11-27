@@ -105,6 +105,8 @@ data class Project(
     val paperTexture: Boolean = true,
     /** Elements build the scene one after another (true) or are all on stage from the start (false). */
     val buildUp: Boolean = true,
+    /** Camera zooms/pans and close-up shots. Off = steady full-frame picture. */
+    val cameraMoves: Boolean = true,
     val grid: GridLayout = GridLayout.SINGLE,
     val youtube: YoutubeKit = YoutubeKit(),
     val updatedAt: Long = System.currentTimeMillis(),

@@ -538,6 +538,7 @@ private fun ExportTab(vm: StudioViewModel, p: Project) {
             Toggle("Stop-motion feel (12 fps steps + paper wobble)", p.stopMotion) { v -> vm.update { it.copy(stopMotion = v) } }
             Toggle("Paper texture, white edges & shadows", p.paperTexture) { v -> vm.update { it.copy(paperTexture = v) } }
             Toggle("Build each scene: elements come in one after another", p.buildUp) { v -> vm.update { it.copy(buildUp = v) } }
+            Toggle("Camera zoom & close-up shots", p.cameraMoves) { v -> vm.update { it.copy(cameraMoves = v) } }
         }
         SectionCard("Export MP4") {
             Hint("${p.aspect.w}×${p.aspect.h}, 30 fps, voice-over included. Rendering runs on the phone; keep the app open.")
