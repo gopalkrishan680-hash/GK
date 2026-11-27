@@ -1,0 +1,259 @@
+import sys, re
+src, dst = sys.argv[1], sys.argv[2]
+h = open(src, encoding='utf-8').read()
+
+def rep(old, new, count=1):
+    global h
+    n = h.count(old)
+    if n != count:
+        sys.exit(f'expected {count} got {n}: {old[:90]!r}')
+    h = h.replace(old, new)
+
+def cut_line(start):
+    """remove one whole line that starts with `start`"""
+    global h
+    lines = h.split('\n'); idx = [i for i, l in enumerate(lines) if l.startswith(start)]
+    if len(idx) != 1: sys.exit(f'line {start!r}: {len(idx)}')
+    del lines[idx[0]]; h = '\n'.join(lines)
+
+def cut_between(a, b):
+    """remove from a (inclusive) up to b (exclusive)"""
+    global h
+    i = h.index(a); j = h.index(b, i); h = h[:i] + h[j:]
+
+# ---------------------------------------------------------------- 1. duplicates out
+# Format: only one control (in Export), the Script-tab copy goes
+rep('''        <label class="inline">Format <select id="aspect"><option value="16:9">16:9 YouTube</option><option value="9:16">9:16 Shorts / Reels</option><option value="1:1">1:1 Square</option></select></label>\n''', '')
+rep('<select id="aspect2">', '<select id="aspect">')
+rep('''$('#aspect2').onchange = e => { S.settings.aspect = e.target.value; $('#aspect').value = e.target.value; sizePreview(); touch(); save(); };\n''', '')
+# Captions: one control (Look card) + the CC button on the preview; the Export copy goes
+rep('''        <div class="row"><label class="inline">Captions in this video <select id="captions2"><option value="words">On — word by word</option><option value="on">On — full subtitles</option><option value="off">Off</option></select></label></div>\n''', '')
+rep('''$('#captions2').onchange = e => { S.settings.captions = e.target.value; showCaptions(); touch(); save(); redraw(); };\n''', '')
+# "Extras for YouTube": frame-thumbnail = Thumbnail maker's "Use the preview frame"; Copy chapters = YouTube kit
+# description (and it was broken: printed [object Object]). Keep only the SRT download, moved into Export.
+cut_between('      <div class="card">\n        <h3>Extras for YouTube</h3>', '    </div>\n  </section>')
+rep('''<div class="row"><button class="btn small" id="checkBtn">Check the video for problems</button></div>''',
+    '''<div class="row"><button class="btn small" id="checkBtn">Check the video for problems</button><button class="btn small ghost" id="srtBtn">Download subtitles (SRT)</button></div>''')
+cut_line("$('#thumbBtn').onclick")
+cut_line("$('#chapBtn').onclick")
+# dead first copy of ytChapters() (the later one wins)
+cut_between('function ytChapters() {\n  const res = resolve(); const ch =', '\n</script>')
+
+# ---------------------------------------------------------------- 2. simpler screens: advanced options folded away
+# Pictures tab
+rep('''      <div class="row wrap-row">
+        <label class="inline">Picture look <select id="look"></select></label>
+        <label class="inline">Gemini watermark <select id="gemMark"><option value="auto">Remove automatically</option><option value="off">Keep</option></select></label> <button class="btn ghost small" id="gemAll">Remove ✦ from all pictures</button>
+        <label class="inline">Decor layers <select id="decor"><option value="on">On (old maps, pages behind · modern: circles, tape, grid)</option><option value="off">Off</option></select></label>
+        <label class="inline">Pictures per AI image <select id="perImage"><option value="6">6 (3×2 sheet, cut automatically) — fastest</option><option value="4">4 (2×2 sheet, cut automatically)</option><option value="1">1 (one prompt per picture)</option></select></label>
+      </div>''', '''      <div class="row wrap-row">
+        <label class="inline">Picture look <select id="look"></select></label>
+        <label class="inline">Pictures per AI image <select id="perImage"><option value="6">6 (3×2 sheet, cut automatically) — fastest</option><option value="4">4 (2×2 sheet, cut automatically)</option><option value="1">1 (one prompt per picture)</option></select></label>
+      </div>
+      <details class="more"><summary>More picture options</summary>
+        <div class="row wrap-row">
+          <label class="inline">Gemini watermark <select id="gemMark"><option value="auto">Remove automatically</option><option value="off">Keep</option></select></label> <button class="btn ghost small" id="gemAll">Remove ✦ from all pictures</button>
+          <label class="inline">Decor layers <select id="decor"><option value="on">On (old maps, pages behind · modern: circles, tape, grid)</option><option value="off">Off</option></select></label>
+        </div>
+      </details>''')
+
+# Look card: the everyday options stay, the rest go into "More look settings"
+i = h.index('<label>Background <select id="theme">'); j = h.index('<label>Captions <select id="captions">')
+look_adv1 = h[i:j]; h = h[:i] + h[j:]
+i = h.index('<label>Caption word colour'); j = h.index('<label>Channel name (corner)')
+look_adv2 = h[i:j]; h = h[:i] + h[j:]
+i = h.index('<label>Video start <select id="hook">'); j = h.index('        </div>\n      </div>\n      <div class="card">\n        <h3>Sound</h3>')
+look_adv3 = h[i:j]; h = h[:i] + h[j:]
+rep('''        </div>
+      </div>
+      <div class="card">
+        <h3>Sound</h3>''', '''        </div>
+        <details class="more"><summary>More look settings</summary>
+          <div class="form">
+          ''' + look_adv1 + look_adv2 + look_adv3 + '''</div>
+        </details>
+      </div>
+      <div class="card">
+        <h3>Sound</h3>''')
+# Sound card
+i = h.index('<label>Effects volume'); j = h.index('<label>Music volume')
+snd_adv = h[i:j]; h = h[:i] + h[j:]
+i = h.index('<label>Music ducking'); j = h.index('</div>', i)
+snd_adv += h[i:j]; h = h[:i] + h[j:]
+rep('''        </div>
+      </div>
+      <div class="card">
+        <h3>Export</h3>''', '''        </div>
+        <details class="more"><summary>More sound settings</summary>
+          <div class="form">
+          ''' + snd_adv + '''</div>
+        </details>
+      </div>
+      <div class="card">
+        <h3>Export</h3>''')
+rep('<p class="muted">Long + Short from the same project: export once in 16:9, switch Format to 9:16 and export again — the layout re-arranges itself.</p>',
+    '<p class="muted">Long + Short from one project: export in 16:9, switch Format to 9:16 and export again — the layout re-arranges itself.</p>')
+
+# ---------------------------------------------------------------- 3. Mythology: less gold + a real (no glow) option
+rep('''<option value="myth">🕉️ Mythology / Divine (dark temple, gold frames, glowing figures, mandala, embers)</option></select></label>''',
+    '''<option value="myth">🕉️ Mythology / Divine (dark temple, frames, figures, mandala)</option></select></label>
+        <label class="inline" id="glowWrap" hidden>Divine glow <select id="glow"><option value="soft">✨ Soft — thoda kam gold (recommended)</option><option value="full">🔆 Full — strong gold (pehle jaisa)</option><option value="off">📷 Real look — natural colours, no glow</option></select></label>''')
+rep("hook: 'off', hookText: '', depth: 'on', shortEnd: '', shortCaps: 'off'\n};", "hook: 'off', hookText: '', depth: 'on', shortEnd: '', shortCaps: 'off', glow: 'soft'\n};")
+rep("const isMyth = () => S.settings.mode === 'myth';",
+    """const isMyth = () => S.settings.mode === 'myth';
+// divine glow strength for the mythology style: soft (default) = less gold, full = the old strong gold, off = real look
+const glowK = () => !isMyth() ? 1 : ({ full: 1, soft: 0.45, off: 0 })[S.settings.glow] ?? 0.45;
+const realMyth = () => isMyth() && S.settings.glow === 'off';
+const glowTag = () => isMyth() ? '|g' + (S.settings.glow || 'soft') : '';""")
+# caches must know the glow level
+rep("const ck = key + '|' + mode + (mode === 'duo' || mode === 'spot' ? accent() : '');", "const ck = key + '|' + mode + (mode === 'duo' || mode === 'spot' ? accent() : '') + glowTag();")
+rep("const ck = key + W + 'x' + H; let c = R.paper.get(ck); if (c) return c;", "const ck = key + W + 'x' + H + glowTag(); let c = R.paper.get(ck); if (c) return c;")
+rep("function toned(key, mode) { const ck = key + '|tn|' + mode + (mode === 'duo' || mode === 'spot' ? accent() : '');", "function toned(key, mode) { const ck = key + '|tn|' + mode + (mode === 'duo' || mode === 'spot' ? accent() : '') + glowTag();")
+rep("(mod ? '|m' : '') + (isMyth() ? '|y' : ''); let c = R.filt.get(ck);", "(mod ? '|m' : '') + (isMyth() ? '|y' + glowTag() : ''); let c = R.filt.get(ck);")
+# photo colour: the warm/golden push follows the glow level (real = the picture's own colours)
+rep("""    const sat = 1.18, hi = clamp((l - 150) / 105, 0, 1);
+    let R2 = l + (r - l) * sat, G2 = l + (g - l) * sat, B2 = l + (b - l) * sat;
+    R2 = sc(clamp(R2 * 1.05 + 6 + hi * 10, 0, 255)); G2 = sc(clamp(G2 * 1.0 + 2 + hi * 6, 0, 255)); B2 = sc(clamp(B2 * 0.86 - 2, 0, 255));""",
+"""    if (gk <= 0) continue;   // real look: keep the picture's own colours
+    const sat = 1 + 0.18 * gk, hi = clamp((l - 150) / 105, 0, 1);
+    let R2 = l + (r - l) * sat, G2 = l + (g - l) * sat, B2 = l + (b - l) * sat;
+    R2 = clamp(R2 * (1 + 0.05 * gk) + (6 + hi * 10) * gk, 0, 255); G2 = clamp(G2 + (2 + hi * 6) * gk, 0, 255); B2 = clamp(B2 * (1 - 0.14 * gk) - 2 * gk, 0, 255);
+    R2 = lerp(R2, sc(R2), gk); G2 = lerp(G2, sc(G2), gk); B2 = lerp(B2, sc(B2), gk);""")
+rep("function mythTone(d, mode) {\n", "function mythTone(d, mode) {\n  const gk = glowK();\n")
+# cut-out figures: gold outline + glow scaled; real look = soft dark shadow, no gold
+rep("""  if (isMyth()) {   // mythology: thin gold outline + warm divine glow behind the figure
+    const gold = cv(cut.width, cut.height), gx = gold.getContext('2d'); gx.drawImage(cut, 0, 0); gx.globalCompositeOperation = 'source-in'; gx.fillStyle = '#f3c75f'; gx.fillRect(0, 0, gold.width, gold.height);
+    x.save(); x.globalAlpha = 0.55; x.filter = `blur(${Math.round(sh * 2.4)}px)`; x.drawImage(gold, pad, pad); x.drawImage(gold, pad, pad); x.restore();
+    for (let a = 0; a < 16; a++) x.drawImage(gold, pad + Math.cos(a / 16 * 6.283) * r * 0.5, pad + Math.sin(a / 16 * 6.283) * r * 0.5);""",
+"""  if (isMyth() && glowK() <= 0) {   // mythology, real look: no gold, no glow, just a soft shadow
+    const dark = cv(cut.width, cut.height), dx = dark.getContext('2d'); dx.drawImage(cut, 0, 0); dx.globalCompositeOperation = 'source-in'; dx.fillStyle = 'rgba(0,0,0,0.55)'; dx.fillRect(0, 0, dark.width, dark.height);
+    x.save(); x.filter = `blur(${Math.round(sh * 1.3)}px)`; x.drawImage(dark, pad + sh * 0.3, pad + sh * 0.8); x.restore();
+    x.drawImage(cut, pad, pad); c.pad = pad; R.filt.set(ck, c); return c;
+  }
+  if (isMyth()) {   // mythology: thin gold outline + warm divine glow behind the figure (strength = Divine glow)
+    const gk = glowK(), gold = cv(cut.width, cut.height), gx = gold.getContext('2d'); gx.drawImage(cut, 0, 0); gx.globalCompositeOperation = 'source-in'; gx.fillStyle = gk >= 1 ? '#f3c75f' : '#e8d3a2'; gx.fillRect(0, 0, gold.width, gold.height);
+    x.save(); x.globalAlpha = 0.55 * gk; x.filter = `blur(${Math.round(sh * (1.2 + 1.2 * gk))}px)`; x.drawImage(gold, pad, pad); if (gk >= 1) x.drawImage(gold, pad, pad); x.restore();
+    x.save(); x.globalAlpha = 0.45 + 0.55 * gk; for (let a = 0; a < 16; a++) x.drawImage(gold, pad + Math.cos(a / 16 * 6.283) * r * 0.5, pad + Math.sin(a / 16 * 6.283) * r * 0.5); x.restore();""")
+# entrance bloom
+old = h[h.index("  if (tr.bloom > 0.02) {"):]; old = old[:old.index('\n')]
+new = old.replace("if (tr.bloom > 0.02) {", "const bl = (tr.bloom || 0) * glowK(); if (bl > 0.02) {").replace('tr.bloom', 'bl').replace("const bl = (bl || 0)", "const bl = (tr.bloom || 0)")
+rep(old, new)
+# temple background: warm centre light softer
+rep("gl.addColorStop(0, GL[0]); gl.addColorStop(0.45, GL[1]); gl.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gl; x.fillRect(0, 0, W, H);",
+    "gl.addColorStop(0, GL[0]); gl.addColorStop(0.45, GL[1]); gl.addColorStop(1, 'rgba(0,0,0,0)'); x.save(); x.globalAlpha = 0.45 + 0.55 * glowK(); x.fillStyle = gl; x.fillRect(0, 0, W, H); x.restore();")
+# mandala / lotus / mist / light rays
+rep("function drawMythBack(ctx, W, H, gt, s) {\n  const T = theme(),", "function drawMythBack(ctx, W, H, gt, s) {\n  const gk = glowK(), T = theme(),")
+rep("ctx.save(); ctx.globalAlpha = cos ? 0.08 : 0.11; ctx.translate(side", "ctx.save(); ctx.globalAlpha = (cos ? 0.08 : 0.11) * (0.4 + 0.6 * gk); ctx.translate(side")
+rep("ctx.save(); ctx.globalAlpha = 0.1; ctx.translate(W / 2, H * 1.02);", "ctx.save(); ctx.globalAlpha = 0.1 * (0.4 + 0.6 * gk); ctx.translate(W / 2, H * 1.02);")
+rep("g.addColorStop(0, `rgba(${ec},0.07)`);", "g.addColorStop(0, `rgba(${ec},${0.07 * (0.4 + 0.6 * gk)})`);")
+rep("  if (P && !P.rays) return;\n", "  if ((P && !P.rays) || gk <= 0) return;\n")
+rep("al = 0.035 + 0.025 * Math.sin(gt * 0.4 + k * 1.7), L =", "al = (0.035 + 0.025 * Math.sin(gt * 0.4 + k * 1.7)) * gk, L =")
+# embers / stars / dust in front: fainter; real look keeps only falling petals
+rep("function drawMythFront(ctx, W, H, gt, s) {   // glowing embers / diya sparks drifting up",
+    """function drawMythFront(ctx, W, H, gt, s) {   // strength follows Divine glow
+  const gk = glowK(), P = stylePack(), kind = P ? P.particles : 'embers'; if (gk <= 0 && kind !== 'petals') return;
+  ctx.save(); ctx.globalAlpha *= 0.45 + 0.55 * gk; drawMythFront0(ctx, W, H, gt, s); ctx.restore();
+}
+function drawMythFront0(ctx, W, H, gt, s) {   // glowing embers / diya sparks drifting up""")
+# gold titles
+rep("""  const g = ctx.createLinearGradient(0, -bh / 2, 0, bh / 2); g.addColorStop(0, '#fff1c2'); g.addColorStop(0.5, '#f2c35a'); g.addColorStop(1, '#b97a1f');
+  shown.forEach((l, i) => { const yy = -bh / 2 + lh * (i + 0.5); ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 18 * s; ctx.lineWidth = size * 0.1; ctx.strokeStyle = 'rgba(40,16,4,0.9)'; ctx.strokeText(l, 0, yy); ctx.shadowColor = 'rgba(255,170,60,0.6)'; ctx.shadowBlur = 22 * s;""",
+"""  const gk = glowK(), G3 = gk >= 1 ? ['#fff1c2', '#f2c35a', '#b97a1f'] : gk > 0 ? ['#fff6df', '#ecd08e', '#bf9550'] : ['#ffffff', '#f4efe6', '#ddd5c8'];
+  const OL = gk >= 1 ? 'rgba(242,195,90,0.9)' : gk > 0 ? 'rgba(236,208,142,0.85)' : 'rgba(244,239,230,0.85)', OD = gk >= 1 ? '#f2c35a' : gk > 0 ? '#ecd08e' : '#f4efe6';
+  const g = ctx.createLinearGradient(0, -bh / 2, 0, bh / 2); g.addColorStop(0, G3[0]); g.addColorStop(0.5, G3[1]); g.addColorStop(1, G3[2]);
+  shown.forEach((l, i) => { const yy = -bh / 2 + lh * (i + 0.5); ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 18 * s; ctx.lineWidth = size * 0.1; ctx.strokeStyle = 'rgba(40,16,4,0.9)'; ctx.strokeText(l, 0, yy); ctx.shadowColor = `rgba(255,170,60,${0.6 * gk})`; ctx.shadowBlur = 22 * s * gk;""")
+rep("if (q > 0) { ctx.strokeStyle = 'rgba(242,195,90,0.9)';", "if (q > 0) { ctx.strokeStyle = OL;")
+rep("ctx.rotate(Math.PI / 4); ctx.fillStyle = '#f2c35a'; const d = 7 * s * q;", "ctx.rotate(Math.PI / 4); ctx.fillStyle = OD; const d = 7 * s * q;")
+# frames
+rep("""  ctx.save(); ctx.shadowColor = 'rgba(255,170,60,0.55)'; ctx.shadowBlur = 34 * s; ctx.fillStyle = '#1c0d04'; path(); ctx.fill(); ctx.restore();
+  const g = ctx.createLinearGradient(x, y, x + w, y + h); g.addColorStop(0, '#f8dc8c'); g.addColorStop(0.5, '#b07a22'); g.addColorStop(1, '#ffe8a6');""",
+"""  const gk = glowK(), C3 = gk >= 1 ? ['#f8dc8c', '#b07a22', '#ffe8a6'] : gk > 0 ? ['#ecd7a4', '#9c7a45', '#f3e3bd'] : ['#d9d2c6', '#8c857a', '#ece6dc'];
+  ctx.save(); ctx.shadowColor = gk > 0 ? `rgba(255,170,60,${0.55 * gk})` : 'rgba(0,0,0,0.5)'; ctx.shadowBlur = (gk > 0 ? 34 * gk : 18) * s; ctx.fillStyle = '#1c0d04'; path(); ctx.fill(); ctx.restore();
+  const g = ctx.createLinearGradient(x, y, x + w, y + h); g.addColorStop(0, C3[0]); g.addColorStop(0.5, C3[1]); g.addColorStop(1, C3[2]);""")
+rep("""  const g = ctx.createLinearGradient(x - o, y - o, x + w + o, y + h + o); g.addColorStop(0, '#7a4a10'); g.addColorStop(0.22, '#f8dc8c'); g.addColorStop(0.45, '#a8701c'); g.addColorStop(0.7, '#ffe8a6'); g.addColorStop(1, '#6e420e');
+  ctx.save(); ctx.shadowColor = 'rgba(255,170,60,0.45)'; ctx.shadowBlur = 40 * s;""",
+"""  const gk = glowK(), F5 = gk >= 1 ? ['#7a4a10', '#f8dc8c', '#a8701c', '#ffe8a6', '#6e420e'] : gk > 0 ? ['#6a4a22', '#e3cd98', '#94703a', '#efdfb6', '#5e4120'] : ['#2e241c', '#6d5a48', '#3b2e24', '#7a6754', '#261d16'];
+  const g = ctx.createLinearGradient(x - o, y - o, x + w + o, y + h + o); F5.forEach((c, i) => g.addColorStop([0, 0.22, 0.45, 0.7, 1][i], c));
+  ctx.save(); ctx.shadowColor = gk > 0 ? `rgba(255,170,60,${0.45 * gk})` : 'rgba(0,0,0,0.55)'; ctx.shadowBlur = (gk > 0 ? 40 * gk : 20) * s;""")
+rep("ctx.rotate(Math.PI / 4); ctx.fillStyle = '#ffe7a0'; ctx.fillRect(-j, -j, j * 2, j * 2); ctx.fillStyle = '#b3261e';",
+    "ctx.rotate(Math.PI / 4); ctx.fillStyle = gk >= 1 ? '#ffe7a0' : gk > 0 ? '#efdcae' : '#8a7764'; ctx.fillRect(-j, -j, j * 2, j * 2); ctx.fillStyle = gk > 0 ? '#b3261e' : '#4a3a2c';")
+# light-burst transition
+rep("ctx.drawImage(p < 0.5 ? A : B, 0, 0); const k = Math.sin(p * Math.PI);", "ctx.drawImage(p < 0.5 ? A : B, 0, 0); const k = Math.sin(p * Math.PI) * (0.3 + 0.7 * glowK());")
+# picture prompts: softer "mythic" text by default, a new real-look style
+rep("""  mythic: { name: '🕉️ Mythic painting (colour, divine light)', text: 'Style: cinematic Indian mythology digital painting, epic and devotional, rich jewel colours (deep red, saffron, gold, peacock blue, emerald), soft golden divine rim light, glowing aura around gods, dramatic sky, ornate gold jewellery and silk clothes, highly detailed, painterly, in the classical Indian art tradition.' },""",
+"""  mythic: { name: '🕉️ Mythic painting (colour, divine light)', get text() { return glowK() >= 1 ? 'Style: cinematic Indian mythology digital painting, epic and devotional, rich jewel colours (deep red, saffron, gold, peacock blue, emerald), soft golden divine rim light, glowing aura around gods, dramatic sky, ornate gold jewellery and silk clothes, highly detailed, painterly, in the classical Indian art tradition.' : 'Style: cinematic Indian mythology digital painting, epic and devotional, balanced natural colours (deep red, saffron, peacock blue, emerald, earthy browns), realistic soft light, only a very faint aura around gods, NOT golden or yellow overall, no heavy glow or light bloom, detailed silk clothes and jewellery, highly detailed, painterly, in the classical Indian art tradition.'; } },
+  mythreal: { name: '📷 Real cinematic (natural light, no glow)', text: 'Style: photorealistic cinematic film still of an Indian mythology story, like a big-budget historical movie: real actors, realistic skin, real fabric, metal and stone, natural daylight or real firelight, true-to-life colours, no glow, no halo, no aura, no golden light rays, no sparkle, no fantasy effects, sharp detail.' },""")
+rep("function lookText(x) { if (x.asset && x.full && !isMod()) return 'Style: rich full-colour cinematic painting, detailed, dramatic light.';",
+    "function lookText(x) { if (x.asset && x.full && !isMod()) return realMyth() ? LOOKS.mythreal.text : 'Style: rich full-colour cinematic painting, detailed, dramatic light.';")
+rep("const intro = isMyth() ? MYTH_INTRO :", "const intro = isMyth() ? mythText(MYTH_INTRO) :")
+rep("const assetRule = isMyth() ? MYTH_ASSETS :", "const assetRule = isMyth() ? mythText(MYTH_ASSETS) :")
+rep("const MOD_INTRO = ", """// the plan request follows the Divine glow choice (real look = no glowing / golden words)
+function mythText(t) {
+  if (!realMyth()) return t;
+  return t.replace('with a slowly turning golden mandala and soft light rays', 'with a faint carved pattern')
+    .replace('characters as glowing cut-out figures with a golden aura, scenes in ornate gold frames — plus short gold titles', 'characters as realistic cut-out figures, scenes in simple dark frames — plus short clean titles')
+    .replace('with a flash of divine light, smoke or a spinning mandala', 'with a soft fade, smoke or a push')
+    .replace('shown glowing on the dark background', 'shown on the dark background').replace('shown in a gold frame', 'shown in a simple frame')
+    .replace('dignified, calm, glowing; never comic', 'dignified, calm, realistic; never comic');
+}
+const MOD_INTRO = """)
+rep("  if (isMyth()) return 'the same look as the video: dark warm temple background with a glowing golden mandala,",
+    "  if (realMyth()) return 'the same look as the video: dark warm background, a realistic cinematic photo of the main character in natural light (no glow, no aura, not golden), bold clean Hindi title text with a dark shadow';\n  if (isMyth()) return 'the same look as the video: dark warm temple background with a glowing golden mandala,")
+# mode defaults + the control
+rep("if (m === 'myth') Object.assign(S.settings, { theme: 'temple', photo: 'myth', look: 'mythic', captions: 'words', capColor: '#ffd36b',",
+    "if (m === 'myth') Object.assign(S.settings, { theme: 'temple', photo: 'myth', look: S.settings.glow === 'off' ? 'mythreal' : 'mythic', captions: 'words', capColor: S.settings.glow === 'off' ? '#ffffff' : S.settings.glow === 'full' ? '#ffd36b' : '#ffe8b0',")
+rep("toast(m === 'myth' ? 'Mythology style: dark temple background, golden mandala + light rays, glowing figures, gold frames and titles, divine light transitions, temple bell sounds'",
+    "toast(m === 'myth' ? 'Mythology style: dark temple background, mandala, framed pictures, temple bell sounds. Divine glow decides how golden it looks (Soft / Full / Real)'")
+rep("const BIND = ['variety',", "const BIND = ['glow', 'variety',")
+rep("$('#projTitle').value = S.settings.title || ''; R.pack = null; showLook(); }",
+    "$('#projTitle').value = S.settings.title || ''; if ($('#glowWrap')) $('#glowWrap').hidden = !isMyth(); R.pack = null; showLook(); }")
+rep("  if (k === 'mode') applyModeDefaults();\n",
+    """  if (k === 'mode') applyModeDefaults();
+  if (k === 'glow') { R.filt.clear(); R.paper.clear(); if (R.lay) R.lay.clear();
+    if (S.settings.glow === 'off' && S.settings.look === 'mythic') S.settings.look = 'mythreal'; else if (S.settings.glow !== 'off' && S.settings.look === 'mythreal') S.settings.look = 'mythic';
+    if (['#ffd36b', '#ffe8b0', '#ffffff'].includes(S.settings.capColor)) S.settings.capColor = S.settings.glow === 'off' ? '#ffffff' : S.settings.glow === 'full' ? '#ffd36b' : '#ffe8b0';
+    applySettingsToUI(); renderSlots(); toast(S.settings.glow === 'off' ? 'Real look: natural colours, no glow, no gold' : S.settings.glow === 'full' ? 'Full divine glow (strong gold)' : 'Soft glow: less gold'); }
+""")
+
+# ---------------------------------------------------------------- 4. a cleaner, more attractive look
+css = r'''
+/* ===== Vox Studio 1.1 look ===== */
+:root { --bg: #f4f1ea; --card: #ffffff; --line: #e6dfd0; --radius: 16px; --shadow: 0 1px 2px rgba(20,15,5,.05), 0 8px 24px rgba(60,40,0,.07); }
+.top { background: linear-gradient(90deg, #141312, #2a2620); box-shadow: 0 2px 12px rgba(0,0,0,.25); }
+.logo { border-radius: 6px; box-shadow: 0 2px 8px rgba(245,211,39,.35); }
+.tabs { background: #1d1b19; padding: 6px 8px; gap: 6px; }
+.tab { border: 0; border-radius: 999px; padding: 8px 14px; transition: background .15s, color .15s; }
+.tab:hover { background: #2e2b27; color: #fff; }
+.tab.on { background: var(--yel); color: var(--ink); border-bottom-color: transparent; }
+.tab.on b { background: var(--ink); color: var(--yel); }
+.pane > h2 { display: inline-block; position: relative; padding-bottom: 4px; }
+.pane > h2::after { content: ''; position: absolute; left: 0; bottom: 0; width: 42px; height: 4px; border-radius: 4px; background: var(--yel); }
+.card { border: 1px solid var(--line); transition: box-shadow .2s; }
+.card:hover { box-shadow: 0 1px 2px rgba(20,15,5,.05), 0 12px 32px rgba(60,40,0,.10); }
+.card h3 { font-size: 17px; }
+.btn { border-radius: 12px; border-width: 1.5px; }
+.btn.primary { background: linear-gradient(180deg, #ffe14d, #f2cc12); box-shadow: 0 3px 10px rgba(217,184,15,.35); }
+.btn.primary:hover { background: linear-gradient(180deg, #ffe76e, #f5d327); }
+.btn.big { border-radius: 14px; padding: 14px 28px; }
+select, input:not([type=range]):not([type=color]):not([type=checkbox]), textarea { border-radius: 12px; }
+.drop { border-radius: 16px; background: #fbf8f0; }
+.style-pick { background: linear-gradient(135deg, #fff8d8, #fdf1c0); border-color: #efd97a; }
+details.more { margin: 12px 0 0; border-top: 1px dashed var(--line); padding-top: 10px; }
+details.more > summary { cursor: pointer; font-weight: 700; font-size: 13px; color: var(--sub); list-style: none; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: #f4efe2; }
+details.more > summary::-webkit-details-marker { display: none; }
+details.more > summary::before { content: '⚙'; }
+details.more[open] > summary { background: var(--ink); color: #fff; }
+details.more > .form, details.more > .row { margin-top: 12px; }
+.preview { border-radius: 18px; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
+.slot, .shot { border-radius: 14px; }
+.toast { border-radius: 999px; }
+.form > label:has(#variety), .form > .row:has(#newLookBtn) { grid-column: 1 / -1; }
+.form > .row:has(#newLookBtn) { margin: 0; align-items: flex-start; }
+#variety { width: 100%; text-overflow: ellipsis; }
+#lookInfo { flex: 1 1 200px; margin: 0; font-size: 12px; line-height: 1.4; }
+@media (max-width: 600px) { .tab { padding: 7px 11px; font-size: 14px; } .card { padding: 12px; } }
+'''
+rep('\n</style>\n</head>', css + '</style>\n</head>')
+
+open(dst, 'w', encoding='utf-8').write(h)
+print('ok', len(h))
