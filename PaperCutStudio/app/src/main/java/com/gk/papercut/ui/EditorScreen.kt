@@ -55,6 +55,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -503,8 +504,9 @@ private fun ExportTab(vm: StudioViewModel, p: Project) {
     val ctx = LocalContext.current
     val exported by vm.exported.collectAsStateWithLifecycle()
     if (p.scenes.isEmpty()) { EmptyState("Create scenes in step 1 first."); return }
-    val renderer = remember(p) { FrameRenderer(p, vm.repo) }
-    var t by remember { mutableDoubleStateOf(0.0) }
+    val renderer = remember(p) { FrameRenderer(p, vm.repo, preview = true) }
+    // Read only where needed (draw phase, label, slider) so the whole tab is not recomposed every frame.
+    val tState = remember { mutableDoubleStateOf(0.0) }
     var playing by remember { mutableStateOf(false) }
     val player = remember(p.audioFile) {
         p.audioFile?.let { f -> runCatching { MediaPlayer().apply { setDataSource(vm.repo.file(p.id, f).path); prepare() } }.getOrNull() }
@@ -513,25 +515,31 @@ private fun ExportTab(vm: StudioViewModel, p: Project) {
 
     LaunchedEffect(playing) {
         if (!playing) { player?.takeIf { it.isPlaying }?.pause(); return@LaunchedEffect }
-        player?.let { it.seekTo((t * 1000).toInt()); it.start() }
-        val t0 = t; var start = -1L
+        player?.let { it.seekTo((tState.doubleValue * 1000).toInt()); it.start() }
+        // Smooth clock from the display's frame time. MediaPlayer's position moves in coarse 20-50 ms jumps,
+        // which made the animation step unevenly; we only nudge towards it when the audio drifts.
+        val t0 = tState.doubleValue; var start = -1L; var offset = 0.0
         while (playing) {
             withFrameNanos { now ->
                 if (start < 0) start = now
-                t = player?.currentPosition?.div(1000.0) ?: (t0 + (now - start) / 1e9)
+                val clock = t0 + (now - start) / 1e9 + offset
+                val audio = player?.currentPosition?.div(1000.0)
+                if (audio != null && kotlin.math.abs(audio - clock) > 0.12) offset += (audio - clock) * 0.2
+                tState.doubleValue = clock
             }
-            if (t >= renderer.duration) { playing = false; t = 0.0 }
+            if (tState.doubleValue >= renderer.duration) { playing = false; tState.doubleValue = 0.0 }
         }
     }
-    val sceneIdx = renderer.sceneIndexAt(t)
-    LaunchedEffect(sceneIdx, renderer) { withContext(Dispatchers.Default) { renderer.prefetch(t) } }
+    val sceneIdx by remember(renderer) { derivedStateOf { renderer.sceneIndexAt(tState.doubleValue) } }
+    // Prepare the current and the next scene in the background (also right after the project changes).
+    LaunchedEffect(sceneIdx, renderer) { withContext(Dispatchers.Default) { renderer.prefetch(tState.doubleValue) } }
 
     Column(Modifier.verticalScroll(rememberScrollState()).padding(12.dp)) {
         androidx.compose.foundation.Canvas(
             Modifier.fillMaxWidth(if (p.aspect.w < p.aspect.h) 0.6f else 1f).align(Alignment.CenterHorizontally)
                 .aspectRatio(renderer.outW / renderer.outH.toFloat()).background(Color(0xFFF6EEDC))
         ) {
-            val time = t
+            val time = tState.doubleValue
             drawIntoCanvas { c ->
                 val nc = c.nativeCanvas
                 nc.save(); nc.scale(size.width / renderer.outW, size.height / renderer.outH)
@@ -542,10 +550,9 @@ private fun ExportTab(vm: StudioViewModel, p: Project) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Button(onClick = { playing = !playing }) { Text(if (playing) "Pause" else "Play") }
             Spacer(Modifier.width(8.dp))
-            Text("${fmtTime(t)} / ${fmtTime(renderer.duration)} · scene ${sceneIdx + 1}", fontSize = 13.sp)
+            TimeLabel(tState, renderer.duration, sceneIdx)
         }
-        Slider(value = t.toFloat(), onValueChange = { playing = false; t = it.toDouble() },
-            valueRange = 0f..renderer.duration.toFloat().coerceAtLeast(0.1f))
+        TimeSlider(tState, renderer.duration) { playing = false }
 
         SectionCard("Style") {
             Toggle("Animated captions (word highlight)", p.captions) { v -> vm.update { it.copy(captions = v) } }
@@ -572,6 +579,15 @@ private fun ExportTab(vm: StudioViewModel, p: Project) {
         Spacer(Modifier.height(40.dp))
     }
 }
+
+@Composable
+private fun TimeLabel(tState: androidx.compose.runtime.MutableDoubleState, duration: Double, sceneIdx: Int) =
+    Text("${fmtTime(tState.doubleValue)} / ${fmtTime(duration)} · scene ${sceneIdx + 1}", fontSize = 13.sp)
+
+@Composable
+private fun TimeSlider(tState: androidx.compose.runtime.MutableDoubleState, duration: Double, onSeek: () -> Unit) =
+    Slider(value = tState.doubleValue.toFloat(), onValueChange = { onSeek(); tState.doubleValue = it.toDouble() },
+        valueRange = 0f..duration.toFloat().coerceAtLeast(0.1f))
 
 @Composable
 private fun Toggle(label: String, value: Boolean, onChange: (Boolean) -> Unit) {

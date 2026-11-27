@@ -56,11 +56,13 @@ class MobileSam(encoder: File, decoder: File) : Closeable {
 
     private fun decode(points: List<Pair<Float, Float>>, labels: List<Float>, outW: Int, outH: Int, only: Int = -1): Pair<List<FloatArray>, FloatArray> {
         val emb = embedding ?: error("Call setImage first")
-        val n = points.size + 1 // padding point (no box prompt)
+        val hasBox = labels.contains(2f)
+        val n = points.size + if (hasBox) 0 else 1 // SAM wants a padding point when there is no box prompt
         val coords = FloatBuffer.allocate(n * 2)
         points.forEach { (x, y) -> coords.put(x * scale); coords.put(y * scale) }
-        coords.put(0f); coords.put(0f); coords.rewind()
-        val lab = FloatBuffer.allocate(n); labels.forEach { lab.put(it) }; lab.put(-1f); lab.rewind()
+        if (!hasBox) { coords.put(0f); coords.put(0f) }
+        coords.rewind()
+        val lab = FloatBuffer.allocate(n); labels.forEach { lab.put(it) }; if (!hasBox) lab.put(-1f); lab.rewind()
         val perCall = mapOf(
             "point_coords" to OnnxTensor.createTensor(env, coords, longArrayOf(1, n.toLong(), 2)),
             "point_labels" to OnnxTensor.createTensor(env, lab, longArrayOf(1, n.toLong())),
@@ -180,8 +182,8 @@ class MobileSam(encoder: File, decoder: File) : Closeable {
         }
 
         // Merge small fragments into the neighbour they touch most.
-        val owner = IntArray(total) { -1 }
-        kept.forEachIndexed { k, c -> for (i in 0 until total) if (c.bits[i] && owner[i] < 0) owner[i] = k }
+        val lowOwner = IntArray(total) { -1 }
+        kept.forEachIndexed { k, c -> for (i in 0 until total) if (c.bits[i] && lowOwner[i] < 0) lowOwner[i] = k }
         val group = IntArray(kept.size) { it }
         fun root(k: Int): Int { var r = k; while (group[r] != r) r = group[r]; return r }
         val small = (total * 0.01f).toInt() // only real fragments (bun, lone hand), not whole people/pillars
@@ -195,7 +197,7 @@ class MobileSam(encoder: File, decoder: File) : Closeable {
                 for (dy in -2..2) for (dx in -2..2) {
                     val xx = x + dx; val yy = y + dy
                     if (xx !in 0 until lw || yy !in 0 until lh) continue
-                    val o = owner[yy * lw + xx]
+                    val o = lowOwner[yy * lw + xx]
                     if (o >= 0 && root(o) != root(k)) touch.merge(root(o), 1, Int::plus)
                 }
             }
@@ -204,37 +206,115 @@ class MobileSam(encoder: File, decoder: File) : Closeable {
         val groups = kept.indices.groupBy { root(it) }.values.toList()
         stats[2] = System.nanoTime()
 
-        // Full-resolution soft masks, one per group.
-        return groups.mapIndexed { gi, members ->
-            progress(0.8f + 0.2f * gi / groups.size)
-            val logits = FloatArray(imgW * imgH) { -20f }
-            members.forEach { k ->
-                val c = kept[k]
-                val (masks, _) = decode(listOf(c.point.first * sx to c.point.second * sy), listOf(1f), imgW, imgH, only = c.index)
-                val m = masks[0]
-                for (i in m.indices) if (m[i] > logits[i]) logits[i] = m[i]
-            }
-            // Island cleanup on the cheap low-res map, then applied to the full-res mask.
+        // Full resolution. Each group is asked again with a BOX around it, so SAM returns the whole character
+        // (arms, legs, head) instead of a part. Then every pixel belongs to exactly ONE group — the one SAM is
+        // most sure about — so a hand is never cut into two layers or glued to the wrong character.
+        val n = imgW * imgH
+        val best = FloatArray(n) { -20f }
+        val owner = IntArray(n) { -1 }
+        // What the scan itself found keeps priority: a refined box mask may ADD unclaimed limbs, but may not
+        // take a part (e.g. the king's sandal) that the scan already gave to another character.
+        val scanOwner = IntArray(total) { -1 }
+        groups.forEachIndexed { gi, members -> members.forEach { k -> val kb = kept[k].bits; for (i in 0 until total) if (kb[i] && scanOwner[i] < 0) scanOwner[i] = gi } }
+        val locked = BooleanArray(n)
+        fun cellOf(i: Int): Int {
+            val lx = ((i % imgW) / sx).toInt().coerceIn(0, lw - 1); val ly = ((i / imgW) / sy).toInt().coerceIn(0, lh - 1)
+            return ly * lw + lx
+        }
+        groups.forEachIndexed { gi, members ->
+            progress(0.8f + 0.15f * gi / groups.size)
             val lowBits = BooleanArray(total).also { b -> members.forEach { k -> val kb = kept[k].bits; for (i in 0 until total) if (kb[i]) b[i] = true } }
-            val (labels, sizes) = Blobs.label(lowBits, lw, lh)
+            var x0 = lw; var y0 = lh; var x1 = -1; var y1 = -1
+            for (i in 0 until total) if (lowBits[i]) { val x = i % lw; val y = i / lw; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y }
+            val padX = (x1 - x0) * 0.04f + 1; val padY = (y1 - y0) * 0.04f + 1
+            val pts = members.map { kept[it].point.first * sx to kept[it].point.second * sy }
+            val box = listOf((x0 - padX).coerceAtLeast(0f) * sx to (y0 - padY).coerceAtLeast(0f) * sy,
+                ((x1 + 1 + padX) * sx).coerceAtMost(imgW.toFloat()) to ((y1 + 1 + padY) * sy).coerceAtMost(imgH.toFloat()))
+            val (masks, ious) = decode(pts + box, List(pts.size) { 1f } + listOf(2f, 3f), imgW, imgH)
+            // Pick the mask that agrees best with what the scan found (IoU on the low-res grid).
+            fun lowIou(m: FloatArray): Float {
+                var inter = 0; var uni = 0
+                for (ly in 0 until lh) {
+                    val y = ((ly + 0.5f) * sy).toInt().coerceIn(0, imgH - 1)
+                    for (lx in 0 until lw) {
+                        val x = ((lx + 0.5f) * sx).toInt().coerceIn(0, imgW - 1)
+                        val a = m[y * imgW + x] > 0f; val b = lowBits[ly * lw + lx]
+                        if (a && b) inter++; if (a || b) uni++
+                    }
+                }
+                return if (uni == 0) 0f else inter.toFloat() / uni
+            }
+            val scored = masks.indices.map { k -> k to lowIou(masks[k]) }
+            val (bk, biou) = scored.maxBy { (k, iou) -> iou + 0.1f * ious[k] }
+            val m = if (biou >= 0.5f) masks[bk] else {
+                // The box answer drifted to something else: fall back to the scan's own masks.
+                FloatArray(n) { -20f }.also { acc -> members.forEach { k ->
+                    val c = kept[k]
+                    val one = decode(listOf(c.point.first * sx to c.point.second * sy), listOf(1f), imgW, imgH, only = c.index).first[0]
+                    for (i in 0 until n) if (one[i] > acc[i]) acc[i] = one[i]
+                } }
+            }
+            for (i in 0 until n) {
+                val v = m[i]
+                if (v <= 0f) continue
+                val pri = scanOwner[cellOf(i)]
+                when {
+                    pri == gi -> { if (!locked[i] || v > best[i]) { best[i] = maxOf(v, 0.5f); owner[i] = gi; locked[i] = true } }
+                    pri >= 0 -> {} // the scan gave this spot to another character
+                    !locked[i] && v > best[i] -> { best[i] = v; owner[i] = gi }
+                }
+            }
+        }
+
+        // Plain backgrounds: foreground pixels nobody claimed (a missed hand, a hem) that touch a character
+        // join that character, so they don't stay behind on the (blurred) background.
+        if (fg != null) {
+            val maxD = maxOf(6, minOf(imgW, imgH) / 60)
+            val dist = ShortArray(n) { Short.MAX_VALUE }
+            val queue = IntArray(n); var qh = 0; var qt = 0
+            for (i in 0 until n) if (owner[i] >= 0 && best[i] > 0f) { dist[i] = 0; queue[qt++] = i }
+            fun fgAt(i: Int): Boolean {
+                val lx = ((i % imgW) / sx).toInt().coerceIn(0, lw - 1); val ly = ((i / imgW) / sy).toInt().coerceIn(0, lh - 1)
+                return fg[ly * lw + lx]
+            }
+            while (qh < qt) {
+                val i = queue[qh++]; val d = dist[i] + 1
+                if (d > maxD) continue
+                val x = i % imgW
+                for (j in intArrayOf(if (x > 0) i - 1 else -1, if (x < imgW - 1) i + 1 else -1, i - imgW, i + imgW)) {
+                    if (j < 0 || j >= n || dist[j] <= d || (owner[j] >= 0 && best[j] > 0f) || !fgAt(j)) continue
+                    dist[j] = d.toShort(); owner[j] = owner[i]; best[j] = 2f; queue[qt++] = j
+                }
+            }
+        }
+
+        // One mask per group from the ownership map, with island cleanup on the cheap low-res grid.
+        return groups.indices.map { gi ->
+            progress(0.95f + 0.05f * gi / groups.size)
+            val lowOwned = BooleanArray(total) { li ->
+                val y = (((li / lw) + 0.5f) * sy).toInt().coerceIn(0, imgH - 1); val x = (((li % lw) + 0.5f) * sx).toInt().coerceIn(0, imgW - 1)
+                owner[y * imgW + x] == gi && best[y * imgW + x] > 0f
+            }
+            val (labels, sizes) = Blobs.label(lowOwned, lw, lh)
             val biggest = sizes.maxOrNull() ?: 0
             val keepLow = BooleanArray(total) { labels[it] > 0 && sizes[labels[it] - 1] >= biggest * 0.15f }
             val out = Mask(imgW, imgH)
             for (y in 0 until imgH) {
                 val ly = (y / sy).toInt().coerceIn(0, lh - 1)
                 for (x in 0 until imgW) {
-                    val v = logits[y * imgW + x]
+                    val i = y * imgW + x
+                    if (owner[i] != gi) continue
+                    val v = best[i]
                     if (v <= -4f) continue
                     val lx = (x / sx).toInt().coerceIn(0, lw - 1)
-                    // keep if the low-res cell (or a direct neighbour) belongs to a kept part
                     var ok = keepLow[ly * lw + lx]
                     if (!ok) ok = (lx > 0 && keepLow[ly * lw + lx - 1]) || (lx < lw - 1 && keepLow[ly * lw + lx + 1]) ||
                         (ly > 0 && keepLow[(ly - 1) * lw + lx]) || (ly < lh - 1 && keepLow[(ly + 1) * lw + lx])
-                    if (ok) out.a[y * imgW + x] = (0.5f + v * 0.12f).coerceIn(0f, 1f) // fast sigmoid-like edge
+                    if (ok) out.a[i] = (0.5f + v * 0.12f).coerceIn(0f, 1f) // fast sigmoid-like edge
                 }
             }
             out
-        }
+        }.filter { it.area() > 0 }
     }
 
     override fun close() { embTensor?.close(); emptyMask.close(); noMask.close(); enc.close(); dec.close(); opts.close() }

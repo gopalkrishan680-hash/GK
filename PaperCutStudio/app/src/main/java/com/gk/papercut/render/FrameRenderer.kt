@@ -27,7 +27,13 @@ import kotlin.math.min
  * Draws any moment of the video onto a Canvas. The same code drives the live preview and the MP4 export,
  * so what you preview is exactly what you export.
  */
-class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
+class FrameRenderer(
+    val project: Project,
+    private val repo: ProjectRepository,
+    /** Live preview: pictures are moved to GPU memory while preparing (off the UI thread), so the first
+     *  frame of a new scene does not stall on uploading ~15 big bitmaps. Export keeps normal bitmaps. */
+    private val preview: Boolean = false,
+) {
 
     /** 1080p = 1.5x the 720p layout; everything else scales from the frame size. */
     private val resScale = if (project.resolution >= 1080) 1.5f else 1f
@@ -63,12 +69,18 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
         return 0
     }
 
-    /** Loads the scene at time [t] and the next one so playback does not stutter. */
+    /** Prepares the scene at time [t] and the next one so playback does not stutter. */
     fun prefetch(t: Double) {
         val i = sceneIndexAt(t)
         if (i < 0) return
         prepared(project.scenes[i])
         project.scenes.getOrNull(i + 1)?.let { prepared(it) }
+    }
+
+    /** True when the scene after [t]'s scene is already prepared. */
+    fun isNextReady(t: Double): Boolean {
+        val next = project.scenes.getOrNull(sceneIndexAt(t) + 1) ?: return true
+        return synchronized(cache) { cache.containsKey(next.hashCode().toString()) }
     }
 
     fun render(canvas: Canvas, t: Double) {
@@ -91,14 +103,26 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
 
     // ------------------------------------------------------------------ scenes
 
-    private fun prepared(scene: Scene): Prepared = synchronized(cache) {
+    /**
+     * Cached scene assets. The lock is held only to read/write the cache — never while building — so the
+     * UI thread is not blocked while the next scene is being prepared in the background.
+     */
+    private fun prepared(scene: Scene): Prepared {
         val key = scene.hashCode().toString()
-        cache[key]?.let { return it }
+        synchronized(cache) { cache[key]?.let { return it } }
+        val built = build(scene)
+        return synchronized(cache) { cache[key] ?: built.also { cache[key] = it } }
+    }
+
+    private fun gpu(b: Bitmap): Bitmap =
+        if (!preview) b else runCatching { b.copy(Bitmap.Config.HARDWARE, false) }.getOrNull()?.also { b.recycle() } ?: b
+
+    private fun build(scene: Scene): Prepared {
         val grain = project.paperTexture
         val bgRaw = repo.loadBitmap(project.id, scene.backgroundFile ?: scene.imageFile)
         val bg = bgRaw?.let { raw ->
             val styled = PaperStyle.styleBackground(raw, grain).also { raw.recycle() }
-            if (project.depthEffect) PaperStyle.depth(styled).also { styled.recycle() } else styled
+            gpu(if (project.depthEffect) PaperStyle.depth(styled).also { styled.recycle() } else styled)
         }
         val visible = if (scene.backgroundFile != null) scene.layers.filter { it.visible } else emptyList()
         val dur = scene.duration.toFloat().coerceAtLeast(1f)
@@ -109,10 +133,11 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
             // The element's word makes it react (hop) exactly when it is spoken.
             val reactAt = if (l.keywordIndex >= 0 && l.keywordIndex < scene.words.size)
                 (scene.words[l.keywordIndex].start - scene.start).toFloat() - 0.05f else -1f
-            PLayer(l, PaperStyle.style(bmp, grain).also { bmp.recycle() }, enterAt, reactAt, l.id.hashCode(), anim)
+            val st = PaperStyle.style(bmp, grain).also { bmp.recycle() }
+            PLayer(l, PaperStyle.Styled(gpu(st.bitmap), st.pad), enterAt, reactAt, l.id.hashCode(), anim)
         }
         val (px, py) = placePopup(scene, bg, layers)
-        Prepared(scene, bg, layers, planShots(scene, bg, layers), px, py, sentenceBeats(scene, layers)).also { cache[key] = it }
+        return Prepared(scene, bg, layers, planShots(scene, bg, layers), px, py, sentenceBeats(scene, layers))
     }
 
     /** Draws one scene at local time [tl] (seconds since the scene started). */
