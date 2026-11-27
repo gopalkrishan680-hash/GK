@@ -274,5 +274,20 @@ rep("rowZero[y] = ink <= w * 0.012 ? 1 : 0; rowCover[y] = ed / w; }\n  let sc = 
     "rowZero[y] = ink <= Math.max(1, w * 0.002) ? 1 : 0; rowLoose[y] = ink <= w * 0.012 ? 1 : 0; rowCover[y] = ed / w; }\n  let sc = 0; const rc = pickCuts(rowZero, rowCover, h, rows) || (rows > 1 ? pickCuts(rowLoose, rowCover, h, rows) : null);")
 rep("const rowZero = new Uint8Array(h), rowCover", "const rowZero = new Uint8Array(h), rowLoose = new Uint8Array(h), rowCover")
 
+# ---------------------------------------------------------------- 6. sheets are cut in an even grid by default (Auto find = option)
+rep("shortEnd: '', shortCaps: 'off', glow: 'soft'\n};", "shortEnd: '', shortCaps: 'off', glow: 'soft', cutMode: 'even'\n};")
+rep("const BIND = ['glow', 'variety',", "const BIND = ['glow', 'cutMode', 'variety',")
+rep('''          <label class="inline">Decor layers''', '''          <label class="inline">Sheet cutting <select id="cutMode"><option value="even">Even grid (equal parts) — recommended</option><option value="auto">Auto find the gaps</option></select></label>
+          <label class="inline">Decor layers''')
+rep("function bestGrid(bmp, n) {", """// equal cells; the layout (3×2 or 2×3) follows the shape of the sheet
+function evenGrid(bmp, n) {
+  const port = bmp.height > bmp.width * 1.1, [cols, rows] = n === 6 ? (port ? [2, 3] : [3, 2]) : n === 2 ? (port ? [1, 2] : [2, 1]) : sheetGrid(n, false);
+  return { cols, rows, sc: 0, ys: Array.from({ length: rows + 1 }, (_, i) => i / rows), xs: Array.from({ length: rows }, () => Array.from({ length: cols + 1 }, (_, i) => i / cols)) };
+}
+const sheetGridFor = (bmp, n) => S.settings.cutMode === 'auto' ? bestGrid(bmp, n) : evenGrid(bmp, n);
+function bestGrid(bmp, n) {""")
+rep("try { const g = bestGrid(bmp, n), parts = await cutCells(bmp, g);", "try { const g = sheetGridFor(bmp, n), parts = await cutCells(bmp, g);")
+rep("S.sheetCuts[k].cols ? S.sheetCuts[k] : bestGrid(src, n))), trim = true", "S.sheetCuts[k].cols ? S.sheetCuts[k] : sheetGridFor(src, n))), trim = true")
+
 open(dst, 'w', encoding='utf-8').write(h)
 print('ok', len(h))
