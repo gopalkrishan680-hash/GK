@@ -121,8 +121,10 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
         val bg = p.bg
         if (bg == null) { drawPlaceholder(canvas, scene); return }
 
-        val stepT = if (project.stopMotion) floor(tl * 12f) / 12f else tl
-        val step = (tl * 12f).toInt()
+        // Stop-motion steps at 15 fps: exactly every 2nd frame of the 30 fps video. (12 fps does not divide
+        // 30, so poses were held 3,2,3,2 frames — an uneven judder most visible right after a scene change.)
+        val stepT = if (project.stopMotion) floor(tl * 15f) / 15f else tl
+        val step = (tl * 15f).toInt()
         val u = (tl / scene.duration.toFloat().coerceAtLeast(0.5f)).coerceIn(0f, 1f)
 
         // Camera: shot framing (wide / close-up per sentence) + gentle drift, parallax on the cut-outs.
@@ -143,8 +145,11 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
         val s = base * zoom
         place(1.06f) {
             for (pl in p.layers) {
-                val local = stepT - pl.enterAt
-                if (local < 0f) continue
+                // Entrances (the big moves right after a scene change) always run smooth at 30 fps;
+                // the stop-motion stepping is kept for the small life-like motion afterwards.
+                val smooth = tl - pl.enterAt
+                if (smooth < 0f) continue
+                val local = if (smooth < Motion.enterSec(pl.anim)) smooth else maxOf(stepT - pl.enterAt, Motion.enterSec(pl.anim))
                 val l = pl.layer
                 val xf = Xf()
                 // Movement amounts are in output pixels; divide by scale because we draw in image space.

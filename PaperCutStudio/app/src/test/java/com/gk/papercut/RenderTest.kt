@@ -98,6 +98,17 @@ class RenderTest {
             r.render(fc, t)
             frame.compress(Bitmap.CompressFormat.PNG, 100, File(outDir, "frame_%02d_%.2fs.png".format(i, t)).outputStream())
         }
+        // Cadence across the scene change with stop-motion on: entrances smooth, then an even 2-frame step.
+        val sm = FrameRenderer(project.copy(stopMotion = true, captions = false), repo)
+        val small = IntArray(160 * 90); var prev: IntArray? = null
+        val start = scenes[1].start
+        val diffs = (-6..45).map { k ->
+            sm.render(fc, start + k / 30.0)
+            Bitmap.createScaledBitmap(frame, 160, 90, true).getPixels(small, 0, 160, 0, 0, 160, 90)
+            val d = prev?.let { pp -> small.indices.sumOf { kotlin.math.abs((small[it] and 255) - (pp[it] and 255)) }.toDouble() / small.size } ?: 0.0
+            prev = small.copyOf(); d
+        }.drop(1)
+        println("CADENCE " + diffs.joinToString(" ") { "%.0f".format(it) })
         println("Words: " + ScriptPlanner.words(text1).joinToString())
         println("Frames written to ${outDir.absolutePath}")
         assertTrue(File(outDir, "background_plate.png").exists())

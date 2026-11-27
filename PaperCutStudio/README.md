@@ -18,7 +18,7 @@ This app turns a script and a voice-over into a **paper cut-out animation video*
 - **Offline element separation**: ML Kit Subject Segmentation, plus MobileSAM (deep scan and tap-to-cut) and LaMa in-painting through ONNX Runtime. Download the models once in **Settings** (~45 MB SAM, ~208 MB LaMa). Without LaMa, a fast built-in fill is used.
 - **Voice-over sync**: the app detects pauses in the voice-over, so scene cuts land on real pauses and words are spread over spoken time only. With an SRT the timing is exact. You can fine-tune each scene's start in ±0.2 s steps.
 - **Word-triggered animation**: each element appears on the word that mentions it ("…*sooraj* nikla" makes the sun rise at that moment). You can change the trigger word for any layer.
-- **Paper look**: white cut edges, paper grain, soft drop shadows, a vignette, and an optional **stop-motion** feel (12 fps steps plus paper "boil" wobble).
+- **Paper look**: white cut edges, paper grain, soft drop shadows, a vignette, and an optional **stop-motion** feel (15 fps steps — exactly every 2nd frame — plus paper "boil" wobble; entrances stay smooth).
 - **Animations**: 11 entrances (pop, slide, drop with bounce, grow-up, spin, paper flip, wobble…), 8 loops (bob, sway, walk, float, pulse, shake, spin…), camera moves with parallax (zoom or pan) and 5 scene transitions (paper slide, paper flip, fold, zoom, cut).
 - **Animated captions**: a short paper-strip subtitle (at most 4 words, 3 in portrait, never across a sentence end) with the current word highlighted.
 - **Keyword pop-ups**: one important word per scene (chosen automatically, or picked per scene in Layers) pops up in big cut-paper letters exactly when it is spoken.

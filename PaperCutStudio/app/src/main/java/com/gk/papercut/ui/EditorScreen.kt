@@ -549,7 +549,7 @@ private fun ExportTab(vm: StudioViewModel, p: Project) {
 
         SectionCard("Style") {
             Toggle("Animated captions (word highlight)", p.captions) { v -> vm.update { it.copy(captions = v) } }
-            Toggle("Stop-motion feel (12 fps steps + paper wobble)", p.stopMotion) { v -> vm.update { it.copy(stopMotion = v) } }
+            Toggle("Stop-motion feel (15 fps steps + paper wobble)", p.stopMotion) { v -> vm.update { it.copy(stopMotion = v) } }
             Toggle("Paper texture, white edges & shadows", p.paperTexture) { v -> vm.update { it.copy(paperTexture = v) } }
             Toggle("Build each scene: elements come in one after another", p.buildUp) { v -> vm.update { it.copy(buildUp = v) } }
             Toggle("Pop-up book style (pieces fold up out of the page in 3D)", p.popupBook) { v -> vm.update { it.copy(popupBook = v) } }
