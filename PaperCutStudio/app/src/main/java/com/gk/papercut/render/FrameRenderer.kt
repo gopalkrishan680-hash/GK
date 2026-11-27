@@ -183,12 +183,17 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
             visible.forEach { l -> out[l.id] = if (l.enter == EnterAnim.NONE) -10f to EnterAnim.NONE else (0.05f + movers.indexOf(l) * st) to l.enter }
             return out
         }
+        // The whole build must fit in the first ~30 % of the scene (max ~1.4 s of start times), so a
+        // scene never sits half-empty and a short last scene still completes before the video ends.
+        val budget = min(1.4f, dur * 0.3f)
         if (project.popupBook) {
-            // Pop-up book: everything (pillars too) folds up out of the page, back to front
-            // (the piece whose bottom edge is highest = farthest away goes first).
-            val order = visible.sortedBy { it.y + it.h }
-            val st = min(0.28f, 2.4f / max(1, order.size))
-            order.forEachIndexed { i, l -> out[l.id] = (0.05f + i * st) to EnterAnim.POPUP_FOLD }
+            // Pop-up book: the main characters fold up first (they are talked about right away), then
+            // everything else (pillars too) back to front — farthest first.
+            val heroesFirst = visible.filter { roleOf(it) == "hero" }.sortedByDescending { it.w * it.h }
+            val rest = visible.filter { roleOf(it) != "hero" }.sortedBy { it.y + it.h }
+            val order = heroesFirst + rest
+            val st = min(0.16f, budget / max(1, order.size))
+            order.forEachIndexed { i, l -> out[l.id] = (0.02f + i * st) to EnterAnim.POPUP_FOLD }
             return out
         }
         val crowd = visible.filter { roleOf(it) == "crowd" }.sortedBy { it.x + it.w / 2 }
@@ -196,13 +201,15 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
             .sortedBy { if (it.keywordIndex >= 0) it.keywordIndex else Int.MAX_VALUE / 2 + (it.x).toInt() }
         visible.filter { roleOf(it) == "set" }.forEach { out[it.id] = -10f to EnterAnim.NONE }
         // Heroes first (they leave the biggest empty spots), then the crowd fills in, one after another.
-        var t = 0.05f
+        val n = heroes.size + crowd.size
+        val heroGap = min(0.3f, budget * 0.5f / max(1, heroes.size))
+        var t = 0.02f
         heroes.forEach { l ->
             out[l.id] = t to (if (l.enter == EnterAnim.NONE) EnterAnim.POP else l.enter)
-            t += 0.4f
+            t += heroGap
         }
         val inPlace = listOf(EnterAnim.POP, EnterAnim.GROW_UP, EnterAnim.WOBBLE_IN)
-        val crowdStagger = min(0.2f, 1.6f / max(1, crowd.size))
+        val crowdStagger = if (n == 0) 0f else min(0.15f, max(0f, budget - t) / max(1, crowd.size))
         crowd.forEachIndexed { i, l ->
             val anim = if (l.enter == EnterAnim.NONE) inPlace[i % inPlace.size] else l.enter
             out[l.id] = (t + i * crowdStagger) to anim

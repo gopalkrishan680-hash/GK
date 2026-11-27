@@ -14,6 +14,19 @@ import java.nio.FloatBuffer
  */
 object Upscaler {
     private const val T = 256
+    private var cachedPath: String? = null
+    private var cached: OrtSession? = null
+    private var cachedOpts: OrtSession.SessionOptions? = null
+
+    @Synchronized private fun session(model: File): OrtSession {
+        if (cachedPath == model.path) cached?.let { return it }
+        release()
+        val o = OrtSession.SessionOptions().apply { setIntraOpNumThreads(4) }
+        return OrtEnvironment.getEnvironment().createSession(model.path, o).also { cached = it; cachedOpts = o; cachedPath = model.path }
+    }
+
+    /** Frees the model (call when a batch is done). */
+    @Synchronized fun release() { cached?.close(); cachedOpts?.close(); cached = null; cachedOpts = null; cachedPath = null }
     private const val PAD = 16
 
     /** Images whose longest side is below [minSide] are upscaled to about [targetSide]. */
@@ -27,9 +40,9 @@ object Upscaler {
         val env = OrtEnvironment.getEnvironment()
         val step = T - 2 * PAD
         val tilesX = (w + step - 1) / step; val tilesY = (h + step - 1) / step
-        OrtSession.SessionOptions().use { opts ->
-            opts.setIntraOpNumThreads(4)
-            env.createSession(model.path, opts).use { sess ->
+        run {
+            val sess = session(model)
+            run {
                 val input = FloatBuffer.allocate(3 * T * T)
                 var n = 0
                 for (ty in 0 until tilesY) for (tx in 0 until tilesX) {

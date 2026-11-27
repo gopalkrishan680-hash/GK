@@ -21,7 +21,22 @@ import kotlin.math.roundToInt
  */
 class LayerSeparator(private val context: Context, private val models: ModelManager) {
 
-    class Result(val cutOuts: List<CutOut>, val background: Bitmap)
+    /** [needsLama] = a quick background was used where LaMa would do better (run it later in a batch). */
+    class Result(val cutOuts: List<CutOut>, val background: Bitmap, val needsLama: Boolean = false)
+
+    // Models stay loaded across scenes during a batch (loading is the slow part).
+    private var sam: MobileSam? = null
+    private var lama: Lama? = null
+
+    @Synchronized private fun sam(): MobileSam =
+        sam ?: MobileSam(models.file(OfflineModel.SAM_ENCODER), models.file(OfflineModel.SAM_DECODER)).also { sam = it }
+
+    @Synchronized private fun lama(): Lama? =
+        if (!models.lamaReady) null else lama ?: runCatching { Lama(models.file(OfflineModel.LAMA)) }.getOrNull().also { lama = it }
+
+    @Synchronized fun releaseSam() { sam?.close(); sam = null }
+    @Synchronized fun releaseLama() { lama?.close(); lama = null }
+    fun release() { releaseSam(); releaseLama(); Upscaler.release() }
 
     private fun segmenter(): SubjectSegmenter = SubjectSegmentation.getClient(
         SubjectSegmenterOptions.Builder()
@@ -53,7 +68,7 @@ class LayerSeparator(private val context: Context, private val models: ModelMana
         }
     }
 
-    suspend fun separate(img: Bitmap, useSam: Boolean, progress: (String) -> Unit): Result {
+    suspend fun separate(img: Bitmap, useSam: Boolean, progress: (String) -> Unit, useLama: Boolean = true): Result {
         val w = img.width; val h = img.height
         val masks = mutableListOf<Mask>()
         val cuts = mutableListOf<CutOut>()
@@ -69,14 +84,14 @@ class LayerSeparator(private val context: Context, private val models: ModelMana
             val s = 480f / maxOf(w, h)
             val lw = (w * s).roundToInt(); val lh = (h * s).roundToInt()
             val fg = plain?.let { PlainBackground.foreground(img, it, lw, lh) }
-            MobileSam(models.file(OfflineModel.SAM_ENCODER), models.file(OfflineModel.SAM_DECODER)).use { sam ->
-                sam.setImage(img)
-                sam.autoSegment(fg, lw, lh) { p -> progress("MobileSAM scan ${(p * 100).toInt()}%") }.forEach { add(it) }
-            }
+            val sam = sam()
+            sam.setImage(img)
+            sam.autoSegment(fg, lw, lh) { p -> progress("MobileSAM scan ${(p * 100).toInt()}%") }.forEach { add(it) }
         }
 
-        progress("Finding main subjects (ML Kit)…")
-        runCatching { mlKitSubjects(img, progress) }
+        // ML Kit only when SAM is missing or found almost nothing (saves a few seconds per scene).
+        if (cuts.size < 2) progress("Finding main subjects (ML Kit)…")
+        if (cuts.size < 2) runCatching { mlKitSubjects(img, progress) }
             .onFailure { progress("ML Kit unavailable: ${it.message}") }
             .getOrNull()?.forEach { c ->
                 val m = Mask.fromAlpha(w, h, c.bitmap, c.x, c.y)
@@ -96,15 +111,19 @@ class LayerSeparator(private val context: Context, private val models: ModelMana
         progress(
             when {
                 plain != null -> "Building background…"
-                models.lamaReady -> "Repainting background (LaMa)…"
+                models.lamaReady && useLama -> "Repainting background (LaMa)…"
                 else -> "Filling background…"
             }
         )
-        return Result(cuts, background(img, masks))
+        val (bg, lamaWanted) = backgroundInfo(img, masks, useLama)
+        return Result(cuts, bg, needsLama = lamaWanted && !useLama)
     }
 
-    fun background(img: Bitmap, masks: List<Mask>): Bitmap {
-        if (masks.isEmpty()) return img
+    fun background(img: Bitmap, masks: List<Mask>, useLama: Boolean = true): Bitmap = backgroundInfo(img, masks, useLama).first
+
+    /** Background plate + whether LaMa would be the right fill for it. */
+    private fun backgroundInfo(img: Bitmap, masks: List<Mask>, useLama: Boolean): Pair<Bitmap, Boolean> {
+        if (masks.isEmpty()) return img to false
         val union = Mask(img.width, img.height)
         masks.forEach { union.union(it) }
         val holes = union.dilated(maxOf(4, minOf(img.width, img.height) / 80))
@@ -123,9 +142,10 @@ class LayerSeparator(private val context: Context, private val models: ModelMana
                 fun mix(c: Int, f: Int) = (c * (1 - m) + f * m).toInt()
                 px[i] = (0xFF shl 24) or (mix((p shr 16) and 255, r0) shl 16) or (mix((p shr 8) and 255, g0) shl 8) or mix(p and 255, b0)
             }
-            return Bitmap.createBitmap(px, img.width, img.height, Bitmap.Config.ARGB_8888)
+            return Bitmap.createBitmap(px, img.width, img.height, Bitmap.Config.ARGB_8888) to false
         }
-        return Inpainter.inpaint(img, holes, if (models.lamaReady) models.file(OfflineModel.LAMA) else null)
+        val l = if (useLama) lama() else null
+        return Inpainter.inpaint(img, holes, l) to models.lamaReady
     }
 
     /** The picture's own paper colour: median of light, low-saturation pixels outside the holes; else cream. */

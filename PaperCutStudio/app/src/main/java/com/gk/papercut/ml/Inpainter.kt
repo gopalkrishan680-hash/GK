@@ -11,19 +11,32 @@ import java.nio.FloatBuffer
  * Fills the holes left behind after the cut-outs are lifted off, so the background plate is clean.
  * Uses LaMa (512x512, input 0..1, output 0..255) when downloaded, otherwise a fast push-pull fill.
  */
+/** A loaded LaMa model; load once and reuse for every scene (loading takes several seconds). */
+class Lama(model: File) : java.io.Closeable {
+    internal val env: OrtEnvironment = OrtEnvironment.getEnvironment()
+    private val opts = OrtSession.SessionOptions().apply { setIntraOpNumThreads(4) }
+    internal val session: OrtSession = env.createSession(model.path, opts)
+    override fun close() { session.close(); opts.close() }
+}
+
 object Inpainter {
 
+    /** Convenience for one-off use (loads the model each time). */
     fun inpaint(src: Bitmap, holes: Mask, lama: File?): Bitmap {
-        val filled = if (lama != null && lama.exists()) {
-            runCatching { lama(src, holes, lama) }.getOrElse { pushPull(src, holes) }
-        } else pushPull(src, holes)
+        if (lama == null || !lama.exists()) return composite(src, pushPull(src, holes), holes)
+        return Lama(lama).use { inpaint(src, holes, it) }
+    }
+
+    fun inpaint(src: Bitmap, holes: Mask, lama: Lama?): Bitmap {
+        val filled = if (lama != null) runCatching { runLama(src, holes, lama) }.getOrElse { pushPull(src, holes) }
+        else pushPull(src, holes)
         return composite(src, filled, holes)
     }
 
     private const val S = 512
 
-    private fun lama(src: Bitmap, holes: Mask, model: File): Bitmap {
-        val env = OrtEnvironment.getEnvironment()
+    private fun runLama(src: Bitmap, holes: Mask, lama: Lama): Bitmap {
+        val env = lama.env
         val small = Bitmap.createScaledBitmap(src, S, S, true)
         val px = IntArray(S * S); small.getPixels(px, 0, S, 0, 0, S, S)
         val img = FloatBuffer.allocate(3 * S * S)
@@ -42,9 +55,9 @@ object Inpainter {
             mask.put(if (v > 0.3f) 1f else 0f)
         }
         mask.rewind()
-        OrtSession.SessionOptions().use { opts ->
-            opts.setIntraOpNumThreads(4)
-            env.createSession(model.path, opts).use { sess ->
+        run {
+            val sess = lama.session
+            run {
                 OnnxTensor.createTensor(env, img, longArrayOf(1, 3, S.toLong(), S.toLong())).use { ti ->
                     OnnxTensor.createTensor(env, mask, longArrayOf(1, 1, S.toLong(), S.toLong())).use { tm ->
                         sess.run(mapOf("image" to ti, "mask" to tm)).use { res ->

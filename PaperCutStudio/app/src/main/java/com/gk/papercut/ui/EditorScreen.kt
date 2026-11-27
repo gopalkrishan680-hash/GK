@@ -97,6 +97,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun EditorScreen(vm: StudioViewModel, project: Project) {
     val busy by vm.busy.collectAsStateWithLifecycle()
+    val work by vm.work.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableIntStateOf(0) }
     ToastHost(vm)
     Scaffold(topBar = {
@@ -111,6 +112,8 @@ fun EditorScreen(vm: StudioViewModel, project: Project) {
                 }
             }
             BusyBar(busy, onCancel = if (busy?.progress != null && tab == 3) ({ vm.cancelExport() }) else null)
+            // Background processing: never blocks; you can keep working while it runs.
+            BusyBar(work, onCancel = { vm.stopProcessing() })
         }
     }) { pad ->
         Box(Modifier.padding(pad).fillMaxSize()) {
@@ -398,7 +401,13 @@ private fun LayersTab(vm: StudioViewModel, p: Project) {
                         Text("Download MobileSAM (45 MB)")
                     }
                 }
-                Button(onClick = { vm.separateAll(useSam && samReady) }, enabled = p.scenes.any { it.imageFile != null }) { Text("Separate all scenes") }
+                Button(onClick = { vm.separateAll(useSam && samReady) }, enabled = p.scenes.any { it.imageFile != null }) { Text("Separate all scenes again") }
+                var auto by remember { mutableStateOf(vm.settings.autoProcess) }
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { auto = !auto; vm.settings.autoProcess = auto }) {
+                    Checkbox(auto, { auto = it; vm.settings.autoProcess = it })
+                    Text("Process new images automatically in the background (sharpen + separate)", fontSize = 13.sp)
+                }
+                Hint("Images are cut and placed instantly; sharpening and separating run in the background (the bar at the top). You can keep working meanwhile.")
                 val upReady = remember(modelsVersion) { vm.models.upscalerReady }
                 val small = p.scenes.count { it.imageFile != null && maxOf(it.imageW, it.imageH) in 1 until 1400 }
                 if (!upReady) {

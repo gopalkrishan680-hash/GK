@@ -94,10 +94,13 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun open(id: String) { _project.value = repo.load(id); _exported.value = null }
-    fun close() { closeSam(); _project.value = null; refreshProjects() }
+    fun close() { stopProcessing(); closeSam(); _project.value = null; refreshProjects() }
     fun deleteProject(id: String) { repo.delete(id); refreshProjects() }
 
-    fun update(transform: (Project) -> Project) {
+    private val updateLock = Any()
+
+    /** Thread-safe: the background processor and the UI both edit the project. */
+    fun update(transform: (Project) -> Project) = synchronized(updateLock) {
         val p = _project.value ?: return
         _project.value = repo.save(transform(p))
     }
@@ -333,60 +336,132 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
         if (_project.value!!.grid != GridLayout.SINGLE) importGridMany(uris) else importMany(uris)
     }
 
-    private fun saveSceneImage(p: Project, sceneId: String, original: Bitmap) {
-        // Small pictures (grid panels) are sharpened with the offline AI upscaler when it is downloaded.
-        val bmp = if (models.upscalerReady && Upscaler.needsUpscale(original))
-            runCatching { Upscaler.upscale(original, models.file(OfflineModel.UPSCALER)) }.getOrDefault(original) else original
-        val name = repo.saveBitmap(p.id, "s_${sceneId}_img_${System.currentTimeMillis() % 100000}.png", bmp)
+    /** Saves a scene picture instantly; sharpening and separation happen later in the background. */
+    private fun saveSceneImage(p: Project, sceneId: String, bmp: Bitmap) {
+        val name = repo.saveJpeg(p.id, "s_${sceneId}_img_${System.currentTimeMillis() % 100000}.jpg", bmp)
         updateScene(sceneId) { it.copy(imageFile = name, backgroundFile = null, layers = emptyList(), imageW = bmp.width, imageH = bmp.height) }
         if (samSceneId == sceneId) closeSam()
+        if (settings.autoProcess) kickProcessing()
     }
 
-    /** Sharpens every small scene image already imported, then separates the scenes again. */
-    fun upscaleAll(useSam: Boolean) = task("AI upscaling…") {
-        if (!models.upscalerReady) { say("Download the AI upscaler first (3 MB)"); return@task }
-        val p = _project.value ?: return@task
-        val todo = p.scenes.filter { it.imageFile != null && maxOf(it.imageW, it.imageH) in 1 until 1400 }
-        if (todo.isEmpty()) { say("All images are already sharp enough"); return@task }
-        todo.forEachIndexed { i, sc ->
-            withContext(Dispatchers.Default) {
-                val img = repo.loadBitmap(p.id, sc.imageFile) ?: return@withContext
-                val up = Upscaler.upscale(img, models.file(OfflineModel.UPSCALER)) { f ->
-                    progress("Upscaling scene ${p.scenes.indexOf(sc) + 1} (${i + 1}/${todo.size})", (i + f) / todo.size)
-                }
-                saveSceneImage(_project.value!!, sc.id, up)
+    // ------------------------------------------------------------------ background processing
+
+    /** Status of the background processor (shown as a small bar; never blocks the rest of the app). */
+    private val _work = MutableStateFlow<Busy?>(null)
+    val work: StateFlow<Busy?> = _work.asStateFlow()
+    private var processJob: Job? = null
+    @Volatile private var processAgain = false
+    /** Scenes the user asked to separate again although they already have layers. */
+    private val forceIds = java.util.Collections.synchronizedSet(HashSet<String>())
+
+    private fun needsUpscale(s: Scene) = models.upscalerReady && s.imageFile != null && maxOf(s.imageW, s.imageH) in 1 until 1400
+    private fun needsSeparation(s: Scene) = s.imageFile != null && (s.backgroundFile == null || s.id in forceIds)
+
+    /**
+     * Starts (or re-triggers) the background processor:
+     *  1. AI-upscale small pictures   (upscaler loaded once)
+     *  2. separate every scene        (MobileSAM loaded once; quick background so the scene is usable at once)
+     *  3. LaMa backgrounds            (LaMa loaded once, only for scenes that need it)
+     * New imports while it runs are picked up automatically.
+     */
+    fun kickProcessing() {
+        if (processJob?.isActive == true) { processAgain = true; return }
+        val pid = _project.value?.id ?: return
+        processJob = viewModelScope.launch(Dispatchers.Default) {
+            try {
+                do { processAgain = false; processPending(pid) } while (processAgain && _project.value?.id == pid)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // stopped by the user or project closed
+            } catch (e: Throwable) {
+                say("Processing stopped: ${e.message ?: e.javaClass.simpleName}")
+            } finally {
+                separator.release(); _work.value = null
             }
         }
-        val again = _project.value!!.scenes.filter { it.imageFile != null }
-        again.forEachIndexed { i, s ->
-            separateScene(s.id, useSam) { msg -> progress("Separating scene ${i + 1}/${again.size}: $msg", i / again.size.toFloat()) }
+    }
+
+    fun stopProcessing() { processJob?.cancel() }
+
+    private suspend fun processPending(pid: String) {
+        fun scenes() = _project.value?.takeIf { it.id == pid }?.scenes.orEmpty()
+        val useSam = models.samReady
+
+        // 1) sharpen
+        val up = scenes().filter(::needsUpscale)
+        up.forEachIndexed { i, sc ->
+            kotlinx.coroutines.yield()
+            val n = scenes().indexOfFirst { it.id == sc.id } + 1
+            _work.value = Busy("Sharpening scene $n (${i + 1}/${up.size})", i / up.size.toFloat())
+            val img = withContext(Dispatchers.IO) { repo.loadBitmap(pid, sc.imageFile) } ?: return@forEachIndexed
+            val big = Upscaler.upscale(img, models.file(OfflineModel.UPSCALER))
+            val p = _project.value?.takeIf { it.id == pid } ?: return
+            withContext(Dispatchers.IO) {
+                val name = repo.saveJpeg(pid, "s_${sc.id}_img_${System.currentTimeMillis() % 100000}.jpg", big)
+                updateScene(sc.id) { it.copy(imageFile = name, backgroundFile = null, layers = emptyList(), imageW = big.width, imageH = big.height) }
+            }
+            if (samSceneId == sc.id) closeSam()
+            check(p.id == pid)
         }
-        say("${todo.size} images sharpened and separated again")
+        Upscaler.release()
+
+        // 2) separate (quick background)
+        val todo = scenes().filter(::needsSeparation)
+        val lamaLater = mutableListOf<String>()
+        todo.forEachIndexed { i, sc ->
+            kotlinx.coroutines.yield()
+            val n = scenes().indexOfFirst { it.id == sc.id } + 1
+            _work.value = Busy("Separating scene $n (${i + 1}/${todo.size})", i / todo.size.toFloat())
+            val needsLama = separateScene(sc.id, useSam, useLama = false) { }
+            forceIds.remove(sc.id)
+            if (needsLama) lamaLater += sc.id
+        }
+        separator.releaseSam()
+
+        // 3) LaMa backgrounds for the scenes that need them
+        lamaLater.forEachIndexed { i, id ->
+            kotlinx.coroutines.yield()
+            val n = scenes().indexOfFirst { it.id == id } + 1
+            _work.value = Busy("Repainting background of scene $n (${i + 1}/${lamaLater.size})", i / lamaLater.size.toFloat())
+            val p = _project.value?.takeIf { it.id == pid } ?: return
+            val sc = p.scenes.firstOrNull { it.id == id } ?: return@forEachIndexed
+            val img = withContext(Dispatchers.IO) { repo.loadBitmap(pid, sc.imageFile) } ?: return@forEachIndexed
+            val bg = rebuildBackground(p, img, sc.layers)
+            updateScene(id) { it.copy(backgroundFile = bg) }
+        }
+        separator.releaseLama()
+        if (todo.isNotEmpty() || up.isNotEmpty()) say("Scenes ready: ${todo.size} separated" + if (up.isNotEmpty()) ", ${up.size} sharpened" else "")
+    }
+
+    /** Sharpen small images: handled by the background processor. */
+    fun upscaleAll(@Suppress("UNUSED_PARAMETER") useSam: Boolean) {
+        if (!models.upscalerReady) { say("Download the AI upscaler first (3 MB)"); return }
+        kickProcessing()
     }
 
     // ------------------------------------------------------------------ step 3: separation
 
-    fun separateAll(useSam: Boolean) = task("Separating elements…") {
-        val todo = _project.value?.scenes?.filter { it.imageFile != null } ?: return@task
-        todo.forEachIndexed { i, s ->
-            separateScene(s.id, useSam) { msg -> progress("Scene ${i + 1}/${todo.size}: $msg", i / todo.size.toFloat()) }
-        }
-        say("All scenes separated")
+    fun separateAll(@Suppress("UNUSED_PARAMETER") useSam: Boolean) {
+        val p = _project.value ?: return
+        forceIds += p.scenes.filter { it.imageFile != null }.map { it.id }
+        kickProcessing()
     }
 
     fun separate(sceneId: String, useSam: Boolean) = task("Separating elements…") {
         separateScene(sceneId, useSam) { progress(it) }
+        separator.release()
     }
 
-    private suspend fun separateScene(sceneId: String, useSam: Boolean, msg: (String) -> Unit) {
-        val p = _project.value ?: return
-        val scene = p.scenes.first { it.id == sceneId }
-        val img = withContext(Dispatchers.IO) { repo.loadBitmap(p.id, scene.imageFile) } ?: return
-        val res = withContext(Dispatchers.Default) { separator.separate(img, useSam, msg) }
+    /** Returns true when a quick background was used and LaMa should repaint it later. */
+    private suspend fun separateScene(sceneId: String, useSam: Boolean, useLama: Boolean = true, msg: (String) -> Unit): Boolean {
+        val p = _project.value ?: return false
+        val scene = p.scenes.firstOrNull { it.id == sceneId } ?: return false
+        val img = withContext(Dispatchers.IO) { repo.loadBitmap(p.id, scene.imageFile) } ?: return false
+        val res = withContext(Dispatchers.Default) { separator.separate(img, useSam, msg, useLama) }
         val layers = withContext(Dispatchers.IO) { buildLayers(p, scene, res.cutOuts, img.width, img.height) }
-        val bgName = repo.saveBitmap(p.id, "s_${sceneId}_bg_${System.currentTimeMillis() % 100000}.png", res.background)
+        val bgName = repo.saveJpeg(p.id, "s_${sceneId}_bg_${System.currentTimeMillis() % 100000}.jpg", res.background)
         updateScene(sceneId) { it.copy(backgroundFile = bgName, layers = layers) }
-        if (layers.isEmpty()) say("No separate elements found – the scene will animate as one picture. Try tap-to-cut.")
+        if (layers.isEmpty() && useLama) say("No separate elements found – the scene will animate as one picture. Try tap-to-cut.")
+        return res.needsLama
     }
 
     /**
@@ -479,7 +554,7 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
             repo.loadBitmap(p.id, l.file)?.let { Mask.fromAlpha(img.width, img.height, it, l.x.toInt(), l.y.toInt()) }
         }
         val bg = separator.background(img, masks)
-        return repo.saveBitmap(p.id, "s_bg_${UUID.randomUUID().toString().take(6)}.png", bg)
+        return repo.saveJpeg(p.id, "s_bg_${UUID.randomUUID().toString().take(6)}.jpg", bg)
     }
 
     fun updateLayer(sceneId: String, layerId: String, transform: (Layer) -> Layer) =
@@ -602,7 +677,7 @@ class StudioViewModel(app: Application) : AndroidViewModel(app) {
         return uri.lastPathSegment ?: ""
     }
 
-    override fun onCleared() { closeSam() }
+    override fun onCleared() { stopProcessing(); closeSam(); separator.release() }
 }
 
 /** "scene_2" before "scene_10". */

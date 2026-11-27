@@ -68,7 +68,7 @@ class RenderTest {
         objs.forEach { (b, _) -> c.drawBitmap(b, 0f, 0f, null) }
 
         val union = Mask(w, h); objs.forEach { union.union(it.second) }
-        val bg = Inpainter.inpaint(scene, union.dilated(10), null)
+        val bg = Inpainter.inpaint(scene, union.dilated(10), null as java.io.File?)
         val p0 = repo.create("render-test")
         repo.saveBitmap(p0.id, "scene.png", scene)
         repo.saveBitmap(p0.id, "bg.png", bg)

@@ -48,6 +48,12 @@ class ProjectRepository(private val context: Context) {
         return name
     }
 
+    /** Opaque pictures (scene images, backgrounds): JPEG is several times faster to save than PNG. */
+    fun saveJpeg(projectId: String, name: String, bmp: Bitmap): String {
+        file(projectId, name).outputStream().use { bmp.compress(Bitmap.CompressFormat.JPEG, 94, it) }
+        return name
+    }
+
     fun loadBitmap(projectId: String, name: String?): Bitmap? {
         if (name == null) return null
         val f = file(projectId, name)
@@ -78,6 +84,10 @@ class Settings(context: Context) {
     var geminiKey: String
         get() = prefs.getString("gemini_key", "") ?: ""
         set(v) = prefs.edit().putString("gemini_key", v.trim()).apply()
+    /** Upscale + separate imported pictures automatically in the background. */
+    var autoProcess: Boolean
+        get() = prefs.getBoolean("auto_process", true)
+        set(v) = prefs.edit().putBoolean("auto_process", v).apply()
     var textModel: String
         get() = prefs.getString("text_model", "gemini-2.5-flash") ?: "gemini-2.5-flash"
         set(v) = prefs.edit().putString("text_model", v.trim()).apply()
