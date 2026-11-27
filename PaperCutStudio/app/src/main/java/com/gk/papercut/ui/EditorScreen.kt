@@ -543,6 +543,7 @@ private fun ExportTab(vm: StudioViewModel, p: Project) {
             Toggle("Stop-motion feel (12 fps steps + paper wobble)", p.stopMotion) { v -> vm.update { it.copy(stopMotion = v) } }
             Toggle("Paper texture, white edges & shadows", p.paperTexture) { v -> vm.update { it.copy(paperTexture = v) } }
             Toggle("Build each scene: elements come in one after another", p.buildUp) { v -> vm.update { it.copy(buildUp = v) } }
+            Toggle("Pop-up book style (pieces fold up out of the page in 3D)", p.popupBook) { v -> vm.update { it.copy(popupBook = v) } }
             Toggle("Camera zoom & close-up shots", p.cameraMoves) { v -> vm.update { it.copy(cameraMoves = v) } }
             Toggle("Depth effect (soft background, cut-outs pop)", p.depthEffect) { v -> vm.update { it.copy(depthEffect = v) } }
             Toggle("Keyword pop-ups (big paper letters)", p.keywordPopups) { v -> vm.update { it.copy(keywordPopups = v) } }

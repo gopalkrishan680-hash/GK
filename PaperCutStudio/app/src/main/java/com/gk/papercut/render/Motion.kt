@@ -15,6 +15,8 @@ data class Xf(
     var rot: Float = 0f, var alpha: Float = 1f,
     /** 0 = scale around centre, 1 = scale around the bottom edge (grow from the ground). */
     var pivotBottom: Boolean = false,
+    /** 3D fold around the bottom edge in degrees: 90 = lying flat on the page, 0 = standing up. */
+    var foldX: Float = 0f,
 )
 
 object Ease {
@@ -35,6 +37,9 @@ object Ease {
 object Motion {
     const val ENTER_SEC = 0.7f
 
+    /** The pop-up book fold is slower, so the 3D unfolding can be seen. */
+    fun enterSec(a: EnterAnim) = if (a == EnterAnim.POPUP_FOLD) 1.1f else ENTER_SEC
+
     /** p = 0..1 progress of the entrance. [w],[h] = output frame size. */
     fun enter(a: EnterAnim, p: Float, w: Float, h: Float, xf: Xf) {
         val q = p.coerceIn(0f, 1f)
@@ -51,6 +56,13 @@ object Motion {
             EnterAnim.WOBBLE_IN -> {
                 val e = Ease.outBack(q, 1.6f).coerceAtLeast(0f); xf.sx = e; xf.sy = e
                 xf.rot = sin(q * 14) * (1 - q) * 16
+            }
+            EnterAnim.POPUP_FOLD -> {
+                // Pop-up book: the piece lies flat on the page and folds up, overshooting a little.
+                xf.pivotBottom = true
+                // Smooth rise with a small paper "bounce" past upright at the end.
+                xf.foldX = 88f * (1f - Ease.outBack(q, 0.9f))
+                xf.alpha = (q * 8f).coerceAtMost(1f)
             }
             EnterAnim.NONE -> {}
         }

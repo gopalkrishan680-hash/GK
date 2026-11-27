@@ -90,6 +90,14 @@ class SeparationTest {
         val project = repo.save(p0.copy(scenes = scenes, audioDuration = scenes.last().end))
         val r = com.gk.papercut.render.FrameRenderer(project, repo)
         val frame = Bitmap.createBitmap(r.outW, r.outH, Bitmap.Config.ARGB_8888)
+        // Pop-up book style clip (frames written for a preview video).
+        val pb = com.gk.papercut.render.FrameRenderer(repo.save(project.copy(popupBook = true, captions = false)), repo)
+        val pbDir = File(out, "popup_frames").apply { deleteRecursively(); mkdirs() }
+        val pbf = Bitmap.createBitmap(pb.outW, pb.outH, Bitmap.Config.ARGB_8888)
+        for (fi in 0 until 105) {
+            pb.render(Canvas(pbf), fi / 30.0)
+            Bitmap.createScaledBitmap(pbf, 854, 480, true).compress(Bitmap.CompressFormat.JPEG, 92, File(pbDir, "f%03d.jpg".format(fi)).outputStream())
+        }
         // 1080p + depth + keyword pop-up with the real Hindi narration.
         val hindi = "भरी सभा में द्रौपदी का अपमान हो रहा था, और भीष्म चुप थे। क्यों? इसका जवाब खुद महाभारत में है।"
         val hs = com.gk.papercut.sync.SyncEngine.syncByReadingSpeed(listOf(scenes[0].copy(text = hindi, words = emptyList())))

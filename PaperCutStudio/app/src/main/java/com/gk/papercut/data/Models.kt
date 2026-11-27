@@ -14,7 +14,8 @@ enum class Aspect(val label: String, val w: Int, val h: Int, val ratio: String) 
 enum class EnterAnim(val label: String) {
     POP("Pop"), SLIDE_LEFT("Slide from left"), SLIDE_RIGHT("Slide from right"),
     SLIDE_UP("Rise from bottom"), DROP("Drop from top"), GROW_UP("Grow up"),
-    SPIN_IN("Spin in"), FLIP("Paper flip"), FADE("Fade"), WOBBLE_IN("Wobble in"), NONE("Already there"),
+    SPIN_IN("Spin in"), FLIP("Paper flip"), FADE("Fade"), WOBBLE_IN("Wobble in"),
+    POPUP_FOLD("Pop-up book fold"), NONE("Already there"),
 }
 
 /** Looping motion while the element is on stage. */
@@ -107,6 +108,8 @@ data class Project(
     val paperTexture: Boolean = true,
     /** Elements build the scene one after another (true) or are all on stage from the start (false). */
     val buildUp: Boolean = true,
+    /** Pop-up book style: every piece folds up out of the page in 3D, back to front. */
+    val popupBook: Boolean = false,
     /** Camera zooms/pans and close-up shots. Off = steady full-frame picture. */
     val cameraMoves: Boolean = true,
     /** Background slightly blurred and dimmed so the cut-outs stand out (2.5D depth). */

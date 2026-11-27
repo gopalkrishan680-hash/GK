@@ -148,8 +148,9 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
                 val l = pl.layer
                 val xf = Xf()
                 // Movement amounts are in output pixels; divide by scale because we draw in image space.
-                Motion.enter(pl.anim, local / Motion.ENTER_SEC, outW / s, outH / s, xf)
-                if (local > Motion.ENTER_SEC) Motion.idle(l.idle, local - Motion.ENTER_SEC, l.h, outW / s, xf)
+                val enterSec = Motion.enterSec(pl.anim)
+                Motion.enter(pl.anim, local / enterSec, outW / s, outH / s, xf)
+                if (local > enterSec) Motion.idle(l.idle, local - enterSec, l.h, outW / s, xf)
                 if (pl.reactAt >= 0f) Motion.react(stepT - pl.reactAt, l.h, xf)
                 p.beats[l.id]?.forEach { b -> Motion.react(stepT - b, l.h, xf) }
                 if (project.stopMotion) Motion.boil(pl.seed, step / 2, xf)
@@ -180,6 +181,14 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
             val movers = visible.filter { it.enter != EnterAnim.NONE }
             val st = min(0.2f, dur * 0.2f / max(1, movers.size))
             visible.forEach { l -> out[l.id] = if (l.enter == EnterAnim.NONE) -10f to EnterAnim.NONE else (0.05f + movers.indexOf(l) * st) to l.enter }
+            return out
+        }
+        if (project.popupBook) {
+            // Pop-up book: everything (pillars too) folds up out of the page, back to front
+            // (the piece whose bottom edge is highest = farthest away goes first).
+            val order = visible.sortedBy { it.y + it.h }
+            val st = min(0.28f, 2.4f / max(1, order.size))
+            order.forEachIndexed { i, l -> out[l.id] = (0.05f + i * st) to EnterAnim.POPUP_FOLD }
             return out
         }
         val crowd = visible.filter { roleOf(it) == "crowd" }.sortedBy { it.x + it.w / 2 }
@@ -276,6 +285,28 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
         val cy = if (xf.pivotBottom) l.y + l.h else l.y + l.h / 2f
         canvas.save()
         canvas.translate(cx + xf.dx, cy + xf.dy)
+        if (xf.foldX != 0f) {
+            // Real perspective fold around the bottom edge (pivot = bottom centre), computed by hand:
+            // rotate each corner about the X axis, then project with a camera at distance D.
+            val th = Math.toRadians(xf.foldX.toDouble())
+            val c = kotlin.math.cos(th).toFloat(); val sn = kotlin.math.sin(th).toFloat()
+            val d = l.h * 2.2f
+            val left = -l.w / 2f - st.pad; val right = l.w / 2f + st.pad
+            val top = -l.h - st.pad; val bottom = st.pad.toFloat()
+            fun proj(x: Float, y: Float): Pair<Float, Float> {
+                val z = -y * sn // y < 0 is above the fold line -> tips away from the viewer
+                val f = d / (d + z)
+                return x * f to y * c * f
+            }
+            val src = floatArrayOf(left, top, right, top, right, bottom, left, bottom)
+            val pts = listOf(proj(left, top), proj(right, top), proj(right, bottom), proj(left, bottom))
+            val dst = FloatArray(8).also { a -> pts.forEachIndexed { i, (x, y) -> a[2 * i] = x; a[2 * i + 1] = y } }
+            val m = android.graphics.Matrix()
+            if (kotlin.math.abs(c) > 0.02f && m.setPolyToPoly(src, 0, dst, 0, 4)) canvas.concat(m) else canvas.scale(1f, 0.02f)
+            // Lying pieces catch less light.
+            val v = ((0.55f + 0.45f * c).coerceIn(0f, 1f) * 255).toInt()
+            bmpPaint.colorFilter = android.graphics.LightingColorFilter(Color.rgb(v, v, v), 0)
+        }
         canvas.rotate(xf.rot)
         canvas.scale(xf.sx, xf.sy)
         bmpPaint.alpha = (xf.alpha.coerceIn(0f, 1f) * 255).toInt()
@@ -283,6 +314,7 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
         val top = (if (xf.pivotBottom) -l.h else -l.h / 2f) - st.pad
         canvas.drawBitmap(st.bitmap, left, top, bmpPaint)
         bmpPaint.alpha = 255
+        bmpPaint.colorFilter = null
         canvas.restore()
     }
 
