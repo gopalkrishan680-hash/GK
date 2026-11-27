@@ -289,5 +289,18 @@ function bestGrid(bmp, n) {""")
 rep("try { const g = bestGrid(bmp, n), parts = await cutCells(bmp, g);", "try { const g = sheetGridFor(bmp, n), parts = await cutCells(bmp, g);")
 rep("S.sheetCuts[k].cols ? S.sheetCuts[k] : bestGrid(src, n))), trim = true", "S.sheetCuts[k].cols ? S.sheetCuts[k] : sheetGridFor(src, n))), trim = true")
 
+# ---------------------------------------------------------------- 7. YouTube kit: description always in English, hashtags start with a small letter
+rep("- description: 1200–2500 characters in ${ytLangName()}:", "- description: 1200–2500 characters, ALWAYS in English (even when the script and titles are Hindi / Hinglish; names of people and places stay as they are):")
+rep("- hashtags: 3–5, the first one is the main topic.", "- hashtags: 3–5, the first one is the main topic. Every hashtag starts with a small (lowercase) letter, no spaces, e.g. #mahabharat #draupadiStory — also on the last line of the description.")
+rep("function quickYT() {", """// hashtags: first letter small (#Mahabharat -> #mahabharat), also inside a text
+const hashLow = s => String(s || '').replace(/#(\\p{Lu})/gu, (m, c) => '#' + c.toLowerCase());
+function quickYT() {""")
+rep("hashtags: hs.map(h => '#' + str(h).replace(/^#+/, '').replace(/\\s+/g, '')).filter(h => h.length > 1) };",
+    "hashtags: hs.map(h => hashLow('#' + str(h).replace(/^#+/, '').replace(/\\s+/g, ''))).filter(h => h.length > 1) }; S.yt.description = hashLow(S.yt.description);")
+rep(".map(k => '#' + k.replace(/\\s+/g, '')).slice(0, 4);", ".map(k => hashLow('#' + k.replace(/\\s+/g, ''))).slice(0, 4);")
+rep("\\n\\nIs video mein:\\n${pick.map(s => '• ' + s).join('\\n')}\\n\\nChapters\\n${chapters}\\n\\n${ch ? `Aisi aur videos ke liye ${ch} ko subscribe karein.` : 'Aisi aur videos ke liye channel ko subscribe karein.'}",
+    "\\n\\nIn this video:\\n${pick.map(s => '• ' + s).join('\\n')}\\n\\nChapters\\n${chapters}\\n\\n${ch ? `Like the video and subscribe to ${ch} for more stories like this.` : 'Like the video and subscribe to the channel for more stories like this.'}")
+rep("else if (k === 'hashtags') S.yt.hashtags = v.split(/\\s+/).filter(Boolean);", "else if (k === 'hashtags') S.yt.hashtags = v.split(/\\s+/).filter(Boolean).map(hashLow);")
+
 open(dst, 'w', encoding='utf-8').write(h)
 print('ok', len(h))
