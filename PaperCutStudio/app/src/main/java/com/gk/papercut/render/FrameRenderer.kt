@@ -38,7 +38,13 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
     private class PLayer(val layer: Layer, val styled: PaperStyle.Styled, val enterAt: Float, val reactAt: Float, val seed: Int, val anim: EnterAnim)
     /** A camera framing inside one scene: centre (image px) and zoom on top of "cover" scale. */
     private class Shot(val start: Float, val cx: Float, val cy: Float, val zoom: Float)
-    private class Prepared(val scene: Scene, val bg: Bitmap?, val layers: List<PLayer>, val shots: List<Shot>)
+    private class Prepared(
+        val scene: Scene, val bg: Bitmap?, val layers: List<PLayer>, val shots: List<Shot>,
+        /** Pop-up centre in output pixels (placed away from faces), or null. */
+        val popX: Float = 0f, val popY: Float = 0f,
+        /** Per layer: extra "reaction" times (s, scene-local) — one character reacts at each new sentence. */
+        val beats: Map<String, FloatArray> = emptyMap(),
+    )
 
     private val cache = object : LinkedHashMap<String, Prepared>(4, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Prepared>?) = size > 3
@@ -105,7 +111,8 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
                 (scene.words[l.keywordIndex].start - scene.start).toFloat() - 0.05f else -1f
             PLayer(l, PaperStyle.style(bmp, grain).also { bmp.recycle() }, enterAt, reactAt, l.id.hashCode(), anim)
         }
-        Prepared(scene, bg, layers, planShots(scene, bg, layers)).also { cache[key] = it }
+        val (px, py) = placePopup(scene, bg, layers)
+        Prepared(scene, bg, layers, planShots(scene, bg, layers), px, py, sentenceBeats(scene, layers)).also { cache[key] = it }
     }
 
     /** Draws one scene at local time [tl] (seconds since the scene started). */
@@ -144,6 +151,7 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
                 Motion.enter(pl.anim, local / Motion.ENTER_SEC, outW / s, outH / s, xf)
                 if (local > Motion.ENTER_SEC) Motion.idle(l.idle, local - Motion.ENTER_SEC, l.h, outW / s, xf)
                 if (pl.reactAt >= 0f) Motion.react(stepT - pl.reactAt, l.h, xf)
+                p.beats[l.id]?.forEach { b -> Motion.react(stepT - b, l.h, xf) }
                 if (project.stopMotion) Motion.boil(pl.seed, step / 2, xf)
                 drawLayer(canvas, pl, xf)
             }
@@ -357,6 +365,59 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
     private val popColors = intArrayOf(Color.rgb(214, 64, 46), Color.rgb(36, 110, 160), Color.rgb(222, 140, 20), Color.rgb(40, 130, 90))
 
     /** Big cut-paper word: pops in when it is spoken, holds ~1.2 s, then folds away. */
+    /**
+     * New sentence = someone on stage reacts (small hop/tilt), heroes first, then the crowd, in turn.
+     * Keeps a scene alive even with the camera switched off.
+     */
+    private fun sentenceBeats(scene: Scene, layers: List<PLayer>): Map<String, FloatArray> {
+        val words = scene.words
+        if (words.size < 4) return emptyMap()
+        val times = mutableListOf<Float>()
+        for (i in 0 until words.size - 1) {
+            if (words[i].text.last() !in ".!?।|,") continue
+            val t = (words[i + 1].start - scene.start).toFloat()
+            if (t > 2.2f && (times.isEmpty() || t - times.last() > 1.6f) && scene.duration - t > 0.6) times += t
+        }
+        val actors = layers.map { it.layer }.filter { roleOf(it) != "set" }
+            .sortedWith(compareBy({ if (roleOf(it) == "hero") 0 else 1 }, { -(it.w * it.h) }))
+        if (actors.isEmpty() || times.isEmpty()) return emptyMap()
+        val out = HashMap<String, MutableList<Float>>()
+        times.forEachIndexed { k, t -> out.getOrPut(actors[k % actors.size].id) { mutableListOf() } += t }
+        return out.mapValues { it.value.toFloatArray() }
+    }
+
+    /** Picks the spot for the pop-up word that covers the fewest faces (top part of each cut-out). */
+    private fun placePopup(scene: Scene, bg: Bitmap?, layers: List<PLayer>): Pair<Float, Float> {
+        val defaultY = outH * (if (outW < outH) 0.24f else 0.27f)
+        val idx = Keywords.popIndex(scene)
+        if (bg == null || idx < 0 || idx >= scene.words.size) return outW / 2f to defaultY
+        val size = min(outW, outH) * 0.15f
+        popFill.textSize = size
+        val tw = min(popFill.measureText(scene.words[idx].text), outW * 0.8f)
+        val bw = tw + size * 0.4f; val bh = size * 1.3f
+        val base = max(outW / bg.width.toFloat(), outH / bg.height.toFloat())
+        val ox = (outW - bg.width * base) / 2; val oy = (outH - bg.height * base) / 2
+        data class R(val l: Float, val t: Float, val r: Float, val b: Float, val wgt: Float)
+        val zones = mutableListOf<R>()
+        layers.map { it.layer }.filter { roleOf(it) != "set" }.forEach { l ->
+            val x0 = ox + l.x * base; val y0 = oy + l.y * base; val x1 = x0 + l.w * base
+            zones += R(x0, y0, x1, y0 + l.h * base * 0.4f, if (roleOf(l) == "hero") 3f else 1.5f) // face zone
+            zones += R(x0, y0, x1, y0 + l.h * base, 0.5f) // body
+        }
+        zones += R(outW * 0.15f, outH * 0.8f, outW * 0.85f, outH.toFloat(), 2f) // captions
+        val cands = listOf(0.2f, 0.35f, 0.5f, 0.65f, 0.8f).flatMap { cx -> listOf(0.1f, 0.2f, 0.32f, 0.45f, 0.6f).map { cy -> cx to cy } }
+        return cands.map { (cx, cy) ->
+            val x = (outW * cx).coerceIn(bw / 2, outW - bw / 2); val y = (outH * cy).coerceIn(bh / 2, outH - bh / 2)
+            var cost = 0f
+            for (z in zones) {
+                val ix = min(x + bw / 2, z.r) - max(x - bw / 2, z.l); val iy = min(y + bh / 2, z.b) - max(y - bh / 2, z.t)
+                if (ix > 0 && iy > 0) cost += ix * iy * z.wgt
+            }
+            cost += (kotlin.math.abs(cx - 0.5f) + kotlin.math.abs(cy - 0.25f)) * bw * bh * 0.08f
+            Triple(x, y, cost)
+        }.minBy { it.third }.let { it.first to it.second }
+    }
+
     private fun drawPopup(canvas: Canvas, scene: Scene, t: Double) {
         val idx = Keywords.popIndex(scene)
         if (idx < 0 || idx >= scene.words.size) return
@@ -377,7 +438,8 @@ class FrameRenderer(val project: Project, private val repo: ProjectRepository) {
         val fit = min(1f, outW * 0.8f / tw)
         val sceneIdx = project.scenes.indexOfFirst { it.id == scene.id }.coerceAtLeast(0)
         canvas.save()
-        canvas.translate(outW / 2f, outH * (if (outW < outH) 0.24f else 0.27f))
+        val pp = prepared(scene)
+        canvas.translate(pp.popX, pp.popY)
         canvas.rotate(if (sceneIdx % 2 == 0) -4f else 3f)
         canvas.scale(s * fit, s * fit)
         val y = size * 0.35f
