@@ -8,6 +8,7 @@
     <uses-feature android:name="android.hardware.camera.any" android:required="true" />
 
     <application
+        android:name=".ProCamApp"
         android:label="ProCam"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"

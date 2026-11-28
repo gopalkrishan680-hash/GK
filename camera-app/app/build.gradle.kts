@@ -11,9 +11,9 @@ android {
         applicationId = "com.gk.procam"
         minSdk = 29
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
-        ndk { abiFilters += listOf("arm64-v8a") }
+        versionCode = 2
+        versionName = "1.0.1"
+        ndk { abiFilters += if (project.hasProperty("emu")) listOf("x86_64") else listOf("arm64-v8a") }
     }
 
     buildTypes {
@@ -28,7 +28,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
     testOptions { unitTests { isIncludeAndroidResources = true; all { it.systemProperty("roborazzi.test.record", "true") } } }
     lint {
         checkReleaseBuilds = false

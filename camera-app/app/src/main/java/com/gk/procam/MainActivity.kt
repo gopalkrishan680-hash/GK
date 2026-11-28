@@ -21,6 +21,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.gk.procam.ui.CameraScreen
+import com.gk.procam.ui.CrashScreen
 import com.gk.procam.ui.PermissionScreen
 
 class MainActivity : ComponentActivity() {
@@ -40,7 +41,15 @@ class MainActivity : ComponentActivity() {
         }
         settings = AppSettings(this)
 
+        val crashFile = ProCamApp.crashFile(application)
+        val lastCrash = runCatching { crashFile.takeIf { it.exists() }?.readText() }.getOrNull()
+
         setContent {
+            var crashText by remember { mutableStateOf(lastCrash) }
+            crashText?.let { text ->
+                CrashScreen(text) { crashFile.delete(); crashText = null }
+                return@setContent
+            }
             var granted by remember { mutableStateOf(hasCamera()) }
             val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
                 granted = hasCamera()

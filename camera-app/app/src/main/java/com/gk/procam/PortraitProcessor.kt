@@ -30,6 +30,7 @@ enum class ModelState { CHECKING, DOWNLOADING, READY, FAILED }
  */
 class PortraitProcessor(private val context: Context) {
     private val segmenter by lazy {
+        runCatching { com.google.mlkit.common.MlKit.initialize(context.applicationContext) }
         SubjectSegmentation.getClient(SubjectSegmenterOptions.Builder().enableForegroundConfidenceMask().build())
     }
 
@@ -41,6 +42,10 @@ class PortraitProcessor(private val context: Context) {
     val ready get() = state == ModelState.READY
 
     fun ensureModel() {
+        try { ensureModelInternal() } catch (e: Throwable) { android.util.Log.e("ProCam", "segmenter init failed", e); state = ModelState.FAILED }
+    }
+
+    private fun ensureModelInternal() {
         val client = ModuleInstall.getClient(context)
         state = ModelState.CHECKING
         client.areModulesAvailable(segmenter)
@@ -49,6 +54,10 @@ class PortraitProcessor(private val context: Context) {
     }
 
     fun download() {
+        try { downloadInternal() } catch (e: Throwable) { state = ModelState.FAILED }
+    }
+
+    private fun downloadInternal() {
         val client = ModuleInstall.getClient(context)
         state = ModelState.DOWNLOADING
         progress = 0f

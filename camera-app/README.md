@@ -2,7 +2,7 @@
 
 ProCam has an iPhone-style interface and an English UI, and adds its own computational-photography pipeline on top of what the phone's hardware provides.
 
-**Install:** copy `release/ProCam-v1.0.apk` to the phone, open it, and allow "Install unknown apps".
+**Install:** copy `release/ProCam-v1.0.1.apk` to the phone, open it, and allow "Install unknown apps".
 On first launch, allow Camera and Microphone. The AI portrait model then downloads automatically through Google Play services.
 
 | Photo | Video | Pro | Settings |

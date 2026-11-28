@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
@@ -208,5 +209,33 @@ fun PermissionScreen(onRequest: () -> Unit) {
         Text("Allow Access", color = Color.Black, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
             modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Yellow).clickable(onClick = onRequest)
                 .padding(horizontal = 28.dp, vertical = 12.dp))
+    }
+}
+
+// ------------------------------------------------------------------------------- crash report
+
+@Composable
+fun CrashScreen(report: String, onContinue: () -> Unit) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    Column(Modifier.fillMaxSize().background(Color.Black).padding(20.dp).padding(top = 30.dp)) {
+        Text("ProCam crashed last time", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(6.dp))
+        Text("Take a screenshot of this page or copy the report and send it to the developer.",
+            color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp)
+        Spacer(Modifier.height(12.dp))
+        Row {
+            Text("Copy report", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(Yellow).clickable {
+                    val cm = ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("ProCam crash", report))
+                }.padding(horizontal = 16.dp, vertical = 10.dp))
+            Spacer(Modifier.width(10.dp))
+            Text("Continue", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(Color(0xFF2C2C2E)).clickable(onClick = onContinue)
+                    .padding(horizontal = 16.dp, vertical = 10.dp))
+        }
+        Spacer(Modifier.height(14.dp))
+        Text(report, color = Color(0xFFFF9F0A), fontSize = 10.sp, lineHeight = 13.sp,
+            modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()))
     }
 }
