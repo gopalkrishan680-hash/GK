@@ -364,6 +364,7 @@ rep('''        <button class="btn icon" id="playBtn" aria-label="Play">▶</butt
         <button class="btn pvb" id="fwdBtn" aria-label="Forward 5 seconds" title="Forward 5 s">5↻</button>
         <span class="pv-sp"></span>
         <button class="btn pvb" id="orientBtn" title="Vertical / landscape"></button>
+        <button class="btn pvb" id="rotBtn" title="Rotate the picture" hidden>⟳ Rotate</button>
         <button class="btn pvb" id="fullBtn" aria-label="Full screen" title="Full screen">⛶</button>
         <button class="btn cc" id="ccBtn" title="Captions on / off">CC</button>
         <span class="pv-br"></span>
@@ -379,16 +380,25 @@ pv.addEventListener('dblclick', e => { const r = pv.getBoundingClientRect(), f =
 // vertical (9:16) / landscape (16:9): the same Format setting as in Export, so what you see is what you export
 function showOrient() { const v = S.settings.aspect === '9:16'; $('#orientBtn').textContent = v ? '▭ Landscape' : '▯ Vertical'; $('#orientBtn').title = v ? 'Switch to landscape 16:9' : 'Switch to vertical 9:16'; }
 $('#orientBtn').onclick = () => { S.settings.aspect = S.settings.aspect === '9:16' ? '16:9' : '9:16'; if ($('#aspect')) $('#aspect').value = S.settings.aspect; R.lay && R.lay.clear(); sizePreview(); showOrient(); touch(); save();
-  toast(S.settings.aspect === '9:16' ? 'Vertical 9:16 (Shorts / Reels) — export will be vertical too' : 'Landscape 16:9 (YouTube) — export will be landscape too'); if (document.body.classList.contains('pv-full')) fullOrient(); };
+  toast(S.settings.aspect === '9:16' ? 'Vertical 9:16 (Shorts / Reels) — export will be vertical too' : 'Landscape 16:9 (YouTube) — export will be landscape too'); if ($('#pvFull')) fitFull(); };
 // full screen: the preview fills the screen (and turns the phone for landscape when the system allows it)
-function fullOrient() { try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock(S.settings.aspect === '9:16' ? 'portrait' : 'landscape').catch(() => {}); } catch (_) {} }
-function setFull(on) {
-  document.body.classList.toggle('pv-full', on); $('#fullBtn').textContent = on ? '✕' : '⛶'; $('#fullBtn').title = on ? 'Close full screen' : 'Full screen';
-  try { if (on) { const r = document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); if (r && r.then) r.then(fullOrient).catch(() => {}); else fullOrient(); } else { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {}); } } catch (_) {}
+// full screen: our own layer on top of the app (no system full-screen / rotation, which the app WebView does not support well)
+function fitFull() {
+  const ov = $('#pvFull'); if (!ov) return; const rot = ov.classList.contains('rot'), vw = innerWidth, vh = innerHeight, SW = rot ? vh : vw, SH = rot ? vw : vh;
+  ov.style.width = SW + 'px'; ov.style.height = SH + 'px';
+  const bar = ov.querySelector('.pv-bar'), bh = bar ? bar.offsetHeight : 90, k = Math.min(SW / pv.width, (SH - bh - 8) / pv.height);
+  pv.style.aspectRatio = ''; pv.style.maxHeight = 'none'; pv.style.margin = '0 auto'; pv.style.width = Math.floor(pv.width * k) + 'px'; pv.style.height = Math.floor(pv.height * k) + 'px';
 }
-$('#fullBtn').onclick = () => setFull(!document.body.classList.contains('pv-full'));
-document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && document.body.classList.contains('pv-full')) setFull(false); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.body.classList.contains('pv-full')) setFull(false); });
+function setFull(on) {
+  const box = document.querySelector('.preview'); if (!box) return;
+  if (on && !$('#pvFull')) { const ov = document.createElement('div'); ov.id = 'pvFull'; document.body.appendChild(ov); ov.appendChild(box); document.body.classList.add('pv-full'); setTimeout(fitFull, 30); }
+  if (!on && $('#pvFull')) { $('#previewCol').appendChild(box); $('#pvFull').remove(); document.body.classList.remove('pv-full'); pv.style.height = ''; sizePreview(); }
+  $('#fullBtn').textContent = on ? '✕' : '⛶'; $('#fullBtn').title = on ? 'Close full screen' : 'Full screen'; $('#rotBtn').hidden = !on;
+}
+$('#fullBtn').onclick = () => setFull(!$('#pvFull'));
+$('#rotBtn').onclick = () => { const ov = $('#pvFull'); if (!ov) return; ov.classList.toggle('rot'); fitFull(); };
+addEventListener('resize', () => setTimeout(fitFull, 60));
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#pvFull')) setFull(false); });
 """)
 rep("$('#projTitle').value = S.settings.title || ''; if ($('#glowWrap'))", "$('#projTitle').value = S.settings.title || ''; if ($('#orientBtn')) showOrient(); if ($('#glowWrap'))")
 rep("  if (k === 'aspect') { sizePreview();", "  if (k === 'aspect') { if ($('#orientBtn')) showOrient(); sizePreview();")
@@ -414,10 +424,12 @@ css2 = r'''
 .btn.pvb { min-height: 34px; padding: 3px 10px; font: 800 13px "Archivo", sans-serif; background: #2c2a26; color: #f1ece1; border: 1.5px solid #4a463f; border-radius: 10px; }
 .btn.pvb:hover { background: #3a3732; }
 body.pv-full { overflow: hidden; }
-body.pv-full .preview-col { display: block !important; }
-body.pv-full .preview { position: fixed !important; inset: 0; top: 0 !important; z-index: 300; border-radius: 0; display: flex; flex-direction: column; justify-content: center; background: #000; }
-body.pv-full #pv { width: auto !important; height: auto !important; max-width: 100vw; max-height: calc(100vh - 96px) !important; margin: 0 auto; }
-body.pv-full .pv-shot { display: none; }
+#pvFull { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 500; background: #000; display: flex; align-items: center; justify-content: center; }
+#pvFull.rot { transform: translate(-50%, -50%) rotate(90deg); }
+#pvFull .preview { position: static; width: 100%; border-radius: 0; box-shadow: none; background: #000; }
+#pvFull #pv { display: block; }
+#pvFull .pv-bar { background: rgba(27,26,24,.92); }
+#pvFull .pv-shot { display: none; }
 '''
 rep('</style>\n</head>', css2 + '</style>\n</head>')
 
