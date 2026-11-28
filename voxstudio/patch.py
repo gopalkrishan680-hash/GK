@@ -354,5 +354,72 @@ rep("""  if (y) { const h0 = (y.hashtags || []).join(' '), d0 = y.description ||
 rep("""    <div class="card"><h3>📝 Description</h3><textarea data-yedit="description" rows="14">""",
     """    <div class="card"><h3>📝 Description</h3>${nonEn ? `<p class="info">⚠ This description is not in English yet. ${hasKey ? 'Making it English with Gemini…' : 'Tap <b>🌐 Make it English</b>: it copies a request — paste it in ChatGPT / Gemini, then paste the answer here. (Add a free Gemini API key in the Plan tab and this happens by itself.)'}</p>` : ''}<textarea data-yedit="description" rows="14">""")
 # after a translation the warning must go: render again (ytMakeEnglish already calls renderYT)
+# ---------------------------------------------------------------- 10. preview: ±5 s, vertical / landscape, full screen, double-tap to skip
+rep('''        <button class="btn icon" id="playBtn" aria-label="Play">▶</button>
+        <input type="range" id="seek" min="0" max="1000" value="0" aria-label="Seek">
+        <span id="pvTime" class="mono">0:00 / 0:00</span>
+        <button class="btn cc" id="ccBtn" title="Captions on / off">CC</button>''',
+'''        <button class="btn pvb" id="backBtn" aria-label="Back 5 seconds" title="Back 5 s">↺5</button>
+        <button class="btn icon" id="playBtn" aria-label="Play">▶</button>
+        <button class="btn pvb" id="fwdBtn" aria-label="Forward 5 seconds" title="Forward 5 s">5↻</button>
+        <span class="pv-sp"></span>
+        <button class="btn pvb" id="orientBtn" title="Vertical / landscape"></button>
+        <button class="btn pvb" id="fullBtn" aria-label="Full screen" title="Full screen">⛶</button>
+        <button class="btn cc" id="ccBtn" title="Captions on / off">CC</button>
+        <span class="pv-br"></span>
+        <input type="range" id="seek" min="0" max="1000" value="0" aria-label="Seek">
+        <span id="pvTime" class="mono">0:00 / 0:00</span>''')
+rep("$('#seek').oninput = e => setT(e.target.value / 1000 * duration());\n",
+"""$('#seek').oninput = e => setT(e.target.value / 1000 * duration());
+// ±5 seconds (buttons, arrow keys, double-tap on the left / right of the picture)
+const skip = d => { setT(nowT() + d); if (playing && S.musicBlob) { try { music.currentTime = music.duration ? nowT() % music.duration : 0; } catch (_) {} } };
+$('#backBtn').onclick = () => skip(-5); $('#fwdBtn').onclick = () => skip(5);
+document.addEventListener('keydown', e => { if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.target.closest('input,textarea,select,[contenteditable]')) { e.preventDefault(); skip(e.key === 'ArrowLeft' ? -5 : 5); } });
+pv.addEventListener('dblclick', e => { const r = pv.getBoundingClientRect(), f = (e.clientX - r.left) / r.width; if (f < 0.35) skip(-5); else if (f > 0.65) skip(5); else playing ? pause() : play(); });
+// vertical (9:16) / landscape (16:9): the same Format setting as in Export, so what you see is what you export
+function showOrient() { const v = S.settings.aspect === '9:16'; $('#orientBtn').textContent = v ? '▭ Landscape' : '▯ Vertical'; $('#orientBtn').title = v ? 'Switch to landscape 16:9' : 'Switch to vertical 9:16'; }
+$('#orientBtn').onclick = () => { S.settings.aspect = S.settings.aspect === '9:16' ? '16:9' : '9:16'; if ($('#aspect')) $('#aspect').value = S.settings.aspect; R.lay && R.lay.clear(); sizePreview(); showOrient(); touch(); save();
+  toast(S.settings.aspect === '9:16' ? 'Vertical 9:16 (Shorts / Reels) — export will be vertical too' : 'Landscape 16:9 (YouTube) — export will be landscape too'); if (document.body.classList.contains('pv-full')) fullOrient(); };
+// full screen: the preview fills the screen (and turns the phone for landscape when the system allows it)
+function fullOrient() { try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock(S.settings.aspect === '9:16' ? 'portrait' : 'landscape').catch(() => {}); } catch (_) {} }
+function setFull(on) {
+  document.body.classList.toggle('pv-full', on); $('#fullBtn').textContent = on ? '✕' : '⛶'; $('#fullBtn').title = on ? 'Close full screen' : 'Full screen';
+  try { if (on) { const r = document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); if (r && r.then) r.then(fullOrient).catch(() => {}); else fullOrient(); } else { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {}); } } catch (_) {}
+}
+$('#fullBtn').onclick = () => setFull(!document.body.classList.contains('pv-full'));
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && document.body.classList.contains('pv-full')) setFull(false); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.body.classList.contains('pv-full')) setFull(false); });
+""")
+rep("$('#projTitle').value = S.settings.title || ''; if ($('#glowWrap'))", "$('#projTitle').value = S.settings.title || ''; if ($('#orientBtn')) showOrient(); if ($('#glowWrap'))")
+rep("  if (k === 'aspect') { sizePreview();", "  if (k === 'aspect') { if ($('#orientBtn')) showOrient(); sizePreview();")
+
+# ---------------------------------------------------------------- 11. style changed after making a plan: say whether a new plan is needed
+rep("  S.assets = assets; S.shots = shots; S.images = images; R.img = {}; R.filt.clear(); touch();", "  S.assets = assets; S.shots = shots; S.images = images; S.settings.planMode = S.settings.mode; R.img = {}; R.filt.clear(); touch();")
+rep("  S.shots = shots; S.images = images; R.img = {}; R.filt.clear(); touch();", "  S.shots = shots; S.images = images; S.settings.planMode = S.settings.mode; R.img = {}; R.filt.clear(); touch();")
+rep("  if (k === 'mode') applyModeDefaults();\n", """  if (k === 'mode') applyModeDefaults();
+  if (k === 'mode' && $('#planInfo')) { const pm = S.settings.planMode, NM = { collage: 'Layered collage', modern: 'Modern collage', classic: 'Classic Vox', myth: 'Mythology / Divine' };
+    $('#planInfo').textContent = !(S.shots || []).length || !pm || pm === S.settings.mode ? '' : (pm === 'classic') !== (S.settings.mode === 'classic')
+      ? `⚠ Your plan was made for ${NM[pm]}. ${NM[S.settings.mode]} needs its own plan: make it again with A, B or C. Your scenes and voice stay as they are.`
+      : `ℹ Your plan was made for ${NM[pm]}. It still works in ${NM[S.settings.mode]} (background, frames, titles and picture style change by themselves). For the best result make a new plan with A or B: the picture ideas and transitions are written for the style. Scenes and voice stay; pictures whose prompt stays the same are kept.`; }
+""")
+
+css2 = r'''
+/* preview controls */
+.pv-bar { flex-wrap: wrap; gap: 8px; }
+.pv-br { flex-basis: 100%; height: 0; }
+.pv-bar #seek { flex: 1 1 auto; min-width: 0; }
+.pv-bar #pvTime { font-size: 12px; white-space: nowrap; }
+@media (max-width: 480px) { .pv-bar { gap: 6px; } .btn.pvb { padding: 3px 8px; font-size: 12px; } .btn.icon { width: 40px; } }
+.pv-sp { flex: 1; }
+.btn.pvb { min-height: 34px; padding: 3px 10px; font: 800 13px "Archivo", sans-serif; background: #2c2a26; color: #f1ece1; border: 1.5px solid #4a463f; border-radius: 10px; }
+.btn.pvb:hover { background: #3a3732; }
+body.pv-full { overflow: hidden; }
+body.pv-full .preview-col { display: block !important; }
+body.pv-full .preview { position: fixed !important; inset: 0; top: 0 !important; z-index: 300; border-radius: 0; display: flex; flex-direction: column; justify-content: center; background: #000; }
+body.pv-full #pv { width: auto !important; height: auto !important; max-width: 100vw; max-height: calc(100vh - 96px) !important; margin: 0 auto; }
+body.pv-full .pv-shot { display: none; }
+'''
+rep('</style>\n</head>', css2 + '</style>\n</head>')
+
 open(dst, 'w', encoding='utf-8').write(h)
 print('ok', len(h))
