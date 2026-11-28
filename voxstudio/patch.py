@@ -454,5 +454,16 @@ rep("const MYTH_EXITS = ['lightburst', 'smoke', 'mandala', 'lightburst', 'iris',
     "const MYTH_EXITS = ['lightburst', 'mandala', 'iris', 'smoke', 'fade', 'mandala', 'lightburst', 'iris'];")
 rep("Use lightburst at big divine moments, smoke for sad or mysterious moments", "Use lightburst at big divine moments, smoke only for 2–3 very sad or mysterious moments in the whole video, otherwise vary mandala, iris and fade")
 
+# ---------------------------------------------------------------- 13. 2.5D depth off by default (it ghosts / smears busy paintings while zooming)
+rep("hook: 'off', hookText: '', depth: 'on',", "hook: 'off', hookText: '', depth: 'off',")
+rep("edges: 'auto', sv: 3,", "edges: 'auto', sv: 4,")
+rep("  if ((+savedVer || 0) < 3) { if (st.sfx === 'on') st.sfx = 'subtle'; if (!st.variety) st.variety = 'auto'; st.sv = 3; }",
+    "  if ((+savedVer || 0) < 3) { if (st.sfx === 'on') st.sfx = 'subtle'; if (!st.variety) st.variety = 'auto'; st.sv = 3; }\n  // v4: 2.5D depth off (the cut-out person grew over the painting and made ghost edges); it can be turned on again\n  if ((+savedVer || 0) < 4) { st.depth = 'off'; st.sv = 4; }")
+rep('<select id="depth"><option value="on">On: the person lifts off the picture (needs internet once)</option><option value="off">Off (flat pictures)</option></select>',
+    '<select id="depth"><option value="off">Off — sharp pictures (recommended)</option><option value="on">On: the person lifts off the picture (can blur busy paintings, needs internet once)</option></select>')
+# when it is on: a gentler lift, so edges ghost less
+rep("const fg = depthFg(key, src, m), b = m.box, ax = dx + dw * (b.x0 + b.x1) / 2, ay = dy + dh * b.y1, z = 1 + 0.045 * p, ex = pan * 0.9;",
+    "const fg = depthFg(key, src, m), b = m.box, ax = dx + dw * (b.x0 + b.x1) / 2, ay = dy + dh * b.y1, z = 1 + 0.02 * p, ex = pan * 0.4;")
+
 open(dst, 'w', encoding='utf-8').write(h)
 print('ok', len(h))
