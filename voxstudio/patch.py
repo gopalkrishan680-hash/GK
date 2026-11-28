@@ -380,24 +380,32 @@ pv.addEventListener('dblclick', e => { const r = pv.getBoundingClientRect(), f =
 // vertical (9:16) / landscape (16:9): the same Format setting as in Export, so what you see is what you export
 function showOrient() { const v = S.settings.aspect === '9:16'; $('#orientBtn').textContent = v ? '▭ Landscape' : '▯ Vertical'; $('#orientBtn').title = v ? 'Switch to landscape 16:9' : 'Switch to vertical 9:16'; }
 $('#orientBtn').onclick = () => { S.settings.aspect = S.settings.aspect === '9:16' ? '16:9' : '9:16'; if ($('#aspect')) $('#aspect').value = S.settings.aspect; R.lay && R.lay.clear(); sizePreview(); showOrient(); touch(); save();
-  toast(S.settings.aspect === '9:16' ? 'Vertical 9:16 (Shorts / Reels) — export will be vertical too' : 'Landscape 16:9 (YouTube) — export will be landscape too'); if ($('#pvFull')) fitFull(); };
+  toast(S.settings.aspect === '9:16' ? 'Vertical 9:16 (Shorts / Reels) — export will be vertical too' : 'Landscape 16:9 (YouTube) — export will be landscape too'); if ($('#pvFull')) { fullRotUser = null; fitFull(); } };
 // full screen: the preview fills the screen (and turns the phone for landscape when the system allows it)
-// full screen: our own layer on top of the app (no system full-screen / rotation, which the app WebView does not support well)
+// full screen: our own layer on top of the app (no system full-screen / rotation, which the app WebView does not support well).
+// The picture is turned by itself when the video and the phone point different ways (landscape video on an upright phone),
+// so it always fills the screen; ⟳ Rotate turns it back. The controls float over the picture and hide while it plays.
+let fullRotUser = null, fullHideT = 0;
+function fullAutoRot() { const vidLand = S.settings.aspect !== '9:16' && S.settings.aspect !== '1:1', scrLand = innerWidth > innerHeight; return vidLand && !scrLand; }   // only a landscape video on an upright phone is turned
 function fitFull() {
-  const ov = $('#pvFull'); if (!ov) return; const rot = ov.classList.contains('rot'), vw = innerWidth, vh = innerHeight, SW = rot ? vh : vw, SH = rot ? vw : vh;
+  const ov = $('#pvFull'); if (!ov) return; const rot = fullRotUser != null ? fullRotUser : fullAutoRot(); ov.classList.toggle('rot', rot);
+  const vw = innerWidth, vh = innerHeight, SW = rot ? vh : vw, SH = rot ? vw : vh;
   ov.style.width = SW + 'px'; ov.style.height = SH + 'px';
-  const bar = ov.querySelector('.pv-bar'), bh = bar ? bar.offsetHeight : 90, k = Math.min(SW / pv.width, (SH - bh - 8) / pv.height);
-  pv.style.aspectRatio = ''; pv.style.maxHeight = 'none'; pv.style.margin = '0 auto'; pv.style.width = Math.floor(pv.width * k) + 'px'; pv.style.height = Math.floor(pv.height * k) + 'px';
+  const k = Math.min(SW / pv.width, SH / pv.height);
+  pv.style.aspectRatio = ''; pv.style.maxHeight = 'none'; pv.style.margin = '0'; pv.style.width = Math.floor(pv.width * k) + 'px'; pv.style.height = Math.floor(pv.height * k) + 'px';
 }
+function fullPoke() { const ov = $('#pvFull'); if (!ov) return; ov.classList.remove('hidebar'); clearTimeout(fullHideT); fullHideT = setTimeout(() => { if (playing && $('#pvFull')) $('#pvFull').classList.add('hidebar'); }, 3000); }
 function setFull(on) {
   const box = document.querySelector('.preview'); if (!box) return;
-  if (on && !$('#pvFull')) { const ov = document.createElement('div'); ov.id = 'pvFull'; document.body.appendChild(ov); ov.appendChild(box); document.body.classList.add('pv-full'); setTimeout(fitFull, 30); }
-  if (!on && $('#pvFull')) { $('#previewCol').appendChild(box); $('#pvFull').remove(); document.body.classList.remove('pv-full'); pv.style.height = ''; sizePreview(); }
+  if (on && !$('#pvFull')) { const ov = document.createElement('div'); ov.id = 'pvFull'; document.body.appendChild(ov); ov.appendChild(box); document.body.classList.add('pv-full'); fullRotUser = null; fitFull(); fullPoke();
+    ov.addEventListener('click', e => { if (ov.classList.contains('hidebar')) { e.stopPropagation(); e.preventDefault(); } fullPoke(); }, true); }
+  if (!on && $('#pvFull')) { clearTimeout(fullHideT); $('#previewCol').appendChild(box); $('#pvFull').remove(); document.body.classList.remove('pv-full'); pv.style.height = ''; sizePreview(); }
   $('#fullBtn').textContent = on ? '✕' : '⛶'; $('#fullBtn').title = on ? 'Close full screen' : 'Full screen'; $('#rotBtn').hidden = !on;
 }
 $('#fullBtn').onclick = () => setFull(!$('#pvFull'));
-$('#rotBtn').onclick = () => { const ov = $('#pvFull'); if (!ov) return; ov.classList.toggle('rot'); fitFull(); };
-addEventListener('resize', () => setTimeout(fitFull, 60));
+$('#rotBtn').onclick = () => { if (!$('#pvFull')) return; fullRotUser = !$('#pvFull').classList.contains('rot'); fitFull(); };
+$('#playBtn').addEventListener('click', () => setTimeout(fullPoke, 0));
+addEventListener('resize', () => setTimeout(() => { fullRotUser = null; fitFull(); }, 80));
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#pvFull')) setFull(false); });
 """)
 rep("$('#projTitle').value = S.settings.title || ''; if ($('#glowWrap'))", "$('#projTitle').value = S.settings.title || ''; if ($('#orientBtn')) showOrient(); if ($('#glowWrap'))")
@@ -424,11 +432,12 @@ css2 = r'''
 .btn.pvb { min-height: 34px; padding: 3px 10px; font: 800 13px "Archivo", sans-serif; background: #2c2a26; color: #f1ece1; border: 1.5px solid #4a463f; border-radius: 10px; }
 .btn.pvb:hover { background: #3a3732; }
 body.pv-full { overflow: hidden; }
-#pvFull { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 500; background: #000; display: flex; align-items: center; justify-content: center; }
+#pvFull { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 500; background: #000; }
 #pvFull.rot { transform: translate(-50%, -50%) rotate(90deg); }
-#pvFull .preview { position: static; width: 100%; border-radius: 0; box-shadow: none; background: #000; }
+#pvFull .preview { position: relative !important; top: auto !important; left: auto; width: 100%; height: 100%; border-radius: 0; box-shadow: none; background: #000; display: flex; align-items: center; justify-content: center; }
 #pvFull #pv { display: block; }
-#pvFull .pv-bar { background: rgba(27,26,24,.92); }
+#pvFull .pv-bar { position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(to top, rgba(0,0,0,.85), rgba(0,0,0,.55) 70%, rgba(0,0,0,0)); padding-top: 18px; transition: opacity .3s; }
+#pvFull.hidebar .pv-bar { opacity: 0; pointer-events: none; }
 #pvFull .pv-shot { display: none; }
 '''
 rep('</style>\n</head>', css2 + '</style>\n</head>')
