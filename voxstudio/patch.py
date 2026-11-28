@@ -442,5 +442,17 @@ body.pv-full { overflow: hidden; }
 '''
 rep('</style>\n</head>', css2 + '</style>\n</head>')
 
+# ---------------------------------------------------------------- 12. transitions keep the pictures sharp (smoke / zoom-through / mist blurred and blew them up)
+rep("ctx.drawImage(B, 0, 0); ctx.save(); ctx.globalAlpha = 1 - e; ctx.filter = `blur(${(e * 26 * s).toFixed(1)}px)`; ctx.translate(W / 2, H / 2); ctx.scale(1 + 0.06 * e, 1 + 0.06 * e); ctx.drawImage(A, -W / 2, -H / 2); ctx.restore();",
+    "ctx.drawImage(B, 0, 0); ctx.save(); ctx.globalAlpha = 1 - e; const sb = Math.sin(p * Math.PI) * 3 * s; if (sb > 0.3) ctx.filter = `blur(${sb.toFixed(1)}px)`; ctx.drawImage(A, 0, 0); ctx.restore();   // a clean cross-fade under the smoke, no zoom, almost no blur")
+rep("a = 0.22 * Math.sin(p * Math.PI); const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R2); g.addColorStop(0, `rgba(210,190,170,${a})`);",
+    "a = 0.16 * Math.sin(p * Math.PI); const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R2); g.addColorStop(0, `rgba(210,190,170,${a})`);")
+rep("case 'zoomthrough': { ctx.save(); ctx.translate(W / 2, H / 2); ctx.scale(1 + 2.2 * e * e, 1 + 2.2 * e * e); ctx.globalAlpha = 1; ctx.drawImage(A, -W / 2, -H / 2); ctx.restore(); ctx.globalAlpha = clamp((p - 0.35) / 0.65, 0, 1);",
+    "case 'zoomthrough': { ctx.save(); ctx.translate(W / 2, H / 2); ctx.scale(1 + 0.35 * e * e, 1 + 0.35 * e * e); ctx.globalAlpha = 1; ctx.drawImage(A, -W / 2, -H / 2); ctx.restore(); ctx.globalAlpha = clamp((p - 0.2) / 0.6, 0, 1);")
+rep("mist:    { d: 1.2, kinds: 'cps', f: (p, pc) => { const e = easeInOut(p); return { blur: (1 - e) * 14,", "mist:    { d: 1.0, kinds: 'cps', f: (p, pc) => { const e = easeInOut(p); return { blur: (1 - e) * 4,")
+rep("const MYTH_EXITS = ['lightburst', 'smoke', 'mandala', 'lightburst', 'iris', 'smoke', 'zoomthrough', 'mandala'];",
+    "const MYTH_EXITS = ['lightburst', 'mandala', 'iris', 'smoke', 'fade', 'mandala', 'lightburst', 'iris'];")
+rep("Use lightburst at big divine moments, smoke for sad or mysterious moments", "Use lightburst at big divine moments, smoke only for 2–3 very sad or mysterious moments in the whole video, otherwise vary mandala, iris and fade")
+
 open(dst, 'w', encoding='utf-8').write(h)
 print('ok', len(h))
